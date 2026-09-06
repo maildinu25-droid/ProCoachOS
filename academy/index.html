@@ -73,6 +73,18 @@
   #topbar-spacer { flex: 1; }
   #theme-toggle-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--surface); border: 1px solid var(--surface-border); color: var(--text); cursor: pointer; flex-shrink: 0; transition: .15s; display: inline-flex; align-items: center; justify-content: center; }
   #theme-toggle-btn:hover { border-color: var(--surface-border-hover); }
+  #notif-bell-btn { width: 34px; height: 34px; border-radius: 50%; background: var(--surface); border: 1px solid var(--surface-border); color: var(--text); cursor: pointer; flex-shrink: 0; transition: .15s; display: inline-flex; align-items: center; justify-content: center; position: relative; font-size: 16px; }
+  #notif-bell-btn:hover { border-color: var(--surface-border-hover); }
+  #notif-bell-badge { position: absolute; top: -2px; right: -2px; background: #e5484d; color: #fff; font-size: 10px; font-weight: 700; min-width: 16px; height: 16px; border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0 3px; }
+  #notif-panel { position: fixed; top: 56px; right: 12px; width: min(360px, calc(100vw - 24px)); max-height: 70vh; overflow-y: auto; background: var(--surface); border: 1px solid var(--surface-border); border-radius: 12px; box-shadow: 0 12px 32px rgba(0,0,0,.35); z-index: 500; display: none; }
+  #notif-panel.open { display: block; }
+  #notif-panel .notif-header { display: flex; justify-content: space-between; align-items: center; padding: 12px 14px; border-bottom: 1px solid var(--surface-border); font-weight: 700; }
+  .notif-item { padding: 10px 14px; border-bottom: 1px solid var(--surface-border); cursor: pointer; }
+  .notif-item:hover { background: var(--navy-2); }
+  .notif-item.unread { background: rgba(16,185,129,.06); }
+  .notif-item .notif-title { font-weight: 600; font-size: 13.5px; }
+  .notif-item .notif-body { font-size: 12.5px; color: var(--text-dim); margin-top: 2px; }
+  .notif-item .notif-time { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
   #profile-badge { max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 13px; color: var(--text-dim); flex-shrink: 0; }
   #layout { display: grid; grid-template-columns: 235px 1fr; flex: 1; min-height: calc(100vh - 68px); }
   #sidebar { background: var(--navy-2); border-right: 1px solid var(--surface-border); padding: 20px 16px; display: flex; flex-direction: column; position: sticky; top: 68px; height: calc(100vh - 68px); overflow-y: auto; }
@@ -326,6 +338,11 @@
     <button id="back-btn" aria-label="Back" style="display:none;">←</button>
     <div class="brand" id="brand-home-btn" role="button" tabindex="0" style="cursor:pointer;">ProCoach OS<small>Academy</small></div>
     <div id="topbar-spacer"></div>
+    <button id="notif-bell-btn" aria-label="Notifications">🔔<span id="notif-bell-badge" style="display:none;">0</span></button>
+    <div id="notif-panel">
+      <div class="notif-header"><span>Notifications</span><button class="link-btn" id="notif-mark-all-btn" style="font-size:12px;">Mark all read</button></div>
+      <div id="notif-list"><div class="empty-state">Loading...</div></div>
+    </div>
     <button id="theme-toggle-btn" aria-label="Toggle theme">🌙</button>
     <div id="profile-badge"></div>
   </div>
@@ -1064,7 +1081,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-04-16:33';
+const APP_BUILD_VERSION = '2026-09-05-16:38';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -1385,6 +1402,7 @@ function roleAtLeast(min) { const order = ['assistant_coach','head_coach','admin
 
 async function applyOrgContext(isInitialBoot) {
   await loadCurrentPlan();
+  loadNotifications();
   document.getElementById('org-role-badge').textContent = (currentRole() || '').replace('_', ' ');
   document.getElementById('profile-badge').textContent = session?.user?.email || '';
   document.querySelectorAll('#main-nav button[data-role-gate]').forEach(btn => { btn.style.display = roleAtLeast(btn.dataset.roleGate) ? '' : 'none'; });
@@ -1474,6 +1492,84 @@ document.getElementById('theme-toggle-btn').addEventListener('click', () => {
   updateThemeToggleIcon();
 });
 updateThemeToggleIcon();
+
+// ---------- Notifications ----------
+// Creates a notification for someone else (a parent, a coach, etc). Deliberately
+// a plain insert with no .select() chained after it — RLS's SELECT policy only
+// allows a user to read their own notifications, and INSERT...RETURNING requires
+// that same SELECT check to pass for the new row. Since the recipient here is
+// never the person doing the inserting, chaining .select() would make every
+// single call fail. Confirmed this directly against the database before writing
+// this comment, not assumed from how RLS is supposed to work.
+// Errors are logged, never thrown — a failed notification should never block
+// the real action (saving an assessment, posting an announcement) it's attached to.
+async function notifyUser(userId, title, body, linkPanel, linkEntityId) {
+  if (!userId) return;
+  const { error } = await supabase.from('notifications').insert({
+    org_id: currentOrgId, user_id: userId, title, body: body || null,
+    link_panel: linkPanel || null, link_entity_id: linkEntityId || null,
+  });
+  if (error) console.error('notifyUser:', error);
+}
+let notifCache = [];
+async function loadNotifications() {
+  if (!session?.user?.id || !currentOrgId) return;
+  const { data, error } = await supabase.from('notifications').select('*')
+    .eq('org_id', currentOrgId).eq('user_id', session.user.id).order('created_at', { ascending: false }).limit(30);
+  if (error) { console.error('loadNotifications:', error); return; }
+  notifCache = data || [];
+  const unreadCount = notifCache.filter(n => !n.read_at).length;
+  const badge = document.getElementById('notif-bell-badge');
+  badge.style.display = unreadCount ? 'flex' : 'none';
+  badge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
+  renderNotifPanel();
+}
+function renderNotifPanel() {
+  const listEl = document.getElementById('notif-list');
+  if (!notifCache.length) { listEl.innerHTML = '<div class="empty-state" style="padding:16px;">No notifications yet.</div>'; return; }
+  listEl.innerHTML = notifCache.map(n => `<div class="notif-item ${n.read_at ? '' : 'unread'}" data-notif-id="${esc(n.id)}">
+    <div class="notif-title">${esc(n.title)}</div>
+    ${n.body ? `<div class="notif-body">${esc(n.body)}</div>` : ''}
+    <div class="notif-time">${new Date(n.created_at).toLocaleString()}</div>
+  </div>`).join('');
+  listEl.querySelectorAll('[data-notif-id]').forEach(el => {
+    el.addEventListener('click', async () => {
+      const notif = notifCache.find(n => n.id === el.dataset.notifId);
+      if (!notif) return;
+      if (!notif.read_at) {
+        await supabase.from('notifications').update({ read_at: new Date().toISOString() }).eq('id', notif.id);
+        notif.read_at = new Date().toISOString();
+        const unreadCount = notifCache.filter(n => !n.read_at).length;
+        const badge = document.getElementById('notif-bell-badge');
+        badge.style.display = unreadCount ? 'flex' : 'none';
+        badge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
+        el.classList.remove('unread');
+      }
+      document.getElementById('notif-panel').classList.remove('open');
+      if (notif.link_panel === 'panel-player-profile' && notif.link_entity_id) openPlayerProfile(notif.link_entity_id);
+      else if (notif.link_panel) showOnlyPanel(notif.link_panel);
+    });
+  });
+}
+document.getElementById('notif-bell-btn').addEventListener('click', (e) => {
+  e.stopPropagation();
+  const panel = document.getElementById('notif-panel');
+  const isOpening = !panel.classList.contains('open');
+  panel.classList.toggle('open');
+  if (isOpening) loadNotifications();
+});
+document.addEventListener('click', (e) => {
+  const panel = document.getElementById('notif-panel');
+  if (panel.classList.contains('open') && !panel.contains(e.target) && e.target.id !== 'notif-bell-btn') panel.classList.remove('open');
+});
+document.getElementById('notif-mark-all-btn').addEventListener('click', async () => {
+  const unreadIds = notifCache.filter(n => !n.read_at).map(n => n.id);
+  if (!unreadIds.length) return;
+  await supabase.from('notifications').update({ read_at: new Date().toISOString() }).in('id', unreadIds);
+  notifCache.forEach(n => { if (!n.read_at) n.read_at = new Date().toISOString(); });
+  document.getElementById('notif-bell-badge').style.display = 'none';
+  renderNotifPanel();
+});
 
 let navHistory = [];
 function showOnlyPanel(id, opts) {
@@ -1930,13 +2026,14 @@ async function loadDashboard() {
 
   // ---------- Announcements ----------
   const announceListEl = document.getElementById('dashboard-announcements-list');
+  if (!cache.teams.length) { const { data: teamData } = await supabase.from('teams').select('*').eq('org_id', currentOrgId).order('name'); cache.teams = teamData || []; }
   const { data: announcements, error: announceErr } = await supabase.from('announcements')
-    .select('id, title, body, created_by, created_at').eq('org_id', currentOrgId).order('created_at', { ascending: false }).limit(5);
+    .select('id, title, body, team_id, created_by, created_at').eq('org_id', currentOrgId).order('created_at', { ascending: false }).limit(5);
   if (announceErr) { reportError(announceErr, `Dashboard announcements (org=${currentOrgId})`); announceListEl.innerHTML = '<div class="empty-state">Could not load.</div>'; }
   else if (!announcements || !announcements.length) { announceListEl.innerHTML = '<div class="empty-state">No announcements yet.</div>'; }
   else {
     const nameByAuthor = await profilesByIds(announcements.map(a => a.created_by));
-    announceListEl.innerHTML = announcements.map(a => `<div class="taskItem"><div class="taskDot done">${icon('bell', 9)}</div><div class="taskText"><b>${esc(a.title)}</b><span>${esc(a.body || '')} ${a.body ? '· ' : ''}${esc(nameByAuthor[a.created_by] || 'Unknown')} · ${new Date(a.created_at).toLocaleDateString()}</span></div></div>`).join('');
+    announceListEl.innerHTML = announcements.map(a => `<div class="taskItem"><div class="taskDot done">${icon('bell', 9)}</div><div class="taskText"><b>${esc(a.title)}</b>${a.team_id ? ` <span class="role-tag">${esc(nameById(cache.teams, a.team_id))}</span>` : ''}<span>${esc(a.body || '')} ${a.body ? '· ' : ''}${esc(nameByAuthor[a.created_by] || 'Unknown')} · ${new Date(a.created_at).toLocaleDateString()}</span></div></div>`).join('');
   }
 
   // ---------- Recent activity (real attribution, from activity_log) — fills the wide tile above ----------
@@ -2180,15 +2277,16 @@ async function loadCoachDashboard() {
 
   bentoEl.innerHTML = html;
 
-  // ---------- Announcements (org-wide — relevant to everyone regardless of team) ----------
+  // ---------- Announcements ----------
   const announceListEl = document.getElementById('dashboard-announcements-list');
+  if (!cache.teams.length) { const { data: teamData } = await supabase.from('teams').select('*').eq('org_id', currentOrgId).order('name'); cache.teams = teamData || []; }
   const { data: announcements, error: announceErr } = await supabase.from('announcements')
-    .select('id, title, body, created_by, created_at').eq('org_id', currentOrgId).order('created_at', { ascending: false }).limit(5);
+    .select('id, title, body, team_id, created_by, created_at').eq('org_id', currentOrgId).order('created_at', { ascending: false }).limit(5);
   if (announceErr) { reportError(announceErr, 'Coach dashboard announcements'); announceListEl.innerHTML = '<div class="empty-state">Could not load.</div>'; }
   else if (!announcements || !announcements.length) { announceListEl.innerHTML = '<div class="empty-state">No announcements yet.</div>'; }
   else {
     const nameByAuthor = await profilesByIds(announcements.map(a => a.created_by));
-    announceListEl.innerHTML = announcements.map(a => `<div class="taskItem"><div class="taskDot done">${icon('bell', 9)}</div><div class="taskText"><b>${esc(a.title)}</b><span>${esc(a.body || '')} ${a.body ? '· ' : ''}${esc(nameByAuthor[a.created_by] || 'Unknown')} · ${new Date(a.created_at).toLocaleDateString()}</span></div></div>`).join('');
+    announceListEl.innerHTML = announcements.map(a => `<div class="taskItem"><div class="taskDot done">${icon('bell', 9)}</div><div class="taskText"><b>${esc(a.title)}</b>${a.team_id ? ` <span class="role-tag">${esc(nameById(cache.teams, a.team_id))}</span>` : ''}<span>${esc(a.body || '')} ${a.body ? '· ' : ''}${esc(nameByAuthor[a.created_by] || 'Unknown')} · ${new Date(a.created_at).toLocaleDateString()}</span></div></div>`).join('');
   }
 
   // ---------- My Recent Activity (my own actions only, not org-wide) ----------
@@ -2305,24 +2403,65 @@ const DASHBOARD_ACTIONS = {
 function announcementFormHtml() {
   return sheetHead('Post Announcement') + `
     <div class="formgrid">
+      <label class="full">Audience<select id="sheet-announce-team"><option value="">Whole academy</option>${cache.teams.map(t => `<option value="${t.id}">${esc(t.name)} only</option>`).join('')}</select></label>
       <label class="full">Title<input id="sheet-announce-title" placeholder="e.g. U14 training moved to 6 PM"></label>
       <label class="full">Details <span class="muted" style="font-weight:400;">(optional)</span><textarea id="sheet-announce-body"></textarea></label>
     </div>
     <button class="btn primary" id="sheet-save-announce-btn" style="margin-top:14px; width:auto;">Post</button>`;
 }
-function openAnnouncementForm() {
+async function openAnnouncementForm() {
+  if (!cache.teams.length) { const { data } = await supabase.from('teams').select('*').eq('org_id', currentOrgId).order('name'); cache.teams = data || []; }
   openSheet(announcementFormHtml());
   document.getElementById('sheet-save-announce-btn').addEventListener('click', async () => {
     const title = document.getElementById('sheet-announce-title').value.trim();
     if (!title) { showToast('Title is required.', 'error'); return; }
+    const teamId = document.getElementById('sheet-announce-team').value || null;
+    const body = document.getElementById('sheet-announce-body').value.trim() || null;
     const { error } = await supabase.from('announcements').insert({
-      org_id: currentOrgId, created_by: session.user.id, title,
-      body: document.getElementById('sheet-announce-body').value.trim() || null,
+      org_id: currentOrgId, created_by: session.user.id, title, team_id, body,
     });
     if (error) { showToast(error.message, 'error'); return; }
     closeSheet();
     loadDashboard();
+    notifyAnnouncementRecipients(title, body, teamId);
   });
+}
+// Fans a new announcement out to every parent/player it's actually relevant to.
+// Fire-and-forget from the caller's perspective — a notification failing here
+// should never undo or block the announcement itself, which has already saved
+// successfully by this point.
+async function notifyAnnouncementRecipients(title, body, teamId) {
+  let playersQuery = supabase.from('players').select('id, linked_user_id').eq('org_id', currentOrgId);
+  if (teamId) playersQuery = playersQuery.eq('team_id', teamId);
+  const { data: players, error: playersErr } = await playersQuery;
+  if (playersErr || !players?.length) return;
+  const playerIds = players.map(p => p.id);
+  const { data: guardians } = await supabase.from('player_guardians').select('user_id').in('player_id', playerIds);
+  const recipientIds = new Set([
+    ...players.map(p => p.linked_user_id).filter(Boolean),
+    ...(guardians || []).map(g => g.user_id),
+  ]);
+  for (const userId of recipientIds) {
+    notifyUser(userId, title, body, 'panel-my-dashboard');
+  }
+}
+// Shared by assessments and development plans — both notify exactly the same
+// audience for a given player: that player's own linked account (if any) plus
+// every guardian linked via player_guardians. Recipients here are always portal
+// users (player/parent), so they're routed to their own dashboard, not the
+// coach-side Player 360 view — that panel isn't even in their nav.
+async function notifyPlayerCircle(playerId, title, body) {
+  const [{ data: player }, { data: guardians }] = await Promise.all([
+    supabase.from('players').select('linked_user_id').eq('id', playerId).maybeSingle(),
+    supabase.from('player_guardians').select('user_id').eq('player_id', playerId),
+  ]);
+  const recipientIds = new Set([
+    ...(player?.linked_user_id ? [player.linked_user_id] : []),
+    ...(guardians || []).map(g => g.user_id),
+  ]);
+  for (const userId of recipientIds) {
+    notifyUser(userId, title, body, 'panel-my-dashboard');
+  }
 }
 ['dashboard-header', 'dashboard-bento'].forEach(id => {
   document.getElementById(id).addEventListener('click', (e) => {
@@ -4228,12 +4367,14 @@ function openAssessmentForm(a) {
       comments: document.getElementById('sheet-assessment-comments').value.trim() || null,
       media_links: document.getElementById('sheet-assessment-links').value.split('\n').map(s => s.trim()).filter(Boolean),
     };
+    const isNew = !editing.assessments;
     const { error } = editing.assessments
       ? await supabase.from('assessments').update(row).eq('id', editing.assessments)
       : await supabase.from('assessments').insert(row);
     if (error) { showToast(error.message, 'error'); return; }
     closeSheet();
     loadAssessments();
+    if (isNew) notifyPlayerCircle(playerId, 'New assessment logged', row.priority ? `Focus area: ${row.priority}` : null);
   });
 }
 document.getElementById('add-assessment-btn').addEventListener('click', () => openAssessmentForm(null));
@@ -4977,13 +5118,14 @@ async function renderMyDashboardFor(player) {
   contentEl.innerHTML = '<div class="empty-state">Loading...</div>';
   const today = new Date().toISOString().slice(0, 10);
   const sevenOut = new Date(Date.now() + 7 * 86400000).toISOString().slice(0, 10);
-  const [sessionsRes, matchesRes, assessRes, devRes, pastSessionsRes, pastMatchesRes] = await Promise.all([
+  const [sessionsRes, matchesRes, assessRes, devRes, pastSessionsRes, pastMatchesRes, announceRes] = await Promise.all([
     supabase.from('sessions').select('date, title, session_type').eq('team_id', player.team_id).gte('date', today).lte('date', sevenOut).order('date'),
     supabase.from('matches').select('date, opponent').eq('team_id', player.team_id).gte('date', today).lte('date', sevenOut).order('date'),
     supabase.from('assessments').select('date, ratings').eq('player_id', player.id).order('date', { ascending: false }).limit(1),
     supabase.from('development_plans').select('goal, deadline, status').eq('player_id', player.id).eq('status', 'active'),
     supabase.from('sessions').select('date, title, session_type, attendance').eq('team_id', player.team_id).lt('date', today).order('date', { ascending: false }).limit(15),
     supabase.from('matches').select('date, opponent, result, playing_xi, batting_review, bowling_review, batting_ratings, bowling_ratings').eq('team_id', player.team_id).lt('date', today).order('date', { ascending: false }).limit(10),
+    supabase.from('announcements').select('title, body, created_at').eq('org_id', currentOrgId).or(`team_id.is.null,team_id.eq.${player.team_id}`).order('created_at', { ascending: false }).limit(5),
   ]);
   const upcoming = [
     ...(sessionsRes.data || []).map(s => ({ date: s.date, label: `${s.title || SESSION_TYPE_LABELS[s.session_type] || 'Session'}` })),
@@ -4999,6 +5141,11 @@ async function renderMyDashboardFor(player) {
   const pastMatchesPlayed = (pastMatchesRes.data || []).filter(m => (m.playing_xi || []).includes(player.id));
 
   let html = `<div class="entityCard"><b>${esc(player.name)}</b><div class="muted">${esc(player.teams?.name || '—')}${player.teams?.branches?.name ? ' · ' + esc(player.teams.branches.name) : ''}${player.role ? ' · ' + esc(player.role) : ''}</div></div>`;
+  const announcements = announceRes.data || [];
+  if (announcements.length) {
+    html += '<div class="sectionHeading">Announcements</div>';
+    html += announcements.map(a => `<div class="list-item"><span><b>${esc(a.title)}</b>${a.body ? ' — ' + esc(a.body) : ''}</span><span class="role-tag">${new Date(a.created_at).toLocaleDateString()}</span></div>`).join('');
+  }
   html += '<div class="sectionHeading">Next 7 days</div>';
   html += upcoming.length ? upcoming.map(u => `<div class="list-item"><span>${esc(u.label)}</span><span class="role-tag">${esc(u.date)}</span></div>`).join('') : '<div class="empty-state">Nothing scheduled.</div>';
   html += '<div class="sectionHeading">Latest assessment</div>';
@@ -6053,12 +6200,14 @@ document.getElementById('save-dev-plan-btn').addEventListener('click', async () 
     deadline: document.getElementById('dev-plan-deadline').value || null,
     drill_ids: drillIds, created_by: session.user.id,
   };
+  const isNew = !editing.devPlans;
   const { error } = editing.devPlans
     ? await supabase.from('development_plans').update(row).eq('id', editing.devPlans)
     : await supabase.from('development_plans').insert(row);
   if (error) { showToast(error.message, 'error'); return; }
   document.getElementById('cancel-dev-plan-btn').click();
   loadDevelopmentPanel();
+  if (isNew) notifyPlayerCircle(playerId, 'New development goal set', goal);
 });
 
 async function loadDevProgress() {
