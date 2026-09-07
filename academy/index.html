@@ -1081,7 +1081,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-05-16:38';
+const APP_BUILD_VERSION = '2026-09-07-06:10';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -1851,6 +1851,7 @@ document.getElementById('customize-pulse-btn').addEventListener('click', async (
 });
 
 async function loadDashboard() {
+  if (!currentOrgId) return; // no org context — nothing here is meaningful to load, and every query below would otherwise fail on a null org_id
   if (currentRole() === 'assistant_coach') { await loadCoachDashboard(); return; }
   document.getElementById('dashboard-trend-title').textContent = 'Activity Trend (8 weeks)';
   document.getElementById('dashboard-workload-title').textContent = 'Coach Workload (30 days)';
