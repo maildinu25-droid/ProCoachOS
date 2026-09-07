@@ -1071,6 +1071,13 @@ function showPremiumLockedMessage(){
       });
     } else if (pd && pd.stage==="mark-pitch"){
       var svg2 = document.getElementById("pitch-svg2");
+      // Specifically override the general touch-action:manipulation this
+      // element normally has — that still lets the browser treat a
+      // single-finger drag as an attempt to scroll the (tall) page,
+      // which can steal the gesture before pointermove ever fires
+      // reliably. Marking is the one moment a drag genuinely means
+      // "refine this position," not "scroll," so it's fully claimed here.
+      svg2.style.touchAction = "none";
       var magnifier = document.getElementById("pitch-magnifier");
       var MAG_SIZE = 128, MAG_SCALE = 2.6;
       var magClone = null;
