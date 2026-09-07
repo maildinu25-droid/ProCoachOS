@@ -108,6 +108,8 @@
   .pm-detail-dropdown{position:absolute;top:calc(100% + 4px);left:0;background:var(--card);border:1.5px solid var(--accent);border-radius:10px;padding:5px;box-shadow:0 10px 24px rgba(0,0,0,.5);z-index:25;display:flex;flex-direction:column;gap:3px;min-width:140px;}
   .pm-detail-dropdown button{font-family:'Inter',sans-serif;font-size:11.5px;font-weight:600;text-align:left;padding:7px 10px;border-radius:6px;border:1px solid transparent;background:transparent;color:var(--text-dim);cursor:pointer;white-space:nowrap;}
   .pm-detail-dropdown button.active{background:var(--accent);color:#04140d;border-color:var(--accent);}
+  .pm-magnifier{position:fixed;width:128px;height:128px;border-radius:50%;overflow:hidden;border:3px solid var(--accent);box-shadow:0 10px 28px rgba(0,0,0,.65);z-index:60;pointer-events:none;background:#0a1420;display:none;}
+  .pm-magnifier-crosshair{position:absolute;top:50%;left:50%;width:16px;height:16px;margin:-8px 0 0 -8px;border-radius:50%;border:2.5px solid #fff;box-shadow:0 0 0 1.5px rgba(0,0,0,.6),0 0 8px rgba(0,0,0,.5);pointer-events:none;box-sizing:border-box;}
   .pm-outcome-btn{font-family:'IBM Plex Mono',monospace;font-size:11px;font-weight:700;border:none;border-radius:6px;padding:9px 4px;cursor:pointer;color:#04140d;min-height:36px;touch-action:manipulation;}
 
   .pm-empty-hint{position:absolute;bottom:10px;left:0;right:0;text-align:center;color:rgba(244,241,232,0.85);font-size:12px;font-style:italic;pointer-events:none;padding:0 12px;}
@@ -833,6 +835,7 @@ function showPremiumLockedMessage(){
       html += '<div class="pm-pitch-wrap" id="combo-wrap">';
       if (pd && pd.stage==="mark-pitch"){
         html += pitchSvgMarkup(bowler, "dots", bowler.balls.filter(passesFilter), null, "pitch-svg2", false);
+        html += '<div class="pm-magnifier" id="pitch-magnifier"><div class="pm-magnifier-crosshair"></div></div>';
         html += '<div class="pm-corner-btn" style="display:flex;flex-direction:column;gap:6px;align-items:flex-end;">';
         html += '<button class="pm-btn small secondary" data-action="cancel-delivery">Cancel</button>';
         if (bowler.balls.length>0 && !pd.deliveryType) html += '<button class="pm-btn small secondary" data-action="repeat-last-ball">&#8635; Same as last</button>';
@@ -1068,16 +1071,86 @@ function showPremiumLockedMessage(){
       });
     } else if (pd && pd.stage==="mark-pitch"){
       var svg2 = document.getElementById("pitch-svg2");
-      svg2.addEventListener("click", function(e){
-        var svgRect = svg2.getBoundingClientRect();
-        var svgUnitX = ((e.clientX-svgRect.left)/svgRect.width)*VB_W_TOTAL - RULER_W;
-        if (svgUnitX < 0) return;
+      var magnifier = document.getElementById("pitch-magnifier");
+      var MAG_SIZE = 128, MAG_SCALE = 2.6;
+      var magClone = null;
+      var dragging = false;
+
+      function computePitchPct(clientX, clientY, svgRect){
+        var svgUnitX = ((clientX-svgRect.left)/svgRect.width)*VB_W_TOTAL - RULER_W;
+        if (svgUnitX < 0) return null;
         var xPct = clamp((svgUnitX/VB_W)*100, 0, 100);
-        var yPct = clamp(((e.clientY-svgRect.top)/svgRect.height)*100, 0, 100);
-        state.pendingDelivery.xPct = xPct; state.pendingDelivery.yPct = yPct;
+        var yPct = clamp(((clientY-svgRect.top)/svgRect.height)*100, 0, 100);
+        return { xPct:xPct, yPct:yPct };
+      }
+
+      function updateMagnifier(clientX, clientY, svgRect){
+        // Position the magnifier near the finger, offset so the finger
+        // itself never covers it — above by default, below instead if
+        // that would push it off the top of the screen.
+        var magTop = clientY - MAG_SIZE - 28;
+        if (magTop < 4) magTop = clientY + 28;
+        var magLeft = clamp(clientX - MAG_SIZE/2, 4, window.innerWidth - MAG_SIZE - 4);
+        magnifier.style.left = magLeft+"px";
+        magnifier.style.top = magTop+"px";
+        magnifier.style.display = "block";
+
+        // Clone the real, currently-on-screen SVG once per gesture, so
+        // the magnified view shows exactly what's really there (existing
+        // dots, colors, filters) instead of a separate hand-maintained
+        // mini-render that could drift out of sync with it.
+        if (!magClone){
+          magClone = svg2.cloneNode(true);
+          magClone.removeAttribute("id");
+          magClone.style.position = "absolute";
+          magClone.style.transformOrigin = "0 0";
+          magClone.style.width = svgRect.width+"px";
+          magClone.style.height = svgRect.height+"px";
+          magClone.style.pointerEvents = "none";
+          magnifier.insertBefore(magClone, magnifier.firstChild);
+        }
+        var relX = clientX-svgRect.left, relY = clientY-svgRect.top;
+        magClone.style.transform = "scale("+MAG_SCALE+")";
+        magClone.style.left = (MAG_SIZE/2 - relX*MAG_SCALE)+"px";
+        magClone.style.top = (MAG_SIZE/2 - relY*MAG_SCALE)+"px";
+      }
+
+      function hideMagnifier(){
+        magnifier.style.display = "none";
+        if (magClone && magClone.parentNode) magClone.parentNode.removeChild(magClone);
+        magClone = null;
+      }
+
+      svg2.addEventListener("pointerdown", function(e){
+        var svgRect = svg2.getBoundingClientRect();
+        var pt = computePitchPct(e.clientX, e.clientY, svgRect);
+        if (!pt) return;
+        dragging = true;
+        try { svg2.setPointerCapture(e.pointerId); } catch(err){}
+        state.pendingDelivery.xPct = pt.xPct; state.pendingDelivery.yPct = pt.yPct;
+        updateMagnifier(e.clientX, e.clientY, svgRect);
+        e.preventDefault();
+      });
+
+      svg2.addEventListener("pointermove", function(e){
+        if (!dragging) return;
+        var svgRect = svg2.getBoundingClientRect();
+        var pt = computePitchPct(e.clientX, e.clientY, svgRect);
+        if (!pt) return;
+        state.pendingDelivery.xPct = pt.xPct; state.pendingDelivery.yPct = pt.yPct;
+        updateMagnifier(e.clientX, e.clientY, svgRect);
+        e.preventDefault();
+      });
+
+      function finishDrag(){
+        if (!dragging) return;
+        dragging = false;
+        hideMagnifier();
         state.pendingDelivery.stage = "awaiting-shot";
         render();
-      });
+      }
+      svg2.addEventListener("pointerup", finishDrag);
+      svg2.addEventListener("pointercancel", function(){ dragging = false; hideMagnifier(); });
     } else if (pd && pd.stage==="awaiting-shot"){
       var gsvg = document.getElementById("ground-svg");
       gsvg.addEventListener("click", function(e){
