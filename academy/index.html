@@ -1081,7 +1081,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-07-06:10';
+const APP_BUILD_VERSION = '2026-09-07-06:56';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -1154,6 +1154,7 @@ try {
 let session = null;
 let memberships = [];
 let currentOrgId = null;
+let currentOrgSuspension = null;
 let currentProfilePlayerName = '';
 
 // ============================================================
@@ -1373,6 +1374,8 @@ function currentRole() { const m = memberships.find(m => m.org_id === currentOrg
 let currentSubscription = null; // raw subscriptions row — status, trial_end, billing dates
 let currentPlan = null;         // the EFFECTIVE plan's full row (features/limits), already resolving trial→Pro
 async function loadCurrentPlan() {
+  const { data: org, error: orgErr } = await supabase.from('organizations').select('suspended_at, suspended_reason').eq('id', currentOrgId).single();
+  currentOrgSuspension = orgErr ? null : org;
   const { data: sub, error: subErr } = await supabase.from('subscriptions').select('*').eq('org_id', currentOrgId).single();
   if (subErr) { reportError(subErr, 'Loading subscription'); currentSubscription = null; currentPlan = null; return; }
   currentSubscription = sub;
@@ -6838,7 +6841,9 @@ async function loadSubscription() {
 
   // ---------- Trial / expired banner ----------
   const bannerEl = document.getElementById('subscription-trial-banner');
-  if (sub?.status === 'trialing') {
+  if (currentOrgSuspension?.suspended_at) {
+    bannerEl.innerHTML = `<div class="alertCard red" style="margin-bottom:14px;"><span class="pulseDot red"></span><div><b>Your academy's account has been suspended.</b><span>${esc(currentOrgSuspension.suspended_reason || 'Contact support for details.')} Your data is safe and stays fully readable — only new changes are affected.</span></div></div>`;
+  } else if (sub?.status === 'trialing') {
     bannerEl.innerHTML = `<div class="note" style="margin-bottom:14px;">${daysLeft} day${daysLeft === 1 ? '' : 's'} left in your free trial — full Pro features are unlocked. Trial ends ${esc(new Date(sub.trial_end).toLocaleDateString())}.</div>`;
   } else if (sub?.status === 'expired' || sub?.status === 'cancelled') {
     bannerEl.innerHTML = `<div class="alertCard red" style="margin-bottom:14px;"><span class="pulseDot red"></span><div><b>Your 14-day ProCoachOS Academy trial has ended.</b><span>Choose a plan to continue managing your academy. Your data is safe and stays fully readable — only new changes are affected.</span></div></div>`;
@@ -7066,7 +7071,7 @@ async function loadPlatformAdmin() {
   await loadEnterpriseLeadsSection();
   const listEl = document.getElementById('platform-admin-list');
   listEl.innerHTML = '<div class="empty-state">Loading...</div>';
-  const { data: orgs, error } = await supabase.from('organizations').select('id, name, created_at, subscriptions(*)').order('created_at', { ascending: false });
+  const { data: orgs, error } = await supabase.from('organizations').select('id, name, created_at, suspended_at, suspended_reason, subscriptions(*)').order('created_at', { ascending: false });
   if (error) { reportError(error, 'Platform Admin'); listEl.innerHTML = '<div class="empty-state">Could not load — you may not have platform admin access.</div>'; return; }
   if (!orgs || !orgs.length) { listEl.innerHTML = '<div class="empty-state">No organizations yet.</div>'; return; }
 
@@ -7097,6 +7102,7 @@ async function loadPlatformAdmin() {
         <div><b>${esc(o.name)}</b><div class="muted">Created ${esc(new Date(o.created_at).toLocaleDateString())}</div></div>
         <span class="tagPill" style="${sub?.status === 'past_due' || sub?.status === 'expired' ? 'background:var(--danger-tint); color:var(--danger);' : ''}">${esc(statusLabels[sub?.status] || sub?.status || 'No subscription')}</span>
       </div>
+      ${o.suspended_at ? `<div class="alertCard red" style="margin-top:8px;"><span class="pulseDot red"></span><div><b>Suspended</b><span>${esc(o.suspended_reason || 'No reason given')} — since ${esc(new Date(o.suspended_at).toLocaleDateString())}</span></div></div>` : ''}
       <div class="muted" style="margin-top:8px;">Plan: ${esc(sub?.plan_id || '—')}${trialInfo ? ' · ' + esc(trialInfo) : ''}${period ? ' · ' + esc(period) : ''}</div>
       <div class="muted">Customer ID: ${esc(sub?.provider_customer_id || '—')} · Subscription ID: ${esc(sub?.provider_subscription_id || '—')}</div>
       <div class="muted">Usage: ${usage.players} players · ${usage.teams} teams · ${usage.coaches} coaches</div>
@@ -7104,6 +7110,7 @@ async function loadPlatformAdmin() {
       ${sub?.custom_notes ? `<div class="muted">Notes: ${esc(sub.custom_notes)}</div>` : ''}
       <button type="button" class="btn ghost" data-grant-enterprise="${o.id}" style="margin-top:8px; width:auto;">${sub?.plan_id === 'enterprise' ? 'Edit Enterprise Terms' : 'Grant Enterprise Access'}</button>
       <button type="button" class="btn ghost" data-test-mode-org="${o.id}" style="margin-top:8px; width:auto;">Test Mode</button>
+      <button type="button" class="btn ${o.suspended_at ? '' : 'danger'}" data-suspend-org="${o.id}" style="margin-top:8px; width:auto;">${o.suspended_at ? 'Unsuspend' : 'Suspend'}</button>
     </div>`;
   }).join('');
 
@@ -7118,6 +7125,24 @@ async function loadPlatformAdmin() {
     btn.onclick = () => {
       const org = orgs.find(o => o.id === btn.dataset.testModeOrg);
       openTestModeForm(org);
+    };
+  });
+  document.querySelectorAll('[data-suspend-org]').forEach(btn => {
+    btn.onclick = async () => {
+      const org = orgs.find(o => o.id === btn.dataset.suspendOrg);
+      if (org.suspended_at) {
+        if (!confirm(`Unsuspend ${org.name}? They'll immediately regain the ability to create and edit data.`)) return;
+        const { error } = await supabase.rpc('unsuspend_organization', { p_org_id: org.id });
+        if (error) { showToast(error.message, 'error'); return; }
+        showToast('Unsuspended.', 'ok');
+      } else {
+        const reason = prompt(`Suspend ${org.name}?\n\nThis blocks them from creating or editing anything — independent of their subscription status — until you unsuspend them. Their existing data stays fully readable.\n\nOptional reason (for your own record):`);
+        if (reason === null) return; // cancelled
+        const { error } = await supabase.rpc('suspend_organization', { p_org_id: org.id, p_reason: reason.trim() || null });
+        if (error) { showToast(error.message, 'error'); return; }
+        showToast('Suspended.', 'ok');
+      }
+      loadPlatformAdmin();
     };
   });
 }
