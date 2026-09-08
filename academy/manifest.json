@@ -1,0 +1,10 @@
+{
+  "name": "ProCoach OS Academy",
+  "short_name": "ProCoach OS",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#08121e",
+  "theme_color": "#08121e",
+  "icons": []
+}
