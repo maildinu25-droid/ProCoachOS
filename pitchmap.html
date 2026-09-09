@@ -1062,7 +1062,8 @@ function showPremiumLockedMessage(){
         var xPct = clamp((svgUnitX/VB_W)*100, 0, 100);
         var yPct = clamp(((e.clientY-svgRect.top)/svgRect.height)*100, 0, 100);
         var bt0 = cb();
-        cb().balls.push({ id:uid(), xPct:xPct, yPct:yPct, wagonX:null, wagonY:null, outcome:"_none", dismissal:null, bowlArm:bt0.bowlArm, bowlPace:bt0.bowlPace, bowlSpin:bt0.bowlSpin, bowlSide:bt0.bowlSide, t:Date.now() });
+        var quickTapDrillHit = evaluateDrillHit({xPct:xPct, yPct:yPct});
+        cb().balls.push({ id:uid(), xPct:xPct, yPct:yPct, wagonX:null, wagonY:null, outcome:"_none", dismissal:null, drillHit:quickTapDrillHit, drillName:(quickTapDrillHit!==null&&state.activeDrill)?state.activeDrill.name:null, bowlArm:bt0.bowlArm, bowlPace:bt0.bowlPace, bowlSpin:bt0.bowlSpin, bowlSide:bt0.bowlSide, t:Date.now() });
         autoSaveSession();
         render();
       });
