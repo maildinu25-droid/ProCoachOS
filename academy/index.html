@@ -1101,7 +1101,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-08-14:11';
+const APP_BUILD_VERSION = '2026-09-09-00:18';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -1534,6 +1534,16 @@ async function notifyUser(userId, title, body, linkPanel, linkEntityId) {
     link_panel: linkPanel || null, link_entity_id: linkEntityId || null,
   });
   if (error) console.error('notifyUser:', error);
+  // Push is best-effort on top of the in-app notification above, which is
+  // the one that must never fail silently — if the user has no push
+  // subscription, or push itself errors, the in-app notification still stands.
+  try {
+    await supabase.functions.invoke('send-push-notification', {
+      body: { user_id: userId, title, body: body || '', url: './' },
+    });
+  } catch (e) {
+    console.error('notifyUser (push):', e);
+  }
 }
 let notifCache = [];
 async function loadNotifications() {
