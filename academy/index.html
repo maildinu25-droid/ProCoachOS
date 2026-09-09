@@ -1101,7 +1101,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-09-00:18';
+const APP_BUILD_VERSION = '2026-09-09-00:27';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -1655,8 +1655,13 @@ function renderPushEnableSection(state) {
     document.getElementById('enable-push-btn').addEventListener('click', subscribeToPush);
   } else if (state === 'subscribed') {
     el.style.display = 'block';
-    el.innerHTML = `<div class="muted" style="font-size:12px; display:flex; justify-content:space-between; align-items:center;">Push notifications on<button class="link-btn" id="disable-push-btn" style="font-size:12px;">Turn off</button></div>`;
+    el.innerHTML = `<div class="muted" style="font-size:12px; display:flex; justify-content:space-between; align-items:center;">Push notifications on<span><button class="link-btn" id="test-push-btn" style="font-size:12px;">Send test</button> <button class="link-btn" id="disable-push-btn" style="font-size:12px;">Turn off</button></span></div>`;
     document.getElementById('disable-push-btn').addEventListener('click', unsubscribeFromPush);
+    document.getElementById('test-push-btn').addEventListener('click', async () => {
+      showToast('Sending test push...', 'ok');
+      await notifyUser(session.user.id, 'Test push notification', 'If you see this as a real notification, push is genuinely working.');
+      showToast('Sent — check for a real notification.', 'ok');
+    });
   } else {
     el.style.display = 'none';
   }
