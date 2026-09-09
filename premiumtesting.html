@@ -641,7 +641,15 @@ function initApp(){
   db.seasons.forEach(s=>{if(!s.id)s.id=uid("season");if(!Array.isArray(s.phases))s.phases=[]});
   [...new Set(db.players.map(p=>p.team).filter(Boolean))].forEach(name=>{if(!db.teams.some(t=>t.name===name))db.teams.push({id:uid("team"),name,category:"",notes:""})});
   if(needsEmailGate()){showEmailGate()}
-  else{nav();renderAll();applyTheme(document.documentElement.classList.contains("light")?"light":"dark");checkPlanTransition();revalidateLicenseIfNeeded()}
+  else{
+   nav();renderAll();applyTheme(document.documentElement.classList.contains("light")?"light":"dark");checkPlanTransition();revalidateLicenseIfNeeded();
+   // Restore whichever page was open before this load — iOS can fully
+   // reload a standalone Home Screen app when returning from a
+   // window.open() tool (e.g. opening an Analysis Tool and closing it),
+   // which would otherwise silently drop back to the Dashboard every time.
+   let lastPage=null;try{lastPage=sessionStorage.getItem("lastActivePage")}catch(e){}
+   if(lastPage && lastPage!=="dashboard" && pages.some(p=>p[0]===lastPage)){go(lastPage,null,true)}
+  }
  });
 }
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));const today=()=>new Date().toISOString().slice(0,10);
@@ -689,7 +697,7 @@ function bottomNav(){
 }
 function nav(){navEl=document.getElementById("nav");navEl.innerHTML=pages.map(([id,n],i)=>{let groupLabel=NAV_GROUP_STARTS[id];return (groupLabel?`<div class="navGroupLabel">${esc(groupLabel)}</div>`:"")+`<button class="${i?"":"active"}" onclick="go('${id}',this)"><span class="navIcon">${PAGE_ICONS[id]||"•"}</span>${n}</button>`}).join("");bottomNav()}
 let navHistory=[];
-function go(id,b,skipHistory){let current=document.querySelector(".page.active");if(!skipHistory&&current&&current.id&&current.id!==id){navHistory.push(current.id);if(navHistory.length>20)navHistory.shift()}document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));if(!b){let idx=pages.findIndex(p=>p[0]===id);b=document.querySelectorAll(".nav button")[idx]}if(b)b.classList.add("active");side.classList.remove("open");document.getElementById("sideOverlay").classList.remove("open");bottomNav()}
+function go(id,b,skipHistory){let current=document.querySelector(".page.active");if(!skipHistory&&current&&current.id&&current.id!==id){navHistory.push(current.id);if(navHistory.length>20)navHistory.shift()}document.querySelectorAll(".page").forEach(x=>x.classList.remove("active"));document.getElementById(id).classList.add("active");document.querySelectorAll(".nav button").forEach(x=>x.classList.remove("active"));if(!b){let idx=pages.findIndex(p=>p[0]===id);b=document.querySelectorAll(".nav button")[idx]}if(b)b.classList.add("active");side.classList.remove("open");document.getElementById("sideOverlay").classList.remove("open");bottomNav();try{sessionStorage.setItem("lastActivePage",id)}catch(e){}}
 function goBack(){let prev=navHistory.pop();go(prev||"dashboard",null,true)}
 function toggleMenu(){side.classList.toggle("open");document.getElementById("sideOverlay").classList.toggle("open")}
 function applyTheme(t){
