@@ -1101,7 +1101,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-09-00:35';
+const APP_BUILD_VERSION = '2026-09-09-00:40';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -1665,7 +1665,20 @@ function renderPushEnableSection(state) {
       const { data, error } = await supabase.functions.invoke('send-push-notification', {
         body: { user_id: session.user.id, title: 'Test push notification', body: 'If you see this as a real notification, push is genuinely working.', url: './' },
       });
-      if (error) { alert('Edge Function call failed: ' + error.message); return; }
+      if (error) {
+        // error.message alone is just a generic "non-2xx" wrapper — the real
+        // detail is in the actual response body, on error.context.
+        let detail = error.message;
+        try {
+          if (error.context && typeof error.context.json === 'function') {
+            detail = JSON.stringify(await error.context.json(), null, 2);
+          } else if (error.context && typeof error.context.text === 'function') {
+            detail = await error.context.text();
+          }
+        } catch (e) { detail += ' (could not read response body: ' + e.message + ')'; }
+        alert('Edge Function error response:\n' + detail);
+        return;
+      }
       alert('Push service response:\n' + JSON.stringify(data, null, 2));
     });
   } else {
