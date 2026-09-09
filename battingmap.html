@@ -114,6 +114,9 @@
   .pm-load-list{max-height:260px;overflow-y:auto;}
   .pm-load-row{display:flex;justify-content:space-between;align-items:center;padding:10px;border:1px solid var(--card-border);border-radius:12px;margin-bottom:8px;background:rgba(255,255,255,0.02);font-size:12.5px;}
   .pm-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.6);display:flex;align-items:center;justify-content:center;z-index:50;padding:16px;}
+  .pm-photo-viewer{position:fixed;inset:0;background:rgba(4,8,14,.96);display:flex;align-items:center;justify-content:center;z-index:70;padding:20px;}
+  .pm-photo-viewer img{max-width:100%;max-height:100%;object-fit:contain;border-radius:8px;}
+  .pm-photo-viewer-close{position:absolute;top:16px;right:16px;background:rgba(255,255,255,.12);color:#fff;border:none;width:38px;height:38px;border-radius:50%;font-size:20px;cursor:pointer;}
   .pm-modal{background:var(--card);border:1px solid var(--card-border);border-radius:18px;padding:18px;width:100%;max-width:420px;max-height:80vh;overflow-y:auto;}
 
   #print-report{display:none;}
@@ -133,6 +136,8 @@
     .pr-stat{ border:1px solid #ccc; border-radius:6px; padding:6px 10px; font-size:11px; text-align:center; min-width:64px; }
     .pr-stat b{ display:block; font-size:15px; color:#7a5c10; }
     .pr-table{ width:100%; border-collapse:collapse; font-size:10.5px; margin-bottom:10px; }
+    .pr-photo-grid{ display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; }
+    .pr-photo{ width:120px; height:120px; object-fit:cover; border-radius:6px; border:1px solid #ccc; }
     .pr-table th, .pr-table td{ border:1px solid #ccc; padding:3px 6px; text-align:left; }
     .pr-table th{ background:#faf2df; }
     .pr-section-title{ font-size:12.5px; font-weight:700; color:#7a5c10; margin:10px 0 4px; }
@@ -572,6 +577,7 @@ function showPremiumLockedMessage(){
     showConditions: false,
     // stance/grip photo log
     showPhotoLog: false,
+    viewingPhotoId: null,
     photoCache: [], // loaded on demand for the current batter's name
     sessionKey: null, // stable key reused by auto-save + manual save so repeated saves update one record
   };
@@ -1015,6 +1021,13 @@ function showPremiumLockedMessage(){
       html += '</div></div>';
     }
 
+    if (state.viewingPhotoId){
+      var viewedPhoto = state.photoCache.find(function(p){return p.id===state.viewingPhotoId;});
+      if (viewedPhoto){
+        html += '<div class="pm-photo-viewer" data-action="close-photo-viewer"><img src="'+viewedPhoto.dataUrl+'"><button class="pm-photo-viewer-close" data-action="close-photo-viewer">&times;</button></div>';
+      }
+    }
+
     if (state.showLoad){
       var keys = savedSessionsCache;
       html += '<div class="pm-modal-backdrop"><div class="pm-modal"><div class="pm-panel-title">Saved sessions</div><div class="pm-load-list">';
@@ -1242,9 +1255,10 @@ function showPremiumLockedMessage(){
       render();
     }
     else if (action==="view-photo"){
-      var photo = state.photoCache.find(function(p){return p.id===el.getAttribute("data-id");});
-      if (photo) window.open(photo.dataUrl, "_blank");
+      state.viewingPhotoId = el.getAttribute("data-id");
+      render();
     }
+    else if (action==="close-photo-viewer"){ state.viewingPhotoId = null; render(); }
     else if (action==="draft-set-arm"){ state.bowlerDraft.bowlArm = el.getAttribute("data-val"); render(); }
     else if (action==="draft-set-pace"){ state.bowlerDraft.bowlPace = el.getAttribute("data-val"); render(); }
     else if (action==="draft-set-spin"){ state.bowlerDraft.bowlSpin = el.getAttribute("data-val"); render(); }
@@ -1712,7 +1726,11 @@ function showPremiumLockedMessage(){
     var ids = Object.keys(state.batters);
     var container = document.getElementById("print-report");
     var html = "";
-    ids.forEach(function(id){
+    dbGetAll("playerphotos").catch(function(){ return []; }).then(function(photoRecords){
+      var photosByKey = {};
+      photoRecords.forEach(function(r){ photosByKey[r.key] = r.data; });
+
+      ids.forEach(function(id){
       var b = state.batters[id];
       var st = statsFor(b.balls);
       var pitchSvg = pitchSvgMarkup(b, "dots", b.balls, null, null, true);
@@ -1782,10 +1800,21 @@ function showPremiumLockedMessage(){
         html += '<tr><td>'+ball.over+'.'+ball.ballNo+'</td><td>'+esc(outcomeTxt)+'</td><td>'+esc(ball.shotType||"—")+'</td><td>'+lz.label+'</td><td>'+ln+'</td><td>'+bowlTypeLabel(ball)+'</td></tr>';
       });
       html += '</table>';
+
+      var batterPhotos = photosByKey[keyName(b.name)] || [];
+      if (batterPhotos.length > 0){
+        html += '<div class="pr-section-title">Stance &amp; grip log</div><div class="pr-photo-grid">';
+        batterPhotos.forEach(function(p){
+          html += '<img class="pr-photo" src="'+p.dataUrl+'">';
+        });
+        html += '</div>';
+      }
+
       html += '</div>';
     });
     container.innerHTML = html;
     setTimeout(function(){ window.print(); }, 60);
+    });
   }
 
   if (!isPremiumUser()){
