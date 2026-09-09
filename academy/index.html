@@ -1101,7 +1101,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-09-05:24';
+const APP_BUILD_VERSION = '2026-09-09-05:47';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -3925,7 +3925,7 @@ function sessionFormHtml(s) {
   return sheetHead(s?.id ? 'Edit Session Plan' : 'New Session Plan') + (s?.id ? '' : sessionTemplatePickerHtml()) + `
     <div class="formgrid">
       <label>Date<input type="date" id="sheet-session-date" value="${esc(s?.date || new Date().toISOString().slice(0, 10))}"></label>
-      <label>Time<input type="text" id="sheet-session-time" value="${esc(s?.time || '')}" placeholder="e.g. 16:30"></label>
+      <label>Time<input type="time" id="sheet-session-time" value="${esc((s?.time || '').slice(0, 5))}"></label>
       <label class="full">Session title <span class="muted" style="font-weight:400;">(optional)</span><input id="sheet-session-title" value="${esc(s?.title || '')}" placeholder="Leave blank to show date + team instead"></label>
       <label>Session type<select id="sheet-session-type"><option value="team" ${(!s || s.session_type === 'team') ? 'selected' : ''}>Team / Squad session</option><option value="player" ${s?.session_type === 'player' ? 'selected' : ''}>Individual Player (1-on-1)</option><option value="custom" ${s?.session_type === 'custom' ? 'selected' : ''}>Custom Group</option></select></label>
       <label>Team<select id="sheet-session-team">${cache.teams.map(t => `<option value="${t.id}" ${s?.team_id === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
