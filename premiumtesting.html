@@ -186,7 +186,7 @@ p{orphans:3;widows:3}
 </div>
 <header class="top"><button class="menu" onclick="toggleMenu()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="brand" onclick="go('dashboard')" style="cursor:pointer">ProCoach OS<small>PROFESSIONAL CRICKET COACHING</small></div><div style="margin-left:auto;display:flex;gap:8px;align-items:center"><button class="searchIconBtn" id="themeToggleBtn" onclick="toggleTheme()" aria-label="Toggle light/dark theme"></button><button class="btn secondary" id="profileBadge" onclick="go('account')">Profile</button></div></header>
 <div class="layout"><aside id="side"><div class="nav" id="nav"></div></aside><div class="sideOverlay" id="sideOverlay" onclick="toggleMenu()"></div><main>
-<section id="dashboard" class="page active"></section><section id="sessions" class="page"></section><section id="reflections" class="page"></section><section id="players" class="page"></section><section id="assessments" class="page"></section><section id="drills" class="page"></section><section id="matches" class="page"></section><section id="reports" class="page"></section><section id="calendar" class="page"></section><section id="organisation" class="page"></section><section id="account" class="page"></section>
+<section id="dashboard" class="page active"></section><section id="sessions" class="page"></section><section id="reflections" class="page"></section><section id="players" class="page"></section><section id="assessments" class="page"></section><section id="drills" class="page"></section><section id="matches" class="page"></section><section id="analysisTools" class="page"></section><section id="reports" class="page"></section><section id="calendar" class="page"></section><section id="organisation" class="page"></section><section id="account" class="page"></section>
 </main></div>
 <div class="bottomNav" id="bottomNav"></div>
 <button class="fab" onclick="quick()">+</button><div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
@@ -225,8 +225,8 @@ p{orphans:3;widows:3}
  cascadePlayerRename) — every other cross-reference in the app links
  by stable id, not by name, so no cascade is needed for those.
 ===================================================================== */
-const pages=[["dashboard","Dashboard"],["sessions","Session Plans"],["drills","Drill Library"],["calendar","Calendar"],["players","Players"],["organisation","Teams & Seasons"],["matches","Match Centre"],["assessments","Assessments"],["reflections","Self Reflections"],["reports","Professional Reports"],["account","Account & Backup"]];
-const NAV_GROUP_STARTS={sessions:"Plan",players:"People & Teams",matches:"Performance",reports:"Insights",account:"Settings"};
+const pages=[["dashboard","Dashboard"],["sessions","Session Plans"],["drills","Drill Library"],["calendar","Calendar"],["players","Players"],["organisation","Teams & Seasons"],["matches","Match Centre"],["assessments","Assessments"],["reflections","Self Reflections"],["analysisTools","Analysis Tools"],["reports","Professional Reports"],["account","Account & Backup"]];
+const NAV_GROUP_STARTS={sessions:"Plan",players:"People & Teams",matches:"Performance",analysisTools:"Insights",account:"Settings"};
 const seed=[{name:"High Catch Pressure Circle",cat:"Fielding",players:"6–12",duration:"15 min",points:"Early call, balanced base, attack the ball, secure finish."},{name:"Direct Hit Competition",cat:"Fielding",players:"6–14",duration:"12 min",points:"Gather under control, align feet, quick release."}];
 const PROFILES_KEY="coachbook_profiles",ACTIVE_KEY="coachbook_active_profile";
 /* ===== Licensing / Trial =====
@@ -675,7 +675,7 @@ function icon(name,size){
  };
  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px">${paths[name]||""}</svg>`;
 }
-const PAGE_ICONS={dashboard:icon("home",20),sessions:icon("sessions",20),reflections:icon("reflections",20),players:icon("players",20),assessments:icon("assessments",20),drills:icon("drills",20),matches:icon("trophy",20),reports:icon("reports",20),calendar:icon("calendar",20),organisation:icon("layers",20),account:icon("account",20)};
+const PAGE_ICONS={dashboard:icon("home",20),sessions:icon("sessions",20),reflections:icon("reflections",20),players:icon("players",20),assessments:icon("assessments",20),drills:icon("drills",20),matches:icon("trophy",20),analysisTools:icon("search",20),reports:icon("reports",20),calendar:icon("calendar",20),organisation:icon("layers",20),account:icon("account",20)};
 const BOTTOM_NAV_ITEMS=["dashboard","players","__new__","sessions","reports"];
 const BOTTOM_NAV_LABELS={dashboard:"Dashboard",players:"Players",sessions:"Sessions",reports:"Reports"};
 function bottomNav(){
@@ -2861,6 +2861,24 @@ function fmtCalDate(ds){let d=new Date(ds+"T00:00:00");return d.toLocaleDateStri
 function calPrevMonth(){calMonth--;if(calMonth<0){calMonth=11;calYear--}calendar()}
 function calNextMonth(){calMonth++;if(calMonth>11){calMonth=0;calYear++}calendar()}
 function calToday(){let t=new Date();calYear=t.getFullYear();calMonth=t.getMonth();calendar()}
+function openAnalysisTool(url){
+ if(!requirePremium("Analysis Tools"))return;
+ window.open(url,"_blank");
+}
+function analysisTools(){
+ let tools=[
+  ["pitchmap.html","Pitch Map","Ball-by-ball bowling analysis — length, line, outcomes and wagon wheel, all in one view."],
+  ["battingmap.html","Batting Map","Shot-by-shot batting analysis — footwork, shot type, and where every run came from."],
+  ["livesession.html","Live Session","Track a full bowler-vs-batter session live, ball by ball, with match-style context."]
+ ];
+ document.getElementById("analysisTools").innerHTML=head("Analysis Tools","Deep, ball-by-ball analysis tools — open the one you need for this session.")+
+  `<div class="grid">${tools.map(([url,name,desc])=>`<div class="card">
+    <h3 style="margin-top:0">${esc(name)}</h3>
+    <p class="muted">${esc(desc)}</p>
+    <button class="btn primary full" onclick="openAnalysisTool('${url}')">Open ${esc(name)} &rarr;</button>
+   </div>`).join("")}</div>
+   <p class="muted" style="margin-top:14px">Opens in a new tab. Each tool saves its own data locally on this device.</p>`;
+}
 function calendar(){
  let first=new Date(calYear,calMonth,1);
  let startDow=first.getDay();
@@ -3109,5 +3127,5 @@ function globalSearchResultsHtml(){
 /* ===== End Global Search ===== */
 
 function quick(){modal(`<div class="sheetHead"><h2>Create</h2><button class="x" onclick="closeM()">×</button></div><div class="grid g2"><button class="btn secondary" onclick="closeM();newSession()">Session Plan</button><button class="btn secondary" onclick="closeM();newReflection()">Self Reflection</button><button class="btn secondary" onclick="closeM();newPlayer()">Player</button><button class="btn secondary" onclick="closeM();newAssessment()">Assessment</button><button class="btn secondary" onclick="closeM();newDrill()">Drill</button><button class="btn secondary" onclick="closeM();newMatch()">Match</button><button class="btn secondary" onclick="closeM();newCalEvent()">Reminder / Event</button></div>`)}
-function renderAll(){dashboard();sessions();reflections();players();assessments();drills();matches();reports();calendar();organisation();accountPage()}initApp();
+function renderAll(){dashboard();sessions();reflections();players();assessments();drills();matches();analysisTools();reports();calendar();organisation();accountPage()}initApp();
 </script></body></html>
