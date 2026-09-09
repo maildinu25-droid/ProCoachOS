@@ -550,7 +550,7 @@ function showPremiumLockedMessage(){
     showChaseSetup: false,
     conditions: { weather:"", pitch:"", ballCondition:"" },
     showConditions: false,
-    showScenarioPicker: false, scenarioNameDraft: "",
+    showScenarioPicker: false, scenarioNameDraft: "", loadedScenarioName: null,
     showLoad: false,
     status: "",
     sessionKey: null, // stable key reused by auto-save + manual save so repeated saves update one record
@@ -647,7 +647,7 @@ function showPremiumLockedMessage(){
     if (!Object.keys(state.bowlerRoster).length && !Object.keys(state.batterRoster).length) return;
     if (!state.deliveries.length) return;
     if (!state.sessionKey) state.sessionKey = "livesession:"+state.sessionDate+":"+Date.now();
-    var payload = { date: state.sessionDate, bowlerRoster: state.bowlerRoster, batterRoster: state.batterRoster, deliveries: state.deliveries, fieldPlacements: state.fieldPlacements, format: state.format, conditions: state.conditions, savedAt: Date.now() };
+    var payload = { date: state.sessionDate, bowlerRoster: state.bowlerRoster, batterRoster: state.batterRoster, deliveries: state.deliveries, fieldPlacements: state.fieldPlacements, format: state.format, conditions: state.conditions, chase: state.chase, loadedScenarioName: state.loadedScenarioName, savedAt: Date.now() };
     dbPut(state.sessionKey, payload, "livesessions").catch(function(){});
   }
 
@@ -1270,6 +1270,7 @@ function showPremiumLockedMessage(){
         state.format = sc.format;
         state.currentPhase = FORMAT_PHASES[sc.format].indexOf(sc.phase)>=0 ? sc.phase : FORMAT_PHASES[sc.format][0];
         state.chase = sc.targetRuns ? { targetRuns:sc.targetRuns, targetOvers:sc.targetOvers } : null;
+        state.loadedScenarioName = sc.name;
         state.showScenarioPicker = false;
         state.status = "Loaded scenario: "+sc.name;
         render(); setTimeout(function(){ state.status=""; render(); }, 2500);
@@ -1400,7 +1401,7 @@ function showPremiumLockedMessage(){
     else if (action==="save"){
       if (!Object.keys(state.bowlerRoster).length && !Object.keys(state.batterRoster).length){ state.status = "Add at least one bowler or batter before saving."; render(); setTimeout(function(){ state.status=""; render(); }, 2500); return; }
       if (!state.sessionKey) state.sessionKey = "livesession:"+state.sessionDate+":"+Date.now();
-      var payload = { date: state.sessionDate, bowlerRoster: state.bowlerRoster, batterRoster: state.batterRoster, deliveries: state.deliveries, fieldPlacements: state.fieldPlacements, format: state.format, conditions: state.conditions, savedAt: Date.now() };
+      var payload = { date: state.sessionDate, bowlerRoster: state.bowlerRoster, batterRoster: state.batterRoster, deliveries: state.deliveries, fieldPlacements: state.fieldPlacements, format: state.format, conditions: state.conditions, chase: state.chase, loadedScenarioName: state.loadedScenarioName, savedAt: Date.now() };
       state.status = "Saving…"; render();
       dbPut(state.sessionKey, payload, "livesessions").then(function(){
         state.status = "Session saved."; render(); setTimeout(function(){ state.status=""; render(); }, 2500);
@@ -1427,7 +1428,8 @@ function showPremiumLockedMessage(){
         state.phaseFilter = "all"; state.pendingField = []; state.loadedFieldId = null;
         state.currentBowlerId = Object.keys(state.bowlerRoster)[0] || null;
         state.currentBatterId = Object.keys(state.batterRoster)[0] || null;
-        state.nonStrikerBatterId = null; state.chase = null;
+        state.nonStrikerBatterId = null; state.chase = data.chase || null;
+        state.loadedScenarioName = data.loadedScenarioName || null;
         state.sessionKey = key;
         state.showSetup = false; state.showMoreActions = false;
         state.pendingDelivery = null; state.mode = "combined"; state.idleView = "ground"; state.viewFilter = "pair";
@@ -1440,7 +1442,7 @@ function showPremiumLockedMessage(){
       dbDelete(delKey, "livesessions").then(function(){ return refreshSavedSessions(); }).then(function(){ render(); });
     }
     else if (action==="export"){
-      var payload = { date: state.sessionDate, bowlerRoster: state.bowlerRoster, batterRoster: state.batterRoster, deliveries: state.deliveries, fieldPlacements: state.fieldPlacements, format: state.format, exportedAt: new Date().toISOString() };
+      var payload = { date: state.sessionDate, bowlerRoster: state.bowlerRoster, batterRoster: state.batterRoster, deliveries: state.deliveries, fieldPlacements: state.fieldPlacements, format: state.format, conditions: state.conditions, chase: state.chase, loadedScenarioName: state.loadedScenarioName, exportedAt: new Date().toISOString() };
       var blob = new Blob([JSON.stringify(payload, null, 2)], { type:"application/json" });
       var url = URL.createObjectURL(blob);
       var a = document.createElement("a");
@@ -1626,7 +1628,17 @@ function showPremiumLockedMessage(){
     var condBits = [state.conditions.weather, state.conditions.pitch].filter(Boolean).join(", ");
     html += '<div class="pr-player"><div class="pr-title">Live Session Summary</div><div class="pr-sub">'+esc(state.sessionDate)+(condBits?(' &middot; '+esc(condBits)):'')+' &middot; ProCoach OS</div>';
     html += '<div class="pr-stats"><div class="pr-stat"><b>'+scoreP.runs+'/'+scoreP.wickets+'</b>Score</div><div class="pr-stat"><b>'+scoreP.overs+'.'+scoreP.ballsIntoOver+'</b>Overs</div><div class="pr-stat"><b>'+state.deliveries.length+'</b>Total balls</div></div>';
-    if (state.chase) html += '<div style="font-size:11px;color:#555;margin-top:6px;">Chase target: '+state.chase.targetRuns+' off '+state.chase.targetOvers+' overs</div>';
+    if (state.loadedScenarioName) html += '<div style="font-size:11px;color:#555;margin-top:6px;">Scenario: '+esc(state.loadedScenarioName)+'</div>';
+    if (state.chase){
+      var scRep = sessionScore();
+      var ballsRemRep = Math.max(0, state.chase.targetOvers*6 - (scRep.overs*6+scRep.ballsIntoOver));
+      var runsNeedRep = Math.max(0, state.chase.targetRuns - scRep.runs);
+      var doneRep = runsNeedRep<=0, failedRep = !doneRep && ballsRemRep<=0;
+      var chaseResultTxt = doneRep ? ('Chased it down! '+scRep.runs+'/'+state.chase.targetRuns+' with '+ballsRemRep+' ball'+(ballsRemRep===1?"":"s")+' to spare.')
+        : failedRep ? ('Fell short. Finished '+scRep.runs+'/'+state.chase.targetRuns+' — needed '+runsNeedRep+' more.')
+        : ('Chasing '+state.chase.targetRuns+' off '+state.chase.targetOvers+' overs — currently '+scRep.runs+', needs '+runsNeedRep+' off '+ballsRemRep+' ball'+(ballsRemRep===1?"":"s")+'.');
+      html += '<div style="font-size:11px;color:'+(doneRep?"#1a7a4a":failedRep?"#a02020":"#555")+';margin-top:6px;font-weight:'+(doneRep||failedRep?"700":"400")+';">Target chase: '+chaseResultTxt+'</div>';
+    }
     html += '</div>';
     bowlerIds.forEach(function(id){
       var b = state.bowlerRoster[id];

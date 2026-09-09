@@ -1223,7 +1223,7 @@ function showPremiumLockedMessage(){
         } else {
           var drillHit1 = evaluateDrillHit(pd);
           var bt1 = cb();
-          cb().balls.push({ id:uid(), xPct:pd.xPct, yPct:pd.yPct, wagonX:pd.wagonX, wagonY:pd.wagonY, outcome:outcomeId, dismissal:null, deliveryType:pd.deliveryType, beaten:!!pd.beaten, ballCondition:pd.ballCondition||"", drillHit:drillHit1, bowlArm:bt1.bowlArm, bowlPace:bt1.bowlPace, bowlSpin:bt1.bowlSpin, bowlSide:bt1.bowlSide, t:Date.now() });
+          cb().balls.push({ id:uid(), xPct:pd.xPct, yPct:pd.yPct, wagonX:pd.wagonX, wagonY:pd.wagonY, outcome:outcomeId, dismissal:null, deliveryType:pd.deliveryType, beaten:!!pd.beaten, ballCondition:pd.ballCondition||"", drillHit:drillHit1, drillName:(drillHit1!==null&&state.activeDrill)?state.activeDrill.name:null, bowlArm:bt1.bowlArm, bowlPace:bt1.bowlPace, bowlSpin:bt1.bowlSpin, bowlSide:bt1.bowlSide, t:Date.now() });
           state.pendingDelivery = freshPendingDelivery();
           autoSaveSession();
           render();
@@ -1235,7 +1235,7 @@ function showPremiumLockedMessage(){
       if (pd2 && pd2.stage==="dismissal"){
         var drillHit2 = evaluateDrillHit(pd2);
         var bt2 = cb();
-        cb().balls.push({ id:uid(), xPct:pd2.xPct, yPct:pd2.yPct, wagonX:pd2.wagonX, wagonY:pd2.wagonY, outcome:"W", dismissal:el.getAttribute("data-dismissal"), deliveryType:pd2.deliveryType, beaten:!!pd2.beaten, ballCondition:pd2.ballCondition||"", drillHit:drillHit2, bowlArm:bt2.bowlArm, bowlPace:bt2.bowlPace, bowlSpin:bt2.bowlSpin, bowlSide:bt2.bowlSide, t:Date.now() });
+        cb().balls.push({ id:uid(), xPct:pd2.xPct, yPct:pd2.yPct, wagonX:pd2.wagonX, wagonY:pd2.wagonY, outcome:"W", dismissal:el.getAttribute("data-dismissal"), deliveryType:pd2.deliveryType, beaten:!!pd2.beaten, ballCondition:pd2.ballCondition||"", drillHit:drillHit2, drillName:(drillHit2!==null&&state.activeDrill)?state.activeDrill.name:null, bowlArm:bt2.bowlArm, bowlPace:bt2.bowlPace, bowlSpin:bt2.bowlSpin, bowlSide:bt2.bowlSide, t:Date.now() });
         state.pendingDelivery = freshPendingDelivery();
         autoSaveSession();
         render();
@@ -1596,6 +1596,20 @@ function showPremiumLockedMessage(){
         html += '<div class="pr-stat"><b>'+s[1]+'</b>'+s[0]+'</div>';
       });
       html += '</div>';
+      var drilledBallsAT = b.balls.filter(function(x){return x.drillHit!==null && x.drillHit!==undefined;});
+      if (drilledBallsAT.length){
+        var drillNamesAT = drilledBallsAT.reduce(function(names, x){
+          var n = x.drillName || "Plan ball";
+          if (names.indexOf(n)===-1) names.push(n);
+          return names;
+        }, []);
+        html += '<div class="pr-section-title">Plan ball / target practice</div>';
+        drillNamesAT.forEach(function(n){
+          var theseBalls = drilledBallsAT.filter(function(x){return (x.drillName||"Plan ball")===n;});
+          var hits = theseBalls.filter(function(x){return x.drillHit;}).length;
+          html += '<div style="font-size:11px;margin-bottom:4px;">&ldquo;'+esc(n)+'&rdquo; &middot; '+hits+'/'+theseBalls.length+' ('+Math.round((hits/theseBalls.length)*100)+'%)</div>';
+        });
+      }
       html += '<div class="pr-charts">'+pitchSvg+groundSvg+'</div>';
       html += '<div class="pr-section-title">By ball position in the over</div>';
       html += '<div style="font-size:10px;color:#8a95a3;margin:-4px 0 8px;">Note: since sessions are combined here, over/ball numbering resets at each session boundary, not necessarily at a clean 6-ball over.</div>';
@@ -1651,6 +1665,21 @@ function showPremiumLockedMessage(){
         html += '<div class="pr-stat"><b>'+s[1]+'</b>'+s[0]+'</div>';
       });
       html += '</div>';
+
+      var drilledBallsR = b.balls.filter(function(x){return x.drillHit!==null && x.drillHit!==undefined;});
+      if (drilledBallsR.length){
+        var drillNamesR = drilledBallsR.reduce(function(names, x){
+          var n = x.drillName || "Plan ball";
+          if (names.indexOf(n)===-1) names.push(n);
+          return names;
+        }, []);
+        html += '<div class="pr-section-title">Plan ball / target practice</div>';
+        drillNamesR.forEach(function(n){
+          var theseBalls = drilledBallsR.filter(function(x){return (x.drillName||"Plan ball")===n;});
+          var hits = theseBalls.filter(function(x){return x.drillHit;}).length;
+          html += '<div style="font-size:11px;margin-bottom:4px;">&ldquo;'+esc(n)+'&rdquo; &middot; '+hits+'/'+theseBalls.length+' ('+Math.round((hits/theseBalls.length)*100)+'%)</div>';
+        });
+      }
 
       html += '<div class="pr-charts">'+pitchSvg+groundSvg+'</div>';
 
