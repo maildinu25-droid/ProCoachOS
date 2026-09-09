@@ -1101,7 +1101,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-09-00:40';
+const APP_BUILD_VERSION = '2026-09-09-05:24';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -1538,11 +1538,14 @@ async function notifyUser(userId, title, body, linkPanel, linkEntityId) {
   // the one that must never fail silently — if the user has no push
   // subscription, or push itself errors, the in-app notification still stands.
   try {
-    await supabase.functions.invoke('send-push-notification', {
+    const { data, error: pushError } = await supabase.functions.invoke('send-push-notification', {
       body: { user_id: userId, title, body: body || '', url: './' },
     });
+    if (pushError) { console.error('notifyUser (push):', pushError); return { pushError }; }
+    return { pushResult: data };
   } catch (e) {
     console.error('notifyUser (push):', e);
+    return { pushError: e };
   }
 }
 let notifCache = [];
@@ -1659,27 +1662,24 @@ function renderPushEnableSection(state) {
     document.getElementById('disable-push-btn').addEventListener('click', unsubscribeFromPush);
     document.getElementById('test-push-btn').addEventListener('click', async () => {
       showToast('Sending test push...', 'ok');
-      // Bypassing notifyUser() deliberately here — it's fire-and-forget by
-      // design for normal use, which would hide exactly what we need to see
-      // right now: the function's actual reported result, not an assumed one.
-      const { data, error } = await supabase.functions.invoke('send-push-notification', {
-        body: { user_id: session.user.id, title: 'Test push notification', body: 'If you see this as a real notification, push is genuinely working.', url: './' },
-      });
-      if (error) {
-        // error.message alone is just a generic "non-2xx" wrapper — the real
-        // detail is in the actual response body, on error.context.
-        let detail = error.message;
+      // Now using the real notifyUser() path — the exact one every genuine
+      // notification in the app goes through — rather than calling the
+      // function directly, now that the diagnostic phase is behind us.
+      const result = await notifyUser(session.user.id, 'Test push notification', 'If you see this as a real notification, push is genuinely working.');
+      if (result?.pushError) {
+        let detail = result.pushError.message || String(result.pushError);
         try {
-          if (error.context && typeof error.context.json === 'function') {
-            detail = JSON.stringify(await error.context.json(), null, 2);
-          } else if (error.context && typeof error.context.text === 'function') {
-            detail = await error.context.text();
+          if (result.pushError.context && typeof result.pushError.context.json === 'function') {
+            detail = JSON.stringify(await result.pushError.context.json(), null, 2);
           }
-        } catch (e) { detail += ' (could not read response body: ' + e.message + ')'; }
-        alert('Edge Function error response:\n' + detail);
+        } catch (e) { /* fall back to the message above */ }
+        alert('Push failed to send:\n' + detail);
         return;
       }
-      alert('Push service response:\n' + JSON.stringify(data, null, 2));
+      const { sent, failed, note } = result?.pushResult || {};
+      if (note) showToast(note, 'error');
+      else if (sent > 0) showToast(`Sent to ${sent} device${sent === 1 ? '' : 's'}. Check for a real notification.`, 'ok');
+      else showToast(`Push service reported ${failed} failure(s) — see console for details.`, 'error');
     });
   } else {
     el.style.display = 'none';
