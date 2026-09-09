@@ -126,8 +126,7 @@ input[type=range]{accent-color:var(--g);width:100%;height:6px;padding:0;backgrou
 @media(max-width:520px){.g4,.g3,.g2{grid-template-columns:1fr}.hero h1{font-size:var(--fs-7)}.card{padding:16px}.brand small{display:none}.brand{font-size:18px}#profileBadge{max-width:110px}}
 @page{size:A4 portrait;margin:10mm}
 @media print{
-:root{--ink:#1a1f29!important;--muted:#5a6472!important;--label:#3a4452!important;--line:#d9e4df!important;--lineHover:#c3d0c9!important;--g:#0e9968!important;--g2:#10b981!important;--blue:#1d4ed8!important;--blue2:#2563eb!important;--red:#c0392b!important;--gold:#b8860b!important;--mint:rgba(16,185,129,.08)!important;--redTint:rgba(192,57,43,.08)!important;--surface:#fff!important;--surface2:#fff!important;--bg:#fff!important}
-html,body{margin:0!important;padding:0!important;background:#fff!important;width:100%!important;height:auto!important;min-height:0!important;overflow:visible!important;color:#1a1f29!important}
+html,body{margin:0!important;padding:0!important;background:#fff!important;width:100%!important;height:auto!important;min-height:0!important;overflow:visible!important}
 body>*{display:none!important}
 #modal{display:block!important;position:static!important;inset:auto!important;width:100%!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important}
 #sheet{display:block!important;position:static!important;width:100%!important;max-width:none!important;height:auto!important;max-height:none!important;min-height:0!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:visible!important;background:#fff!important}
@@ -187,7 +186,7 @@ p{orphans:3;widows:3}
 </div>
 <header class="top"><button class="menu" onclick="toggleMenu()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg></button><div class="brand" onclick="go('dashboard')" style="cursor:pointer">ProCoach OS<small>PROFESSIONAL CRICKET COACHING</small></div><div style="margin-left:auto;display:flex;gap:8px;align-items:center"><button class="searchIconBtn" id="themeToggleBtn" onclick="toggleTheme()" aria-label="Toggle light/dark theme"></button><button class="btn secondary" id="profileBadge" onclick="go('account')">Profile</button></div></header>
 <div class="layout"><aside id="side"><div class="nav" id="nav"></div></aside><div class="sideOverlay" id="sideOverlay" onclick="toggleMenu()"></div><main>
-<section id="dashboard" class="page active"></section><section id="sessions" class="page"></section><section id="reflections" class="page"></section><section id="players" class="page"></section><section id="assessments" class="page"></section><section id="drills" class="page"></section><section id="matches" class="page"></section><section id="reports" class="page"></section><section id="analysis" class="page"></section><section id="calendar" class="page"></section><section id="organisation" class="page"></section><section id="account" class="page"></section>
+<section id="dashboard" class="page active"></section><section id="sessions" class="page"></section><section id="reflections" class="page"></section><section id="players" class="page"></section><section id="assessments" class="page"></section><section id="drills" class="page"></section><section id="matches" class="page"></section><section id="reports" class="page"></section><section id="calendar" class="page"></section><section id="organisation" class="page"></section><section id="account" class="page"></section>
 </main></div>
 <div class="bottomNav" id="bottomNav"></div>
 <button class="fab" onclick="quick()">+</button><div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
@@ -226,7 +225,7 @@ p{orphans:3;widows:3}
  cascadePlayerRename) — every other cross-reference in the app links
  by stable id, not by name, so no cascade is needed for those.
 ===================================================================== */
-const pages=[["dashboard","Dashboard"],["sessions","Session Plans"],["drills","Drill Library"],["calendar","Calendar"],["players","Players"],["organisation","Teams & Seasons"],["matches","Match Centre"],["assessments","Assessments"],["reflections","Self Reflections"],["reports","Professional Reports"],["analysis","Analysis Tools"],["account","Account & Backup"]];
+const pages=[["dashboard","Dashboard"],["sessions","Session Plans"],["drills","Drill Library"],["calendar","Calendar"],["players","Players"],["organisation","Teams & Seasons"],["matches","Match Centre"],["assessments","Assessments"],["reflections","Self Reflections"],["reports","Professional Reports"],["account","Account & Backup"]];
 const NAV_GROUP_STARTS={sessions:"Plan",players:"People & Teams",matches:"Performance",reports:"Insights",account:"Settings"};
 const seed=[{name:"High Catch Pressure Circle",cat:"Fielding",players:"6–12",duration:"15 min",points:"Early call, balanced base, attack the ball, secure finish."},{name:"Direct Hit Competition",cat:"Fielding",players:"6–14",duration:"12 min",points:"Gather under control, align feet, quick release."}];
 const PROFILES_KEY="coachbook_profiles",ACTIVE_KEY="coachbook_active_profile";
@@ -299,8 +298,6 @@ const SEND_CODE_API="https://coachbook-email.maildinu25.workers.dev/send-code";
 const VERIFY_CODE_API="https://coachbook-email.maildinu25.workers.dev/verify-code";
 const TRIAL_CHECK_API="https://procoachos-dodo.maildinu25.workers.dev/api/trial/check";
 let pendingVerificationEmail="";
-let isRestoreFlow=false;
-const RESTORE_API="https://procoachos-dodo.maildinu25.workers.dev/api/trial/restore";
 async function checkTrialEmailUsed(email){
  try{
   let response=await fetch(TRIAL_CHECK_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});
@@ -323,14 +320,9 @@ async function submitEmailGateStep1(e){
  if(submitBtn){submitBtn.disabled=true;submitBtn.textContent="Checking..."}
  let{alreadyUsed}=await checkTrialEmailUsed(email);
  if(alreadyUsed){
-  // Not a dead end anymore — this email has a real trial or license
-  // somewhere already (possibly in a different, isolated browser
-  // context, like Instagram's in-app browser or an iOS Home Screen
-  // shortcut). Verify it's really them, then restore their existing
-  // access here rather than blocking them outright.
-  isRestoreFlow=true;
- } else {
-  isRestoreFlow=false;
+  if(submitBtn){submitBtn.disabled=false;submitBtn.textContent="Send Verification Code"}
+  alert("This email has already used a free trial. If that's you, enter a Basic or Premium license key on the Account page instead — or use a different email to start a new trial.");
+  return;
  }
  if(submitBtn){submitBtn.textContent="Sending Code..."}
  let sendResult=null;
@@ -356,16 +348,7 @@ function showEmailGateStep2(email){
  if(!overlay)return;
  let card=overlay.querySelector(".card");
  if(!card)return;
- card.innerHTML=isRestoreFlow?
- `<h1 style="margin-top:0;font-size:var(--fs-7)">Restore your access</h1>
- <p class="muted">This email already has an account. We sent a 6-digit code to <b>${esc(email)}</b> — enter it to confirm it's you and continue on this device.</p>
- <form onsubmit="submitEmailGateStep2(event)">
-  <label class="full">Verification code<input type="text" id="emailGateCodeInput" required inputmode="numeric" maxlength="6" placeholder="123456" style="letter-spacing:6px;font-size:20px;text-align:center"></label>
-  <button class="btn primary full" style="margin-top:14px">Verify &amp; Restore Access</button>
- </form>
- <button type="button" class="btn secondary full" style="margin-top:10px" onclick="resendEmailGateCode()">Resend Code</button>`
- :
- `<h1 style="margin-top:0;font-size:var(--fs-7)">Check your email</h1>
+ card.innerHTML=`<h1 style="margin-top:0;font-size:var(--fs-7)">Check your email</h1>
  <p class="muted">We sent a 6-digit code to <b>${esc(email)}</b>. Enter it below to start your trial.</p>
  <form onsubmit="submitEmailGateStep2(event)">
   <label class="full">Verification code<input type="text" id="emailGateCodeInput" required inputmode="numeric" maxlength="6" placeholder="123456" style="letter-spacing:6px;font-size:20px;text-align:center"></label>
@@ -395,7 +378,6 @@ async function submitEmailGateStep2(e){
  let email=pendingVerificationEmail;
  if(!code||!email){alert("Enter the code from your email.");return}
  let submitBtn=e&&e.target?e.target.querySelector("button"):null;
- let defaultLabel=isRestoreFlow?"Verify & Restore Access":"Verify & Start Trial";
  if(submitBtn){submitBtn.disabled=true;submitBtn.textContent="Verifying..."}
  let verifyResult=null;
  try{
@@ -403,44 +385,14 @@ async function submitEmailGateStep2(e){
   verifyResult=null;try{verifyResult=await response.json()}catch(_){}
  }catch(err){
   console.error("Verify-code request failed:",err&&err.message?err.message:err);
-  if(submitBtn){submitBtn.disabled=false;submitBtn.textContent=defaultLabel}
+  if(submitBtn){submitBtn.disabled=false;submitBtn.textContent="Verify & Start Trial"}
   alert("Couldn't reach the verification server. Check your connection and try again.");
   return;
  }
  if(!verifyResult||verifyResult.verified!==true){
-  if(submitBtn){submitBtn.disabled=false;submitBtn.textContent=defaultLabel}
+  if(submitBtn){submitBtn.disabled=false;submitBtn.textContent="Verify & Start Trial"}
   let reason=verifyResult&&verifyResult.error==="wrong_code"?"That code doesn't match. Please try again.":"That code has expired. Tap Resend Code to get a new one.";
   alert(reason);
-  return;
- }
- if(isRestoreFlow){
-  // Identity confirmed via the code above — now pull back whatever
-  // access this email actually has (paid license, or an existing
-  // trial with its REAL original start date) rather than granting a
-  // fresh trial on this new, previously-empty browser context.
-  if(submitBtn){submitBtn.textContent="Restoring Access..."}
-  let restoreResult=null;
-  try{
-   let response=await fetch(RESTORE_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email})});
-   restoreResult=null;try{restoreResult=await response.json()}catch(_){}
-  }catch(err){
-   console.error("Restore request failed:",err&&err.message?err.message:err);
-   if(submitBtn){submitBtn.disabled=false;submitBtn.textContent=defaultLabel}
-   alert("Couldn't reach the server to restore your access. Check your connection and try again.");
-   return;
-  }
-  if(!restoreResult||restoreResult.found!==true){
-   if(submitBtn){submitBtn.disabled=false;submitBtn.textContent=defaultLabel}
-   alert("We couldn't find an existing account for this email. Please contact hello@procoachos.in for help.");
-   return;
-  }
-  let lic=restoreResult.status==="licensed"
-   ?{status:restoreResult.tier,trialStartedAt:today(),licenseKey:restoreResult.licenseKey,trialEndedNoticeShown:true,email:email}
-   :{status:"trial",trialStartedAt:restoreResult.trialStartedAt||today(),licenseKey:"",trialEndedNoticeShown:false,email:email};
-  saveLicenseState(lic);
-  pendingVerificationEmail="";isRestoreFlow=false;
-  let overlay=document.getElementById("emailGateOverlay");if(overlay)overlay.remove();
-  nav();renderAll();applyTheme(document.documentElement.classList.contains("light")?"light":"dark");checkPlanTransition();
   return;
  }
  if(submitBtn){submitBtn.textContent="Starting Trial..."}
@@ -457,7 +409,7 @@ async function submitEmailGateStep2(e){
  }catch(err){console.error("Welcome email failed to send:",err&&err.message?err.message:err)}
  let lic={status:"trial",trialStartedAt:today(),licenseKey:"",trialEndedNoticeShown:false,email:email};
  saveLicenseState(lic);
- pendingVerificationEmail="";isRestoreFlow=false;
+ pendingVerificationEmail="";
  let overlay=document.getElementById("emailGateOverlay");if(overlay)overlay.remove();
  nav();renderAll();applyTheme(document.documentElement.classList.contains("light")?"light":"dark");checkPlanTransition();
 }
@@ -677,6 +629,8 @@ function initApp(){
   db.sessions.forEach(s=>{if(!s.id)s.id=uid("sess")});
   db.reflections.forEach(r=>{if(!r.id)r.id=uid("refl")});
   db.assessments.forEach(a=>{if(!a.id)a.id=uid("assess")});
+  db.customSkills=(db.customSkills&&typeof db.customSkills==="object")?db.customSkills:{};
+  Object.keys(skillSets).forEach(k=>{db.customSkills[k]=Array.isArray(db.customSkills[k])?db.customSkills[k]:[]});
   db.settings=(db.settings&&typeof db.settings==="object")?db.settings:{};
   db.teams=Array.isArray(db.teams)?db.teams:[];
   db.tournaments=Array.isArray(db.tournaments)?db.tournaments:[];
@@ -692,56 +646,6 @@ function initApp(){
 }
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));const today=()=>new Date().toISOString().slice(0,10);
 function save(){idbSet(DB_KEY,db).catch(err=>console.warn("IndexedDB save failed",err));try{localStorage.setItem(DB_KEY,JSON.stringify(db))}catch(e){}renderAll()}function head(t,s){return `<button class="backBtn noPrint" onclick="goBack()">${icon("chevronLeft",13)} Back</button><div class="hero"><h1>${t}</h1><div class="muted">${s}</div></div>`}function empty(t){return `<div class="empty">${t}</div>`}
-// ===== State-aware "next step" nudges — lightweight, dismissible, tied to =====
-// ===== real data on each page, not a generic hover or tutorial overlay. =====
-function isNudgeDismissed(id){
- try{ let d=JSON.parse(localStorage.getItem("coachbook_dismissed_nudges")||"[]"); return d.includes(id); }catch(e){ return false; }
-}
-function dismissNudge(id,pageId){
- try{ let d=JSON.parse(localStorage.getItem("coachbook_dismissed_nudges")||"[]"); if(!d.includes(id)){d.push(id);localStorage.setItem("coachbook_dismissed_nudges",JSON.stringify(d))} }catch(e){}
- if(typeof window[pageId]==="function") window[pageId]();
-}
-function nudgeBanner(pageId,nudge){
- if(!nudge||isNudgeDismissed(nudge.id))return "";
- return `<div class="card" style="border-color:rgba(75,140,255,.35);background:rgba(75,140,255,.06);display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:16px">
- <div style="flex:1"><b style="color:#7db0ff;font-size:var(--fs-2);text-transform:uppercase;letter-spacing:.4px">Next step</b><div style="margin-top:4px">${esc(nudge.text)}</div>${nudge.actionLabel?`<button class="btn secondary" style="margin-top:10px" onclick="${nudge.action}">${esc(nudge.actionLabel)}</button>`:""}</div>
- <button onclick="dismissNudge('${nudge.id}','${pageId}')" style="background:none;border:none;color:var(--muted);font-size:20px;line-height:1;cursor:pointer;padding:2px 6px" aria-label="Dismiss">×</button>
- </div>`;
-}
-function sessionsNudge(){
- if(!db.sessions.length)return{id:"sessions-first",text:"Plan your first session to get started — set objectives, pick drills, and track attendance.",actionLabel:"+ New Session",action:"newSession()"};
- if(db.sessions.length>=3&&!(db.sessionTemplates&&db.sessionTemplates.length))return{id:"sessions-template",text:"You've logged a few sessions now — save one as a template to speed up planning next time.",actionLabel:null,action:null};
- return null;
-}
-function drillsNudge(){
- if(!db.drills.length)return{id:"drills-first",text:"Add your first drill so you can start building it into session plans.",actionLabel:"+ Add Drill",action:"newDrill()"};
- let usedDrillIds=new Set();
- db.sessions.forEach(s=>{(s.mainDrillIds||[]).forEach(id=>usedDrillIds.add(id));(s.gameDrillIds||[]).forEach(id=>usedDrillIds.add(id));});
- if(db.drills.length&&usedDrillIds.size===0&&db.sessions.length>0)return{id:"drills-link",text:"None of your drills are linked to a session yet — link them in to see which ones you actually use most.",actionLabel:null,action:null};
- return null;
-}
-function playersNudge(){
- if(!db.players.length)return{id:"players-first",text:"Add your first player to start tracking their development.",actionLabel:"+ Add Player",action:"newPlayer()"};
- if(db.players.length&&db.players.every(p=>!(p.goals&&p.goals.length)))return{id:"players-goal",text:"None of your players have a goal set yet — add one to start tracking progress toward something specific.",actionLabel:null,action:null};
- return null;
-}
-function organisationNudge(){
- if(!db.teams.length&&db.players.length>0)return{id:"org-team",text:"Create a team to start organising your players into squads.",actionLabel:"+ Add Team",action:"newOrgEntity('team')"};
- if(db.teams.length&&!db.seasons.length)return{id:"org-season",text:"Set up a season to track a team's fixtures and attendance over a defined period.",actionLabel:"+ Add Season",action:"newOrgEntity('season')"};
- return null;
-}
-function matchesNudge(){
- if(!db.matches.length)return{id:"matches-first",text:"Log your first match to start building a performance history.",actionLabel:"+ New Match",action:"newMatch()"};
- return null;
-}
-function assessmentsNudge(){
- if(!db.assessments.length&&db.players.length>0)return{id:"assessments-first",text:"Run your first player assessment to start tracking skill development over time.",actionLabel:"+ New Assessment",action:"newAssessment()"};
- return null;
-}
-function reflectionsNudge(){
- if(!db.reflections.length&&db.sessions.length>0)return{id:"reflections-first",text:"Log a reflection after your next session — it takes about two minutes and helps you spot patterns over time.",actionLabel:"+ New Reflection",action:"newReflection()"};
- return null;
-}
 function cssVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()||"#10b981"}
 function icon(name,size){
  size=size||18;
@@ -771,7 +675,7 @@ function icon(name,size){
  };
  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px">${paths[name]||""}</svg>`;
 }
-const PAGE_ICONS={dashboard:icon("home",20),sessions:icon("sessions",20),reflections:icon("reflections",20),players:icon("players",20),assessments:icon("assessments",20),drills:icon("drills",20),matches:icon("trophy",20),reports:icon("reports",20),analysis:"📊",calendar:icon("calendar",20),organisation:icon("layers",20),account:icon("account",20)};
+const PAGE_ICONS={dashboard:icon("home",20),sessions:icon("sessions",20),reflections:icon("reflections",20),players:icon("players",20),assessments:icon("assessments",20),drills:icon("drills",20),matches:icon("trophy",20),reports:icon("reports",20),calendar:icon("calendar",20),organisation:icon("layers",20),account:icon("account",20)};
 const BOTTOM_NAV_ITEMS=["dashboard","players","__new__","sessions","reports"];
 const BOTTOM_NAV_LABELS={dashboard:"Dashboard",players:"Players",sessions:"Sessions",reports:"Reports"};
 function bottomNav(){
@@ -1077,7 +981,6 @@ function sessions(){
  if(sessionSquadFilter)list=list.filter(s=>s.squad===sessionSquadFilter);
  let squadOptions=[...new Set(db.sessions.map(s=>s.squad).filter(Boolean))].sort();
  document.getElementById("sessions").innerHTML=head("Session Plans","Plan, document and review every coaching session.")
- +nudgeBanner("sessions",sessionsNudge())
  +`<button class="btn primary noPrint" onclick="newSession()">+ New Session</button>
  <button class="btn secondary noPrint" style="margin-left:8px" onclick="manageSessionTemplates()">Templates</button>
  <div class="card" style="margin:15px 0"><div class="formgrid">
@@ -1244,7 +1147,6 @@ function reflections(){
  let list=db.reflections.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
  if(reflectionQuery){let q=reflectionQuery.toLowerCase();list=list.filter(x=>reflectionSearchableText(x).some(v=>String(v||"").toLowerCase().includes(q)))}
  document.getElementById("reflections").innerHTML=head("Self Reflections","Turn experience into deliberate coaching improvement.")
- +nudgeBanner("reflections",reflectionsNudge())
  +`<button class="btn primary" onclick="newReflection()">+ New Reflection</button>
  <div class="card" style="margin:15px 0"><label>Search<input id="reflectionSearch" value="${esc(reflectionQuery)}" oninput="reflectionQuery=this.value;reflections()" onfocus="reflectionSearchFocused=true" onblur="reflectionSearchFocused=false" placeholder="Session, notes, learning..."></label></div>
  <h2 class="section">Reflection history (${list.length})</h2>
@@ -1433,7 +1335,6 @@ function players(){
  if(playerRoleFilter)list=list.filter(p=>p.role===playerRoleFilter);
  if(playerTeamFilter)list=list.filter(p=>p.team===playerTeamFilter);
  document.getElementById("players").innerHTML=head("Players","Development record for every player.")
- +nudgeBanner("players",playersNudge())
  +`<div class="toolbar noPrint"><button class="btn primary" onclick="newPlayer()">+ Add Player</button><button class="btn secondary" onclick="newPlayersBulk()">+ Add Multiple</button><button class="btn secondary" onclick="playerRosterReport()">Print Roster</button></div>
  <div class="card" style="margin:15px 0"><div class="formgrid">
  <label>Search<input id="playerSearch" value="${esc(playerQuery)}" oninput="playerQuery=this.value;players()" onfocus="playerSearchFocused=true" onblur="playerSearchFocused=false" placeholder="Name, team, notes..."></label>
@@ -1490,233 +1391,6 @@ function deletePlayerGoal(playerId,goalId){
  p.goals=p.goals.filter(x=>x.id!==goalId);
  save();playerView(playerId);
 }
-// ===== Fitness testing — same test types and units as the Academy platform =====
-// ===== so the two products stay consistent if a coach ever moves between   =====
-// ===== them. Stored directly on the player record, matching how goals work.=====
-const FITNESS_TEST_TYPES=["Sprint 20m","Agility 5-10-5","Throwing accuracy","Bowling speed","Bowling accuracy","Bat speed","Custom"];
-const FITNESS_UNIT_MAP={"Sprint 20m":"seconds","Agility 5-10-5":"seconds","Throwing accuracy":"%","Bowling speed":"km/h","Bowling accuracy":"%","Bat speed":"km/h","Custom":""};
-function onFitnessTypeChange(playerId){
- let sel=document.getElementById("fitness-type-"+playerId);
- let customEl=document.getElementById("fitness-custom-"+playerId);
- let unitEl=document.getElementById("fitness-unit-"+playerId);
- if(!sel||!customEl||!unitEl)return;
- if(sel.value==="Custom"){customEl.style.display="";unitEl.value=""}
- else{customEl.style.display="none";unitEl.value=FITNESS_UNIT_MAP[sel.value]||""}
-}
-function playerFitnessTestsHtml(p){
- let tests=(p.fitnessTests||[]).slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
- return `<h2 class="section">Fitness Testing</h2><div class="card">
- ${tests.length?tests.map(t=>`<div class="item"><div><b>${esc(t.testType)}</b><div class="muted">${esc(fmtDate(t.date))}${t.value?" · "+esc(t.value)+(t.unit?" "+esc(t.unit):""):""}</div>${t.notes?`<div class="muted" style="margin-top:2px">${esc(t.notes)}</div>`:""}</div><button class="btn danger" onclick="deleteFitnessTest('${p.id}','${t.id}')">×</button></div>`).join(""):`<div class="muted" style="margin-bottom:10px">No test results logged yet.</div>`}
- <form onsubmit="addFitnessTest(event,'${p.id}')" class="formgrid" style="margin-top:10px;padding:0">
- <select name="testType" id="fitness-type-${p.id}" onchange="onFitnessTypeChange('${p.id}')">${FITNESS_TEST_TYPES.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}</select>
- <input name="customType" id="fitness-custom-${p.id}" placeholder="Custom test name" style="display:none">
- <input type="date" name="date" value="${today()}" required>
- <input type="number" step="any" name="value" placeholder="Value">
- <input name="unit" id="fitness-unit-${p.id}" placeholder="Unit" value="${FITNESS_UNIT_MAP[FITNESS_TEST_TYPES[0]]}">
- <input name="notes" placeholder="Notes (optional)">
- <button class="btn primary full" style="margin-top:4px">+ Add Result</button>
- </form></div>`;
-}
-function addFitnessTest(e,playerId){
- e.preventDefault();
- if(!requireWriteAccess())return;
- let p=db.players.find(x=>x.id===playerId);if(!p)return;
- let fd=new FormData(e.target);
- let typeSel=String(fd.get("testType")||"");
- let testType=typeSel==="Custom"?String(fd.get("customType")||"").trim():typeSel;
- if(!testType){alert("Please name the custom test.");return}
- if(!p.fitnessTests)p.fitnessTests=[];
- p.fitnessTests.push({id:uid("fit"),testType,date:fd.get("date")||today(),value:fd.get("value")||"",unit:String(fd.get("unit")||"").trim(),notes:String(fd.get("notes")||"").trim()});
- save();playerView(playerId);
-}
-function deleteFitnessTest(playerId,testId){
- if(!requireWriteAccess())return;
- let p=db.players.find(x=>x.id===playerId);if(!p||!p.fitnessTests)return;
- if(!confirm("Delete this test result?"))return;
- p.fitnessTests=p.fitnessTests.filter(x=>x.id!==testId);
- save();playerView(playerId);
-}
-// Reads PitchMap's own separate database (read-only) and aggregates
-// bowling stats for a given player by name — the analysis tools store
-// free-text names, not player IDs, so matching is name-based and best-
-// effort. Fails silently (resolves null) if anything is missing, so a
-// coach who's never used PitchMap sees nothing extra, not an error.
-function loadPitchMapStatsForPlayer(playerName){
- return new Promise(function(resolve){
-  try{
-   var target=String(playerName||"").trim().toLowerCase();
-   if(!target){resolve(null);return}
-   var req=indexedDB.open("procoachos");
-   req.onerror=function(){resolve(null)};
-   req.onsuccess=function(){
-    try{
-     var idb=req.result;
-     if(!idb.objectStoreNames.contains("pitchsessions")){resolve(null);return}
-     var tx=idb.transaction("pitchsessions","readonly");
-     var getAllReq=tx.objectStore("pitchsessions").getAll();
-     getAllReq.onerror=function(){resolve(null)};
-     getAllReq.onsuccess=function(){
-      var records=getAllReq.result||[];
-      var OUTCOME_RUNS={dot:0,"1":1,"2":2,"3":3,"4":4,"6":6,W:0,wd:1,nb:1};
-      var sessions=0,wickets=0,runs=0,balls=0;
-      records.forEach(function(rec){
-       var data=rec&&rec.data;if(!data||!data.bowlers)return;
-       var foundInThisSession=false;
-       Object.keys(data.bowlers).forEach(function(bid){
-        var bowler=data.bowlers[bid];
-        if(!bowler||!bowler.name||bowler.name.trim().toLowerCase()!==target)return;
-        foundInThisSession=true;
-        (bowler.balls||[]).forEach(function(b){
-         if(!b||b.outcome==="_none")return;
-         balls++;
-         if(b.outcome==="W")wickets++;
-         if(OUTCOME_RUNS.hasOwnProperty(b.outcome))runs+=OUTCOME_RUNS[b.outcome];
-        });
-       });
-       if(foundInThisSession)sessions++;
-      });
-      resolve(sessions?{sessions:sessions,wickets:wickets,runs:runs,balls:balls}:null);
-     };
-    }catch(e){resolve(null)}
-   };
-  }catch(e){resolve(null)}
- });
-}
-function loadAndRenderPitchMapStats(containerId,playerName){
- var box=document.getElementById(containerId);
- if(!box)return;
- loadPitchMapStatsForPlayer(playerName).then(function(stats){
-  box=document.getElementById(containerId);if(!box)return; // page may have navigated away by now
-  if(!stats){box.style.display="none";return}
-  var overs=Math.floor(stats.balls/6)+"."+(stats.balls%6);
-  box.style.display="";
-  box.innerHTML="<h2 class=\"section\">Bowling — PitchMap</h2><div class=\"card\"><p>"+stats.sessions+" session"+(stats.sessions!==1?"s":"")+" logged &middot; "+stats.wickets+" wicket"+(stats.wickets!==1?"s":"")+" &middot; "+stats.runs+" run"+(stats.runs!==1?"s":"")+" conceded &middot; "+overs+" overs</p><a class=\"btn secondary\" style=\"margin-top:8px;display:inline-block\" href=\"pitchmap.html?player="+encodeURIComponent(playerName)+"\" target=\"_blank\">View Full Report →</a></div>";
- });
-}
-// Same pattern as PitchMap above, reading BattingMap's own separate
-// database instead. Note the outcome-to-runs mapping is DIFFERENT here
-// on purpose — a wide or no-ball is 0 runs for the batter (it's an
-// extra credited to the team), whereas PitchMap correctly counts it as
-// 1 run conceded by the bowler. Confirmed against BattingMap's own
-// source rather than assumed from PitchMap's mapping.
-function loadBattingMapStatsForPlayer(playerName){
- return new Promise(function(resolve){
-  try{
-   var target=String(playerName||"").trim().toLowerCase();
-   if(!target){resolve(null);return}
-   var req=indexedDB.open("procoachos");
-   req.onerror=function(){resolve(null)};
-   req.onsuccess=function(){
-    try{
-     var idb=req.result;
-     if(!idb.objectStoreNames.contains("battingsessions")){resolve(null);return}
-     var tx=idb.transaction("battingsessions","readonly");
-     var getAllReq=tx.objectStore("battingsessions").getAll();
-     getAllReq.onerror=function(){resolve(null)};
-     getAllReq.onsuccess=function(){
-      var records=getAllReq.result||[];
-      var OUTCOME_RUNS={dot:0,"1":1,"2":2,"3":3,"4":4,"6":6,W:0,wd:0,nb:0};
-      var sessions=0,dismissals=0,runs=0,balls=0;
-      records.forEach(function(rec){
-       var data=rec&&rec.data;if(!data||!data.batters)return;
-       var foundInThisSession=false;
-       Object.keys(data.batters).forEach(function(bid){
-        var batter=data.batters[bid];
-        if(!batter||!batter.name||batter.name.trim().toLowerCase()!==target)return;
-        foundInThisSession=true;
-        (batter.balls||[]).forEach(function(b){
-         if(!b||b.outcome==="_none")return;
-         balls++;
-         if(b.outcome==="W")dismissals++;
-         if(OUTCOME_RUNS.hasOwnProperty(b.outcome))runs+=OUTCOME_RUNS[b.outcome];
-        });
-       });
-       if(foundInThisSession)sessions++;
-      });
-      resolve(sessions?{sessions:sessions,dismissals:dismissals,runs:runs,balls:balls}:null);
-     };
-    }catch(e){resolve(null)}
-   };
-  }catch(e){resolve(null)}
- });
-}
-function loadAndRenderBattingMapStats(containerId,playerName){
- var box=document.getElementById(containerId);
- if(!box)return;
- loadBattingMapStatsForPlayer(playerName).then(function(stats){
-  box=document.getElementById(containerId);if(!box)return;
-  if(!stats){box.style.display="none";return}
-  var sr=stats.balls?((stats.runs/stats.balls)*100).toFixed(1):"—";
-  box.style.display="";
-  box.innerHTML="<h2 class=\"section\">Batting — BattingMap</h2><div class=\"card\"><p>"+stats.sessions+" session"+(stats.sessions!==1?"s":"")+" logged &middot; "+stats.runs+" run"+(stats.runs!==1?"s":"")+" &middot; "+stats.balls+" ball"+(stats.balls!==1?"s":"")+" faced &middot; "+stats.dismissals+" dismissal"+(stats.dismissals!==1?"s":"")+" &middot; SR "+sr+"</p><a class=\"btn secondary\" style=\"margin-top:8px;display:inline-block\" href=\"battingmap.html?player="+encodeURIComponent(playerName)+"\" target=\"_blank\">View Full Report →</a></div>";
- });
-}
-// LiveSession stores one combined delivery per ball, stamped with BOTH
-// bowlerName and batterName — so a single read gives both roles' stats
-// at once. Important: the same wide/no-ball delivery must count 1 run
-// toward the bowler's conceded total (matching PitchMap's convention)
-// but 0 runs toward the batter's scored total (matching BattingMap's
-// convention) — confirmed deliberate, not a copy-paste of one mapping.
-function loadLiveSessionStatsForPlayer(playerName){
- return new Promise(function(resolve){
-  try{
-   var target=String(playerName||"").trim().toLowerCase();
-   if(!target){resolve({bowling:null,batting:null});return}
-   var req=indexedDB.open("procoachos");
-   req.onerror=function(){resolve({bowling:null,batting:null})};
-   req.onsuccess=function(){
-    try{
-     var idb=req.result;
-     if(!idb.objectStoreNames.contains("livesessions")){resolve({bowling:null,batting:null});return}
-     var tx=idb.transaction("livesessions","readonly");
-     var getAllReq=tx.objectStore("livesessions").getAll();
-     getAllReq.onerror=function(){resolve({bowling:null,batting:null})};
-     getAllReq.onsuccess=function(){
-      var records=getAllReq.result||[];
-      var BOWL_RUNS={dot:0,"1":1,"2":2,"3":3,"4":4,"6":6,W:0,wd:1,nb:1};
-      var BAT_RUNS={dot:0,"1":1,"2":2,"3":3,"4":4,"6":6,W:0,wd:0,nb:0};
-      var bowlSessions={},bowlWickets=0,bowlRuns=0,bowlBalls=0;
-      var batSessions={},batDismissals=0,batRuns=0,batBalls=0;
-      records.forEach(function(rec){
-       var data=rec&&rec.data;if(!data||!Array.isArray(data.deliveries))return;
-       data.deliveries.forEach(function(d){
-        if(!d||d.outcome==="_none")return;
-        if(d.bowlerName&&d.bowlerName.trim().toLowerCase()===target){
-         bowlSessions[rec.key]=true;bowlBalls++;
-         if(d.outcome==="W")bowlWickets++;
-         if(BOWL_RUNS.hasOwnProperty(d.outcome))bowlRuns+=BOWL_RUNS[d.outcome];
-        }
-        if(d.batterName&&d.batterName.trim().toLowerCase()===target){
-         batSessions[rec.key]=true;batBalls++;
-         if(d.outcome==="W")batDismissals++;
-         if(BAT_RUNS.hasOwnProperty(d.outcome))batRuns+=BAT_RUNS[d.outcome];
-        }
-       });
-      });
-      var bowlCount=Object.keys(bowlSessions).length,batCount=Object.keys(batSessions).length;
-      resolve({
-       bowling:bowlCount?{sessions:bowlCount,wickets:bowlWickets,runs:bowlRuns,balls:bowlBalls}:null,
-       batting:batCount?{sessions:batCount,dismissals:batDismissals,runs:batRuns,balls:batBalls}:null
-      });
-     };
-    }catch(e){resolve({bowling:null,batting:null})}
-   };
-  }catch(e){resolve({bowling:null,batting:null})}
- });
-}
-function loadAndRenderLiveSessionStats(containerId,playerName){
- var box=document.getElementById(containerId);
- if(!box)return;
- loadLiveSessionStatsForPlayer(playerName).then(function(result){
-  box=document.getElementById(containerId);if(!box)return;
-  if(!result.bowling&&!result.batting){box.style.display="none";return}
-  box.style.display="";
-  var parts=[];
-  if(result.bowling){var b=result.bowling;var overs=Math.floor(b.balls/6)+"."+(b.balls%6);parts.push("<p><b>Bowling:</b> "+b.sessions+" session"+(b.sessions!==1?"s":"")+" &middot; "+b.wickets+" wicket"+(b.wickets!==1?"s":"")+" &middot; "+b.runs+" run"+(b.runs!==1?"s":"")+" conceded &middot; "+overs+" overs</p>")}
-  if(result.batting){var t=result.batting;var sr=t.balls?((t.runs/t.balls)*100).toFixed(1):"—";parts.push("<p><b>Batting:</b> "+t.sessions+" session"+(t.sessions!==1?"s":"")+" &middot; "+t.runs+" run"+(t.runs!==1?"s":"")+" &middot; "+t.balls+" ball"+(t.balls!==1?"s":"")+" faced &middot; SR "+sr+"</p>")}
-  box.innerHTML="<h2 class=\"section\">Live Session (Net Practice)</h2><div class=\"card\">"+parts.join("")+"<a class=\"btn secondary\" style=\"margin-top:8px;display:inline-block\" href=\"livesession.html?player="+encodeURIComponent(playerName)+"\" target=\"_blank\">View Full Report →</a></div>";
- });
-}
 function playerViewBody(p){
  let assessments=playerAssessments(p);
  let latest=assessments.slice(-1)[0];
@@ -1726,21 +1400,17 @@ function playerViewBody(p){
  ${p.age?`<div class="muted" style="margin-top:8px">Age: ${esc(p.age)}</div>`:""}
  <h2 class="section">Current goal</h2><div class="card">${esc(p.focus||"—")}</div>
  ${playerGoalsHtml(p)}
- ${playerFitnessTestsHtml(p)}
  ${p.strengths?`<h2 class="section">Strengths</h2><div class="card">${esc(p.strengths)}</div>`:""}
  ${p.areas?`<h2 class="section">Development areas</h2><div class="card">${esc(p.areas)}</div>`:""}
  ${p.notes?`<h2 class="section">Coach notes</h2><div class="card">${esc(p.notes)}</div>`:""}
  ${latest?`<h2 class="section">Latest assessment</h2><div class="card"><b>Overall ${assessmentAvg(latest)}/10</b><br>${assessmentDisciplines(latest).map(d=>`<span class="tag">${d} ${disciplineAvg(latest,d)}/10</span>`).join("")}</div>${assessmentDetailHTML(latest)}`:""}
  <h2 class="section">Assessment history (${assessments.length})</h2>${assessments.length?`<div class="card">${assessments.map(a=>`<div class="item"><div><b>${esc(fmtDate(a.date))}</b><div class="muted">Overall ${assessmentAvg(a)}/10</div>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div></div>`).join("")}</div>`:empty("No assessments yet.")}
  <h2 class="section">Session attendance (${sessions.length})</h2>${sessions.length?`<div class="card">${sessions.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}</div></div></div>`).join("")}</div>`:empty("No recorded attendance yet.")}
- <h2 class="section">Match history (${matches.length})</h2>${matches.length?`<div class="card">${matches.map(m=>{let bat=(m.battingReview||[]).find(r=>r.name===p.name);let bowl=(m.bowlingReview||[]).find(r=>r.name===p.name);return `<div class="item"><div><b>vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(fmtDate(m.date))}${bat?" · "+esc(bat.runs||0)+"("+esc(bat.balls||0)+")":""}${bowl?" · "+esc(bowl.wickets||0)+"/"+esc(bowl.runs||0):""}</div></div><button class="btn secondary" onclick="closeM();matchReportView('${m.id}')">Report</button></div>`}).join("")}</div>`:empty("No match entries yet.")}
- <div id="pitchmap-stats-${p.id}" style="display:none"></div>
- <div id="battingmap-stats-${p.id}" style="display:none"></div>
- <div id="livesession-stats-${p.id}" style="display:none"></div>`;
+ <h2 class="section">Match history (${matches.length})</h2>${matches.length?`<div class="card">${matches.map(m=>{let bat=(m.battingReview||[]).find(r=>r.name===p.name);let bowl=(m.bowlingReview||[]).find(r=>r.name===p.name);return `<div class="item"><div><b>vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(fmtDate(m.date))}${bat?" · "+esc(bat.runs||0)+"("+esc(bat.balls||0)+")":""}${bowl?" · "+esc(bowl.wickets||0)+"/"+esc(bowl.runs||0):""}</div></div><button class="btn secondary" onclick="closeM();matchReportView('${m.id}')">Report</button></div>`}).join("")}</div>`:empty("No match entries yet.")}`;
 }
 function playerView(id){let p=db.players.find(x=>x.id===id);if(!p)return;modal(`<div class="sheetHead"><h2>${esc(p.name)}</h2><button class="x" onclick="closeM()">×</button></div>${playerViewBody(p)}<button class="btn secondary" style="margin-top:14px" onclick="playerProfileReport('${p.id}')">Print Profile</button>
  <button class="btn secondary" style="margin-top:8px" onclick="parentSummaryReport('${p.id}')">Parent / Player Summary</button>
- <button class="btn secondary" style="margin-top:8px" onclick="compareVideos('${p.id}')">Compare Videos (Before / After)</button>`);loadAndRenderPitchMapStats("pitchmap-stats-"+p.id,p.name);loadAndRenderBattingMapStats("battingmap-stats-"+p.id,p.name);loadAndRenderLiveSessionStats("livesession-stats-"+p.id,p.name)}
+ <button class="btn secondary" style="margin-top:8px" onclick="compareVideos('${p.id}')">Compare Videos (Before / After)</button>`)}
 function compareVideos(playerId){
  let p=db.players.find(x=>x.id===playerId);if(!p)return;
  let allLinks=[];
@@ -1770,7 +1440,7 @@ function renderVideoComparison(playerId){
  <div class="card"><b>After — ${esc(fmtDate(after.date))}</b><div style="margin-top:8px"><a href="${esc(after.link)}" target="_blank" rel="noopener" class="btn secondary full">Open Video</a></div></div>
  </div>`;
 }
-function playerProfileReport(id){let p=db.players.find(x=>x.id===id);if(!p)return;reportShell(esc(p.name),`${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}`,playerViewBody(p));loadAndRenderPitchMapStats("pitchmap-stats-"+p.id,p.name);loadAndRenderBattingMapStats("battingmap-stats-"+p.id,p.name);loadAndRenderLiveSessionStats("livesession-stats-"+p.id,p.name)}
+function playerProfileReport(id){let p=db.players.find(x=>x.id===id);if(!p)return;reportShell(esc(p.name),`${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}`,playerViewBody(p))}
 // A deliberately curated, parent/player-facing summary — strengths,
 // active goals, a plain-language trend, and next focus only. No coach
 // notes, no raw per-session assessment scores, and nothing about any
@@ -1807,12 +1477,13 @@ function playerRosterReport(){
  reportShell("Player Roster",`${list.length} players`,list.length?list.map(p=>`<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span><p class="muted">${p.team?esc(p.team):"No team set"}${p.group?" · "+esc(p.group):""}</p><p>${esc(p.focus||"")}</p></div>`).join(""):empty("No players yet."));
 }
 const skillSets={Batting:["Setup & Balance","Footwork","Bat Swing / Contact","Shot Selection","Playing Pace","Playing Spin","Strike Rotation","Boundary Options","Game Awareness","Execution Under Pressure"],Bowling:["Run-up / Approach","Action & Alignment","Accuracy","Control & Consistency","Pace / Revolutions","Swing / Seam / Spin","Variations","Tactical Awareness","Execution Under Pressure"],Fielding:["Catching","Ground Fielding","Throwing Accuracy","Throwing Power","Movement & Agility","Positioning","Game Awareness","Communication","Decision Making","Execution Under Pressure"],Wicketkeeping:["Set Position","Footwork","Glove Work","Standing Back","Standing Up","Taking Spin","Leg-side Takes","Gather & Release","Communication","Decision Making"]};const legacySkills=["Catching","Ground Fielding","Throwing Accuracy","Movement","Game Awareness","Communication","Decision Making","Work Ethic","Coachability"];
+function allSkillsFor(d){return skillSets[d].concat((db.customSkills&&db.customSkills[d])||[])}
 // Bowling used to have "Length Control" and "Consistency" as two separate skills
 // (10 total); they're now merged into one "Control & Consistency" skill (9 total).
 // Old assessments still have 10 stored values — this preserves them exactly as
 // originally entered rather than silently corrupting/relabeling them.
 const legacyBowlingSkills=["Run-up / Approach","Action & Alignment","Accuracy","Length Control","Consistency","Pace / Revolutions","Swing / Seam / Spin","Variations","Tactical Awareness","Execution Under Pressure"];
-function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+nudgeBanner("assessments",assessmentsNudge())+`<button class="btn primary" onclick="newAssessment()">+ New Assessment</button><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(a.date)} · Overall ${assessmentAvg(a)}/10</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="editAssessment('${a.id}')">Edit</button><button class="btn danger" onclick="delAssessment('${a.id}')">×</button></div></div>`).join(""):empty("No assessments yet.")}</div>`}
+function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<button class="btn primary" onclick="newAssessment()">+ New Assessment</button><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(a.date)} · Overall ${assessmentAvg(a)}/10</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="editAssessment('${a.id}')">Edit</button><button class="btn danger" onclick="delAssessment('${a.id}')">×</button></div></div>`).join(""):empty("No assessments yet.")}</div>`}
 function assessmentFormHtml(a,mode){
  a=a||{};
  return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Assessment":"Player Assessment"}</h2><button class="x" onclick="closeM()">×</button></div>
@@ -1895,7 +1566,8 @@ function renderAssessmentSkills(){
  box.innerHTML=sel.map(d=>{
   let oldVals=(existing&&existing.ratings&&existing.ratings[d])?existing.ratings[d]:null;
   let isLegacyBowling=d==="Bowling"&&oldVals&&oldVals.length===10;
-  return `<label style="margin-bottom:6px">${d} · Rate 1–10</label><div class="card">${skillSets[d].map((s,i)=>{
+  let skills=allSkillsFor(d);
+  return `<label style="margin-bottom:6px">${d} · Rate 1–10</label><div class="card">${skills.map((s,i)=>{
    let val=5;
    if(oldVals){
     if(isLegacyBowling){
@@ -1907,9 +1579,20 @@ function renderAssessmentSkills(){
     }
    }
    return sliderRow(s,`${d}_${i}`,val);
-  }).join("")}<label>${d} development notes<textarea name="${d}_notes">${esc((existing&&existing.disciplineNotes&&existing.disciplineNotes[d])||"")}</textarea></label></div>`;
+  }).join("")}<div class="formgrid" style="margin-top:8px"><input type="text" id="newSkill_${d}" placeholder="Add a custom metric for ${d}..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomSkill('${d}')}"><button type="button" class="btn" onclick="addCustomSkill('${d}')">+ Add metric</button></div><label>${d} development notes<textarea name="${d}_notes">${esc((existing&&existing.disciplineNotes&&existing.disciplineNotes[d])||"")}</textarea></label></div>`;
  }).join("")||empty("Select at least one skill area.");
  enhanceTextareasWithVoice(box);
+}
+function addCustomSkill(d){
+ let input=document.getElementById(`newSkill_${d}`);
+ let name=(input.value||"").trim();
+ if(!name)return;
+ let existingNames=allSkillsFor(d).map(s=>s.toLowerCase());
+ if(existingNames.includes(name.toLowerCase())){alert(`"${name}" already exists for ${d}.`);return}
+ db.customSkills[d]=db.customSkills[d]||[];
+ db.customSkills[d].push(name);
+ save();
+ renderAssessmentSkills();
 }
 function saveAssessment(e){
  e.preventDefault();
@@ -1918,7 +1601,7 @@ function saveAssessment(e){
  if(!sel.length){alert("Select at least one skill area.");return}
  let a={player:fd.get("player"),date:fd.get("date"),disciplines:sel,priority:fd.get("priority"),comments:fd.get("comments"),ratings:{},disciplineNotes:{}};
  a.mediaLinks=(fd.get("mediaLinks")||"").split("\n").map(s=>s.trim()).filter(Boolean);
- sel.forEach(d=>{a.ratings[d]=skillSets[d].map((_,i)=>Number(fd.get(`${d}_${i}`)||0));a.disciplineNotes[d]=fd.get(`${d}_notes`)||""});
+ sel.forEach(d=>{a.ratings[d]=allSkillsFor(d).map((_,i)=>Number(fd.get(`${d}_${i}`)||0));a.disciplineNotes[d]=fd.get(`${d}_notes`)||""});
  if(editingAssessmentId){
   let idx=db.assessments.findIndex(x=>x.id===editingAssessmentId);
   if(idx>-1){a.id=editingAssessmentId;db.assessments[idx]=a}
@@ -1930,7 +1613,7 @@ function saveAssessment(e){
 }
 function delAssessment(id){if(confirm("Delete this assessment?")){db.assessments=db.assessments.filter(x=>x.id!==id);save()}}
 function assessmentDisciplines(a){return Array.isArray(a.disciplines)&&a.disciplines.length?a.disciplines:["Fielding"]}function disciplineAvg(a,d){let n=[];if(a.ratings&&Array.isArray(a.ratings[d]))n=a.ratings[d].map(Number).filter(x=>x>0);else if(d==="Fielding")n=legacySkills.map((_,i)=>Number(a["s"+i]||0)).filter(x=>x>0);return n.length?(n.reduce((x,y)=>x+y,0)/n.length).toFixed(1):"—"}function assessmentAvg(a){let n=assessmentDisciplines(a).map(d=>Number(disciplineAvg(a,d))).filter(Number.isFinite);return n.length?(n.reduce((x,y)=>x+y,0)/n.length).toFixed(1):"—"}
-function assessmentDetailHTML(a){return assessmentDisciplines(a).map(d=>{let vals=a.ratings?.[d]||[],labels=(d==="Bowling"&&vals.length===10)?legacyBowlingSkills:(skillSets[d]||legacySkills);if(!vals.length&&d==="Fielding")vals=legacySkills.map((_,i)=>Number(a["s"+i]||0));return `<h2 class="section">${d} · ${disciplineAvg(a,d)}/10</h2><div class="card">${labels.map((s,i)=>vals[i]?`<div><b>${esc(s)}</b> — ${esc(vals[i])}/10</div>`:"").join("")}${a.disciplineNotes?.[d]?`<p><b>Development notes</b><br>${esc(a.disciplineNotes[d])}</p>`:""}</div>`}).join("")+assessmentMediaLinksHtml(a)}
+function assessmentDetailHTML(a){return assessmentDisciplines(a).map(d=>{let vals=a.ratings?.[d]||[],labels=(d==="Bowling"&&vals.length===10)?legacyBowlingSkills:allSkillsFor(d);if(!vals.length&&d==="Fielding")vals=legacySkills.map((_,i)=>Number(a["s"+i]||0));return `<h2 class="section">${d} · ${disciplineAvg(a,d)}/10</h2><div class="card">${labels.map((s,i)=>vals[i]?`<div><b>${esc(s)}</b> — ${esc(vals[i])}/10</div>`:"").join("")}${a.disciplineNotes?.[d]?`<p><b>Development notes</b><br>${esc(a.disciplineNotes[d])}</p>`:""}</div>`}).join("")+assessmentMediaLinksHtml(a)}
 function assessmentMediaLinksHtml(a){
  if(!a.mediaLinks||!a.mediaLinks.length)return "";
  return `<div class="card" style="margin-top:10px"><b>Video / Photo Links</b><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px">${a.mediaLinks.map((link,i)=>{
@@ -2027,7 +1710,6 @@ function drills(){
  if(drillQuery){let q=drillQuery.toLowerCase();list=list.filter(d=>[d.name,d.cat,d.equipment,d.points,d.progressions,d.regressions].some(v=>String(v||"").toLowerCase().includes(q)))}
  if(drillCatFilter)list=list.filter(d=>d.cat===drillCatFilter);
  document.getElementById("drills").innerHTML=head("Drill Library","Keep your best coaching practices organised and reusable.")
- +nudgeBanner("drills",drillsNudge())
  +`<div class="toolbar noPrint"><button class="btn primary" onclick="newDrill()">+ Add Drill</button><button class="btn secondary" onclick="drillLibraryReport()">Print Library</button></div>
  <div class="card" style="margin:15px 0"><div class="formgrid">
  <label>Search<input id="drillSearch" value="${esc(drillQuery)}" oninput="drillQuery=this.value;drills()" onfocus="drillSearchFocused=true" onblur="drillSearchFocused=false" placeholder="Name, equipment, coaching points..."></label>
@@ -2054,7 +1736,7 @@ function matches(){
  if(matchQuery){let q=matchQuery.toLowerCase();list=list.filter(m=>[m.team,m.opp,m.venue,m.notes,m.actions,m.result,m.teamNotes,m.battingAssessmentNotes,m.bowlingAssessmentNotes].some(v=>String(v||"").toLowerCase().includes(q)))}
  if(matchFormatFilter)list=list.filter(m=>m.format===matchFormatFilter);
  if(matchResultFilter)list=list.filter(m=>matchResultOutcome(m)===matchResultFilter);
- document.getElementById("matches").innerHTML=head("Match Centre","Match details, foundation, team & individual reviews, and automatic reports.")+nudgeBanner("matches",matchesNudge())+`<div class="toolbar noPrint"><button class="btn primary" onclick="newMatch()">+ New Match</button><button class="btn secondary" onclick="matchReport()">Print Report</button><button class="btn secondary" onclick="exportExcel()">Export Excel</button></div>
+ document.getElementById("matches").innerHTML=head("Match Centre","Match details, foundation, team & individual reviews, and automatic reports.")+`<div class="toolbar noPrint"><button class="btn primary" onclick="newMatch()">+ New Match</button><button class="btn secondary" onclick="matchReport()">Print Report</button><button class="btn secondary" onclick="exportExcel()">Export Excel</button></div>
  <div class="card" style="margin:15px 0"><div class="formgrid">
  <label>Search<input id="matchSearch" value="${esc(matchQuery)}" oninput="matchQuery=this.value;matches()" onfocus="matchSearchFocused=true" onblur="matchSearchFocused=false" placeholder="Team, opposition, venue, notes..."></label>
  <label>Format<select onchange="matchFormatFilter=this.value;matches()"><option value="">All formats</option>${MATCH_FORMATS.map(f=>`<option value="${f}" ${matchFormatFilter===f?"selected":""}>${f}</option>`).join("")}</select></label>
@@ -2311,7 +1993,6 @@ let tournamentSquadOpen={};
 function toggleTournamentSquad(id){tournamentSquadOpen[id]=!tournamentSquadOpen[id];organisation()}
 function organisation(){
  document.getElementById("organisation").innerHTML=head("Teams & Seasons","Manage the teams, tournaments and seasons your coaching work is organised around.")
- +nudgeBanner("organisation",organisationNudge())
  +`<h2 class="section" style="margin-top:0">Teams</h2>
  <div class="toolbar noPrint"><button class="btn primary" onclick="newOrgEntity('team')">+ Add Team</button></div>
  <div class="grid g3" style="margin-top:12px">${db.teams.length?db.teams.map(t=>{
@@ -2675,21 +2356,6 @@ const REPORT_GROUPS=[
 ];
 let reportGroupsOpen={};
 function toggleReportGroup(key){reportGroupsOpen[key]=!reportGroupsOpen[key];reports()}
-function analysisTools(){
- let el=document.getElementById("analysis");if(!el)return;
- if(!isPremium()){
-  let daysLeft=trialDaysLeft();
-  el.innerHTML=head("Analysis Tools","Ball-by-ball pitch mapping, batting impact tracking, live net sessions and squad insights.")
-  +`<div class="card" style="text-align:center;padding:32px"><h2 style="margin-top:0">Analysis Tools is an Elite feature</h2><p class="muted">${daysLeft>0?`You have ${daysLeft} day${daysLeft!==1?"s":""} left in your free trial to explore this.`:"Your free trial has ended."}</p><button class="btn primary" style="margin-top:10px" onclick="showUpgradePrompt('Analysis Tools')">Learn more</button></div>`;
-  return;
- }
- el.innerHTML=head("Analysis Tools","Ball-by-ball pitch mapping, batting impact tracking, live net sessions and squad insights — separate on-device tools, no sign-in required.")
- +`<div class="card" style="border-left:4px solid #22c58b"><b>Pitch Map</b><p class="muted" style="margin:6px 0 12px">Log where the ball pitches, wagon wheel of shots conceded, dismissals, full print/share reports.</p><a href="pitchmap.html" class="btn secondary full">Open Pitch Map</a></div>
- <div class="card" style="border-left:4px solid #e0ab2c;margin-top:12px"><b>Batting Impact Map</b><p class="muted" style="margin:6px 0 12px">Track balls faced, shot type and direction, dismissal patterns, and bowling type faced — per batter, per session.</p><a href="battingmap.html" class="btn secondary full">Open Batting Map</a></div>
- <div class="card" style="border-left:4px solid #3d8bd6;margin-top:12px"><b>Squad Insights</b><p class="muted" style="margin:6px 0 12px">Matchup reports, squad session summaries, trend charts, and auto-generated insights built from the tools above.</p><a href="insights.html" class="btn secondary full">Open Insights</a></div>
- <div class="card" style="border-left:4px solid #9b6bd6;margin-top:12px"><b>Live Session</b><p class="muted" style="margin:6px 0 12px">Real head-to-head data — pick who's bowling and who's batting, tap once per delivery, every ball logged for both at once.</p><a href="livesession.html" class="btn secondary full">Open Live Session</a></div>
- <div class="muted" style="margin-top:14px;font-size:var(--fs-2)">These tools store their own data separately from your main player records — player names entered here won't automatically appear in the rest of ProCoach OS yet.</div>`;
-}
 function reports(){
  if(!isPremium()){
   let daysLeft=trialDaysLeft();
@@ -3024,14 +2690,7 @@ function buildPlayerReport(){
  ${Object.entries(disciplineTrend).some(([,t])=>t.count>=2)?`<h2>Development Trend</h2><div class="card">${Object.entries(disciplineTrend).filter(([,t])=>t.count>=2).map(([d,t])=>{let diff=(t.last-t.first).toFixed(1);let sign=t.last>=t.first?"+":"";let color=t.last>=t.first?"var(--g)":"var(--red)";return `<div style="margin-bottom:6px"><b>${esc(d)}:</b> ${t.first.toFixed(1)} → ${t.last.toFixed(1)} <span style="color:${color};font-weight:700">(${sign}${diff})</span></div>`}).join("")}</div>`:""}
  ${matches.length?`<h2>Match Performance</h2><div class="card"><p>${battingEntries.length?`Batting: ${totalRuns} run${totalRuns!==1?"s":""} across ${battingEntries.length} innings`:""}${battingEntries.length&&bowlingEntries.length?" · ":""}${bowlingEntries.length?`Bowling: ${totalWickets} wicket${totalWickets!==1?"s":""} across ${bowlingEntries.length} match${bowlingEntries.length!==1?"es":""}`:""}${!battingEntries.length&&!bowlingEntries.length?`Played in ${matches.length} match${matches.length!==1?"es":""}, no batting or bowling entries logged.`:""}</p>${backToBackCount>0?`<p style="margin-top:8px;color:var(--gold)"><b>⚠ Workload note:</b> ${backToBackCount} match${backToBackCount!==1?"es":""} played with a day or less rest before the next one.</p>`:""}</div>`:""}
  ${matchTrendHtml}
- <h2>Assessment History</h2>${aa.length?aa.slice().reverse().map(a=>`<div class="card"><b>${esc(fmtDate(a.date))} · Overall ${assessmentAvg(a)}/10</b><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d} ${disciplineAvg(a,d)}/10</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${assessmentDetailHTML(a)}</div>`).join(""):empty("No assessments for this player.")}
- <div id="pitchmap-stats-report-${p.id}" style="display:none"></div>
- <div id="battingmap-stats-report-${p.id}" style="display:none"></div>
- <div id="livesession-stats-report-${p.id}" style="display:none"></div>`);
- loadAndRenderPitchMapStats("pitchmap-stats-report-"+p.id,p.name);
- loadAndRenderBattingMapStats("battingmap-stats-report-"+p.id,p.name);
- loadAndRenderLiveSessionStats("livesession-stats-report-"+p.id,p.name);
-}
+ <h2>Assessment History</h2>${aa.length?aa.slice().reverse().map(a=>`<div class="card"><b>${esc(fmtDate(a.date))} · Overall ${assessmentAvg(a)}/10</b><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d} ${disciplineAvg(a,d)}/10</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${assessmentDetailHTML(a)}</div>`).join(""):empty("No assessments for this player.")}`)}
 function seasonReport(){scopeAndRangeModal("Season / Full Report","buildSeasonReport")}
 function buildSeasonReport(){
  let scope=scopeValues();
@@ -3450,5 +3109,5 @@ function globalSearchResultsHtml(){
 /* ===== End Global Search ===== */
 
 function quick(){modal(`<div class="sheetHead"><h2>Create</h2><button class="x" onclick="closeM()">×</button></div><div class="grid g2"><button class="btn secondary" onclick="closeM();newSession()">Session Plan</button><button class="btn secondary" onclick="closeM();newReflection()">Self Reflection</button><button class="btn secondary" onclick="closeM();newPlayer()">Player</button><button class="btn secondary" onclick="closeM();newAssessment()">Assessment</button><button class="btn secondary" onclick="closeM();newDrill()">Drill</button><button class="btn secondary" onclick="closeM();newMatch()">Match</button><button class="btn secondary" onclick="closeM();newCalEvent()">Reminder / Event</button></div>`)}
-function renderAll(){dashboard();sessions();reflections();players();assessments();drills();matches();reports();analysisTools();calendar();organisation();accountPage()}initApp();
+function renderAll(){dashboard();sessions();reflections();players();assessments();drills();matches();reports();calendar();organisation();accountPage()}initApp();
 </script></body></html>
