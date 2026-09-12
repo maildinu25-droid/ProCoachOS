@@ -1498,6 +1498,45 @@ function goalStatusInfo(g){
  if(days===0)return{text:"Due today",color:"var(--red)"};
  return{text:`${days} day${days!==1?"s":""} left`,color:"var(--muted)"};
 }
+const FITNESS_TEST_TYPES=["Sprint 20m","Agility 5-10-5","Throwing accuracy","Bowling speed","Bowling accuracy","Bat speed","Custom"];
+const FITNESS_TEST_UNITS={"Sprint 20m":"seconds","Agility 5-10-5":"seconds","Throwing accuracy":"%","Bowling speed":"km/h","Bowling accuracy":"%","Bat speed":"km/h"};
+function updateFitnessTestUnit(sel){
+ let unitInput=document.getElementById("fitnessTestUnit");
+ if(!unitInput)return;
+ if(sel.value==="Custom"){unitInput.value="";unitInput.readOnly=false;unitInput.placeholder="e.g. reps, cm, minutes"}
+ else{unitInput.value=FITNESS_TEST_UNITS[sel.value]||"";unitInput.readOnly=true}
+}
+function fitnessTestsHtml(p,forPrint){
+ let tests=(p.fitnessTests||[]).slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+ let listHtml=tests.length?`<div class="card">${tests.map(t=>`<div class="item"><div><b>${esc(t.testType)}</b><div class="muted">${esc(t.value)} ${esc(t.unit)} · ${esc(fmtDate(t.date))}</div>${t.notes?`<div class="muted" style="margin-top:2px">${esc(t.notes)}</div>`:""}</div>${forPrint?"":`<button class="btn danger" onclick="deleteFitnessTest('${p.id}','${t.id}')">×</button>`}</div>`).join("")}</div>`:empty("No fitness tests logged yet.");
+ if(forPrint)return `<h2 class="section">Fitness testing</h2>${listHtml}`;
+ return `<h2 class="section">Fitness testing</h2>${listHtml}
+ <form onsubmit="saveFitnessTest(event,'${p.id}')" class="formgrid" style="margin-top:10px;padding:0">
+ <label>Test type<select name="testType" onchange="updateFitnessTestUnit(this)">${FITNESS_TEST_TYPES.map(t=>`<option>${t}</option>`).join("")}</select></label>
+ <label>Value<input name="value" type="number" step="any" required></label>
+ <label>Unit<input name="unit" id="fitnessTestUnit" value="${FITNESS_TEST_UNITS[FITNESS_TEST_TYPES[0]]}" readonly required></label>
+ <label>Date<input name="date" type="date" value="${today()}" required></label>
+ <label class="full">Notes (optional)<input name="notes"></label>
+ <button class="btn primary full" style="margin-top:4px">+ Add fitness test</button>
+ </form>`;
+}
+function saveFitnessTest(e,playerId){
+ e.preventDefault();
+ if(!requireWriteAccess())return;
+ let p=db.players.find(x=>x.id===playerId);if(!p)return;
+ let fd=new FormData(e.target);
+ let value=fd.get("value");
+ if(value===null||value==="")return;
+ if(!p.fitnessTests)p.fitnessTests=[];
+ p.fitnessTests.push({id:uid("fit"),testType:fd.get("testType")||"Custom",date:fd.get("date")||today(),value,unit:fd.get("unit")||"",notes:fd.get("notes")||""});
+ save();playerView(playerId);
+}
+function deleteFitnessTest(playerId,testId){
+ if(!requireWriteAccess())return;
+ let p=db.players.find(x=>x.id===playerId);if(!p)return;
+ p.fitnessTests=(p.fitnessTests||[]).filter(t=>t.id!==testId);
+ save();playerView(playerId);
+}
 function playerGoalsHtml(p){
  let goals=(p.goals||[]).slice().sort((a,b)=>String(a.achieved).localeCompare(String(b.achieved))||String(a.targetDate||"").localeCompare(String(b.targetDate||"")));
  return `<h2 class="section">Goals</h2><div class="card">
@@ -1543,6 +1582,7 @@ function playerViewBody(p,forPrint){
  <h2 class="section">Current goal</h2><div class="card">${esc(p.focus||"—")}</div>
  ${playerGoalsHtml(p)}
  ${forPrint?playerProgressPrintHtml(playerAssessments(p)):playerProgressChartHtml(p)}
+ ${fitnessTestsHtml(p,forPrint)}
  ${p.strengths?`<h2 class="section">Strengths</h2><div class="card">${esc(p.strengths)}</div>`:""}
  ${p.areas?`<h2 class="section">Development areas</h2><div class="card">${esc(p.areas)}</div>`:""}
  ${p.notes?`<h2 class="section">Coach notes</h2><div class="card">${esc(p.notes)}</div>`:""}
