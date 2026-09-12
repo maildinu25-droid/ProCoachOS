@@ -1239,6 +1239,12 @@ function saveReflection(e){
 function delReflection(id){if(confirm("Delete this reflection?")){db.reflections=db.reflections.filter(r=>r.id!==id);save()}}
 
 const PLAYER_ROLES=["Batter","Bowler","All-rounder","Wicketkeeper","Wicketkeeper-Batter"];
+const BATTING_HANDS=["RHB","LHB"];
+const BOWLING_ARMS=["Right-arm","Left-arm"];
+const BOWLING_TYPES=["Pace","Spin"];
+const SPIN_TYPES=["Off-spin","Leg-spin"];
+function roleNeedsBatting(role){return role!=="Bowler"}
+function roleNeedsBowling(role){return role==="Bowler"||role==="All-rounder"}
 let playerQuery="",playerRoleFilter="",playerTeamFilter="",playerSearchFocused=false,editingPlayerId=null;
 let sessionQuery="",sessionSquadFilter="",sessionSearchFocused=false;
 let reflectionQuery="",reflectionSearchFocused=false;
@@ -1253,7 +1259,11 @@ function playerFormHtml(p,mode){
 <label>Availability<select name="available"><option value="yes" ${p.available!=="no"?"selected":""}>Available</option><option value="no" ${p.available==="no"?"selected":""}>Unavailable</option></select></label>
 <div class="full" id="playerMoreToggleWrap" style="${hasExtra?"display:none":""}"><button type="button" class="btn secondary" onclick="togglePlayerMoreFields()">+ Add more details</button></div>
 <label class="playerExtraField" style="${hasExtra?"":"display:none"}">Squad / Group<input name="group" value="${esc(p.group||"")}"></label>
-<label class="playerExtraField" style="${hasExtra?"":"display:none"}">Role<select name="role">${PLAYER_ROLES.map(r=>`<option ${p.role===r?"selected":""}>${r}</option>`).join("")}</select></label>
+<label class="playerExtraField" style="${hasExtra?"":"display:none"}">Role<select name="role" onchange="updatePlayingStyleFields(this.value)">${PLAYER_ROLES.map(r=>`<option ${p.role===r?"selected":""}>${r}</option>`).join("")}</select></label>
+<label class="playerExtraField playingStyleField playingStyleBatting" id="battingHandField" style="${(hasExtra&&roleNeedsBatting(p.role||"Batter"))?"":"display:none"}">Batting hand<select name="battingHand">${BATTING_HANDS.map(h=>`<option ${p.battingHand===h?"selected":""}>${h}</option>`).join("")}</select></label>
+<label class="playerExtraField playingStyleField playingStyleBowling" id="bowlingArmField" style="${(hasExtra&&roleNeedsBowling(p.role||"Batter"))?"":"display:none"}">Bowling arm<select name="bowlingArm">${BOWLING_ARMS.map(a=>`<option ${p.bowlingArm===a?"selected":""}>${a}</option>`).join("")}</select></label>
+<label class="playerExtraField playingStyleField playingStyleBowling" id="bowlingTypeField" style="${(hasExtra&&roleNeedsBowling(p.role||"Batter"))?"":"display:none"}">Bowling type<select name="bowlingType" onchange="updateSpinTypeField(this.value)">${BOWLING_TYPES.map(t=>`<option ${p.bowlingType===t?"selected":""}>${t}</option>`).join("")}</select></label>
+<label class="playerExtraField playingStyleField playingStyleBowling" id="spinTypeField" style="${(hasExtra&&roleNeedsBowling(p.role||"Batter")&&(p.bowlingType||"Pace")==="Spin")?"":"display:none"}">Spin type<select name="spinType">${SPIN_TYPES.map(s=>`<option ${p.spinType===s?"selected":""}>${s}</option>`).join("")}</select></label>
 <label class="playerExtraField" style="${hasExtra?"":"display:none"}">Age<input type="number" name="age" value="${esc(p.age||"")}"></label>
 <label class="full playerExtraField" style="${hasExtra?"":"display:none"}">Strengths<textarea name="strengths">${esc(p.strengths||"")}</textarea></label>
 <label class="full playerExtraField" style="${hasExtra?"":"display:none"}">Development areas<textarea name="areas">${esc(p.areas||"")}</textarea></label>
@@ -1262,10 +1272,35 @@ function playerFormHtml(p,mode){
 <label class="full playerExtraField" style="${hasExtra?"":"display:none"}">Coach notes<textarea name="notes">${esc(p.notes||"")}</textarea></label>
 <button class="btn primary full">Save Player</button>
 </form>`}
+function playingStyleLabel(p){
+ let parts=[];
+ if(roleNeedsBatting(p.role||"Batter")&&p.battingHand)parts.push(p.battingHand);
+ if(roleNeedsBowling(p.role||"")&&p.bowlingArm&&p.bowlingType){
+  let bowlDesc=p.bowlingType==="Spin"&&p.spinType?`${p.bowlingArm} ${p.spinType}`:`${p.bowlingArm} ${p.bowlingType}`;
+  parts.push(bowlDesc);
+ }
+ return parts.join(" · ")
+}
 function togglePlayerMoreFields(){
  document.querySelectorAll(".playerExtraField").forEach(el=>el.style.display="");
  let wrap=document.getElementById("playerMoreToggleWrap");
  if(wrap)wrap.style.display="none";
+ let roleSelect=document.querySelector('select[name="role"]');
+ if(roleSelect)updatePlayingStyleFields(roleSelect.value);
+}
+function updatePlayingStyleFields(role){
+ let battingField=document.getElementById("battingHandField");
+ let bowlingFields=[document.getElementById("bowlingArmField"),document.getElementById("bowlingTypeField")];
+ if(battingField)battingField.style.display=roleNeedsBatting(role)?"":"none";
+ bowlingFields.forEach(el=>{if(el)el.style.display=roleNeedsBowling(role)?"":"none"});
+ let bowlingTypeSelect=document.querySelector('select[name="bowlingType"]');
+ updateSpinTypeField(roleNeedsBowling(role)&&bowlingTypeSelect?bowlingTypeSelect.value:"Pace");
+}
+function updateSpinTypeField(bowlingType){
+ let spinField=document.getElementById("spinTypeField");
+ let roleSelect=document.querySelector('select[name="role"]');
+ let bowlingActive=roleSelect&&roleNeedsBowling(roleSelect.value);
+ if(spinField)spinField.style.display=(bowlingActive&&bowlingType==="Spin")?"":"none";
 }
 function newPlayer(){editingPlayerId=null;modal(playerFormHtml(null,"new"))}
 function editPlayer(id){let p=db.players.find(x=>x.id===id);if(!p)return;editingPlayerId=id;modal(playerFormHtml(p,"edit"))}
@@ -1404,7 +1439,7 @@ function playerViewBody(p){
  let latest=assessments.slice(-1)[0];
  let sessions=playerSessions(p);
  let matches=playerMatches(p);
- return `<div class="grid g2"><div class="card"><b>Role</b><div>${esc(p.role||"—")}</div></div><div class="card"><b>Team / Squad</b><div>${esc(p.team||"—")}${p.group?" · "+esc(p.group):""}</div></div></div>
+ return `<div class="grid g2"><div class="card"><b>Role</b><div>${esc(p.role||"—")}${playingStyleLabel(p)?`<div class="muted" style="margin-top:2px">${esc(playingStyleLabel(p))}</div>`:""}</div></div><div class="card"><b>Team / Squad</b><div>${esc(p.team||"—")}${p.group?" · "+esc(p.group):""}</div></div></div>
  ${p.age?`<div class="muted" style="margin-top:8px">Age: ${esc(p.age)}</div>`:""}
  <h2 class="section">Current goal</h2><div class="card">${esc(p.focus||"—")}</div>
  ${playerGoalsHtml(p)}
