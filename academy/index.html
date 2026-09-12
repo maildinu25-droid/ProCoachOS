@@ -1101,7 +1101,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-09-05:47';
+const APP_BUILD_VERSION = '2026-09-12-14:01';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -4424,18 +4424,19 @@ document.getElementById('match-result-filter').addEventListener('change', (e) =>
 // ASSESSMENTS
 // ============================================================
 const DEFAULT_ASSESSMENT_TEMPLATE = {
-  name: 'Standard (Technical, Tactical, Physical, Mental)',
+  name: 'Standard Skill Areas',
   categories: [
-    { category: 'Technical', criteria: ['Batting', 'Bowling', 'Fielding', 'Wicketkeeping'] },
-    { category: 'Tactical', criteria: ['Decision making', 'Game awareness', 'Shot selection', 'Tactical awareness'] },
-    { category: 'Physical', criteria: ['Speed', 'Agility', 'Strength', 'Endurance'] },
-    { category: 'Mental', criteria: ['Concentration', 'Confidence', 'Communication', 'Resilience', 'Discipline'] },
+    { category: 'Batting', criteria: ['Setup & Balance', 'Footwork', 'Bat Swing / Contact', 'Shot Selection', 'Playing Pace', 'Running Between Wickets'] },
+    { category: 'Bowling', criteria: ['Run-up & Approach', 'Action / Release', 'Line & Length', 'Variation', 'Pace Control', 'Follow-through'] },
+    { category: 'Fielding', criteria: ['Ground Fielding', 'Catching', 'Throwing Accuracy', 'Reflexes / Anticipation', 'Agility'] },
+    { category: 'Wicketkeeping', criteria: ['Standing Position', 'Glove Work', 'Footwork', 'Stumping Speed', 'Communication'] },
   ],
 };
 let assessmentQuery = '', assessmentPlayerFilterVal = '';
 
 function assessmentAvg(a) {
-  const vals = Object.values(a.ratings || {}).map(Number).filter(Number.isFinite);
+  const flatten = (obj) => Object.values(obj || {}).flatMap(v => (v && typeof v === 'object') ? flatten(v) : [v]);
+  const vals = flatten(a.ratings).map(Number).filter(Number.isFinite);
   return vals.length ? (vals.reduce((x, y) => x + y, 0) / vals.length).toFixed(1) : '—';
 }
 function getAssessmentTemplateById(id) {
@@ -4487,35 +4488,77 @@ function assessmentItemCard(a) {
   card.querySelector('[data-act="delete"]').onclick = async () => { if (!confirmDelete('this assessment')) return; await supabase.from('assessments').delete().eq('id', a.id); loadAssessments(); };
   return card;
 }
-function renderAssessmentCriteriaGroups(template, checkedCriteria, existingRatings) {
+function renderAssessmentCriteriaGroups(template, checkedSkillAreas, existingRatings) {
   const box = document.getElementById('sheet-assessment-criteria-box');
-  const checked = new Set(checkedCriteria || []);
-  box.innerHTML = template.categories.map(cat => `
-    <div style="margin-top:10px;">
-      <label class="field-label" style="margin-bottom:2px;">${esc(cat.category)}</label>
-      <div class="checkbox-list">${cat.criteria.map(c => `<label><input type="checkbox" class="criterion-check" value="${esc(c)}" style="width:auto; margin:0;" ${checked.has(c) ? 'checked' : ''}> ${esc(c)}</label>`).join('')}</div>
-    </div>`).join('');
-  renderAssessmentRatingInputs(Array.from(checked).filter(c => template.categories.some(cat => cat.criteria.includes(c))), existingRatings);
+  const checked = new Set(checkedSkillAreas || []);
+  box.innerHTML = `
+    <label class="field-label">Choose Skill Areas</label>
+    <div class="muted" style="margin-bottom:6px; font-size:12px;">Select as many as required.</div>
+    <div class="checkbox-list">${template.categories.map(cat => `<label><input type="checkbox" class="skill-area-check" value="${esc(cat.category)}" style="width:auto; margin:0;" ${checked.has(cat.category) ? 'checked' : ''}> ${esc(cat.category)}</label>`).join('')}</div>`;
+  renderSkillAreaMetrics(template, Array.from(checked).filter(c => template.categories.some(cat => cat.category === c)), existingRatings || {});
 }
-function renderAssessmentRatingInputs(checkedCriteria, existingRatings) {
+function renderSkillAreaMetrics(template, checkedSkillAreas, existingRatings) {
   const box = document.getElementById('sheet-assessment-ratings-box');
-  const ratings = existingRatings || {};
-  box.innerHTML = checkedCriteria.length
-    ? checkedCriteria.map(c => `<label>${esc(c)} rating (1-10)<input type="number" min="1" max="10" class="discipline-rating" data-discipline="${esc(c)}" value="${ratings[c] ?? ''}"></label>`).join('')
-    : '<div class="empty-state">Select at least one criterion to rate it.</div>';
+  if (!checkedSkillAreas.length) { box.innerHTML = '<div class="empty-state">Select at least one skill area above to rate it.</div>'; return; }
+  box.innerHTML = checkedSkillAreas.map(skillArea => {
+    const cat = template.categories.find(c => c.category === skillArea);
+    // Old-shape assessments stored ratings flat (e.g. {'Batting': 7}), not
+    // nested by skill area — only render saved values here if they're
+    // genuinely in the new per-metric shape, so old data doesn't leak in as
+    // a bogus metric row.
+    const savedForSkill = (existingRatings && existingRatings[skillArea] && typeof existingRatings[skillArea] === 'object') ? existingRatings[skillArea] : {};
+    const extraMetrics = Object.keys(savedForSkill).filter(m => !cat.criteria.includes(m));
+    const allMetrics = [...cat.criteria, ...extraMetrics];
+    return `<div class="entityCard metric-skill-card" data-skill-area="${esc(skillArea)}" style="margin-top:10px;">
+      <label class="field-label" style="margin-bottom:8px;">${esc(skillArea)} · Rate 1-10</label>
+      ${allMetrics.map(m => metricRowHtml(m, Object.prototype.hasOwnProperty.call(savedForSkill, m) ? savedForSkill[m] : 5)).join('')}
+      <div style="display:flex; gap:6px; margin-top:4px;">
+        <input type="text" class="add-custom-metric-input" placeholder="Add custom metric" style="flex:1;">
+        <button type="button" class="btn ghost add-custom-metric-btn" style="width:auto;">+ Add</button>
+      </div>
+    </div>`;
+  }).join('');
+  wireMetricRowEvents();
+}
+function metricRowHtml(metricName, value) {
+  return `<div class="metric-row" data-metric="${esc(metricName)}" style="margin-bottom:14px;">
+    <label style="font-weight:400; display:flex; align-items:center; gap:6px; margin-bottom:2px;"><input type="checkbox" class="metric-assessed-check" style="width:auto; margin:0;" checked><span class="muted" style="font-size:12px;">Assessed today</span></label>
+    <div style="display:flex; justify-content:space-between; align-items:center;"><b>${esc(metricName)}</b><span class="metric-value-display" style="color:var(--green); font-weight:700;">${esc(value)}</span></div>
+    <input type="range" min="1" max="10" value="${esc(value)}" class="metric-slider" style="width:100%;">
+  </div>`;
+}
+function wireMetricRowEvents() {
+  const box = document.getElementById('sheet-assessment-ratings-box');
+  box.querySelectorAll('.metric-slider').forEach(slider => {
+    slider.oninput = () => { slider.closest('.metric-row').querySelector('.metric-value-display').textContent = slider.value; };
+  });
+  box.querySelectorAll('.add-custom-metric-btn').forEach(btn => {
+    btn.onclick = () => {
+      const input = btn.previousElementSibling;
+      const name = input.value.trim();
+      if (!name) return;
+      const card = btn.closest('[data-skill-area]');
+      if (card.querySelector(`[data-metric="${CSS.escape(name)}"]`)) { showToast('That metric is already in the list.', 'error'); return; }
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = metricRowHtml(name, 5);
+      const row = wrapper.firstElementChild;
+      card.insertBefore(row, card.querySelector('.add-custom-metric-input').parentElement);
+      row.querySelector('.metric-slider').oninput = (e) => { row.querySelector('.metric-value-display').textContent = e.target.value; };
+      input.value = '';
+    };
+  });
 }
 function assessmentFormHtml(a) {
   const templateOptions = [`<option value="default">${esc(DEFAULT_ASSESSMENT_TEMPLATE.name)}</option>`]
     .concat(cache.assessmentTemplates.map(t => `<option value="${t.id}">${esc(t.name)}</option>`)).join('');
   return sheetHead(a ? 'Edit Assessment' : 'New Assessment') + `
-    <p style="color:var(--text-dim); font-size:13px; margin-top:0;">Choose one or more criteria across Technical, Tactical, Physical and Mental areas.</p>
     <div class="formgrid">
       <label>Player<select id="sheet-assessment-player">${cache.players.map(p => `<option value="${p.id}" ${a?.player_id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
       <label>Date<input type="date" id="sheet-assessment-date" value="${esc(a?.date || new Date().toISOString().slice(0, 10))}"></label>
       <label class="full">Template<select id="sheet-assessment-template">${templateOptions}</select></label>
     </div>
-    <div id="sheet-assessment-criteria-box"></div>
-    <div class="formgrid" id="sheet-assessment-ratings-box" style="margin-top:10px;"></div>
+    <div id="sheet-assessment-criteria-box" style="margin-top:10px;"></div>
+    <div id="sheet-assessment-ratings-box"></div>
     <div class="formgrid" style="margin-top:10px;">
       <label class="full">Priority area <span class="muted" style="font-weight:400;">(optional)</span><input id="sheet-assessment-priority" value="${esc(a?.priority || '')}"></label>
       <label class="full">Comments<textarea id="sheet-assessment-comments">${esc(a?.comments || '')}</textarea></label>
@@ -4531,19 +4574,53 @@ function openAssessmentForm(a) {
   document.getElementById('sheet-assessment-template').addEventListener('change', (e) => {
     renderAssessmentCriteriaGroups(getAssessmentTemplateById(e.target.value), [], {});
   });
-  document.getElementById('sheet-assessment-criteria-box').addEventListener('change', () => {
-    const checked = Array.from(document.querySelectorAll('.criterion-check:checked')).map(c => c.value);
-    const currentRatings = {};
-    document.querySelectorAll('.discipline-rating').forEach(inp => { if (inp.value) currentRatings[inp.dataset.discipline] = inp.value; });
-    renderAssessmentRatingInputs(checked, currentRatings);
+  // Surgical add/remove per skill area on toggle — deliberately not a full
+  // re-render, which would need to capture and restore every other already-
+  // entered slider value and custom metric to avoid silently wiping them out
+  // whenever one unrelated checkbox changes.
+  document.getElementById('sheet-assessment-criteria-box').addEventListener('change', (e) => {
+    if (!e.target.classList.contains('skill-area-check')) return;
+    const skillArea = e.target.value;
+    const ratingsBox = document.getElementById('sheet-assessment-ratings-box');
+    ratingsBox.querySelector('.empty-state')?.remove();
+    if (e.target.checked) {
+      const template = getAssessmentTemplateById(document.getElementById('sheet-assessment-template').value);
+      const cat = template.categories.find(c => c.category === skillArea);
+      if (!cat) return;
+      const wrapper = document.createElement('div');
+      wrapper.innerHTML = `<div class="entityCard metric-skill-card" data-skill-area="${esc(skillArea)}" style="margin-top:10px;">
+        <label class="field-label" style="margin-bottom:8px;">${esc(skillArea)} · Rate 1-10</label>
+        ${cat.criteria.map(m => metricRowHtml(m, 5)).join('')}
+        <div style="display:flex; gap:6px; margin-top:4px;">
+          <input type="text" class="add-custom-metric-input" placeholder="Add custom metric" style="flex:1;">
+          <button type="button" class="btn ghost add-custom-metric-btn" style="width:auto;">+ Add</button>
+        </div>
+      </div>`;
+      ratingsBox.appendChild(wrapper.firstElementChild);
+      wireMetricRowEvents();
+    } else {
+      ratingsBox.querySelector(`[data-skill-area="${CSS.escape(skillArea)}"]`)?.remove();
+      if (!ratingsBox.children.length) ratingsBox.innerHTML = '<div class="empty-state">Select at least one skill area above to rate it.</div>';
+    }
   });
   document.getElementById('sheet-save-assessment-btn').addEventListener('click', async () => {
     const playerId = document.getElementById('sheet-assessment-player').value;
     const date = document.getElementById('sheet-assessment-date').value;
     if (!playerId || !date) { showToast('Player and date are required.', 'error'); return; }
-    const disciplines = Array.from(document.querySelectorAll('.criterion-check:checked')).map(c => c.value);
+    const disciplines = Array.from(document.querySelectorAll('.skill-area-check:checked')).map(c => c.value);
+    // Nested by skill area deliberately — "Footwork" under Batting and
+    // "Footwork" under Wicketkeeping are genuinely different metrics, and a
+    // flat {metric: value} map would let one silently overwrite the other.
     const ratings = {};
-    document.querySelectorAll('.discipline-rating').forEach(inp => { if (inp.value) ratings[inp.dataset.discipline] = Number(inp.value); });
+    document.querySelectorAll('.metric-skill-card').forEach(card => {
+      const skillRatings = {};
+      card.querySelectorAll('.metric-row').forEach(row => {
+        if (row.querySelector('.metric-assessed-check').checked) {
+          skillRatings[row.dataset.metric] = Number(row.querySelector('.metric-slider').value);
+        }
+      });
+      if (Object.keys(skillRatings).length) ratings[card.dataset.skillArea] = skillRatings;
+    });
     const row = {
       org_id: currentOrgId, player_id: playerId, assessed_by: session.user.id, date,
       disciplines,
@@ -4600,7 +4677,7 @@ function templateEditFormHtml(t) {
   return sheetHead(t ? 'Edit Template' : 'New Template') + `
     <div class="formgrid">
       <label class="full">Template name<input id="sheet-template-name" value="${esc(t?.name || '')}"></label>
-      <label class="full">Categories <span class="muted" style="font-weight:400;">(one per line: Category: item1, item2, item3)</span><textarea id="sheet-template-categories" style="min-height:140px;">${esc(t ? categoriesToText(t.categories) : categoriesToText(DEFAULT_ASSESSMENT_TEMPLATE.categories))}</textarea></label>
+      <label class="full">Skill areas &amp; metrics <span class="muted" style="font-weight:400;">(one per line: Skill Area: metric1, metric2, metric3)</span><textarea id="sheet-template-categories" style="min-height:140px;">${esc(t ? categoriesToText(t.categories) : categoriesToText(DEFAULT_ASSESSMENT_TEMPLATE.categories))}</textarea></label>
     </div>
     <button class="btn primary" id="sheet-save-template-btn" style="margin-top:14px; width:auto;">${t ? 'Save changes' : 'Create Template'}</button>`;
 }
@@ -4609,7 +4686,7 @@ function openTemplateEditForm(t) {
   document.getElementById('sheet-save-template-btn').addEventListener('click', async () => {
     const name = document.getElementById('sheet-template-name').value.trim();
     const categories = textToCategories(document.getElementById('sheet-template-categories').value);
-    if (!name || !categories.length) { showToast('Name and at least one valid category line are required.', 'error'); return; }
+    if (!name || !categories.length) { showToast('Name and at least one valid skill area line are required.', 'error'); return; }
     const row = { org_id: currentOrgId, name, categories };
     const { error } = t
       ? await supabase.from('assessment_templates').update(row).eq('id', t.id)
