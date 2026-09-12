@@ -1257,11 +1257,11 @@ function multiLineChartSvg(series){
  return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="140" style="display:block">${lines}</svg>${dateLabel}<div class="muted" style="margin-top:6px;font-size:var(--fs-1)">${legend}</div>`;
 }
 const PROGRESS_CHART_COLORS=["var(--g)","var(--blue)","var(--gold)","var(--blue2)","var(--red)"];
-function playerAssessmentSeries(p,mode,discipline,skill){
- let assessments=playerAssessments(p);
+const SKILL_CHART_COLORS=["var(--g)","var(--blue)","var(--gold)","var(--blue2)","var(--red)","#a78bfa","#f472b6","#2dd4bf","#fb923c","#94a3b8"];
+function assessmentSeriesFromList(assessments,mode,discipline,skill,colorOverride){
  if(mode==="overall"){
   let points=assessments.map(a=>({date:a.date,value:Number(assessmentAvg(a))})).filter(pt=>Number.isFinite(pt.value)&&pt.value>0);
-  return[{name:"Overall",color:PROGRESS_CHART_COLORS[0],points}];
+  return[{name:"Overall",color:colorOverride||PROGRESS_CHART_COLORS[0],points}];
  }
  if(mode==="discipline"){
   let allDisciplines=[...new Set(assessments.flatMap(a=>assessmentDisciplines(a)))];
@@ -1275,9 +1275,12 @@ function playerAssessmentSeries(p,mode,discipline,skill){
   let skillIdx=allSkillsFor(discipline).indexOf(skill);
   if(skillIdx===-1)return[];
   let points=assessments.filter(a=>assessmentDisciplines(a).includes(discipline)&&a.ratings&&Array.isArray(a.ratings[discipline])).map(a=>({date:a.date,value:Number(a.ratings[discipline][skillIdx])})).filter(pt=>Number.isFinite(pt.value)&&pt.value>0);
-  return[{name:skill,color:PROGRESS_CHART_COLORS[1],points}];
+  return[{name:skill,color:colorOverride||PROGRESS_CHART_COLORS[1],points}];
  }
  return[];
+}
+function playerAssessmentSeries(p,mode,discipline,skill){
+ return assessmentSeriesFromList(playerAssessments(p),mode,discipline,skill);
 }
 let playerProgressState={mode:"overall",discipline:"Batting",skill:""};
 function playerProgressChartHtml(p){
@@ -1312,6 +1315,27 @@ function renderPlayerProgressChart(playerId){
  document.querySelectorAll(".progressSkillPicker").forEach(el=>el.style.display=playerProgressState.mode==="skill"?"":"none");
  let box=document.getElementById("playerProgressChartBox");
  if(box)box.innerHTML=playerProgressChartInner(p);
+}
+function playerProgressPrintHtml(assessments){
+ if(assessments.length<2)return "";
+ let html=`<h2 class="section">Progress over time</h2>`;
+ let overallSeries=assessmentSeriesFromList(assessments,"overall");
+ if(overallSeries[0]&&overallSeries[0].points.length>=2){
+  html+=`<div class="card"><b>Overall</b>${multiLineChartSvg(overallSeries)}</div>`;
+ }
+ let discSeries=assessmentSeriesFromList(assessments,"discipline").filter(s=>s.points.length>=2);
+ if(discSeries.length){
+  html+=`<div class="card" style="margin-top:8px"><b>By discipline</b>${multiLineChartSvg(discSeries)}</div>`;
+ }
+ let allDisciplines=[...new Set(assessments.flatMap(a=>assessmentDisciplines(a)))];
+ allDisciplines.forEach(d=>{
+  let skills=allSkillsFor(d);
+  let skillSeries=skills.map((s,i)=>assessmentSeriesFromList(assessments,"skill",d,s,SKILL_CHART_COLORS[i%SKILL_CHART_COLORS.length])[0]).filter(s=>s&&s.points.length>=2);
+  if(skillSeries.length){
+   html+=`<div class="card" style="margin-top:8px"><b>${esc(d)} — by skill</b>${multiLineChartSvg(skillSeries)}</div>`;
+  }
+ });
+ return html;
 }
 
 const BATTING_HANDS=["RHB","LHB"];
@@ -1509,7 +1533,7 @@ function deletePlayerGoal(playerId,goalId){
  p.goals=p.goals.filter(x=>x.id!==goalId);
  save();playerView(playerId);
 }
-function playerViewBody(p){
+function playerViewBody(p,forPrint){
  let assessments=playerAssessments(p);
  let latest=assessments.slice(-1)[0];
  let sessions=playerSessions(p);
@@ -1518,7 +1542,7 @@ function playerViewBody(p){
  ${p.age?`<div class="muted" style="margin-top:8px">Age: ${esc(p.age)}</div>`:""}
  <h2 class="section">Current goal</h2><div class="card">${esc(p.focus||"—")}</div>
  ${playerGoalsHtml(p)}
- ${playerProgressChartHtml(p)}
+ ${forPrint?playerProgressPrintHtml(playerAssessments(p)):playerProgressChartHtml(p)}
  ${p.strengths?`<h2 class="section">Strengths</h2><div class="card">${esc(p.strengths)}</div>`:""}
  ${p.areas?`<h2 class="section">Development areas</h2><div class="card">${esc(p.areas)}</div>`:""}
  ${p.notes?`<h2 class="section">Coach notes</h2><div class="card">${esc(p.notes)}</div>`:""}
@@ -1559,7 +1583,7 @@ function renderVideoComparison(playerId){
  <div class="card"><b>After — ${esc(fmtDate(after.date))}</b><div style="margin-top:8px"><a href="${esc(after.link)}" target="_blank" rel="noopener" class="btn secondary full">Open Video</a></div></div>
  </div>`;
 }
-function playerProfileReport(id){let p=db.players.find(x=>x.id===id);if(!p)return;reportShell(esc(p.name),`${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}`,playerViewBody(p))}
+function playerProfileReport(id){let p=db.players.find(x=>x.id===id);if(!p)return;reportShell(esc(p.name),`${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}`,playerViewBody(p,true))}
 // A deliberately curated, parent/player-facing summary — strengths,
 // active goals, a plain-language trend, and next focus only. No coach
 // notes, no raw per-session assessment scores, and nothing about any
@@ -1588,6 +1612,7 @@ function parentSummaryReport(id){
  `<div class="card"><b>Strengths</b><p>${esc(p.strengths||"Building foundations across the board.")}</p></div>
  ${activeGoals.length?`<h2>Current Goals</h2><div class="card">${activeGoals.map(g=>`<p><b>${esc(g.text)}</b>${g.targetDate?" — target "+esc(fmtDate(g.targetDate)):""}</p>`).join("")}</div>`:""}
  ${trendLines.length?`<h2>Recent Progress</h2><div class="card">${trendLines.map(l=>`<p>${esc(l)}</p>`).join("")}</div>`:""}
+ ${playerProgressPrintHtml(aa)}
  ${attendanceRate!==null?`<h2>Attendance</h2><div class="card"><p>${attended} of ${teamSessions.length} sessions attended (${attendanceRate}%).</p></div>`:""}
  ${p.focus?`<h2>Next Focus</h2><div class="card"><p>${esc(p.focus)}</p></div>`:""}`);
 }
@@ -2814,6 +2839,7 @@ function buildPlayerReport(){
  ${goalProgressHtml}
  <h2>Profile</h2><div class="card"><b>Strengths</b><p>${esc(p.strengths||"—")}</p><b>Development areas</b><p>${esc(p.areas||"—")}</p></div>
  ${Object.entries(disciplineTrend).some(([,t])=>t.count>=2)?`<h2>Development Trend</h2><div class="card">${Object.entries(disciplineTrend).filter(([,t])=>t.count>=2).map(([d,t])=>{let diff=(t.last-t.first).toFixed(1);let sign=t.last>=t.first?"+":"";let color=t.last>=t.first?"var(--g)":"var(--red)";return `<div style="margin-bottom:6px"><b>${esc(d)}:</b> ${t.first.toFixed(1)} → ${t.last.toFixed(1)} <span style="color:${color};font-weight:700">(${sign}${diff})</span></div>`}).join("")}</div>`:""}
+ ${playerProgressPrintHtml(aa)}
  ${matches.length?`<h2>Match Performance</h2><div class="card"><p>${battingEntries.length?`Batting: ${totalRuns} run${totalRuns!==1?"s":""} across ${battingEntries.length} innings`:""}${battingEntries.length&&bowlingEntries.length?" · ":""}${bowlingEntries.length?`Bowling: ${totalWickets} wicket${totalWickets!==1?"s":""} across ${bowlingEntries.length} match${bowlingEntries.length!==1?"es":""}`:""}${!battingEntries.length&&!bowlingEntries.length?`Played in ${matches.length} match${matches.length!==1?"es":""}, no batting or bowling entries logged.`:""}</p>${backToBackCount>0?`<p style="margin-top:8px;color:var(--gold)"><b>⚠ Workload note:</b> ${backToBackCount} match${backToBackCount!==1?"es":""} played with a day or less rest before the next one.</p>`:""}</div>`:""}
  ${matchTrendHtml}
  <h2>Assessment History</h2>${aa.length?aa.slice().reverse().map(a=>`<div class="card"><b>${esc(fmtDate(a.date))} · Overall ${assessmentAvg(a)}/10</b><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d} ${disciplineAvg(a,d)}/10</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${assessmentDetailHTML(a)}</div>`).join(""):empty("No assessments for this player.")}`)}
