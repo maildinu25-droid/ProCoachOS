@@ -1101,7 +1101,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-12-14:01';
+const APP_BUILD_VERSION = '2026-09-12-14:30';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -4426,10 +4426,10 @@ document.getElementById('match-result-filter').addEventListener('change', (e) =>
 const DEFAULT_ASSESSMENT_TEMPLATE = {
   name: 'Standard Skill Areas',
   categories: [
-    { category: 'Batting', criteria: ['Setup & Balance', 'Footwork', 'Bat Swing / Contact', 'Shot Selection', 'Playing Pace', 'Running Between Wickets'] },
-    { category: 'Bowling', criteria: ['Run-up & Approach', 'Action / Release', 'Line & Length', 'Variation', 'Pace Control', 'Follow-through'] },
-    { category: 'Fielding', criteria: ['Ground Fielding', 'Catching', 'Throwing Accuracy', 'Reflexes / Anticipation', 'Agility'] },
-    { category: 'Wicketkeeping', criteria: ['Standing Position', 'Glove Work', 'Footwork', 'Stumping Speed', 'Communication'] },
+    { category: 'Batting', criteria: ['Setup & Balance', 'Footwork', 'Batswing & Contact', 'Shot Selection', 'Playing Pacers', 'Playing Spinners', 'Strike Rotation', 'Boundary Options', 'Game Awareness', 'Execution Under Pressure'] },
+    { category: 'Bowling', criteria: ['Run-up / Approach', 'Action & Alignment', 'Accuracy', 'Consistency', 'Pace / Revolutions', 'Swing / Seam / Spin', 'Variations', 'Tactical Awareness', 'Wicket-Taking Threat', 'Execution Under Pressure'] },
+    { category: 'Wicketkeeping', criteria: ['Crouch', 'Footwork', 'Glovework', 'Standing Back', 'Standing Up', 'Leg Side Takes', 'Communication', 'Decision Making', 'Game Awareness'] },
+    { category: 'Fielding', criteria: ['Catching', 'Ground Fielding', 'Throwing', 'Movement', 'Positioning', 'Game Awareness', 'Communication', 'Decision Making', 'Execution Under Pressure'] },
   ],
 };
 let assessmentQuery = '', assessmentPlayerFilterVal = '';
