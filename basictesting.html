@@ -1502,9 +1502,18 @@ const FITNESS_TEST_TYPES=["Sprint 20m","Agility 5-10-5","Throwing accuracy","Bow
 const FITNESS_TEST_UNITS={"Sprint 20m":"seconds","Agility 5-10-5":"seconds","Throwing accuracy":"%","Bowling speed":"km/h","Bowling accuracy":"%","Bat speed":"km/h"};
 function updateFitnessTestUnit(sel){
  let unitInput=document.getElementById("fitnessTestUnit");
+ let customNameRow=document.getElementById("fitnessTestCustomNameRow");
+ let customNameInput=document.getElementById("fitnessTestCustomName");
  if(!unitInput)return;
- if(sel.value==="Custom"){unitInput.value="";unitInput.readOnly=false;unitInput.placeholder="e.g. reps, cm, minutes"}
- else{unitInput.value=FITNESS_TEST_UNITS[sel.value]||"";unitInput.readOnly=true}
+ if(sel.value==="Custom"){
+  unitInput.value="";unitInput.readOnly=false;unitInput.placeholder="e.g. reps, cm, minutes";
+  if(customNameRow)customNameRow.style.display="";
+  if(customNameInput)customNameInput.required=true;
+ } else {
+  unitInput.value=FITNESS_TEST_UNITS[sel.value]||"";unitInput.readOnly=true;
+  if(customNameRow)customNameRow.style.display="none";
+  if(customNameInput)customNameInput.required=false;
+ }
 }
 function fitnessTestsHtml(p,forPrint){
  let tests=(p.fitnessTests||[]).slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
@@ -1513,6 +1522,7 @@ function fitnessTestsHtml(p,forPrint){
  return `<h2 class="section">Fitness testing</h2>${listHtml}
  <form onsubmit="saveFitnessTest(event,'${p.id}')" class="formgrid" style="margin-top:10px;padding:0">
  <label>Test type<select name="testType" onchange="updateFitnessTestUnit(this)">${FITNESS_TEST_TYPES.map(t=>`<option>${t}</option>`).join("")}</select></label>
+ <label class="full" id="fitnessTestCustomNameRow" style="display:none">Test name<input name="customTestName" id="fitnessTestCustomName" placeholder="e.g. Bronco, Yo-yo test, 40m dash"></label>
  <label>Value<input name="value" type="number" step="any" required></label>
  <label>Unit<input name="unit" id="fitnessTestUnit" value="${FITNESS_TEST_UNITS[FITNESS_TEST_TYPES[0]]}" readonly required></label>
  <label>Date<input name="date" type="date" value="${today()}" required></label>
@@ -1527,8 +1537,14 @@ function saveFitnessTest(e,playerId){
  let fd=new FormData(e.target);
  let value=fd.get("value");
  if(value===null||value==="")return;
+ let testType=fd.get("testType")||"Custom";
+ if(testType==="Custom"){
+  let customName=String(fd.get("customTestName")||"").trim();
+  if(!customName)return;
+  testType=customName;
+ }
  if(!p.fitnessTests)p.fitnessTests=[];
- p.fitnessTests.push({id:uid("fit"),testType:fd.get("testType")||"Custom",date:fd.get("date")||today(),value,unit:fd.get("unit")||"",notes:fd.get("notes")||""});
+ p.fitnessTests.push({id:uid("fit"),testType,date:fd.get("date")||today(),value,unit:fd.get("unit")||"",notes:fd.get("notes")||""});
  save();playerView(playerId);
 }
 function deleteFitnessTest(playerId,testId){
