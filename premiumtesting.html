@@ -1239,6 +1239,81 @@ function saveReflection(e){
 function delReflection(id){if(confirm("Delete this reflection?")){db.reflections=db.reflections.filter(r=>r.id!==id);save()}}
 
 const PLAYER_ROLES=["Batter","Bowler","All-rounder","Wicketkeeper","Wicketkeeper-Batter"];
+function multiLineChartSvg(series){
+ series=series.filter(s=>s.points&&s.points.length);
+ if(!series.length)return "";
+ let allDates=series.flatMap(s=>s.points.map(pt=>new Date(pt.date).getTime())).filter(Number.isFinite);
+ let minD=Math.min(...allDates),maxD=Math.max(...allDates),span=(maxD-minD)||1;
+ function xFor(d){return allDates.length>1?((new Date(d).getTime()-minD)/span)*100:50}
+ function yFor(v){return 100-(((v-1)/9)*88)-6}
+ let lines=series.map(s=>{
+  let pts=s.points.map(pt=>`${xFor(pt.date).toFixed(1)},${yFor(pt.value).toFixed(1)}`).join(" ");
+  let dots=s.points.map(pt=>`<circle cx="${xFor(pt.date).toFixed(1)}" cy="${yFor(pt.value).toFixed(1)}" r="1.6" fill="${s.color}"/>`).join("");
+  let line=s.points.length>1?`<polyline points="${pts}" fill="none" stroke="${s.color}" stroke-width="2" vector-effect="non-scaling-stroke"/>`:"";
+  return line+dots;
+ }).join("");
+ let legend=series.map(s=>`<span style="display:inline-flex;align-items:center;gap:4px;margin-right:12px"><span style="width:8px;height:8px;border-radius:50%;background:${s.color};display:inline-block"></span>${esc(s.name)}</span>`).join("");
+ let dateLabel=allDates.length?`<div class="muted" style="display:flex;justify-content:space-between;font-size:var(--fs-1);margin-top:2px"><span>${esc(fmtDate(new Date(minD).toISOString().slice(0,10)))}</span>${allDates.length>1?`<span>${esc(fmtDate(new Date(maxD).toISOString().slice(0,10)))}</span>`:""}</div>`:"";
+ return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="140" style="display:block">${lines}</svg>${dateLabel}<div class="muted" style="margin-top:6px;font-size:var(--fs-1)">${legend}</div>`;
+}
+const PROGRESS_CHART_COLORS=["var(--g)","var(--blue)","var(--gold)","var(--blue2)","var(--red)"];
+function playerAssessmentSeries(p,mode,discipline,skill){
+ let assessments=playerAssessments(p);
+ if(mode==="overall"){
+  let points=assessments.map(a=>({date:a.date,value:Number(assessmentAvg(a))})).filter(pt=>Number.isFinite(pt.value)&&pt.value>0);
+  return[{name:"Overall",color:PROGRESS_CHART_COLORS[0],points}];
+ }
+ if(mode==="discipline"){
+  let allDisciplines=[...new Set(assessments.flatMap(a=>assessmentDisciplines(a)))];
+  return allDisciplines.map((d,i)=>{
+   let points=assessments.filter(a=>assessmentDisciplines(a).includes(d)).map(a=>({date:a.date,value:Number(disciplineAvg(a,d))})).filter(pt=>Number.isFinite(pt.value)&&pt.value>0);
+   return{name:d,color:PROGRESS_CHART_COLORS[i%PROGRESS_CHART_COLORS.length],points};
+  }).filter(s=>s.points.length);
+ }
+ if(mode==="skill"){
+  if(!discipline||!skill)return[];
+  let skillIdx=allSkillsFor(discipline).indexOf(skill);
+  if(skillIdx===-1)return[];
+  let points=assessments.filter(a=>assessmentDisciplines(a).includes(discipline)&&a.ratings&&Array.isArray(a.ratings[discipline])).map(a=>({date:a.date,value:Number(a.ratings[discipline][skillIdx])})).filter(pt=>Number.isFinite(pt.value)&&pt.value>0);
+  return[{name:skill,color:PROGRESS_CHART_COLORS[1],points}];
+ }
+ return[];
+}
+let playerProgressState={mode:"overall",discipline:"Batting",skill:""};
+function playerProgressChartHtml(p){
+ let assessments=playerAssessments(p);
+ if(assessments.length<2)return `<h2 class="section">Progress over time</h2><div class="card muted">Needs at least 2 assessments (with real ratings) to show a trend.</div>`;
+ let allDisciplines=[...new Set(assessments.flatMap(a=>assessmentDisciplines(a)))];
+ if(!allDisciplines.includes(playerProgressState.discipline))playerProgressState.discipline=allDisciplines[0]||"Batting";
+ let skillOptions=allSkillsFor(playerProgressState.discipline);
+ if(!skillOptions.includes(playerProgressState.skill))playerProgressState.skill=skillOptions[0]||"";
+ return `<h2 class="section">Progress over time</h2>
+ <div class="card">
+  <div class="formgrid" style="margin-bottom:8px">
+   <label>View<select onchange="playerProgressState.mode=this.value;renderPlayerProgressChart('${p.id}')">
+    <option value="overall" ${playerProgressState.mode==="overall"?"selected":""}>Overall</option>
+    <option value="discipline" ${playerProgressState.mode==="discipline"?"selected":""}>By discipline</option>
+    <option value="skill" ${playerProgressState.mode==="skill"?"selected":""}>By specific skill</option>
+   </select></label>
+   <label class="progressSkillPicker" style="${playerProgressState.mode==="skill"?"":"display:none"}">Discipline<select onchange="playerProgressState.discipline=this.value;playerProgressState.skill='';renderPlayerProgressChart('${p.id}')">${allDisciplines.map(d=>`<option ${playerProgressState.discipline===d?"selected":""}>${esc(d)}</option>`).join("")}</select></label>
+   <label class="progressSkillPicker" style="${playerProgressState.mode==="skill"?"":"display:none"}">Skill<select onchange="playerProgressState.skill=this.value;renderPlayerProgressChart('${p.id}')">${skillOptions.map(s=>`<option ${playerProgressState.skill===s?"selected":""}>${esc(s)}</option>`).join("")}</select></label>
+  </div>
+  <div id="playerProgressChartBox">${playerProgressChartInner(p)}</div>
+ </div>`;
+}
+function playerProgressChartInner(p){
+ let series=playerAssessmentSeries(p,playerProgressState.mode,playerProgressState.discipline,playerProgressState.skill);
+ let chart=multiLineChartSvg(series);
+ return chart||`<div class="muted">Not enough rated data yet for this view.</div>`;
+}
+function renderPlayerProgressChart(playerId){
+ let p=db.players.find(x=>x.id===playerId);
+ if(!p)return;
+ document.querySelectorAll(".progressSkillPicker").forEach(el=>el.style.display=playerProgressState.mode==="skill"?"":"none");
+ let box=document.getElementById("playerProgressChartBox");
+ if(box)box.innerHTML=playerProgressChartInner(p);
+}
+
 const BATTING_HANDS=["RHB","LHB"];
 const BOWLING_ARMS=["Right-arm","Left-arm"];
 const BOWLING_TYPES=["Pace","Spin"];
@@ -1443,6 +1518,7 @@ function playerViewBody(p){
  ${p.age?`<div class="muted" style="margin-top:8px">Age: ${esc(p.age)}</div>`:""}
  <h2 class="section">Current goal</h2><div class="card">${esc(p.focus||"—")}</div>
  ${playerGoalsHtml(p)}
+ ${playerProgressChartHtml(p)}
  ${p.strengths?`<h2 class="section">Strengths</h2><div class="card">${esc(p.strengths)}</div>`:""}
  ${p.areas?`<h2 class="section">Development areas</h2><div class="card">${esc(p.areas)}</div>`:""}
  ${p.notes?`<h2 class="section">Coach notes</h2><div class="card">${esc(p.notes)}</div>`:""}
