@@ -1101,7 +1101,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-12-14:30';
+const APP_BUILD_VERSION = '2026-09-12-14:51';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -4521,16 +4521,25 @@ function renderSkillAreaMetrics(template, checkedSkillAreas, existingRatings) {
   wireMetricRowEvents();
 }
 function metricRowHtml(metricName, value) {
-  return `<div class="metric-row" data-metric="${esc(metricName)}" style="margin-bottom:14px;">
-    <label style="font-weight:400; display:flex; align-items:center; gap:6px; margin-bottom:2px;"><input type="checkbox" class="metric-assessed-check" style="width:auto; margin:0;" checked><span class="muted" style="font-size:12px;">Assessed today</span></label>
-    <div style="display:flex; justify-content:space-between; align-items:center;"><b>${esc(metricName)}</b><span class="metric-value-display" style="color:var(--green); font-weight:700;">${esc(value)}</span></div>
-    <input type="range" min="1" max="10" value="${esc(value)}" class="metric-slider" style="width:100%;">
+  return `<div class="metric-row" data-metric="${esc(metricName)}" style="margin-bottom:14px; font-family:inherit; font-size:14px; transition:opacity .15s;">
+    <label style="font-weight:400; display:flex; align-items:center; gap:6px; margin-bottom:2px; font-family:inherit;"><input type="checkbox" class="metric-assessed-check" style="width:auto; margin:0;" checked><span class="muted" style="font-size:12px; font-family:inherit;">Assessed today</span></label>
+    <div style="display:flex; justify-content:space-between; align-items:center; font-family:inherit;"><b style="font-family:inherit; font-size:14.5px; font-weight:700;">${esc(metricName)}</b><span class="metric-value-display" style="color:var(--green); font-weight:700; font-family:inherit; font-size:14.5px;">${esc(value)}</span></div>
+    <input type="range" min="1" max="10" value="${esc(value)}" class="metric-slider" style="width:100%; accent-color:var(--green); font-family:inherit;">
   </div>`;
+}
+// Not assessed today = visually and functionally inactive: greyed out and the
+// slider genuinely disabled, not just cosmetically dimmed while still live.
+function applyMetricAssessedState(row) {
+  const assessed = row.querySelector('.metric-assessed-check').checked;
+  row.style.opacity = assessed ? '1' : '0.4';
+  row.querySelector('.metric-slider').disabled = !assessed;
 }
 function wireMetricRowEvents() {
   const box = document.getElementById('sheet-assessment-ratings-box');
-  box.querySelectorAll('.metric-slider').forEach(slider => {
-    slider.oninput = () => { slider.closest('.metric-row').querySelector('.metric-value-display').textContent = slider.value; };
+  box.querySelectorAll('.metric-row').forEach(row => {
+    applyMetricAssessedState(row);
+    row.querySelector('.metric-assessed-check').onchange = () => applyMetricAssessedState(row);
+    row.querySelector('.metric-slider').oninput = () => { row.querySelector('.metric-value-display').textContent = row.querySelector('.metric-slider').value; };
   });
   box.querySelectorAll('.add-custom-metric-btn').forEach(btn => {
     btn.onclick = () => {
@@ -4543,7 +4552,9 @@ function wireMetricRowEvents() {
       wrapper.innerHTML = metricRowHtml(name, 5);
       const row = wrapper.firstElementChild;
       card.insertBefore(row, card.querySelector('.add-custom-metric-input').parentElement);
-      row.querySelector('.metric-slider').oninput = (e) => { row.querySelector('.metric-value-display').textContent = e.target.value; };
+      applyMetricAssessedState(row);
+      row.querySelector('.metric-assessed-check').onchange = () => applyMetricAssessedState(row);
+      row.querySelector('.metric-slider').oninput = () => { row.querySelector('.metric-value-display').textContent = row.querySelector('.metric-slider').value; };
       input.value = '';
     };
   });
