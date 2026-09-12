@@ -1576,17 +1576,18 @@ function renderAssessmentSkills(){
   let isLegacyBowling=d==="Bowling"&&oldVals&&oldVals.length===10;
   let skills=allSkillsFor(d);
   return `<label style="margin-bottom:6px">${d} · Rate 1–10</label><div class="card">${skills.map((s,i)=>{
-   let val=5;
+   let val=5,wasAssessed=true;
    if(oldVals){
     if(isLegacyBowling){
-     if(i===3)val=Math.round(((Number(oldVals[3])||5)+(Number(oldVals[4])||5))/2);
-     else if(i<3)val=oldVals[i]!==undefined?oldVals[i]:5;
-     else val=oldVals[i+1]!==undefined?oldVals[i+1]:5;
+     if(i===3){val=Math.round(((Number(oldVals[3])||5)+(Number(oldVals[4])||5))/2);wasAssessed=!!(oldVals[3]||oldVals[4])}
+     else if(i<3){val=oldVals[i]!==undefined?oldVals[i]:5;wasAssessed=!!oldVals[i]}
+     else{val=oldVals[i+1]!==undefined?oldVals[i+1]:5;wasAssessed=!!oldVals[i+1]}
     } else {
      val=oldVals[i]!==undefined?oldVals[i]:5;
+     wasAssessed=!!oldVals[i];
     }
    }
-   return sliderRow(s,`${d}_${i}`,val);
+   return sliderRow(s,`${d}_${i}`,val,wasAssessed);
   }).join("")}<div class="formgrid" style="margin-top:8px"><input type="text" id="newSkill_${d}" placeholder="Add a custom metric for ${d}..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomSkill('${d}')}"><button type="button" class="btn" onclick="addCustomSkill('${d}')">+ Add metric</button></div><label>${d} development notes<textarea name="${d}_notes">${esc((existing&&existing.disciplineNotes&&existing.disciplineNotes[d])||"")}</textarea></label></div>`;
  }).join("")||empty("Select at least one skill area.");
  enhanceTextareasWithVoice(box);
@@ -1735,7 +1736,13 @@ const MATCH_FORMATS=["T20","ODI","One Day","Test/Multi-day","Friendly","Practice
 const BATTING_METRICS=["Shot Selection","Intent","Partnerships","Pressure Management","Game Awareness"];
 const BOWLING_METRICS=["Plan Execution","Pressure Creation","Good Streaks","Game Awareness","Wicket-Taking Threat"];
 const FIELDING_METRICS=["Energy","Pressure Creation","Positioning","Execution"];
-function sliderRow(metric,fieldName,value){value=value||5;return `<div class="sliderRow"><div class="sliderLabel"><span>${esc(metric)}</span><b id="${fieldName}_out">${value}</b></div><input type="range" min="1" max="10" value="${value}" name="${fieldName}" oninput="document.getElementById('${fieldName}_out').textContent=this.value"></div>`}
+function sliderRow(metric,fieldName,value,assessed){value=value||5;let hasCheckbox=assessed!==undefined;let checkboxHtml=hasCheckbox?`<label style="display:flex;align-items:center;gap:6px;font-weight:400;cursor:pointer"><input type="checkbox" name="${fieldName}_assessed" ${assessed?"checked":""} onchange="toggleSkillAssessed('${fieldName}',this.checked)" style="width:auto"> <span class="muted" style="font-size:var(--fs-1)">Assessed today</span></label>`:"";return `<div class="sliderRow" id="${fieldName}_row">${checkboxHtml}<div class="sliderLabel"><span>${esc(metric)}</span><b id="${fieldName}_out">${value}</b></div><input type="range" min="1" max="10" value="${value}" name="${fieldName}" id="${fieldName}_input" ${hasCheckbox&&!assessed?"disabled":""} oninput="document.getElementById('${fieldName}_out').textContent=this.value"></div>`}
+function toggleSkillAssessed(fieldName,checked){
+ let input=document.getElementById(`${fieldName}_input`);
+ if(input)input.disabled=!checked;
+ let row=document.getElementById(`${fieldName}_row`);
+ if(row)row.style.opacity=checked?"1":"0.5";
+}
 function collectRatings(fd,prefix,metrics){let obj={};metrics.forEach((metric,i)=>{obj[metric]=Number(fd.get(`${prefix}_${i}`))||0});return obj}
 function avgRatingObj(obj){if(!obj)return 0;let vals=Object.values(obj).filter(v=>Number.isFinite(v)&&v>0);return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0}
 function matchResultOutcome(m){let r=String(m.result||"").toLowerCase();if(/\bwin|\bwon\b/.test(r))return"Win";if(/\bloss|\blost\b/.test(r))return"Loss";if(/\bdraw\b/.test(r))return"Draw";if(/no result|abandon/.test(r))return"NR";return"Other"}
