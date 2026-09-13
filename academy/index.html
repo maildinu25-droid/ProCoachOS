@@ -1101,7 +1101,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-12-14:51';
+const APP_BUILD_VERSION = '2026-09-13-05:52';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -4078,6 +4078,34 @@ function playerSelectHtml(players, selectedId) {
   return '<option value="">Select player</option>' + players.map(p => `<option value="${p.id}" ${p.id === selectedId ? 'selected' : ''}>${esc(p.name)}</option>`).join('');
 }
 const RATING_OPTIONS_HTML = '<option value="">Rating</option>' + [1,2,3,4,5,6,7,8,9,10].map(n => `<option value="${n}">${n}</option>`).join('');
+const MATCH_REVIEW_METRICS = {
+  batting: ['Shot Selection', 'Intent', 'Partnerships', 'Pressure Management', 'Game Awareness'],
+  bowling: ['Plan Execution', 'Pressure Creation', 'Good Streaks', 'Game Awareness', 'Wicket-Taking Threat'],
+  fielding: ['Energy', 'Pressure Creation', 'Positioning', 'Execution'],
+};
+// Same slider pattern already proven for assessments — named metric, live
+// green value display, no "assessed today" toggle needed here since every
+// added player's ratings are expected to be filled in.
+function ratingSlidersHtml(kind, ratings) {
+  return `<div class="rating-sliders" data-kind="${kind}" style="width:100%; margin-top:6px; font-family:inherit;">
+    ${MATCH_REVIEW_METRICS[kind].map(metric => `<div class="rating-slider-row" data-metric="${esc(metric)}" style="margin-bottom:10px; font-family:inherit;">
+      <div style="display:flex; justify-content:space-between; align-items:center; font-size:13px; font-family:inherit;"><span style="font-family:inherit;">${esc(metric)}</span><span class="rating-slider-value" style="color:var(--green); font-weight:700; font-family:inherit;">${esc(ratings?.[metric] ?? 5)}</span></div>
+      <input type="range" min="1" max="10" value="${esc(ratings?.[metric] ?? 5)}" class="rating-slider" style="width:100%; accent-color:var(--green); font-family:inherit;">
+    </div>`).join('')}
+  </div>`;
+}
+function wireRatingSliders(container) {
+  container.querySelectorAll('.rating-slider').forEach(slider => {
+    slider.oninput = () => { slider.closest('.rating-slider-row').querySelector('.rating-slider-value').textContent = slider.value; };
+  });
+}
+function collectRatingSliders(container) {
+  const ratings = {};
+  container.querySelectorAll('.rating-slider-row').forEach(row => {
+    ratings[row.dataset.metric] = Number(row.querySelector('.rating-slider').value);
+  });
+  return ratings;
+}
 
 function battingSR(runs, balls) { return balls > 0 ? ((runs / balls) * 100).toFixed(1) : '—'; }
 function bowlingEcon(runs, overs) { return overs > 0 ? (runs / overs).toFixed(2) : '—'; }
@@ -4097,10 +4125,8 @@ function addBattingRow(data) {
     <input type="number" class="batting-sixes" placeholder="6s" style="max-width:50px;" value="${data?.sixes ?? ''}">
     <span class="batting-sr" style="font-size:11.5px; color:var(--text-dim); min-width:55px;"></span>
     <input type="text" class="batting-dismissal" placeholder="Dismissal" style="max-width:100px;" value="${esc(data?.dismissal || '')}">
-    <select class="batting-rating">${RATING_OPTIONS_HTML}</select>
     <input type="text" class="batting-notes" placeholder="Notes" style="flex:2;" value="${esc(data?.notes || '')}">
     <button type="button" class="remove-row">✕</button>`;
-  row.querySelector('.batting-rating').value = data?.rating || '';
   row.querySelector('.remove-row').onclick = () => row.remove();
   row.querySelector('.batting-runs').addEventListener('input', () => updateBattingSR(row));
   row.querySelector('.batting-balls').addEventListener('input', () => updateBattingSR(row));
@@ -4123,10 +4149,8 @@ function addBowlingRow(data) {
     <input type="number" class="bowling-maidens" placeholder="Maidens" style="max-width:75px;" value="${data?.maidens ?? ''}">
     <input type="number" class="bowling-dotballs" placeholder="Dot balls" style="max-width:80px;" value="${data?.dotBalls ?? ''}">
     <span class="bowling-econ" style="font-size:11.5px; color:var(--text-dim); min-width:70px;"></span>
-    <select class="bowling-rating">${RATING_OPTIONS_HTML}</select>
     <input type="text" class="bowling-notes" placeholder="Notes" style="flex:2;" value="${esc(data?.notes || '')}">
     <button type="button" class="remove-row">✕</button>`;
-  row.querySelector('.bowling-rating').value = data?.rating || '';
   row.querySelector('.remove-row').onclick = () => row.remove();
   row.querySelector('.bowling-runs').addEventListener('input', () => updateBowlingEcon(row));
   row.querySelector('.bowling-overs').addEventListener('input', () => updateBowlingEcon(row));
@@ -4142,68 +4166,56 @@ function addFieldingRow(data) {
     <input type="number" class="fielding-runouts" placeholder="Run-outs" style="max-width:75px;" value="${data?.runOuts ?? ''}">
     <input type="number" class="fielding-stumpings" placeholder="Stumpings" style="max-width:85px;" value="${data?.stumpings ?? ''}">
     <input type="number" class="fielding-misfields" placeholder="Misfields" style="max-width:80px;" value="${data?.misfields ?? ''}">
-    <select class="fielding-rating">${RATING_OPTIONS_HTML}</select>
     <button type="button" class="remove-row">✕</button>`;
-  row.querySelector('.fielding-rating').value = data?.rating || '';
   row.querySelector('.remove-row').onclick = () => row.remove();
   document.getElementById('sheet-match-fielding-rows').appendChild(row);
 }
 function populateMatchStatRows(m) {
   const battingReview = Array.isArray(m.batting_review) ? m.batting_review : [];
-  const battingRatings = m.batting_ratings || {};
-  for (const b of battingReview) addBattingRow({ ...b, rating: battingRatings[b.playerId] });
-  for (const pid of Object.keys(battingRatings)) if (!battingReview.find(b => b.playerId === pid)) addBattingRow({ playerId: pid, rating: battingRatings[pid] });
+  for (const b of battingReview) addBattingRow(b);
 
   const bowlingReview = Array.isArray(m.bowling_review) ? m.bowling_review : [];
-  const bowlingRatings = m.bowling_ratings || {};
-  for (const b of bowlingReview) addBowlingRow({ ...b, rating: bowlingRatings[b.playerId] });
-  for (const pid of Object.keys(bowlingRatings)) if (!bowlingReview.find(b => b.playerId === pid)) addBowlingRow({ playerId: pid, rating: bowlingRatings[pid] });
+  for (const b of bowlingReview) addBowlingRow(b);
 
   const fieldingReview = Array.isArray(m.fielding_review) ? m.fielding_review : [];
-  const fieldingRatings = m.fielding_ratings || {};
-  for (const f of fieldingReview) addFieldingRow({ ...f, rating: fieldingRatings[f.playerId] });
-  for (const pid of Object.keys(fieldingRatings)) if (!fieldingReview.find(f => f.playerId === pid)) addFieldingRow({ playerId: pid, rating: fieldingRatings[pid] });
+  for (const f of fieldingReview) addFieldingRow(f);
 }
 function collectBattingRows() {
-  const review = [], ratings = {};
+  const review = [];
   for (const row of document.querySelectorAll('#sheet-match-batting-rows .stat-row')) {
     const playerId = row.querySelector('.batting-player').value;
     if (!playerId) continue;
     const runs = row.querySelector('.batting-runs').value, balls = row.querySelector('.batting-balls').value;
     const fours = row.querySelector('.batting-fours').value, sixes = row.querySelector('.batting-sixes').value;
     const dismissal = row.querySelector('.batting-dismissal').value.trim();
-    const rating = row.querySelector('.batting-rating').value, notes = row.querySelector('.batting-notes').value.trim();
+    const notes = row.querySelector('.batting-notes').value.trim();
     if (runs || balls || fours || sixes || dismissal || notes) review.push({ playerId, runs: runs || null, balls: balls || null, fours: fours || null, sixes: sixes || null, dismissal: dismissal || null, notes: notes || null });
-    if (rating) ratings[playerId] = Number(rating);
   }
-  return { review: review.length ? review : null, ratings: Object.keys(ratings).length ? ratings : null };
+  return review.length ? review : null;
 }
 function collectBowlingRows() {
-  const review = [], ratings = {};
+  const review = [];
   for (const row of document.querySelectorAll('#sheet-match-bowling-rows .stat-row')) {
     const playerId = row.querySelector('.bowling-player').value;
     if (!playerId) continue;
     const overs = row.querySelector('.bowling-overs').value, runsConceded = row.querySelector('.bowling-runs').value;
-    const wickets = row.querySelector('.bowling-wickets').value, rating = row.querySelector('.bowling-rating').value;
+    const wickets = row.querySelector('.bowling-wickets').value;
     const maidens = row.querySelector('.bowling-maidens').value, dotBalls = row.querySelector('.bowling-dotballs').value;
     const notes = row.querySelector('.bowling-notes').value.trim();
     if (overs || runsConceded || wickets || maidens || dotBalls || notes) review.push({ playerId, overs: overs || null, runsConceded: runsConceded || null, wickets: wickets || null, maidens: maidens || null, dotBalls: dotBalls || null, notes: notes || null });
-    if (rating) ratings[playerId] = Number(rating);
   }
-  return { review: review.length ? review : null, ratings: Object.keys(ratings).length ? ratings : null };
+  return review.length ? review : null;
 }
 function collectFieldingRows() {
-  const review = [], ratings = {};
+  const review = [];
   for (const row of document.querySelectorAll('#sheet-match-fielding-rows .stat-row')) {
     const playerId = row.querySelector('.fielding-player').value;
     if (!playerId) continue;
     const catches = row.querySelector('.fielding-catches').value, runOuts = row.querySelector('.fielding-runouts').value;
     const stumpings = row.querySelector('.fielding-stumpings').value, misfields = row.querySelector('.fielding-misfields').value;
-    const rating = row.querySelector('.fielding-rating').value;
     if (catches || runOuts || stumpings || misfields) review.push({ playerId, catches: catches || null, runOuts: runOuts || null, stumpings: stumpings || null, misfields: misfields || null });
-    if (rating) ratings[playerId] = Number(rating);
   }
-  return { review: review.length ? review : null, ratings: Object.keys(ratings).length ? ratings : null };
+  return review.length ? review : null;
 }
 
 async function loadMatches() {
@@ -4334,19 +4346,24 @@ function matchFormHtml(m) {
     <div class="sectionCollapseBody" id="matchSec-batting" style="display:none;">
       <div id="sheet-match-batting-rows"></div>
       <button type="button" class="link-btn" id="sheet-add-batting-row-btn" style="margin:8px 0;">+ Add batter</button>
+      <div id="sheet-match-batting-ratings">${ratingSlidersHtml('batting', m?.batting_ratings)}</div>
+      <label class="full" style="display:block; margin-top:8px;">Batting notes<textarea id="sheet-match-batting-notes">${esc(m?.batting_notes || '')}</textarea></label>
     </div>
 
     ${sectionHeadHtml('bowling', 'Bowling Review', false)}
     <div class="sectionCollapseBody" id="matchSec-bowling" style="display:none;">
       <div id="sheet-match-bowling-rows"></div>
       <button type="button" class="link-btn" id="sheet-add-bowling-row-btn" style="margin:8px 0;">+ Add bowler</button>
+      <div id="sheet-match-bowling-ratings">${ratingSlidersHtml('bowling', m?.bowling_ratings)}</div>
+      <label class="full" style="display:block; margin-top:8px;">Bowling notes<textarea id="sheet-match-bowling-notes">${esc(m?.bowling_notes || '')}</textarea></label>
     </div>
 
     ${sectionHeadHtml('fielding', 'Fielding Review', false)}
     <div class="sectionCollapseBody" id="matchSec-fielding" style="display:none;">
       <div id="sheet-match-fielding-rows"></div>
       <button type="button" class="link-btn" id="sheet-add-fielding-row-btn" style="margin:8px 0;">+ Add fielding rating</button>
-      <label class="full" style="display:block; margin-top:8px;">Notes<textarea id="sheet-match-notes">${esc(m?.notes || '')}</textarea></label>
+      <div id="sheet-match-fielding-ratings">${ratingSlidersHtml('fielding', m?.fielding_ratings)}</div>
+      <label class="full" style="display:block; margin-top:8px;">Fielding notes<textarea id="sheet-match-notes">${esc(m?.notes || '')}</textarea></label>
     </div>
 
     ${sectionHeadHtml('learnings', 'Key Learnings &amp; Training Actions', false)}
@@ -4370,6 +4387,9 @@ function openMatchForm(m) {
   openSheet(matchFormHtml(m));
   renderSheetMatchXI(m?.playing_xi || []);
   populateMatchStatRows(m || {});
+  wireRatingSliders(document.getElementById('sheet-match-batting-ratings'));
+  wireRatingSliders(document.getElementById('sheet-match-bowling-ratings'));
+  wireRatingSliders(document.getElementById('sheet-match-fielding-ratings'));
   document.getElementById('sheet-match-team').addEventListener('change', () => renderSheetMatchXI());
   document.getElementById('sheet-add-batting-row-btn').addEventListener('click', () => addBattingRow());
   document.getElementById('sheet-add-bowling-row-btn').addEventListener('click', () => addBowlingRow());
@@ -4379,9 +4399,6 @@ function openMatchForm(m) {
     const date = document.getElementById('sheet-match-date').value;
     if (!teamId || !date) { showToast('Team and date are required.', 'error'); return; }
     const playingXi = Array.from(document.querySelectorAll('#sheet-match-xi-checkboxes input:checked')).map(c => c.value);
-    const battingData = collectBattingRows();
-    const bowlingData = collectBowlingRows();
-    const fieldingData = collectFieldingRows();
     const row = {
       org_id: currentOrgId, team_id: teamId, date,
       opponent: document.getElementById('sheet-match-opponent').value.trim() || null,
@@ -4398,12 +4415,16 @@ function openMatchForm(m) {
       team_fielding_rating: document.getElementById('sheet-match-team-fielding-rating').value || null,
       team_notes: document.getElementById('sheet-match-team-notes').value.trim() || null,
       playing_xi: playingXi,
-      batting_review: battingData.review,
-      bowling_review: bowlingData.review,
-      batting_ratings: battingData.ratings,
-      bowling_ratings: bowlingData.ratings,
-      fielding_review: fieldingData.review,
-      fielding_ratings: fieldingData.ratings,
+      batting_review: collectBattingRows(),
+      bowling_review: collectBowlingRows(),
+      // Team-wide, not per-player — one set of named-metric ratings per
+      // section, matching the shape avgRatingHint() already expects.
+      batting_ratings: collectRatingSliders(document.getElementById('sheet-match-batting-ratings')),
+      bowling_ratings: collectRatingSliders(document.getElementById('sheet-match-bowling-ratings')),
+      fielding_review: collectFieldingRows(),
+      fielding_ratings: collectRatingSliders(document.getElementById('sheet-match-fielding-ratings')),
+      batting_notes: document.getElementById('sheet-match-batting-notes').value.trim() || null,
+      bowling_notes: document.getElementById('sheet-match-bowling-notes').value.trim() || null,
       actions: document.getElementById('sheet-match-actions').value.trim() || null,
       notes: document.getElementById('sheet-match-notes').value.trim() || null,
     };
@@ -5171,7 +5192,7 @@ const FIELD_LABELS = {
   tournaments: { name: 'Name', start_date: 'Start date', end_date: 'End date', notes: 'Notes', squad_player_ids: 'Squad' },
   seasons: { name: 'Name', team_id: 'Team', start_date: 'Start date', end_date: 'End date', notes: 'Notes' },
   sessions: { team_id: 'Team', date: 'Date', time: 'Time', title: 'Title', session_type: 'Type', duration: 'Duration', venue: 'Venue', focus: 'Focus', objectives: 'Objectives', warmup: 'Warm-up', main: 'Main activity', game: 'Game', cues: 'Cues', success: 'Success criteria', attendance: 'Attendance', main_drill_ids: 'Main drills', game_drill_ids: 'Game drills', equipment_ids: 'Equipment used' },
-  matches: { team_id: 'Team', tournament_id: 'Tournament', date: 'Date', opponent: 'Opponent', venue: 'Venue', format: 'Format', result: 'Result', toss: 'Toss', toss_decision: 'Toss decision', conditions: 'Conditions', team_rating: 'Team rating', team_batting_rating: 'Team batting rating', team_bowling_rating: 'Team bowling rating', team_fielding_rating: 'Team fielding rating', team_notes: 'Team review', playing_xi: 'Playing XI', batting_review: 'Batting review', bowling_review: 'Bowling review', fielding_review: 'Fielding review', batting_ratings: 'Batting ratings', bowling_ratings: 'Bowling ratings', fielding_ratings: 'Fielding ratings', actions: 'Actions', notes: 'Notes' },
+  matches: { team_id: 'Team', tournament_id: 'Tournament', date: 'Date', opponent: 'Opponent', venue: 'Venue', format: 'Format', result: 'Result', toss: 'Toss', toss_decision: 'Toss decision', conditions: 'Conditions', team_rating: 'Team rating', team_batting_rating: 'Team batting rating', team_bowling_rating: 'Team bowling rating', team_fielding_rating: 'Team fielding rating', team_notes: 'Team review', playing_xi: 'Playing XI', batting_review: 'Batting review', bowling_review: 'Bowling review', fielding_review: 'Fielding review', batting_ratings: 'Batting ratings', bowling_ratings: 'Bowling ratings', fielding_ratings: 'Fielding ratings', batting_notes: 'Batting notes', bowling_notes: 'Bowling notes', actions: 'Actions', notes: 'Notes' },
   assessments: { player_id: 'Player', date: 'Date', disciplines: 'Disciplines', ratings: 'Ratings', discipline_notes: 'Discipline notes', priority: 'Priority', comments: 'Comments', media_links: 'Media links' },
   reflections: { session_id: 'Session', date: 'Date', rating: 'Rating', communication: 'Communication', well: 'What went well', better: 'What could be better', players: 'Player notes', change: 'What to change', next: 'Next steps' },
   phases: { name: 'Name', start_date: 'Start date', end_date: 'End date', focus: 'Focus', session_target: 'Session target' },
