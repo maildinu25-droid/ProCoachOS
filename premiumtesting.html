@@ -631,6 +631,8 @@ function initApp(){
   db.assessments.forEach(a=>{if(!a.id)a.id=uid("assess")});
   db.customSkills=(db.customSkills&&typeof db.customSkills==="object")?db.customSkills:{};
   Object.keys(skillSets).forEach(k=>{db.customSkills[k]=Array.isArray(db.customSkills[k])?db.customSkills[k]:[]});
+  db.archivedSkills=(db.archivedSkills&&typeof db.archivedSkills==="object")?db.archivedSkills:{};
+  Object.keys(skillSets).forEach(k=>{db.archivedSkills[k]=Array.isArray(db.archivedSkills[k])?db.archivedSkills[k]:[]});
   db.settings=(db.settings&&typeof db.settings==="object")?db.settings:{};
   db.teams=Array.isArray(db.teams)?db.teams:[];
   db.tournaments=Array.isArray(db.tournaments)?db.tournaments:[];
@@ -1678,6 +1680,24 @@ function playerRosterReport(){
 }
 const skillSets={Batting:["Setup & Balance","Footwork","Bat Swing / Contact","Shot Selection","Playing Pace","Playing Spin","Strike Rotation","Boundary Options","Game Awareness","Execution Under Pressure"],Bowling:["Run-up / Approach","Action & Alignment","Accuracy","Control & Consistency","Pace / Revolutions","Swing / Seam / Spin","Variations","Tactical Awareness","Execution Under Pressure"],Fielding:["Catching","Ground Fielding","Throwing Accuracy","Throwing Power","Movement & Agility","Positioning","Game Awareness","Communication","Decision Making","Execution Under Pressure"],Wicketkeeping:["Set Position","Footwork","Glove Work","Standing Back","Standing Up","Taking Spin","Leg-side Takes","Gather & Release","Communication","Decision Making"]};const legacySkills=["Catching","Ground Fielding","Throwing Accuracy","Movement","Game Awareness","Communication","Decision Making","Work Ethic","Coachability"];
 function allSkillsFor(d){return skillSets[d].concat((db.customSkills&&db.customSkills[d])||[])}
+function isSkillArchived(d,skillName){return((db.archivedSkills&&db.archivedSkills[d])||[]).includes(skillName)}
+function archiveSkill(d,skillName){
+ if(!requireWriteAccess())return;
+ db.archivedSkills[d]=db.archivedSkills[d]||[];
+ if(!db.archivedSkills[d].includes(skillName))db.archivedSkills[d].push(skillName);
+ save();
+ renderAssessmentSkills();
+}
+function unarchiveSkill(d,skillName){
+ if(!requireWriteAccess())return;
+ db.archivedSkills[d]=(db.archivedSkills[d]||[]).filter(s=>s!==skillName);
+ save();
+ renderAssessmentSkills();
+}
+function toggleArchivedSkillsPanel(d){
+ let panel=document.getElementById(`archivedSkillsPanel_${d}`);
+ if(panel)panel.style.display=panel.style.display==="none"?"":"none";
+}
 // Bowling used to have "Length Control" and "Consistency" as two separate skills
 // (10 total); they're now merged into one "Control & Consistency" skill (9 total).
 // Old assessments still have 10 stored values — this preserves them exactly as
@@ -1761,12 +1781,15 @@ function reassessDuePlayers(){
 }
 function editAssessment(id){let a=db.assessments.find(x=>x.id===id);if(!a)return;openAssessmentForm(a,"edit")}
 function renderAssessmentSkills(){
- let box=document.getElementById("assessmentSkills"),sel=[...document.querySelectorAll('input[name="disciplines"]:checked')].map(x=>x.value);
+ let box=document.getElementById("assessmentSkills");
+ if(!box)return;
+ let sel=[...document.querySelectorAll('input[name="disciplines"]:checked')].map(x=>x.value);
  let existing=editingAssessmentId?db.assessments.find(x=>x.id===editingAssessmentId):null;
  box.innerHTML=sel.map(d=>{
   let oldVals=(existing&&existing.ratings&&existing.ratings[d])?existing.ratings[d]:null;
   let isLegacyBowling=d==="Bowling"&&oldVals&&oldVals.length===10;
   let skills=allSkillsFor(d);
+  let archivedList=(db.archivedSkills&&db.archivedSkills[d])||[];
   return `<label style="margin-bottom:6px">${d} · Rate 1–10</label><div class="card">${skills.map((s,i)=>{
    let val=5,wasAssessed=true;
    if(oldVals){
@@ -1779,8 +1802,18 @@ function renderAssessmentSkills(){
      wasAssessed=!!oldVals[i];
     }
    }
-   return sliderRow(s,`${d}_${i}`,val,wasAssessed);
-  }).join("")}<div class="formgrid" style="margin-top:8px"><input type="text" id="newSkill_${d}" placeholder="Add a custom metric for ${d}..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomSkill('${d}')}"><button type="button" class="btn" onclick="addCustomSkill('${d}')">+ Add metric</button></div><label>${d} development notes<textarea name="${d}_notes">${esc((existing&&existing.disciplineNotes&&existing.disciplineNotes[d])||"")}</textarea></label></div>`;
+   let archived=isSkillArchived(d,s);
+   // Archived skills are never removed from this list — doing so would
+   // shift every later skill's index and corrupt how past assessments
+   // are read back. Instead: hide the row, and only auto-force it
+   // unrated when this is a genuinely NEW assessment (no prior value to
+   // preserve). If editing an assessment that already had a real rating
+   // here, that value is kept exactly as-is, just out of view.
+   if(archived&&!oldVals)wasAssessed=false;
+   let rowHtml=sliderRow(s,`${d}_${i}`,val,wasAssessed);
+   if(archived)return `<div style="display:none">${rowHtml}</div>`;
+   return `<div style="position:relative">${rowHtml}<button type="button" class="btn secondary" style="position:absolute;top:0;right:0;padding:3px 8px;font-size:var(--fs-1)" title="Archive this metric — hides it from future assessments without affecting past data" onclick="archiveSkill('${d}','${esc(s).replace(/'/g,"\\'")}')">Archive</button></div>`;
+  }).join("")}<div class="formgrid" style="margin-top:8px"><input type="text" id="newSkill_${d}" placeholder="Add a custom metric for ${d}..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomSkill('${d}')}"><button type="button" class="btn" onclick="addCustomSkill('${d}')">+ Add metric</button></div>${archivedList.length?`<div style="margin-top:8px"><a href="#" onclick="event.preventDefault();toggleArchivedSkillsPanel('${d}')" class="muted">Archived metrics (${archivedList.length})</a><div id="archivedSkillsPanel_${d}" style="display:none;margin-top:6px">${archivedList.map(s=>`<div class="item"><span class="muted">${esc(s)}</span><button type="button" class="btn secondary" onclick="unarchiveSkill('${d}','${esc(s).replace(/'/g,"\\'")}')">Unarchive</button></div>`).join("")}</div></div>`:""}<label>${d} development notes<textarea name="${d}_notes">${esc((existing&&existing.disciplineNotes&&existing.disciplineNotes[d])||"")}</textarea></label></div>`;
  }).join("")||empty("Select at least one skill area.");
  enhanceTextareasWithVoice(box);
 }
