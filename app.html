@@ -894,8 +894,24 @@ function dashboard(){
  let streak=reflectionStreak();
  let activity=recentActivity().slice(0,3);
  let isNewUser=db.players.length===0&&db.sessions.length===0&&db.teams.length===0;
+ let hasRealData=db.players.length>0||db.sessions.length>0;
+ let lastBackupDash=localStorage.getItem("coachbook_last_backup");
+ let dismissedAt=localStorage.getItem("coachbook_backup_notice_dismissed_at");
+ let dismissedDaysAgo=dismissedAt?Math.floor((Date.now()-Number(dismissedAt))/86400000):999;
+ // Only nag once real data exists to actually lose, and only if never
+ // backed up — re-surface every 14 days if dismissed but still no
+ // backup has ever been made, rather than hiding this warning forever
+ // after a single tap.
+ let showBackupNotice=hasRealData&&!lastBackupDash&&dismissedDaysAgo>=14;
 
  dashboardEl.innerHTML=`
+ ${showBackupNotice?`<div class="card" style="border-color:var(--blue2);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+ <div><b>Your data lives on this device only</b><div class="muted" style="font-size:var(--fs-2);margin-top:2px">Nothing syncs to the cloud automatically. Export a backup so you can move to a new phone or browser without losing anything.</div></div>
+ <div style="display:flex;gap:8px;flex-shrink:0">
+ <button class="btn secondary" onclick="localStorage.setItem('coachbook_backup_notice_dismissed_at',Date.now());dashboard()">Later</button>
+ <button class="btn primary" onclick="exportBackup()">Export Backup</button>
+ </div>
+ </div>`:""}
  <div class="homeHeader">
  <div><div class="homeGreeting">${greetingWord()}, <b>${esc(profile.name||"Coach")}</b> 👋</div><div class="homeSub">${esc(fmtCalDate(today()))}</div></div>
  <div style="display:flex;gap:8px;align-items:center">
@@ -3306,6 +3322,9 @@ function accountPage(){
  </div>
 
  <h2 class="section">Backup &amp; Restore</h2>
+ <div class="card" style="border-color:var(--blue2);margin-bottom:12px">
+ <p style="margin:0"><b>This app stores everything on this device only</b> — nothing syncs to the cloud automatically. If you get a new phone, switch browsers, or want to use ProCoach OS on a second device, you need to <b>Export a Backup</b> here first, then <b>Restore from Backup</b> on the new device.</p>
+ </div>
  ${daysSince!==null&&daysSince>=7?`<div class="card" style="border-color:var(--gold);margin-bottom:12px">It's been ${daysSince} days since your last backup — consider exporting one now.</div>`:""}
  <div class="card">
  <p class="muted">Export a full backup of this profile's data, or restore from a previous backup file.</p>
