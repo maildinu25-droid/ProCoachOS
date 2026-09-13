@@ -986,7 +986,7 @@ function renderSessionAttachmentPreview(){
  el.innerHTML=sessionAttachment?`<div class="item"><div><b>${esc(sessionAttachment.name)}</b><div class="muted">${esc(sessionAttachment.type||"File")}</div></div><button type="button" class="btn danger" onclick="sessionAttachment=null;renderSessionAttachmentPreview();document.getElementById('sessionAttachmentInput').value=''">Remove</button></div>`:"";
 }
 function sessions(){
- let list=db.sessions.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+ let list=db.sessions.slice().sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a)));
  if(sessionQuery){let q=sessionQuery.toLowerCase();list=list.filter(s=>[sessionLabel(s),s.squad,s.objectives,s.focus,s.venue].some(v=>String(v||"").toLowerCase().includes(q)))}
  if(sessionSquadFilter)list=list.filter(s=>s.squad===sessionSquadFilter);
  let squadOptions=[...new Set(db.sessions.map(s=>s.squad).filter(Boolean))].sort();
@@ -1165,7 +1165,7 @@ function reflections(){
 }
 function reflectionFormHtml(x,mode){
  x=x||{};
- let recentSessions=db.sessions.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).slice(0,60);
+ let recentSessions=db.sessions.slice().sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a))).slice(0,60);
  return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Reflection":"Coach Self Reflection"}</h2><button class="x" onclick="closeM()">×</button></div>
  <form class="formgrid" onsubmit="saveReflection(event)">
  <label>Date<input type="date" name="date" value="${esc(x.date||today())}"></label>
@@ -1213,7 +1213,7 @@ function newReflectionForSession(sessionId){
  newReflection({date:s.date,session:sessionLabel(s),sessionId:s.id});
 }
 function reflectPendingSessions(){
- let overdue=db.sessions.filter(s=>s.date<today()&&!db.reflections.some(r=>r.sessionId===s.id)).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+ let overdue=db.sessions.filter(s=>s.date<today()&&!db.reflections.some(r=>r.sessionId===s.id)).sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a)));
  if(!overdue.length)return;
  if(overdue.length===1){newReflectionForSession(overdue[0].id);return}
  modal(`<div class="sheetHead"><h2>Sessions Awaiting Reflection</h2><button class="x" onclick="closeM()">×</button></div>
@@ -1490,7 +1490,7 @@ function players(){
  let sEl=document.getElementById("playerSearch");if(sEl&&playerSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
 function playerAssessments(p){return db.assessments.filter(a=>a.player===p.name).slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")))}
-function playerSessions(p){return db.sessions.filter(s=>Array.isArray(s.attendees)&&s.attendees.includes(p.name)).slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))}
+function playerSessions(p){return db.sessions.filter(s=>Array.isArray(s.attendees)&&s.attendees.includes(p.name)).slice().sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a)))}
 function playerMatches(p){return db.matches.filter(m=>(m.playingXI||[]).includes(p.name)||(m.battingReview||[]).some(r=>r.name===p.name)||(m.bowlingReview||[]).some(r=>r.name===p.name)).slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))}
 function goalStatusInfo(g){
  if(g.achieved)return{text:"Achieved"+(g.achievedDate?" "+fmtDate(g.achievedDate):""),color:"var(--g)"};
@@ -1813,7 +1813,7 @@ function renderAssessmentSkills(){
    let rowHtml=sliderRow(s,`${d}_${i}`,val,wasAssessed);
    if(archived)return `<div style="display:none">${rowHtml}</div>`;
    return `<div style="position:relative">${rowHtml}<button type="button" class="btn secondary" style="position:absolute;top:0;right:0;padding:3px 8px;font-size:var(--fs-1)" title="Archive this metric — hides it from future assessments without affecting past data" onclick="archiveSkill('${d}','${esc(s).replace(/'/g,"\\'")}')">Archive</button></div>`;
-  }).join("")}<div class="formgrid" style="margin-top:8px"><input type="text" id="newSkill_${d}" placeholder="Add a custom metric for ${d}..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomSkill('${d}')}"><button type="button" class="btn" onclick="addCustomSkill('${d}')">+ Add metric</button></div>${archivedList.length?`<div style="margin-top:8px"><a href="#" onclick="event.preventDefault();toggleArchivedSkillsPanel('${d}')" class="muted">Archived metrics (${archivedList.length})</a><div id="archivedSkillsPanel_${d}" style="display:none;margin-top:6px">${archivedList.map(s=>`<div class="item"><span class="muted">${esc(s)}</span><button type="button" class="btn secondary" onclick="unarchiveSkill('${d}','${esc(s).replace(/'/g,"\\'")}')">Unarchive</button></div>`).join("")}</div></div>`:""}<label>${d} development notes<textarea name="${d}_notes">${esc((existing&&existing.disciplineNotes&&existing.disciplineNotes[d])||"")}</textarea></label></div>`;
+  }).join("")}<div class="formgrid" style="margin-top:8px"><input type="text" id="newSkill_${d}" placeholder="Add a custom metric for ${d}..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomSkill('${d}')}"><button type="button" class="btn primary" onclick="addCustomSkill('${d}')">+ Add metric</button></div>${archivedList.length?`<div style="margin-top:8px"><a href="#" onclick="event.preventDefault();toggleArchivedSkillsPanel('${d}')" class="muted">Archived metrics (${archivedList.length})</a><div id="archivedSkillsPanel_${d}" style="display:none;margin-top:6px">${archivedList.map(s=>`<div class="item"><span class="muted">${esc(s)}</span><button type="button" class="btn secondary" onclick="unarchiveSkill('${d}','${esc(s).replace(/'/g,"\\'")}')">Unarchive</button></div>`).join("")}</div></div>`:""}<label>${d} development notes<textarea name="${d}_notes">${esc((existing&&existing.disciplineNotes&&existing.disciplineNotes[d])||"")}</textarea></label></div>`;
  }).join("")||empty("Select at least one skill area.");
  enhanceTextareasWithVoice(box);
 }
@@ -2615,7 +2615,7 @@ function reports(){
  let todaySessions=db.sessions.filter(s=>s.date===today());
  let todayMatches=db.matches.filter(m=>m.date===today());
  let todayEvents=db.events.filter(e=>e.date===today());
- let upcomingSessions=db.sessions.slice().filter(s=>s.date>=today()).sort((a,b)=>String(a.date||"").localeCompare(String(b.date||""))).slice(0,5);
+ let upcomingSessions=db.sessions.slice().filter(s=>s.date>=today()).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b))).slice(0,5);
  let upcomingCal=[
   ...db.sessions.filter(s=>s.date>=today()).map(s=>({date:s.date,label:sessionLabel(s),type:"Session"})),
   ...db.matches.filter(m=>m.date>=today()).map(m=>({date:m.date,label:"vs "+(m.opp||"Opposition"),type:"Match"})),
@@ -2698,6 +2698,7 @@ function printReport(){
   setTimeout(()=>window.print(),100);
 }
 window.addEventListener("afterprint",()=>document.body.classList.remove("printingReport"));
+function sessionDateTimeKey(s){return `${s.date||""} ${s.time||"00:00"}`}
 function fmtDate(iso){if(!iso||typeof iso!=="string"||!/^\d{4}-\d{2}-\d{2}/.test(iso))return iso||"";let[y,m,d]=iso.slice(0,10).split("-");return `${d}-${m}-${y}`}
 function reportRangeModal(title,buildFnName){
  modal(`<div class="sheetHead"><h2>${title}</h2><button class="x" onclick="closeM()">×</button></div>
@@ -2978,7 +2979,7 @@ function buildSessionReport(){
  let hasAnyTags=categoryCounts.some(c=>c.count>0);
  reportShell("Session Report",rangeLabel(from,to),sessions.length?`
  ${hasAnyTags?`<h2>Objective Category Breakdown</h2><div class="card">${categoryCounts.map(c=>`<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${esc(c.name)}</span><b>${c.count} session${c.count!==1?"s":""}</b></div>`).join("")}</div>`:""}
- <table class="reportTable"><tr><th>Date</th><th>Title</th><th>Type</th><th>Focus</th><th>Categories</th><th>Objectives</th></tr>${sessions.slice().sort((a,b)=>String(a.date).localeCompare(String(b.date))).map(s=>`<tr><td>${esc(fmtDate(s.date))}</td><td>${esc(s.title||"—")}</td><td>${esc(sessionTypeLabel(s.sessionType))}</td><td>${esc(s.focus)}</td><td>${(s.objectiveTags||[]).map(t=>esc(t)).join(", ")||"—"}</td><td>${esc(s.objectives)}</td></tr>`).join("")}</table>`:empty("No sessions documented."));
+ <table class="reportTable"><tr><th>Date</th><th>Title</th><th>Type</th><th>Focus</th><th>Categories</th><th>Objectives</th></tr>${sessions.slice().sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b))).map(s=>`<tr><td>${esc(fmtDate(s.date))}</td><td>${esc(s.title||"—")}</td><td>${esc(sessionTypeLabel(s.sessionType))}</td><td>${esc(s.focus)}</td><td>${(s.objectiveTags||[]).map(t=>esc(t)).join(", ")||"—"}</td><td>${esc(s.objectives)}</td></tr>`).join("")}</table>`:empty("No sessions documented."));
 }
 function matchReport(){reportRangeModal("Match Report","buildMatchReport")}
 function buildMatchReport(){
@@ -3170,7 +3171,7 @@ function saveCalEvent(e){
 function delCalEvent(id){if(confirm("Delete this reminder/event?")){db.events=db.events.filter(x=>x.id!==id);save()}}
 function calMonthReport(){
  let mk=`${calYear}-${String(calMonth+1).padStart(2,"0")}`;
- let ss=db.sessions.filter(s=>String(s.date||"").slice(0,7)===mk).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+ let ss=db.sessions.filter(s=>String(s.date||"").slice(0,7)===mk).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b)));
  let mm=db.matches.filter(m=>String(m.date||"").slice(0,7)===mk).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
  let ee=db.events.filter(e=>String(e.date||"").slice(0,7)===mk).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
  let label=new Date(calYear,calMonth,1).toLocaleDateString(undefined,{month:"long",year:"numeric"});
