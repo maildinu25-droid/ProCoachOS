@@ -2563,6 +2563,37 @@ function buildTeamReport(){
  <h2>Match Results</h2>${matches.length?matches.map(m=>`<div class="card"><b>${esc(fmtDate(m.date))} · vs ${esc(m.opp||"Opposition")}</b><p>${esc(m.result||"—")}</p></div>`).join(""):empty("No matches recorded in this scope.")}`);
 }
 function assessmentReport(){scopeAndRangeModal("Assessment Report","buildAssessmentReport")}
+function skillTrendsHtml(roster,assessments){
+ let disciplines=Object.keys(skillSets);
+ let rows=roster.map(p=>{
+  let declining=[],stagnant=[],improving=[];
+  disciplines.forEach(d=>{
+   let skills=allSkillsFor(d);
+   skills.forEach((s,i)=>{
+    let series=assessments.filter(a=>a.player===p.name&&assessmentDisciplines(a).includes(d)&&a.ratings&&Array.isArray(a.ratings[d]))
+     .map(a=>({date:a.date,value:Number(a.ratings[d][i])}))
+     .filter(pt=>Number.isFinite(pt.value)&&pt.value>0)
+     .sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
+    if(series.length<2)return;
+    let first=series[0].value,latest=series[series.length-1].value;
+    let last3=series.slice(-3);
+    let isStagnant=last3.length>=3&&last3.every(pt=>pt.value===last3[0].value);
+    if(isStagnant){stagnant.push(`${d}: ${s}`)}
+    else if(latest<first){declining.push(`${d}: ${s} (${first}→${latest})`)}
+    else if(latest>first){improving.push(`${d}: ${s} (${first}→${latest})`)}
+   });
+  });
+  return{p,declining,stagnant,improving};
+ }).filter(r=>r.declining.length||r.stagnant.length||r.improving.length);
+ if(!rows.length)return "";
+ return `<h2>Skill Trends</h2>
+ ${rows.map(({p,declining,stagnant,improving})=>`<div class="card">
+ <b>${esc(p.name)}</b>
+ ${declining.length?`<p style="color:var(--red);margin-top:6px"><b>Declining:</b> ${esc(declining.join(", "))}</p>`:""}
+ ${stagnant.length?`<p style="color:var(--gold);margin-top:6px"><b>Stagnant (3+ assessments, no change):</b> ${esc(stagnant.join(", "))}</p>`:""}
+ ${improving.length?`<p class="muted" style="margin-top:6px"><b>Improving:</b> ${esc(improving.join(", "))}</p>`:""}
+ </div>`).join("")}`;
+}
 function buildAssessmentReport(){
  let scope=scopeValues();
  let{from,to}=reportRangeValues();
@@ -2572,6 +2603,7 @@ function buildAssessmentReport(){
  let byPlayer=roster.map(p=>{let aa=assessments.filter(a=>a.player===p.name).sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));let latest=aa.slice(-1)[0];return{p,count:aa.length,latest}});
  reportShell(`Assessment Report — ${esc(scopeLabel(scope))}`,rangeLabel(from,to),
  `${assessmentCoverageHeatmapHtml(roster)}
+ ${skillTrendsHtml(roster,assessments)}
  <h2>Player Summary</h2>${byPlayer.length?byPlayer.map(({p,count,latest})=>`<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span><p>${count} assessment${count!==1?"s":""} logged${latest?" · Latest: "+assessmentAvg(latest)+"/10 on "+esc(fmtDate(latest.date)):""}</p></div>`).join(""):empty("No players in this scope.")}
  <h2>Full Assessment Log</h2>${assessments.length?assessments.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).map(a=>`<div class="card"><b>${esc(a.player)} · ${esc(fmtDate(a.date))}</b><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d} ${disciplineAvg(a,d)}/10</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div>`).join(""):empty("No assessments recorded in this scope.")}`);
 }
