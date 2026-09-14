@@ -3504,6 +3504,12 @@ const DAYS_OF_WEEK=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday
 function booking(){
  let el=document.getElementById("booking");
  if(!el)return;
+ if(!isPremium()){
+  let daysLeft=trialDaysLeft();
+  el.innerHTML=head("Booking","Let parents request a 1-on-1 slot against your real availability — no back-and-forth.")
+  +`<div class="card" style="text-align:center;padding:32px"><h2 style="margin-top:0">Booking is a Premium feature</h2><p class="muted">${daysLeft>0?`You have ${daysLeft} day${daysLeft!==1?"s":""} left in your free trial to explore this.`:"Your free trial has ended."}</p><button class="btn primary" style="margin-top:10px" onclick="showUpgradePrompt('Booking')">Learn more</button></div>`;
+  return;
+ }
  let t=bookingTokens();
  if(!t.management){
   el.innerHTML=head("Booking","Let parents request a 1-on-1 slot against your real availability — no back-and-forth.")
