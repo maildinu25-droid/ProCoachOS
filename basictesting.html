@@ -2549,14 +2549,6 @@ function buildTeamReport(){
   return attended/teamSessions.length*100;
  }).filter(r=>r!==null);
  let avgAttendance=attendanceRates.length?Math.round(attendanceRates.reduce((a,b)=>a+b,0)/attendanceRates.length):null;
- let needsAttention=roster.filter(p=>{
-  let pa=db.assessments.filter(a=>a.player===p.name);
-  if(!pa.length)return true;
-  let latestDate=pa.map(a=>a.date).filter(Boolean).sort().slice(-1)[0];
-  if(!latestDate)return true;
-  let daysSince=Math.floor((new Date(today()+"T00:00:00Z")-new Date(latestDate+"T00:00:00Z"))/86400000);
-  return daysSince>=30;
- });
  reportShell(`Team Report — ${esc(scopeLabel(scope))}`,`${roster.length} player${roster.length!==1?"s":""} · ${matches.length} match${matches.length!==1?"es":""} · ${rangeLabel(from,to)}`,
  `<div class="grid g4"><div class="card stat"><span>Players</span><b>${roster.length}</b></div><div class="card stat"><span>Wins</span><b>${wins}</b></div><div class="card stat"><span>Losses</span><b>${losses}</b></div><div class="card stat"><span>Draws</span><b>${draws}</b></div></div>
  ${matches.length?`<div class="card" style="margin-top:15px"><span class="muted">Recent Form (oldest → newest)</span><div style="margin-top:8px">${recentForm}</div></div>`:""}
@@ -2568,7 +2560,6 @@ function buildTeamReport(){
   let wickets=pMatches.reduce((sum,m)=>{let r=(m.bowlingReview||[]).find(x=>x.name===p.name);return sum+(r?(+r.wickets||0):0)}, 0);
   return `<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span><p class="muted">${pMatches.length} match${pMatches.length!==1?"es":""} · ${runs} run${runs!==1?"s":""} · ${wickets} wicket${wickets!==1?"s":""}</p></div>`;
  }).join(""):empty("No players in this scope.")}
- ${needsAttention.length?`<h2>Needs Attention</h2><div class="card"><p class="muted">Never assessed, or not assessed in 30+ days:</p><p style="margin-top:8px">${needsAttention.map(p=>esc(p.name)).join(", ")}</p></div>`:""}
  <h2>Match Results</h2>${matches.length?matches.map(m=>`<div class="card"><b>${esc(fmtDate(m.date))} · vs ${esc(m.opp||"Opposition")}</b><p>${esc(m.result||"—")}</p></div>`).join(""):empty("No matches recorded in this scope.")}`);
 }
 function assessmentReport(){scopeAndRangeModal("Assessment Report","buildAssessmentReport")}
