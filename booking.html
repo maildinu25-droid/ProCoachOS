@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Book a session — ProCoach OS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{--g:#10b981;--g2:#34d399;--ink:#eef2f7;--muted:#8a95ab;--line:rgba(255,255,255,.08);--bg:#08121e;--surface:#0f1a2b;--surface2:#16233a;--gold:#f59e0b;--red:#ef5350}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:var(--bg);color:var(--ink);line-height:1.5}
+.wrap{max-width:520px;margin:0 auto;padding:28px 18px 60px}
+.coachName{font-size:26px;font-weight:800;letter-spacing:-.01em;margin:0 0 4px}
+.sub{color:var(--muted);font-size:14.5px;margin:0 0 28px}
+.dateGroup{margin-bottom:22px}
+.dateLabel{font-size:13px;font-weight:600;color:var(--ink);margin-bottom:10px}
+.slotGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:8px}
+.slotBtn{background:var(--surface);border:1px solid var(--line);color:var(--ink);border-radius:10px;padding:10px 6px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s}
+.slotBtn:hover{border-color:var(--g)}
+.slotBtn.selected{background:linear-gradient(135deg,var(--g),var(--g2));border-color:transparent;color:#04140d}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:20px}
+.formRow{margin-bottom:14px}
+.formRow label{display:block;font-size:13px;font-weight:600;margin-bottom:6px;color:var(--ink)}
+.formRow input,.formRow textarea{width:100%;background:var(--surface2);border:1px solid var(--line);border-radius:10px;padding:11px 12px;color:var(--ink);font-family:inherit;font-size:15px}
+.formRow textarea{resize:vertical;min-height:64px}
+.chosenSlot{background:var(--surface2);border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:14.5px}
+.btn{width:100%;background:linear-gradient(135deg,var(--g),var(--g2));border:0;color:#04140d;font-weight:700;font-size:15.5px;padding:14px;border-radius:10px;cursor:pointer}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.state{text-align:center;padding:60px 20px;color:var(--muted)}
+.state h2{color:var(--ink);font-size:19px;margin-bottom:8px}
+.backLink{display:inline-block;margin-top:14px;color:var(--g);font-size:14px;text-decoration:none;cursor:pointer}
+.confirmCard{text-align:center;padding:36px 20px}
+.confirmCard .tick{width:52px;height:52px;border-radius:50%;background:var(--mint,rgba(16,185,129,.15));display:flex;align-items:center;justify-content:center;margin:0 auto 18px;font-size:26px}
+.errMsg{color:var(--red);font-size:13.5px;margin-top:8px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"><div class="state">Loading availability…</div></div>
+
+<script>
+const BOOKING_API = "https://procoachos-booking.maildinu25.workers.dev";
+const params = new URLSearchParams(location.search);
+const token = params.get("t");
+const app = document.getElementById("app");
+
+let state = { openSlots: [], selected: null, submitting: false, submitted: false, error: null };
+
+function fmtDateLabel(dateStr){
+  const d = new Date(dateStr + "T00:00:00");
+  const today = new Date(); today.setHours(0,0,0,0);
+  const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate()+1);
+  if (d.getTime() === today.getTime()) return "Today";
+  if (d.getTime() === tomorrow.getTime()) return "Tomorrow";
+  return d.toLocaleDateString(undefined, { weekday:"long", month:"long", day:"numeric" });
+}
+function fmtTimeLabel(timeStr){
+  const [h,m] = timeStr.split(":").map(Number);
+  const period = h >= 12 ? "pm" : "am";
+  const h12 = h % 12 === 0 ? 12 : h % 12;
+  return m === 0 ? `${h12}${period}` : `${h12}:${String(m).padStart(2,"0")}${period}`;
+}
+function groupByDate(slots){
+  const groups = {};
+  slots.forEach(s => { (groups[s.date] = groups[s.date] || []).push(s); });
+  return Object.entries(groups).sort(([a],[b]) => a.localeCompare(b));
+}
+
+function render(){
+  if (!token){
+    app.innerHTML = `<div class="state"><h2>This link isn't valid</h2><p>Ask your coach to resend the booking link.</p></div>`;
+    return;
+  }
+  if (state.submitted){
+    app.innerHTML = `<div class="card confirmCard">
+      <div class="tick">✓</div>
+      <h2 style="margin:0 0 6px">Request sent</h2>
+      <p style="color:var(--muted);margin:0">Your coach will confirm shortly. You'll hear back once it's approved.</p>
+    </div>`;
+    return;
+  }
+  if (state.error === "invalid-link"){
+    app.innerHTML = `<div class="state"><h2>This link isn't valid</h2><p>Ask your coach to resend the booking link.</p></div>`;
+    return;
+  }
+  if (!state.loaded){
+    app.innerHTML = `<div class="state">Loading availability…</div>`;
+    return;
+  }
+  if (!state.openSlots.length){
+    app.innerHTML = `<div class="state"><h2>No open slots right now</h2><p>Check back soon, or message your coach directly.</p></div>`;
+    return;
+  }
+
+  let html = `<h1 class="coachName">Book a session</h1><p class="sub">Pick a time that works, then send your request.</p>`;
+
+  if (!state.selected){
+    groupByDate(state.openSlots).forEach(([date, slots]) => {
+      html += `<div class="dateGroup"><div class="dateLabel">${fmtDateLabel(date)}</div><div class="slotGrid">`;
+      slots.forEach(s => {
+        html += `<button class="slotBtn" data-date="${s.date}" data-time="${s.time}" onclick="selectSlot('${s.date}','${s.time}')">${fmtTimeLabel(s.time)}</button>`;
+      });
+      html += `</div></div>`;
+    });
+  } else {
+    html += `<div class="chosenSlot">${fmtDateLabel(state.selected.date)} at ${fmtTimeLabel(state.selected.time)} <a class="backLink" onclick="changeSlot()">Change</a></div>
+    <div class="card">
+      <div class="formRow"><label>Your name</label><input id="fParent" placeholder="e.g. Priya Sharma"></div>
+      <div class="formRow"><label>Player's name</label><input id="fPlayer" placeholder="e.g. Arjun Sharma"></div>
+      <div class="formRow"><label>Note <span style="color:var(--muted);font-weight:400">(optional)</span></label><textarea id="fNote" placeholder="Anything your coach should know"></textarea></div>
+      <button class="btn" id="submitBtn" onclick="submitRequest()" ${state.submitting?"disabled":""}>${state.submitting?"Sending…":"Send Request"}</button>
+      ${state.error==="missing-fields"?`<div class="errMsg">Please fill in your name and the player's name.</div>`:""}
+      ${state.error==="submit-failed"?`<div class="errMsg">Something went wrong sending your request. Please try again.</div>`:""}
+    </div>`;
+  }
+  app.innerHTML = html;
+}
+
+function selectSlot(date, time){ state.selected = { date, time }; state.error=null; render(); }
+function changeSlot(){ state.selected = null; state.error=null; render(); }
+
+async function loadSlots(){
+  try{
+    const res = await fetch(`${BOOKING_API}/api/booking/slots?t=${encodeURIComponent(token)}`);
+    if (!res.ok){ state.error = "invalid-link"; state.loaded = true; render(); return; }
+    const data = await res.json();
+    state.openSlots = data.openSlots || [];
+    state.loaded = true;
+    render();
+  } catch(e){
+    state.error = "invalid-link"; state.loaded = true; render();
+  }
+}
+
+async function submitRequest(){
+  const parentName = document.getElementById("fParent").value.trim();
+  const playerName = document.getElementById("fPlayer").value.trim();
+  const note = document.getElementById("fNote").value.trim();
+  if (!parentName || !playerName){ state.error = "missing-fields"; render(); return; }
+  state.submitting = true; state.error = null; render();
+  try{
+    const res = await fetch(`${BOOKING_API}/api/booking/request?t=${encodeURIComponent(token)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parentName, playerName, note, date: state.selected.date, time: state.selected.time })
+    });
+    if (!res.ok) throw new Error("failed");
+    state.submitting = false; state.submitted = true; render();
+  } catch(e){
+    state.submitting = false; state.error = "submit-failed"; render();
+  }
+}
+
+loadSlots();
+</script>
+</body>
+</html>
