@@ -2569,7 +2569,6 @@ function buildTeamReport(){
   return `<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span><p class="muted">${pMatches.length} match${pMatches.length!==1?"es":""} · ${runs} run${runs!==1?"s":""} · ${wickets} wicket${wickets!==1?"s":""}</p></div>`;
  }).join(""):empty("No players in this scope.")}
  ${needsAttention.length?`<h2>Needs Attention</h2><div class="card"><p class="muted">Never assessed, or not assessed in 30+ days:</p><p style="margin-top:8px">${needsAttention.map(p=>esc(p.name)).join(", ")}</p></div>`:""}
- ${assessmentCoverageHeatmapHtml(roster)}
  <h2>Match Results</h2>${matches.length?matches.map(m=>`<div class="card"><b>${esc(fmtDate(m.date))} · vs ${esc(m.opp||"Opposition")}</b><p>${esc(m.result||"—")}</p></div>`).join(""):empty("No matches recorded in this scope.")}`);
 }
 function assessmentReport(){scopeAndRangeModal("Assessment Report","buildAssessmentReport")}
@@ -2581,7 +2580,8 @@ function buildAssessmentReport(){
  let assessments=db.assessments.filter(a=>inRange(a.date,from,to)&&rosterNames.has(a.player));
  let byPlayer=roster.map(p=>{let aa=assessments.filter(a=>a.player===p.name).sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));let latest=aa.slice(-1)[0];return{p,count:aa.length,latest}});
  reportShell(`Assessment Report — ${esc(scopeLabel(scope))}`,rangeLabel(from,to),
- `<h2>Player Summary</h2>${byPlayer.length?byPlayer.map(({p,count,latest})=>`<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span><p>${count} assessment${count!==1?"s":""} logged${latest?" · Latest: "+assessmentAvg(latest)+"/10 on "+esc(fmtDate(latest.date)):""}</p></div>`).join(""):empty("No players in this scope.")}
+ `${assessmentCoverageHeatmapHtml(roster)}
+ <h2>Player Summary</h2>${byPlayer.length?byPlayer.map(({p,count,latest})=>`<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span><p>${count} assessment${count!==1?"s":""} logged${latest?" · Latest: "+assessmentAvg(latest)+"/10 on "+esc(fmtDate(latest.date)):""}</p></div>`).join(""):empty("No players in this scope.")}
  <h2>Full Assessment Log</h2>${assessments.length?assessments.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).map(a=>`<div class="card"><b>${esc(a.player)} · ${esc(fmtDate(a.date))}</b><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d} ${disciplineAvg(a,d)}/10</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div>`).join(""):empty("No assessments recorded in this scope.")}`);
 }
 function attendanceReport(){scopeAndRangeModal("Attendance Report","buildAttendanceReport")}
