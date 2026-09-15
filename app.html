@@ -45,8 +45,6 @@ input[type=range]{accent-color:var(--g);width:100%;height:6px;padding:0;backgrou
 .searchIconBtn,.bellBtn{width:34px;height:34px;border-radius:50%;background:var(--surface2);border:1px solid var(--line);color:var(--ink);cursor:pointer;flex-shrink:0;transition:.15s;position:relative;display:inline-flex;align-items:center;justify-content:center}
 .searchIconBtn:hover,.bellBtn:hover{background:var(--surface);border-color:var(--lineHover)}
 .bellBtn .badge{position:absolute;top:-3px;right:-3px;background:var(--red);color:#fff;font-size:var(--fs-1);font-weight:800;width:14px;height:14px;border-radius:50%;display:flex;align-items:center;justify-content:center}
-.whatsNewBtn{background:var(--goldTint);border-color:var(--gold);color:var(--gold)}
-.whatsNewBtn:hover{background:var(--goldTint);filter:brightness(1.15)}
 .homeSection{padding:8px 22px 0}
 .homeSectionTitle{font-size:var(--fs-2);text-transform:uppercase;letter-spacing:.5px;color:var(--muted);font-weight:700;margin-bottom:6px;display:flex;justify-content:space-between;align-items:center}
 .reportGroupHeader{display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:13px 16px;cursor:pointer;font-size:var(--fs-5);font-weight:800;color:var(--ink);transition:.15s}
@@ -664,6 +662,7 @@ function icon(name,size){
  size=size||18;
  const paths={
  home:'<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V10"/>',
+ plus:'<path d="M12 5v14M5 12h14"/>',
  sessions:'<rect x="4" y="3" width="16" height="18" rx="2.5"/><line x1="8" y1="8.5" x2="16" y2="8.5"/><line x1="8" y1="12.5" x2="16" y2="12.5"/><line x1="8" y1="16.5" x2="12.5" y2="16.5"/>',
  reflections:'<path d="M21 11.5a8.4 8.4 0 0 1-8.6 8.4H12a8.4 8.4 0 0 1-4.4-1.3L3 20l1.8-4.6A8.4 8.4 0 0 1 21 11.5z"/>',
  players:'<path d="M16.5 20.5v-1.8a3.7 3.7 0 0 0-3.7-3.7H6.9a3.7 3.7 0 0 0-3.7 3.7v1.8"/><circle cx="10.2" cy="7.8" r="3.7"/><path d="M21 20.5v-1.8a3.7 3.7 0 0 0-2.8-3.6"/><path d="M15 4.3a3.7 3.7 0 0 1 0 7.2"/>',
@@ -717,7 +716,7 @@ function totalPendingCount(){
  return (reflectionToday?0:1)+(assessmentToday?0:1)+(unassessedCount>0?1:0)+bookingPendingCount();
 }
 function refreshNotificationBadge(){
- let btn=document.querySelector(".bellBtn");
+ let btn=document.querySelector(".bellBtn:not(.whatsNewBtn)");
  if(!btn)return;
  let count=totalPendingCount();
  btn.innerHTML=`${icon("bell",17)}${count?`<span class="badge">${count}</span>`:""}`;
@@ -860,6 +859,16 @@ function buildInsights(months,hrsTrend,ratingTrend,assessTrend,sessTrend){
  return out.slice(0,5);
 }
 const CHANGELOG=[
+ {date:"2026-09-15",items:[
+  "Booking is here — share one link, set your weekly availability, and let parents/players request a 1-on-1 slot without the back-and-forth. Includes exceptions for one-off dates, a way for them to check their request status, and everything routes through Premium.",
+  "Bulk-archive — clear out every never-used metric in a discipline in one tap, instead of archiving them one by one.",
+  "Assessment Coverage heatmap and Skill Trends (improving/stagnant/declining) added to the Assessment Report.",
+  "Copy Last Session's Plan — start a new session from your most recent one instead of a blank form.",
+  "A persistent backup-status indicator in the nav, always visible, not just a one-time dashboard reminder.",
+  "Quick Add — tap the new + icon next to search to jump straight to adding a player, session, assessment, or match.",
+  "Pending booking requests now show up in the notification bell alongside your other pending items.",
+  "A handful of small fixes: correct number keyboards on more fields, the Reports upgrade screen correctly says Premium, and the What's New icon no longer gets overwritten by the notification badge refresh."
+ ]},
  {date:"2026-09-13",items:[
   "Custom assessment metrics — add your own rating metric to any discipline, with an option to archive ones you no longer use.",
   "Detailed playing style — batting hand, bowling arm, pace/spin, and spin type, right on the player profile.",
@@ -883,6 +892,16 @@ function hasUnseenChangelog(){
 function refreshWhatsNewBadge(){
  let btn=document.querySelector(".whatsNewBtn");
  if(btn)btn.innerHTML=`${icon("star",16)}${hasUnseenChangelog()?`<span class="badge"></span>`:""}`;
+}
+function openQuickAdd(){
+ let items=[
+  {text:"New Player",action:"go('players');newPlayer()"},
+  {text:"New Session Plan",action:"go('sessions');newSession()"},
+  {text:"New Assessment",action:"go('assessments');newAssessment()"},
+  {text:"New Match",action:"go('matches');newMatch()"},
+ ];
+ modal(`<div class="sheetHead"><h2>Quick Add</h2><button class="x" onclick="closeM()">×</button></div>
+ <div class="list">${items.map(i=>`<div class="item" style="cursor:pointer" onclick="closeM();${i.action}"><div><b>${esc(i.text)}</b></div></div>`).join("")}</div>`);
 }
 function openNotifications(){
  let reflectionToday=db.reflections.some(r=>r.date===today());
@@ -974,7 +993,7 @@ function dashboard(){
  <button class="bellBtn whatsNewBtn" onclick="openWhatsNew()" aria-label="What's new">${icon("star",16)}${hasUnseenChangelog()?`<span class="badge"></span>`:""}</button>
  <button class="bellBtn" onclick="openNotifications()" aria-label="Pending items">${icon("bell",17)}${pendingCount?`<span class="badge">${pendingCount}</span>`:""}</button>
  <button class="searchIconBtn" onclick="openGlobalSearch()" aria-label="Search">${icon("search",16)}</button>
- <div class="avatarCircle">${esc(initials(profile.name))}</div>
+ <button class="bellBtn" onclick="openQuickAdd()" aria-label="Quick add">${icon("plus",18)}</button>
  </div>
  </div>
  ${(daysSinceActivity!==null&&daysSinceActivity>=5)?`<div class="card" style="margin-top:12px;border:1px solid var(--red);background:var(--redTint)"><b style="color:var(--red)">It's been ${daysSinceActivity} days since anything was logged</b><div class="muted" style="margin-top:4px">No sessions, reflections, assessments or matches recorded since ${esc(fmtDate(lastActivityDate))}. A quick log now keeps your trends and reports meaningful.</div></div>`:""}
