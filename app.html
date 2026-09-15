@@ -705,6 +705,21 @@ function backupStatusBadge(){
  let text=daysSince===null?"Never backed up":daysSince===0?"Backed up today":`Backed up ${daysSince}d ago`;
  return `<button class="navBackupBadge" onclick="go('account')" style="display:flex;align-items:center;gap:6px;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--border);padding:10px 12px;cursor:pointer;font-size:var(--fs-1)"><span style="width:7px;height:7px;border-radius:50%;background:${color};flex-shrink:0"></span><span class="muted">${text}</span></button>`;
 }
+function bookingPendingCount(){
+ return bookingState.requests.filter(b=>b.status==="pending").length;
+}
+function totalPendingCount(){
+ let reflectionToday=db.reflections.some(r=>r.date===today());
+ let assessmentToday=db.assessments.some(a=>a.date===today());
+ let unassessedCount=db.players.filter(p=>!db.assessments.some(a=>a.player===p.name)).length;
+ return (reflectionToday?0:1)+(assessmentToday?0:1)+(unassessedCount>0?1:0)+bookingPendingCount();
+}
+function refreshNotificationBadge(){
+ let btn=document.querySelector(".bellBtn");
+ if(!btn)return;
+ let count=totalPendingCount();
+ btn.innerHTML=`${icon("bell",17)}${count?`<span class="badge">${count}</span>`:""}`;
+}
 function refreshBackupBadge(){
  let badge=document.querySelector(".navBackupBadge");
  if(badge)badge.outerHTML=backupStatusBadge();
@@ -887,6 +902,8 @@ function openNotifications(){
  if(unassessedCount>0)items.push({text:`${unassessedCount} player${unassessedCount!==1?"s":""} awaiting first assessment`,action:"assessPendingPlayers()"});
  if(reassessDueCount>0)items.push({text:`${reassessDueCount} player${reassessDueCount!==1?"s":""} due for reassessment`,action:"reassessDuePlayers()"});
  if(workloadCount>0)items.push({text:`${workloadCount} player${workloadCount!==1?"s":""} with back-to-back match workload`,action:"showWorkloadFlags()"});
+ let bookingCount=bookingPendingCount();
+ if(bookingCount>0)items.push({text:`${bookingCount} pending booking request${bookingCount!==1?"s":""}`,action:"go('booking')"});
  modal(`<div class="sheetHead"><h2>Pending Items</h2><button class="x" onclick="closeM()">×</button></div>
  <div class="list">${items.length?items.map(i=>`<div class="item" style="cursor:pointer" onclick="closeM();${i.action}"><div><b>${esc(i.text)}</b></div></div>`).join(""):empty("Nothing pending — you're all caught up!")}</div>`);
 }
@@ -923,7 +940,7 @@ function dashboard(){
  let allActivityDates=[...db.sessions.map(s=>s.date),...db.reflections.map(r=>r.date),...db.assessments.map(a=>a.date),...db.matches.map(m=>m.date)].filter(Boolean).sort();
  let lastActivityDate=allActivityDates.slice(-1)[0]||null;
  let daysSinceActivity=lastActivityDate?Math.floor((new Date(today()+"T00:00:00Z")-new Date(lastActivityDate+"T00:00:00Z"))/86400000):null;
- let pendingCount=(reflectionToday?0:1)+(assessmentToday?0:1)+(unassessedCount>0?1:0);
+ let pendingCount=totalPendingCount();
 
  let score=coachingActivityScore();
  let weeklyGoal=db.settings.weeklySessionGoal;
@@ -3394,7 +3411,7 @@ function handleRestoreFile(input){
 function storageUsageBytes(){
  try{return JSON.stringify(db).length*2}catch(e){return 0}
 }
-let bookingState={availability:{rules:[],blockedDates:[]},requests:[],loaded:false,error:null};
+let bookingState={availability:{rules:[],blockedDates:[],extraSlots:[]},requests:[],loaded:false,error:null};
 function bookingTokens(){
  return{
   management:localStorage.getItem("coachbook_booking_mgmt_token")||"",
@@ -3426,12 +3443,19 @@ async function bookingLoadEverything(){
  if(!t.management)return;
  try{
   let[availRes,reqRes]=await Promise.all([
-   fetch(`${BOOKING_API}/api/booking/slots?t=${t.public}`),
+   fetch(`${BOOKING_API}/api/booking/availability?t=${t.management}`),
    fetch(`${BOOKING_API}/api/booking/requests?t=${t.management}`)
   ]);
+  if(availRes.ok){
+   let data=await availRes.json();
+   let a=data.availability||{};
+   bookingState.availability={rules:a.rules||[],blockedDates:a.blockedDates||[],extraSlots:a.extraSlots||[]};
+   normalizeAvailabilityRules();
+  }
   if(reqRes.ok){let data=await reqRes.json();bookingState.requests=data.bookings||[]}
   bookingState.loaded=true;
   booking();
+  refreshNotificationBadge();
  }catch(e){
   bookingState.error="Couldn't load your booking data. Check your connection.";
   bookingState.loaded=true;
@@ -3452,12 +3476,56 @@ function bookingShareLink(){
   bookingCopyLink();
  }
 }
+function addBlockedDate(){
+ let input=document.getElementById("bookingBlockDateInput");
+ if(!input||!input.value)return;
+ if(!bookingState.availability.blockedDates.includes(input.value)){
+  bookingState.availability.blockedDates.push(input.value);
+  bookingState.availability.blockedDates.sort();
+ }
+ input.value="";
+ booking();
+}
+function removeBlockedDate(date){
+ bookingState.availability.blockedDates=bookingState.availability.blockedDates.filter(d=>d!==date);
+ booking();
+}
+function addExtraSlot(){
+ let dateInput=document.getElementById("bookingExtraDateInput");
+ let timeInput=document.getElementById("bookingExtraTimeInput");
+ if(!dateInput||!timeInput||!dateInput.value||!timeInput.value)return;
+ let exists=bookingState.availability.extraSlots.some(s=>s.date===dateInput.value&&s.time===timeInput.value);
+ if(!exists){
+  bookingState.availability.extraSlots.push({date:dateInput.value,time:timeInput.value});
+  bookingState.availability.extraSlots.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
+ }
+ dateInput.value="";timeInput.value="";
+ booking();
+}
+function removeExtraSlot(date,time){
+ bookingState.availability.extraSlots=bookingState.availability.extraSlots.filter(s=>!(s.date===date&&s.time===time));
+ booking();
+}
+function normalizeAvailabilityRules(){
+ // Backward-compatible: any rule saved before the days-array redesign still
+ // had a single `day` field — convert it in place so the editor and the
+ // slot computation both see one consistent shape from here on.
+ bookingState.availability.rules.forEach(r=>{
+  if(!Array.isArray(r.days))r.days=r.day?[r.day]:[];
+ });
+}
 function addAvailabilityRule(){
- bookingState.availability.rules.push({day:"Monday",startTime:"16:00",endTime:"18:00",slotMinutes:30});
+ bookingState.availability.rules.push({days:[],startTime:"16:00",endTime:"18:00",slotMinutes:30});
  booking();
 }
 function removeAvailabilityRule(idx){
  bookingState.availability.rules.splice(idx,1);
+ booking();
+}
+function toggleAvailabilityRuleDay(idx,day){
+ let days=bookingState.availability.rules[idx].days;
+ let pos=days.indexOf(day);
+ if(pos===-1)days.push(day);else days.splice(pos,1);
  booking();
 }
 function updateAvailabilityRule(idx,field,value){
@@ -3466,21 +3534,73 @@ function updateAvailabilityRule(idx,field,value){
 async function saveAvailability(){
  if(!requireWriteAccess())return;
  let t=bookingTokens();
- let btn=document.getElementById("bookingSaveAvailBtn");
- if(btn){btn.disabled=true;btn.textContent="Saving…"}
+ let btns=[document.getElementById("bookingSaveAvailBtn"),document.getElementById("bookingSaveExceptionsBtn")].filter(Boolean);
+ btns.forEach(btn=>{btn.disabled=true;btn.textContent="Saving…"});
  try{
   let res=await fetch(`${BOOKING_API}/api/booking/availability?t=${t.management}`,{
    method:"POST",headers:{"Content-Type":"application/json"},
    body:JSON.stringify(bookingState.availability)
   });
   if(!res.ok)throw new Error("save failed");
-  if(btn){btn.disabled=false;btn.textContent="Saved ✓";setTimeout(()=>{if(btn)btn.textContent="Save Availability"},2000)}
+  btns.forEach(btn=>{btn.disabled=false;btn.textContent="Saved ✓"});
+  setTimeout(()=>{btns.forEach(btn=>{if(btn)btn.textContent=btn.id==="bookingSaveExceptionsBtn"?"Save Exceptions":"Save Availability"})},2000);
  }catch(e){
-  if(btn){btn.disabled=false;btn.textContent="Save Availability"}
+  btns.forEach(btn=>{btn.disabled=false;btn.textContent=btn.id==="bookingSaveExceptionsBtn"?"Save Exceptions":"Save Availability"});
   alert("Couldn't save your availability right now. Check your connection and try again.");
  }
 }
-async function respondToBooking(id,decision){
+function findExactPlayerMatch(typedName){
+ let norm=String(typedName||"").trim().toLowerCase();
+ return activePlayers().find(p=>String(p.name||"").trim().toLowerCase()===norm)||null;
+}
+function bookingApproveClick(id){
+ let b=bookingState.requests.find(x=>x.id===id);
+ if(!b)return;
+ let exact=findExactPlayerMatch(b.playerName);
+ if(exact){
+  respondToBooking(id,"approved",exact.name);
+  return;
+ }
+ let roster=activePlayers();
+ modal(`<div class="sheetHead"><h2>Confirm player</h2><button class="x" onclick="closeM()">×</button></div>
+ <p class="muted">"${esc(b.playerName)}" doesn't exactly match anyone in your roster — pick who this actually is, or keep it as typed if they're new.</p>
+ <div class="formgrid" style="margin-top:10px">
+  <label>Match to a player<select id="bookingMatchSelect">
+   <option value="">— Keep as typed: "${esc(b.playerName)}" —</option>
+   ${roster.map(p=>`<option value="${esc(p.id)}">${esc(p.name)}</option>`).join("")}
+  </select></label>
+ </div>
+ <button class="btn primary full" style="margin-top:14px" onclick="confirmBookingPlayerMatch('${id}')">Confirm &amp; Approve</button>`);
+}
+function confirmBookingPlayerMatch(id){
+ let b=bookingState.requests.find(x=>x.id===id);
+ if(!b)return;
+ let selectedId=document.getElementById("bookingMatchSelect").value;
+ let finalName=b.playerName;
+ if(selectedId){
+  let matched=db.players.find(p=>p.id===selectedId);
+  if(matched)finalName=matched.name;
+ }
+ closeM();
+ respondToBooking(id,"approved",finalName);
+}
+async function deleteBookingHistoryEntry(id){
+ if(!requireWriteAccess())return;
+ if(!confirm("Remove this from your booking history? This only clears it from view — it doesn't affect the session if one was already created."))return;
+ let t=bookingTokens();
+ try{
+  let res=await fetch(`${BOOKING_API}/api/booking/delete?t=${t.management}`,{
+   method:"POST",headers:{"Content-Type":"application/json"},
+   body:JSON.stringify({bookingId:id})
+  });
+  if(!res.ok)throw new Error("delete failed");
+  bookingState.requests=bookingState.requests.filter(b=>b.id!==id);
+  booking();
+ }catch(e){
+  alert("Couldn't delete this entry right now. Check your connection and try again.");
+ }
+}
+async function respondToBooking(id,decision,confirmedPlayerName){
  if(!requireWriteAccess())return;
  let t=bookingTokens();
  try{
@@ -3492,7 +3612,8 @@ async function respondToBooking(id,decision){
   let booking_=bookingState.requests.find(b=>b.id===id);
   if(booking_)booking_.status=decision;
   if(decision==="approved"&&booking_){
-   db.sessions.push({id:uid("sess"),date:booking_.date,time:booking_.time,sessionType:"player",title:`1-on-1 with ${booking_.playerName}`,duration:60,attendees:[booking_.playerName]});
+   let playerName=confirmedPlayerName||booking_.playerName;
+   db.sessions.push({id:uid("sess"),date:booking_.date,time:booking_.time,sessionType:"player",title:`1-on-1 with ${playerName}`,duration:60,attendees:[playerName]});
    save();
   }
   booking();
@@ -3506,18 +3627,18 @@ function booking(){
  if(!el)return;
  if(!isPremium()){
   let daysLeft=trialDaysLeft();
-  el.innerHTML=head("Booking","Let parents request a 1-on-1 slot against your real availability — no back-and-forth.")
+  el.innerHTML=head("Booking","Let parents/players request a 1-on-1 slot against your real availability — no back-and-forth.")
   +`<div class="card" style="text-align:center;padding:32px"><h2 style="margin-top:0">Booking is a Premium feature</h2><p class="muted">${daysLeft>0?`You have ${daysLeft} day${daysLeft!==1?"s":""} left in your free trial to explore this.`:"Your free trial has ended."}</p><button class="btn primary" style="margin-top:10px" onclick="showUpgradePrompt('Booking')">Learn more</button></div>`;
   return;
  }
  let t=bookingTokens();
  if(!t.management){
-  el.innerHTML=head("Booking","Let parents request a 1-on-1 slot against your real availability — no back-and-forth.")
+  el.innerHTML=head("Booking","Let parents/players request a 1-on-1 slot against your real availability — no back-and-forth.")
   +`<div class="card" style="text-align:center;padding:32px"><p class="muted">Set up your booking page once, then share the link with parents whenever you like.</p><button class="btn primary" id="bookingSetupBtn" style="margin-top:12px" onclick="bookingSetup()">Set Up My Booking Page</button></div>`;
   return;
  }
  if(!bookingState.loaded){
-  el.innerHTML=head("Booking","Let parents request a 1-on-1 slot against your real availability — no back-and-forth.")+`<div class="card muted">Loading…</div>`;
+  el.innerHTML=head("Booking","Let parents/players request a 1-on-1 slot against your real availability — no back-and-forth.")+`<div class="card muted">Loading…</div>`;
   bookingLoadEverything();
   return;
  }
@@ -3529,41 +3650,84 @@ function booking(){
 
  let linkSectionHtml=`<h2 class="section">Your Booking Link</h2>
  <div class="card">
-  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-   <input readonly value="${esc(link)}" style="flex:1;min-width:200px;background:var(--surface2, transparent);border:1px solid var(--border);border-radius:8px;padding:8px 10px;font-size:var(--fs-2)" onclick="this.select()">
-   <button class="btn secondary" onclick="bookingCopyLink()">Copy</button>
-   <button class="btn primary" onclick="bookingShareLink()">Share</button>
+  <div style="display:flex;gap:12px;align-items:center">
+   <img src="https://api.qrserver.com/v1/create-qr-code/?size=100x100&data=${encodeURIComponent(link)}" alt="QR code for your booking link" width="100" height="100" style="border-radius:8px;flex-shrink:0">
+   <div style="flex:1;min-width:0">
+    <p class="muted" style="font-size:var(--fs-1);margin:0 0 8px">Share once — parents can book anytime after that.</p>
+    <div style="display:flex;gap:8px">
+     <button class="btn secondary" style="flex:1" onclick="bookingCopyLink()">Copy Link</button>
+     <button class="btn primary" style="flex:1" onclick="bookingShareLink()">Share</button>
+    </div>
+    <div id="bookingCopyStatus" class="muted" style="margin-top:4px;font-size:var(--fs-1)"></div>
+    <p class="muted" style="font-size:var(--fs-1);margin:6px 0 0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${esc(link)}">${esc(link)}</p>
+   </div>
   </div>
-  <div id="bookingCopyStatus" class="muted" style="margin-top:6px;font-size:var(--fs-1)"></div>
-  <div style="margin-top:14px;display:flex;justify-content:center">
-   <img src="https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(link)}" alt="QR code for your booking link" width="160" height="160" style="border-radius:8px">
-  </div>
-  <p class="muted" style="text-align:center;margin-top:8px;font-size:var(--fs-1)">Print this or share it once — parents can book anytime after that.</p>
  </div>`;
 
  let oneRuleHtml=function(r,i){
-  return `<div class="formgrid" style="margin-bottom:8px;padding-bottom:8px;border-bottom:1px solid var(--border)">
-   <label>Day<select onchange="updateAvailabilityRule(${i},'day',this.value)">${DAYS_OF_WEEK.map(d=>`<option ${r.day===d?"selected":""}>${d}</option>`).join("")}</select></label>
-   <label>From<input type="time" value="${r.startTime}" onchange="updateAvailabilityRule(${i},'startTime',this.value)"></label>
-   <label>To<input type="time" value="${r.endTime}" onchange="updateAvailabilityRule(${i},'endTime',this.value)"></label>
-   <label>Slot length<select onchange="updateAvailabilityRule(${i},'slotMinutes',this.value)"><option value="30" ${r.slotMinutes===30?"selected":""}>30 min</option><option value="45" ${r.slotMinutes===45?"selected":""}>45 min</option><option value="60" ${r.slotMinutes===60?"selected":""}>60 min</option></select></label>
-   <button type="button" class="btn danger full" onclick="removeAvailabilityRule(${i})">Remove</button>
+  let dayChips=DAYS_OF_WEEK.map(d=>{
+   let on=r.days.includes(d);
+   return `<button type="button" onclick="toggleAvailabilityRuleDay(${i},'${d}')" style="padding:6px 4px;border-radius:8px;border:1px solid ${on?"transparent":"var(--border)"};background:${on?"linear-gradient(135deg,var(--g),var(--g2))":"transparent"};color:${on?"#04140d":"var(--ink,inherit)"};font-size:var(--fs-1);font-weight:600;cursor:pointer">${d.slice(0,3)}</button>`;
+  }).join("");
+  return `<div style="margin-bottom:10px;padding-bottom:10px;border-bottom:1px solid var(--border)">
+   <div style="display:grid;grid-template-columns:repeat(7,1fr);gap:4px;margin-bottom:8px">${dayChips}</div>
+   <div class="formgrid">
+    <label>From<input type="time" value="${r.startTime}" onchange="updateAvailabilityRule(${i},'startTime',this.value)"></label>
+    <label>To<input type="time" value="${r.endTime}" onchange="updateAvailabilityRule(${i},'endTime',this.value)"></label>
+    <label>Slot length<select onchange="updateAvailabilityRule(${i},'slotMinutes',this.value)"><option value="30" ${r.slotMinutes===30?"selected":""}>30 min</option><option value="45" ${r.slotMinutes===45?"selected":""}>45 min</option><option value="60" ${r.slotMinutes===60?"selected":""}>60 min</option></select></label>
+    <button type="button" class="btn danger full" onclick="removeAvailabilityRule(${i})">Remove</button>
+   </div>
   </div>`;
  };
  let rulesListHtml=bookingState.availability.rules.length
   ?bookingState.availability.rules.map(oneRuleHtml).join("")
-  :`<p class="muted">No availability set yet — add a day below so parents can request a slot.</p>`;
+  :`<p class="muted">No availability set yet — add a time block below, then tap the days it applies to.</p>`;
 
  let availabilitySectionHtml=`<h2 class="section">Your Weekly Availability</h2>
+ <p class="muted" style="font-size:var(--fs-1);margin-top:-4px">Tap the days a time block applies to — pick several days at once if they share the same hours.</p>
  <div class="card">
   ${rulesListHtml}
-  <button type="button" class="btn secondary" onclick="addAvailabilityRule()">+ Add a day</button>
+  <button type="button" class="btn secondary" onclick="addAvailabilityRule()">+ Add a time block</button>
   <button type="button" class="btn primary full" id="bookingSaveAvailBtn" style="margin-top:10px" onclick="saveAvailability()">Save Availability</button>
+ </div>`;
+
+ let oneBlockedDateHtml=function(date){
+  return `<div class="item"><span>${esc(fmtDate(date))}</span><button type="button" class="btn secondary" onclick="removeBlockedDate('${date}')">Unblock</button></div>`;
+ };
+ let blockedDatesListHtml=bookingState.availability.blockedDates.length
+  ?bookingState.availability.blockedDates.map(oneBlockedDateHtml).join("")
+  :`<p class="muted" style="font-size:var(--fs-1)">No dates blocked.</p>`;
+
+ let oneExtraSlotHtml=function(s){
+  return `<div class="item"><span>${esc(fmtDate(s.date))} at ${esc(s.time)}</span><button type="button" class="btn secondary" onclick="removeExtraSlot('${s.date}','${s.time}')">Remove</button></div>`;
+ };
+ let extraSlotsListHtml=bookingState.availability.extraSlots.length
+  ?bookingState.availability.extraSlots.map(oneExtraSlotHtml).join("")
+  :`<p class="muted" style="font-size:var(--fs-1)">No one-off slots added.</p>`;
+
+ let exceptionsSectionHtml=`<h2 class="section">Exceptions to Your Normal Week</h2>
+ <div class="card" style="margin-bottom:12px">
+  <p class="muted" style="font-size:var(--fs-2);margin-top:0">Block a specific date — no slots will show for it, even on a day you're normally free.</p>
+  ${blockedDatesListHtml}
+  <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+   <input type="date" id="bookingBlockDateInput" style="flex:1;min-width:140px">
+   <button type="button" class="btn secondary" onclick="addBlockedDate()">Block This Date</button>
+  </div>
+ </div>
+ <div class="card">
+  <p class="muted" style="font-size:var(--fs-2);margin-top:0">Add a one-off slot on a day you're not normally free — it won't repeat next week.</p>
+  ${extraSlotsListHtml}
+  <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+   <input type="date" id="bookingExtraDateInput" style="flex:1;min-width:140px">
+   <input type="time" id="bookingExtraTimeInput" style="flex:1;min-width:100px">
+   <button type="button" class="btn secondary" onclick="addExtraSlot()">Add This Slot</button>
+  </div>
+  <button type="button" class="btn primary full" id="bookingSaveExceptionsBtn" style="margin-top:10px" onclick="saveAvailability()">Save Exceptions</button>
  </div>`;
 
  let onePendingHtml=function(b){
   let noteHtml=b.note?`<p class="muted" style="font-size:var(--fs-2)">"${esc(b.note)}"</p>`:"";
-  return `<div class="card" style="margin-bottom:8px"><b>${esc(b.playerName)}</b> <span class="muted">requested by ${esc(b.parentName)}</span><p style="margin:4px 0">${esc(fmtDate(b.date))} at ${esc(b.time)}</p>${noteHtml}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn primary" onclick="respondToBooking('${b.id}','approved')">Approve</button><button class="btn secondary" onclick="respondToBooking('${b.id}','declined')">Decline</button></div></div>`;
+  return `<div class="card" style="margin-bottom:8px"><b>${esc(b.playerName)}</b> <span class="muted">requested by ${esc(b.parentName)}</span><p style="margin:4px 0">${esc(fmtDate(b.date))} at ${esc(b.time)}</p>${noteHtml}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn primary" onclick="bookingApproveClick('${b.id}')">Approve</button><button class="btn secondary" onclick="respondToBooking('${b.id}','declined')">Decline</button></div></div>`;
  };
  let pendingListHtml=pending.length?pending.map(onePendingHtml).join(""):empty("No pending requests right now.");
  let pendingCountLabel=pending.length?`(${pending.length})`:"";
@@ -3571,12 +3735,12 @@ function booking(){
 
  let oneHistoryHtml=function(b){
   let statusColor=b.status==="approved"?"var(--g)":"var(--red)";
-  return `<div class="card" style="margin-bottom:6px;opacity:.75"><b>${esc(b.playerName)}</b> · ${esc(fmtDate(b.date))} at ${esc(b.time)} <span style="color:${statusColor}">· ${b.status}</span></div>`;
+  return `<div class="card" style="margin-bottom:6px;opacity:.75;display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>${esc(b.playerName)}</b> · ${esc(fmtDate(b.date))} at ${esc(b.time)} <span style="color:${statusColor}">· ${b.status}</span></span><button type="button" class="btn danger" onclick="deleteBookingHistoryEntry('${b.id}')">Delete</button></div>`;
  };
- let historySectionHtml=past.length?`<h2 class="section">Recent History</h2>${past.map(oneHistoryHtml).join("")}`:"";
+ let historySectionHtml=past.length?`<h2 class="section">Recent History <span class="muted" style="font-weight:400;font-size:var(--fs-1)">(last ${past.length}, most recent first)</span></h2>${past.map(oneHistoryHtml).join("")}`:"";
 
- el.innerHTML=head("Booking","Let parents request a 1-on-1 slot against your real availability — no back-and-forth.")
-  +errorHtml+linkSectionHtml+availabilitySectionHtml+pendingSectionHtml+historySectionHtml;
+ el.innerHTML=head("Booking","Let parents/players request a 1-on-1 slot against your real availability — no back-and-forth.")
+  +errorHtml+linkSectionHtml+availabilitySectionHtml+exceptionsSectionHtml+pendingSectionHtml+historySectionHtml;
 }
 function accountPage(){
  let profiles=getProfiles();

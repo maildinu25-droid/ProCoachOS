@@ -705,6 +705,21 @@ function backupStatusBadge(){
  let text=daysSince===null?"Never backed up":daysSince===0?"Backed up today":`Backed up ${daysSince}d ago`;
  return `<button class="navBackupBadge" onclick="go('account')" style="display:flex;align-items:center;gap:6px;width:100%;text-align:left;background:none;border:0;border-top:1px solid var(--border);padding:10px 12px;cursor:pointer;font-size:var(--fs-1)"><span style="width:7px;height:7px;border-radius:50%;background:${color};flex-shrink:0"></span><span class="muted">${text}</span></button>`;
 }
+function bookingPendingCount(){
+ return bookingState.requests.filter(b=>b.status==="pending").length;
+}
+function totalPendingCount(){
+ let reflectionToday=db.reflections.some(r=>r.date===today());
+ let assessmentToday=db.assessments.some(a=>a.date===today());
+ let unassessedCount=db.players.filter(p=>!db.assessments.some(a=>a.player===p.name)).length;
+ return (reflectionToday?0:1)+(assessmentToday?0:1)+(unassessedCount>0?1:0)+bookingPendingCount();
+}
+function refreshNotificationBadge(){
+ let btn=document.querySelector(".bellBtn");
+ if(!btn)return;
+ let count=totalPendingCount();
+ btn.innerHTML=`${icon("bell",17)}${count?`<span class="badge">${count}</span>`:""}`;
+}
 function refreshBackupBadge(){
  let badge=document.querySelector(".navBackupBadge");
  if(badge)badge.outerHTML=backupStatusBadge();
@@ -887,6 +902,8 @@ function openNotifications(){
  if(unassessedCount>0)items.push({text:`${unassessedCount} player${unassessedCount!==1?"s":""} awaiting first assessment`,action:"assessPendingPlayers()"});
  if(reassessDueCount>0)items.push({text:`${reassessDueCount} player${reassessDueCount!==1?"s":""} due for reassessment`,action:"reassessDuePlayers()"});
  if(workloadCount>0)items.push({text:`${workloadCount} player${workloadCount!==1?"s":""} with back-to-back match workload`,action:"showWorkloadFlags()"});
+ let bookingCount=bookingPendingCount();
+ if(bookingCount>0)items.push({text:`${bookingCount} pending booking request${bookingCount!==1?"s":""}`,action:"go('booking')"});
  modal(`<div class="sheetHead"><h2>Pending Items</h2><button class="x" onclick="closeM()">×</button></div>
  <div class="list">${items.length?items.map(i=>`<div class="item" style="cursor:pointer" onclick="closeM();${i.action}"><div><b>${esc(i.text)}</b></div></div>`).join(""):empty("Nothing pending — you're all caught up!")}</div>`);
 }
@@ -923,7 +940,7 @@ function dashboard(){
  let allActivityDates=[...db.sessions.map(s=>s.date),...db.reflections.map(r=>r.date),...db.assessments.map(a=>a.date),...db.matches.map(m=>m.date)].filter(Boolean).sort();
  let lastActivityDate=allActivityDates.slice(-1)[0]||null;
  let daysSinceActivity=lastActivityDate?Math.floor((new Date(today()+"T00:00:00Z")-new Date(lastActivityDate+"T00:00:00Z"))/86400000):null;
- let pendingCount=(reflectionToday?0:1)+(assessmentToday?0:1)+(unassessedCount>0?1:0);
+ let pendingCount=totalPendingCount();
 
  let score=coachingActivityScore();
  let weeklyGoal=db.settings.weeklySessionGoal;
@@ -3438,6 +3455,7 @@ async function bookingLoadEverything(){
   if(reqRes.ok){let data=await reqRes.json();bookingState.requests=data.bookings||[]}
   bookingState.loaded=true;
   booking();
+  refreshNotificationBadge();
  }catch(e){
   bookingState.error="Couldn't load your booking data. Check your connection.";
   bookingState.loaded=true;
@@ -3609,18 +3627,18 @@ function booking(){
  if(!el)return;
  if(!isPremium()){
   let daysLeft=trialDaysLeft();
-  el.innerHTML=head("Booking","Let parents request a 1-on-1 slot against your real availability — no back-and-forth.")
+  el.innerHTML=head("Booking","Let parents/players request a 1-on-1 slot against your real availability — no back-and-forth.")
   +`<div class="card" style="text-align:center;padding:32px"><h2 style="margin-top:0">Booking is a Premium feature</h2><p class="muted">${daysLeft>0?`You have ${daysLeft} day${daysLeft!==1?"s":""} left in your free trial to explore this.`:"Your free trial has ended."}</p><button class="btn primary" style="margin-top:10px" onclick="showUpgradePrompt('Booking')">Learn more</button></div>`;
   return;
  }
  let t=bookingTokens();
  if(!t.management){
-  el.innerHTML=head("Booking","Let parents request a 1-on-1 slot against your real availability — no back-and-forth.")
+  el.innerHTML=head("Booking","Let parents/players request a 1-on-1 slot against your real availability — no back-and-forth.")
   +`<div class="card" style="text-align:center;padding:32px"><p class="muted">Set up your booking page once, then share the link with parents whenever you like.</p><button class="btn primary" id="bookingSetupBtn" style="margin-top:12px" onclick="bookingSetup()">Set Up My Booking Page</button></div>`;
   return;
  }
  if(!bookingState.loaded){
-  el.innerHTML=head("Booking","Let parents request a 1-on-1 slot against your real availability — no back-and-forth.")+`<div class="card muted">Loading…</div>`;
+  el.innerHTML=head("Booking","Let parents/players request a 1-on-1 slot against your real availability — no back-and-forth.")+`<div class="card muted">Loading…</div>`;
   bookingLoadEverything();
   return;
  }
@@ -3721,7 +3739,7 @@ function booking(){
  };
  let historySectionHtml=past.length?`<h2 class="section">Recent History <span class="muted" style="font-weight:400;font-size:var(--fs-1)">(last ${past.length}, most recent first)</span></h2>${past.map(oneHistoryHtml).join("")}`:"";
 
- el.innerHTML=head("Booking","Let parents request a 1-on-1 slot against your real availability — no back-and-forth.")
+ el.innerHTML=head("Booking","Let parents/players request a 1-on-1 slot against your real availability — no back-and-forth.")
   +errorHtml+linkSectionHtml+availabilitySectionHtml+exceptionsSectionHtml+pendingSectionHtml+historySectionHtml;
 }
 function accountPage(){
