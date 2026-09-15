@@ -42,9 +42,10 @@ body{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;ba
 const BOOKING_API = "https://procoachos-booking.maildinu25.workers.dev";
 const params = new URLSearchParams(location.search);
 const token = params.get("t");
+const checkId = params.get("check");
 const app = document.getElementById("app");
 
-let state = { openSlots: [], selected: null, submitting: false, submitted: false, error: null };
+let state = { openSlots: [], selected: null, submitting: false, submitted: false, submittedId: null, error: null, formValues: { parentName:"", playerName:"", note:"" }, statusResult: null, statusLoaded: false };
 
 function fmtDateLabel(dateStr){
   const d = new Date(dateStr + "T00:00:00");
@@ -71,11 +72,17 @@ function render(){
     app.innerHTML = `<div class="state"><h2>This link isn't valid</h2><p>Ask your coach to resend the booking link.</p></div>`;
     return;
   }
+  if (checkId){
+    renderStatusView();
+    return;
+  }
   if (state.submitted){
+    const checkLink = `${location.origin}${location.pathname}?t=${encodeURIComponent(token)}&check=${encodeURIComponent(state.submittedId)}`;
     app.innerHTML = `<div class="card confirmCard">
       <div class="tick">✓</div>
       <h2 style="margin:0 0 6px">Request sent</h2>
-      <p style="color:var(--muted);margin:0">Your coach will confirm shortly. You'll hear back once it's approved.</p>
+      <p style="color:var(--muted);margin:0">Your coach hasn't confirmed it yet. Use the link below to check — bookmark it or save it now, since this is the only way to see whether it's been confirmed.</p>
+      <a href="${checkLink}" class="btn primary" style="display:block;margin-top:18px;text-decoration:none;box-sizing:border-box">Check Your Request Status</a>
     </div>`;
     return;
   }
@@ -105,10 +112,11 @@ function render(){
   } else {
     html += `<div class="chosenSlot">${fmtDateLabel(state.selected.date)} at ${fmtTimeLabel(state.selected.time)} <a class="backLink" onclick="changeSlot()">Change</a></div>
     <div class="card">
-      <div class="formRow"><label>Your name</label><input id="fParent" placeholder="e.g. Priya Sharma"></div>
-      <div class="formRow"><label>Player's name</label><input id="fPlayer" placeholder="e.g. Arjun Sharma"></div>
-      <div class="formRow"><label>Note <span style="color:var(--muted);font-weight:400">(optional)</span></label><textarea id="fNote" placeholder="Anything your coach should know"></textarea></div>
+      <div class="formRow"><label>Your name</label><input id="fParent" placeholder="e.g. Priya Sharma" value="${state.formValues.parentName.replace(/"/g,"&quot;")}" oninput="state.formValues.parentName=this.value"></div>
+      <div class="formRow"><label>Player's name</label><input id="fPlayer" placeholder="e.g. Arjun Sharma" value="${state.formValues.playerName.replace(/"/g,"&quot;")}" oninput="state.formValues.playerName=this.value"></div>
+      <div class="formRow"><label>Note <span style="color:var(--muted);font-weight:400">(optional)</span></label><textarea id="fNote" placeholder="Anything your coach should know" oninput="state.formValues.note=this.value">${state.formValues.note.replace(/</g,"&lt;")}</textarea></div>
       <button class="btn" id="submitBtn" onclick="submitRequest()" ${state.submitting?"disabled":""}>${state.submitting?"Sending…":"Send Request"}</button>
+      <p style="color:var(--muted);font-size:12.5px;margin:10px 0 0;text-align:center">You won't get an email — after sending, you'll get a link to check whether it's been confirmed.</p>
       ${state.error==="missing-fields"?`<div class="errMsg">Please fill in your name and the player's name.</div>`:""}
       ${state.error==="submit-failed"?`<div class="errMsg">Something went wrong sending your request. Please try again.</div>`:""}
     </div>`;
@@ -133,9 +141,9 @@ async function loadSlots(){
 }
 
 async function submitRequest(){
-  const parentName = document.getElementById("fParent").value.trim();
-  const playerName = document.getElementById("fPlayer").value.trim();
-  const note = document.getElementById("fNote").value.trim();
+  const parentName = state.formValues.parentName.trim();
+  const playerName = state.formValues.playerName.trim();
+  const note = state.formValues.note.trim();
   if (!parentName || !playerName){ state.error = "missing-fields"; render(); return; }
   state.submitting = true; state.error = null; render();
   try{
@@ -145,13 +153,50 @@ async function submitRequest(){
       body: JSON.stringify({ parentName, playerName, note, date: state.selected.date, time: state.selected.time })
     });
     if (!res.ok) throw new Error("failed");
-    state.submitting = false; state.submitted = true; render();
+    const data = await res.json();
+    state.submitting = false; state.submitted = true; state.submittedId = data.id; render();
   } catch(e){
     state.submitting = false; state.error = "submit-failed"; render();
   }
 }
 
-loadSlots();
+function renderStatusView(){
+  if (!state.statusLoaded){
+    app.innerHTML = `<div class="state">Checking your request…</div>`;
+    loadStatus();
+    return;
+  }
+  if (!state.statusResult){
+    app.innerHTML = `<div class="state"><h2>Couldn't find that request</h2><p>The link may be out of date. Ask your coach directly if you're unsure.</p></div>`;
+    return;
+  }
+  const r = state.statusResult;
+  const when = `${fmtDateLabel(r.date)} at ${fmtTimeLabel(r.time)}`;
+  const statusLabel = r.status === "approved" ? "Confirmed" : r.status === "declined" ? "Not confirmed" : "Still pending";
+  const statusColor = r.status === "approved" ? "#10b981" : r.status === "declined" ? "#ef5350" : "#f59e0b";
+  app.innerHTML = `<div class="card confirmCard">
+    <div class="tick" style="background:${statusColor}22;color:${statusColor}">${r.status==="approved"?"✓":r.status==="declined"?"✕":"…"}</div>
+    <h2 style="margin:0 0 6px">${statusLabel}</h2>
+    <p style="color:var(--muted);margin:0">${esc(r.playerName)} — ${esc(when)}</p>
+    ${r.status==="pending"?`<p style="color:var(--muted);font-size:13px;margin-top:14px">Your coach hasn't responded yet — check back later.</p>`:""}
+  </div>`;
+}
+function esc(s){
+  const d = document.createElement("div"); d.textContent = String(s); return d.innerHTML;
+}
+async function loadStatus(){
+  try{
+    const res = await fetch(`${BOOKING_API}/api/booking/status?t=${encodeURIComponent(token)}&check=${encodeURIComponent(checkId)}`);
+    if (!res.ok){ state.statusResult = null; state.statusLoaded = true; render(); return; }
+    state.statusResult = await res.json();
+    state.statusLoaded = true;
+    render();
+  } catch(e){
+    state.statusResult = null; state.statusLoaded = true; render();
+  }
+}
+
+if (checkId) render(); else loadSlots();
 </script>
 </body>
 </html>
