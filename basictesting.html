@@ -809,7 +809,7 @@ function initials(name){return String(name||"C").trim().split(/\s+/).slice(0,2).
 function monthsBack(n){let out=[];for(let i=n-1;i>=0;i--){let d=new Date();d.setMonth(d.getMonth()-i);out.push({mk:d.toISOString().slice(0,7),label:d.toLocaleDateString(undefined,{month:"short"})})}return out}
 function recentActivity(){
  let items=[
-  ...db.sessions.filter(s=>s.date).map(s=>({date:s.date,text:`Session added: ${sessionLabel(s)}`,icon:icon("sessions",13)})),
+  ...activeSessions().filter(s=>s.date).map(s=>({date:s.date,text:`Session added: ${sessionLabel(s)}`,icon:icon("sessions",13)})),
   ...db.matches.filter(m=>m.date).map(m=>({date:m.date,text:`Match logged: vs ${m.opp||"Opposition"}`,icon:icon("trophy",13)})),
   ...db.assessments.filter(a=>a.date).map(a=>({date:a.date,text:`Assessment logged: ${a.player||"Player"}`,icon:icon("assessments",13)})),
   ...db.reflections.filter(r=>r.date).map(r=>({date:r.date,text:"Reflection logged",icon:icon("reflections",13)}))
@@ -825,7 +825,7 @@ function setDashChartTab(t){dashChartTab=t;reports()}
 function computeSuggestions(){
  let suggestions=[];
  let cutoff=new Date(new Date(today()+"T00:00:00Z").getTime()-30*86400000).toISOString().slice(0,10);
- let recentSessions=db.sessions.filter(s=>s.date&&s.date>=cutoff);
+ let recentSessions=activeSessions().filter(s=>s.date&&s.date>=cutoff);
  let coveredCategories=new Set();
  recentSessions.forEach(s=>(s.objectiveTags||[]).forEach(t=>coveredCategories.add(t)));
  let uncovered=OBJECTIVE_CATEGORIES.filter(c=>!coveredCategories.has(c));
@@ -848,7 +848,7 @@ function computeSuggestions(){
 function coachingActivityScore(){
  let ratings=db.assessments.map(a=>Number(assessmentAvg(a))).filter(Number.isFinite);
  let teamAvg=ratings.length?ratings.reduce((a,b)=>a+b,0)/ratings.length:0;
- let weeks=[0,1,2,3].map(w=>{let end=new Date();end.setDate(end.getDate()-w*7);let start=new Date(end);start.setDate(start.getDate()-7);let sk=start.toISOString().slice(0,10),ek=end.toISOString().slice(0,10);return db.sessions.some(s=>s.date>=sk&&s.date<=ek)});
+ let weeks=[0,1,2,3].map(w=>{let end=new Date();end.setDate(end.getDate()-w*7);let start=new Date(end);start.setDate(start.getDate()-7);let sk=start.toISOString().slice(0,10),ek=end.toISOString().slice(0,10);return activeSessions().some(s=>s.date>=sk&&s.date<=ek)});
  let sessionConsistency=weeks.filter(Boolean).length/4*100;
  let coverage=activePlayers().length?activePlayers().filter(p=>db.assessments.some(a=>a.player===p.name)).length/activePlayers().length*100:0;
  let last30=[...Array(30)].map((_,i)=>{let d=new Date();d.setDate(d.getDate()-i);return d.toISOString().slice(0,10)});
@@ -864,7 +864,7 @@ function setHoursGoal(){let cur=db.settings.hoursGoal||"";let v=prompt("Set your
 function setWeeklyGoal(){let cur=db.settings.weeklySessionGoal||"";let v=prompt("Set your weekly session goal:",cur);if(v===null)return;let n=Number(v);if(!Number.isFinite(n)||n<=0){alert("Enter a valid number of sessions.");return}db.settings.weeklySessionGoal=n;save()}
 function weekStart(offsetWeeks){let d=new Date();let day=d.getDay();let diff=d.getDate()-day+(day===0?-6:1)-(offsetWeeks*7);let s=new Date(d);s.setDate(diff);return s.toISOString().slice(0,10)}
 function weekEnd(offsetWeeks){let s=new Date(weekStart(offsetWeeks));s.setDate(s.getDate()+6);return s.toISOString().slice(0,10)}
-function attendanceTotal(){return db.sessions.reduce((a,s)=>a+((s.attendees&&s.attendees.length)||0),0)}
+function attendanceTotal(){return activeSessions().reduce((a,s)=>a+((s.attendees&&s.attendees.length)||0),0)}
 function avgSessionRating(){let vals=db.reflections.map(r=>Number(r.rating)).filter(Number.isFinite);return vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length):0}
 function buildInsights(months,hrsTrend,ratingTrend,assessTrend,sessTrend){
  let out=[];
@@ -931,7 +931,7 @@ function openNotifications(){
 }
 function dashboard(){
  let profile=getActiveProfile();
- let todaySessions=db.sessions.filter(s=>s.date===today());
+ let todaySessions=activeSessions().filter(s=>s.date===today());
  let todayMatches=db.matches.filter(m=>m.date===today());
  let todayEvents=db.events.filter(e=>e.date===today());
  let todayCount=todaySessions.length+todayMatches.length+todayEvents.length;
@@ -939,7 +939,7 @@ function dashboard(){
  let reflectionToday=db.reflections.some(r=>r.date===today());
  let assessmentToday=db.assessments.some(a=>a.date===today());
  let unassessedCount=db.players.filter(p=>!db.assessments.some(a=>a.player===p.name)).length;
- let overdueReflections=db.sessions.filter(s=>s.date<today()&&!db.reflections.some(r=>r.sessionId===s.id)).length;
+ let overdueReflections=activeSessions().filter(s=>s.date<today()&&!db.reflections.some(r=>r.sessionId===s.id)).length;
  let reassessDueCount=db.players.filter(p=>{
   let pa=db.assessments.filter(a=>a.player===p.name);
   if(!pa.length)return false;
@@ -959,14 +959,14 @@ function dashboard(){
  let reflectionTrendPct=(thisMonthAvgRating!==null&&lastMonthAvgRating)?Math.round((thisMonthAvgRating-lastMonthAvgRating)/lastMonthAvgRating*100):null;
  let lastBackupStr=localStorage.getItem("coachbook_last_backup");
  let daysSinceBackup=lastBackupStr?Math.floor((new Date(today())-new Date(lastBackupStr))/86400000):null;
- let allActivityDates=[...db.sessions.map(s=>s.date),...db.reflections.map(r=>r.date),...db.assessments.map(a=>a.date),...db.matches.map(m=>m.date)].filter(Boolean).sort();
+ let allActivityDates=[...activeSessions().map(s=>s.date),...db.reflections.map(r=>r.date),...db.assessments.map(a=>a.date),...db.matches.map(m=>m.date)].filter(Boolean).sort();
  let lastActivityDate=allActivityDates.slice(-1)[0]||null;
  let daysSinceActivity=lastActivityDate?Math.floor((new Date(today()+"T00:00:00Z")-new Date(lastActivityDate+"T00:00:00Z"))/86400000):null;
  let pendingCount=totalPendingCount();
 
  let score=coachingActivityScore();
  let weeklyGoal=db.settings.weeklySessionGoal;
- let sessionsThisWeek=db.sessions.filter(s=>s.date>=weekStart(0)&&s.date<=weekEnd(0)).length;
+ let sessionsThisWeek=activeSessions().filter(s=>s.date>=weekStart(0)&&s.date<=weekEnd(0)).length;
  let streak=reflectionStreak();
  let activity=recentActivity().slice(0,3);
  let isNewUser=activePlayers().length===0&&activeSessions().length===0&&db.teams.length===0;
@@ -1040,7 +1040,7 @@ function dashboard(){
  ${reassessDueCount>0?`<div class="taskItem" style="cursor:pointer" onclick="reassessDuePlayers()"><div class="taskDot"></div><div class="taskText"><b>${reassessDueCount} player${reassessDueCount!==1?"s":""} due for reassessment</b><span>30+ days since last assessment</span></div></div>`:""}
  ${workloadCount>0?`<div class="taskItem" style="cursor:pointer" onclick="showWorkloadFlags()"><div class="taskDot"></div><div class="taskText"><b>${workloadCount} player${workloadCount!==1?"s":""} with back-to-back match workload</b><span>Matches on consecutive days recently</span></div></div>`:""}
  ${reflectionTrendPct!==null?`<div class="taskItem"><div class="taskDot done">${icon("check",10)}</div><div class="taskText"><b>Reflection ratings ${reflectionTrendPct>=0?"up":"down"} ${Math.abs(reflectionTrendPct)}%</b><span>Compared to last month</span></div></div>`:""}
- ${(daysSinceBackup!==null&&daysSinceBackup>=7)||(daysSinceBackup===null&&(db.sessions.length||db.players.length))?`<div class="taskItem" style="cursor:pointer" onclick="exportBackup()"><div class="taskDot"></div><div class="taskText"><b>${daysSinceBackup!==null?`${daysSinceBackup} days since your last backup`:"You haven't backed up yet"}</b><span>Tap to export a backup now</span></div></div>`:""}
+ ${(daysSinceBackup!==null&&daysSinceBackup>=7)||(daysSinceBackup===null&&(activeSessions().length||db.players.length))?`<div class="taskItem" style="cursor:pointer" onclick="exportBackup()"><div class="taskDot"></div><div class="taskText"><b>${daysSinceBackup!==null?`${daysSinceBackup} days since your last backup`:"You haven't backed up yet"}</b><span>Tap to export a backup now</span></div></div>`:""}
  </div>
 
  <div class="bentoTile bento-wide">
@@ -1082,7 +1082,7 @@ function sessions(){
  let list=db.sessions.filter(s=>!s.deletedAt).sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a)));
  if(sessionQuery){let q=sessionQuery.toLowerCase();list=list.filter(s=>[sessionLabel(s),s.squad,s.objectives,s.focus,s.venue].some(v=>String(v||"").toLowerCase().includes(q)))}
  if(sessionSquadFilter)list=list.filter(s=>s.squad===sessionSquadFilter);
- let squadOptions=[...new Set(db.sessions.map(s=>s.squad).filter(Boolean))].sort();
+ let squadOptions=[...new Set(activeSessions().map(s=>s.squad).filter(Boolean))].sort();
  document.getElementById("sessions").innerHTML=head("Session Plans","Plan, document and review every coaching session.")
  +`<button class="btn primary noPrint" onclick="newSession()">+ New Session</button>
  <button class="btn secondary noPrint" style="margin-left:8px" onclick="manageSessionTemplates()">Templates</button>
@@ -1296,7 +1296,7 @@ function reflections(){
 }
 function reflectionFormHtml(x,mode){
  x=x||{};
- let recentSessions=db.sessions.slice().sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a))).slice(0,60);
+ let recentSessions=activeSessions().slice().sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a))).slice(0,60);
  return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Reflection":"Coach Self Reflection"}</h2><button class="x" onclick="closeM()">×</button></div>
  <form class="formgrid" onsubmit="saveReflection(event)">
  <label>Date<input type="date" name="date" value="${esc(x.date||today())}"></label>
@@ -1344,7 +1344,7 @@ function newReflectionForSession(sessionId){
  newReflection({date:s.date,session:sessionLabel(s),sessionId:s.id});
 }
 function reflectPendingSessions(){
- let overdue=db.sessions.filter(s=>s.date<today()&&!db.reflections.some(r=>r.sessionId===s.id)).sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a)));
+ let overdue=activeSessions().filter(s=>s.date<today()&&!db.reflections.some(r=>r.sessionId===s.id)).sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a)));
  if(!overdue.length)return;
  if(overdue.length===1){newReflectionForSession(overdue[0].id);return}
  modal(`<div class="sheetHead"><h2>Sessions Awaiting Reflection</h2><button class="x" onclick="closeM()">×</button></div>
@@ -1625,7 +1625,7 @@ function players(){
  let sEl=document.getElementById("playerSearch");if(sEl&&playerSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
 function playerAssessments(p){return db.assessments.filter(a=>a.player===p.name).slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")))}
-function playerSessions(p){return db.sessions.filter(s=>Array.isArray(s.attendees)&&s.attendees.includes(p.name)).slice().sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a)))}
+function playerSessions(p){return activeSessions().filter(s=>Array.isArray(s.attendees)&&s.attendees.includes(p.name)).slice().sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a)))}
 function playerMatches(p){return db.matches.filter(m=>(m.playingXI||[]).includes(p.name)||(m.battingReview||[]).some(r=>r.name===p.name)||(m.bowlingReview||[]).some(r=>r.name===p.name)).slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))}
 function goalStatusInfo(g){
  if(g.achieved)return{text:"Achieved"+(g.achievedDate?" "+fmtDate(g.achievedDate):""),color:"var(--g)"};
@@ -1797,7 +1797,7 @@ function parentSummaryReport(id){
   let verb=t.last>t.first?"improved":t.last<t.first?"needs continued focus":"stayed steady";
   return `${d} has ${verb}${t.last!==t.first?` (${t.first.toFixed(1)} → ${t.last.toFixed(1)} out of 10)`:""}.`;
  });
- let teamSessions=p.team?db.sessions.filter(s=>s.squad===p.team&&p.available!=="no"):[];
+ let teamSessions=p.team?activeSessions().filter(s=>s.squad===p.team&&p.available!=="no"):[];
  let attended=teamSessions.filter(s=>(s.attendees||[]).includes(p.name)).length;
  let attendanceRate=teamSessions.length?Math.round(attended/teamSessions.length*100):null;
  let activeGoals=(p.goals||[]).filter(g=>!g.achieved);
@@ -2389,7 +2389,7 @@ function organisation(){
  <div class="toolbar noPrint"><button class="btn primary" onclick="newOrgEntity('team')">+ Add Team</button></div>
  <div class="grid g3" style="margin-top:12px">${db.teams.length?db.teams.map(t=>{
   let playerCount=db.players.filter(p=>p.team===t.name).length;
-  let sessionCount=db.sessions.filter(s=>s.squad===t.name).length;
+  let sessionCount=activeSessions().filter(s=>s.squad===t.name).length;
   let matchCount=db.matches.filter(m=>m.team===t.name).length;
   return `<div class="card"><b>${esc(t.name)}</b>${t.category?`<div class="muted">${esc(t.category)}</div>`:""}<div class="muted" style="margin-top:6px">${playerCount} player${playerCount!==1?"s":""} · ${sessionCount} session${sessionCount!==1?"s":""} · ${matchCount} match${matchCount!==1?"es":""}</div>${t.notes?`<p style="margin-top:8px">${esc(t.notes)}</p>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary" onclick="editOrgEntity('team','${t.id}')">Edit</button><button class="btn danger" onclick="delOrgEntity('team','${t.id}')">Delete</button></div></div>`;
  }).join(""):empty("No teams yet. Add one here, or assign a team to a player and it'll appear automatically.")}</div>
@@ -2423,7 +2423,7 @@ function organisation(){
  <div class="toolbar noPrint"><button class="btn primary" onclick="newOrgEntity('season')">+ Add Season</button></div>
  <div class="list" style="margin-top:12px">${db.seasons.length?db.seasons.map(s=>{
   let inRange=x=>s.startDate&&s.endDate&&x.date>=s.startDate&&x.date<=s.endDate;
-  let sessionCount=db.sessions.filter(x=>inRange(x)&&x.sessionType!=="player"&&(!s.team||x.squad===s.team)).length;
+  let sessionCount=activeSessions().filter(x=>inRange(x)&&x.sessionType!=="player"&&(!s.team||x.squad===s.team)).length;
   let matchCount=db.matches.filter(x=>inRange(x)&&(!s.team||x.team===s.team)).length;
   return `<div class="card">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px">
@@ -2434,7 +2434,7 @@ function organisation(){
   <div style="margin-top:14px;border-top:1px solid var(--line);padding-top:12px">
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px"><b style="font-size:var(--fs-4)">Season Plan</b><div class="toolbar">${s.startDate&&s.endDate?`<button class="btn secondary" onclick="autoSplitPhases('${s.id}')">Auto-split into phases</button>`:""}<button class="btn secondary" onclick="newPhase('${s.id}')">+ Add Phase</button></div></div>
   ${(s.phases&&s.phases.length)?s.phases.slice().sort((a,b)=>String(a.startDate||"").localeCompare(String(b.startDate||""))).map(ph=>{
-   let actual=db.sessions.filter(x=>ph.startDate&&ph.endDate&&x.date>=ph.startDate&&x.date<=ph.endDate&&x.sessionType!=="player"&&(!s.team||x.squad===s.team)).length;
+   let actual=activeSessions().filter(x=>ph.startDate&&ph.endDate&&x.date>=ph.startDate&&x.date<=ph.endDate&&x.sessionType!=="player"&&(!s.team||x.squad===s.team)).length;
    let target=Number(ph.sessionTarget)||0;
    let pct=target>0?Math.min(100,Math.round(actual/target*100)):null;
    return `<div class="item" style="margin-top:8px;align-items:flex-start"><div style="flex:1"><b>${esc(ph.name)}</b><div class="muted" style="font-size:var(--fs-2)">${esc(ph.startDate||"?")} → ${esc(ph.endDate||"?")}</div>${ph.focus?`<div style="margin-top:4px;font-size:var(--fs-3)">${esc(ph.focus)}</div>`:""}<div style="margin-top:6px;font-size:var(--fs-3)">${target>0?`${actual}/${target} sessions`:`${actual} session${actual!==1?"s":""} logged`}</div>${target>0?`<div class="goalBar" style="margin-top:5px"><div class="goalBarFill" style="width:${pct}%;background:${pct>=100?"var(--g)":"var(--gold)"}"></div></div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="editPhase('${s.id}','${ph.id}')">Edit</button><button class="btn danger" onclick="delPhase('${s.id}','${ph.id}')">×</button></div></div>`;
@@ -2619,7 +2619,7 @@ function buildTeamReport(){
  let avgOf=arr=>arr.length?(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1):"—";
  let attendanceRates=roster.map(p=>{
   if(p.available==="no")return null;
-  let teamSessions=p.team?db.sessions.filter(s=>s.squad===p.team&&inRange(s.date,from,to)):[];
+  let teamSessions=p.team?activeSessions().filter(s=>s.squad===p.team&&inRange(s.date,from,to)):[];
   if(!teamSessions.length)return null;
   let attended=teamSessions.filter(s=>(s.attendees||[]).includes(p.name)).length;
   return attended/teamSessions.length*100;
@@ -2688,7 +2688,7 @@ function buildAttendanceReport(){
  let scope=scopeValues();
  let{from,to}=reportRangeValues();
  let roster=playersInScope(scope);
- let sessions=db.sessions.filter(s=>inRange(s.date,from,to));
+ let sessions=activeSessions().filter(s=>inRange(s.date,from,to));
  let rows=roster.map(p=>{
   let unavailable=p.available==="no";
   let teamSessions=(p.team&&!unavailable)?sessions.filter(s=>s.squad===p.team):[];
@@ -2744,7 +2744,7 @@ function buildSeasonAnalyticsReport(){
  let sid=document.getElementById("reportSeason").value;
  let s=db.seasons.find(x=>x.id===sid);if(!s)return;
  let inRange=x=>s.startDate&&s.endDate&&x.date>=s.startDate&&x.date<=s.endDate;
- let seasonSessions=db.sessions.filter(x=>inRange(x)&&x.sessionType!=="player"&&(!s.team||x.squad===s.team));
+ let seasonSessions=activeSessions().filter(x=>inRange(x)&&x.sessionType!=="player"&&(!s.team||x.squad===s.team));
  let seasonMatches=db.matches.filter(x=>inRange(x)&&(!s.team||x.team===s.team));
  let seasonReflections=db.reflections.filter(inRange);
  let seasonAssessments=db.assessments.filter(inRange);
@@ -2760,7 +2760,7 @@ function buildSeasonAnalyticsReport(){
  <div class="grid g4" style="margin-top:15px"><div class="card stat"><span>Matches</span><b>${seasonMatches.length}</b></div><div class="card stat"><span>Wins</span><b>${wins}</b></div><div class="card stat"><span>Losses</span><b>${losses}</b></div><div class="card stat"><span>Draws</span><b>${draws}</b></div></div>
  <div class="card" style="margin-top:15px"><span class="muted">Avg Assessment Rating</span><b style="display:block;font-size:var(--fs-7);color:var(--g);margin-top:6px">${teamAvg}${teamAvg!=="—"?"/10":""}</b></div>
  ${(s.phases&&s.phases.length)?`<h2>Season Plan — Phase Breakdown</h2>${s.phases.slice().sort((a,b)=>String(a.startDate||"").localeCompare(String(b.startDate||""))).map(ph=>{
-  let actual=db.sessions.filter(x=>ph.startDate&&ph.endDate&&x.date>=ph.startDate&&x.date<=ph.endDate&&x.sessionType!=="player"&&(!s.team||x.squad===s.team)).length;
+  let actual=activeSessions().filter(x=>ph.startDate&&ph.endDate&&x.date>=ph.startDate&&x.date<=ph.endDate&&x.sessionType!=="player"&&(!s.team||x.squad===s.team)).length;
   let target=Number(ph.sessionTarget)||0;
   return `<div class="card"><b>${esc(ph.name)}</b><div class="muted">${esc(fmtDate(ph.startDate)||"?")} → ${esc(fmtDate(ph.endDate)||"?")}</div>${ph.focus?`<p style="margin-top:6px">${esc(ph.focus)}</p>`:""}<p style="margin-top:6px"><b>${target>0?`${actual}/${target} sessions${actual>=target?" ✓":""}`:`${actual} session${actual!==1?"s":""} logged`}</b></p></div>`;
  }).join("")}`:""}
@@ -2798,21 +2798,21 @@ function reports(){
   +`<div class="card" style="text-align:center;padding:32px"><h2 style="margin-top:0">Reports is a Premium feature</h2><p class="muted">${daysLeft>0?`You have ${daysLeft} day${daysLeft!==1?"s":""} left in your free trial to explore this.`:"Your free trial has ended."}</p><button class="btn primary" style="margin-top:10px" onclick="showUpgradePrompt('Reports')">Learn more</button></div>`;
   return;
  }
- let hrs=db.sessions.reduce((a,s)=>a+(+s.duration||0),0)/60,nums=db.assessments.map(a=>Number(assessmentAvg(a))).filter(Number.isFinite),avg=nums.length?(nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(1):"—";
+ let hrs=activeSessions().reduce((a,s)=>a+(+s.duration||0),0)/60,nums=db.assessments.map(a=>Number(assessmentAvg(a))).filter(Number.isFinite),avg=nums.length?(nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(1):"—";
  let mk=today().slice(0,7);
  let lastMonthDate=new Date();lastMonthDate.setMonth(lastMonthDate.getMonth()-1);let lastMk=lastMonthDate.toISOString().slice(0,7);
- let ssMonth=db.sessions.filter(s=>monthKey(s.date)===mk);
+ let ssMonth=activeSessions().filter(s=>monthKey(s.date)===mk);
  let mmMonth=db.matches.filter(m=>monthKey(m.date)===mk);
  let rrMonth=db.reflections.filter(r=>monthKey(r.date)===mk);
  let hrsMonth=ssMonth.reduce((a,s)=>a+(+s.duration||0),0)/60;
- let ssLastMonthCount=db.sessions.filter(s=>monthKey(s.date)===lastMk).length;
+ let ssLastMonthCount=activeSessions().filter(s=>monthKey(s.date)===lastMk).length;
  let sessionTrend=ssLastMonthCount?Math.round((ssMonth.length-ssLastMonthCount)/ssLastMonthCount*100):(ssMonth.length?100:0);
- let todaySessions=db.sessions.filter(s=>s.date===today());
+ let todaySessions=activeSessions().filter(s=>s.date===today());
  let todayMatches=db.matches.filter(m=>m.date===today());
  let todayEvents=db.events.filter(e=>e.date===today());
- let upcomingSessions=db.sessions.slice().filter(s=>s.date>=today()).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b))).slice(0,5);
+ let upcomingSessions=activeSessions().filter(s=>s.date>=today()).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b))).slice(0,5);
  let upcomingCal=[
-  ...db.sessions.filter(s=>s.date>=today()).map(s=>({date:s.date,label:sessionLabel(s),type:"Session"})),
+  ...activeSessions().filter(s=>s.date>=today()).map(s=>({date:s.date,label:sessionLabel(s),type:"Session"})),
   ...db.matches.filter(m=>m.date>=today()).map(m=>({date:m.date,label:"vs "+(m.opp||"Opposition"),type:"Match"})),
   ...db.events.filter(e=>e.date>=today()).map(e=>({date:e.date,label:e.title,type:e.type||"Event"}))
  ].sort((a,b)=>String(a.date||"").localeCompare(String(b.date||""))).slice(0,6);
@@ -2820,14 +2820,14 @@ function reports(){
  let ratedAssessments=db.assessments.map(a=>Number(assessmentAvg(a))).filter(Number.isFinite);
  let teamAvg=ratedAssessments.length?(ratedAssessments.reduce((a,b)=>a+b,0)/ratedAssessments.length).toFixed(1):"—";
  let months6=monthsBack(6);
- let sessTrend6=months6.map(m=>db.sessions.filter(s=>monthKey(s.date)===m.mk).length);
+ let sessTrend6=months6.map(m=>activeSessions().filter(s=>monthKey(s.date)===m.mk).length);
  let playerTrend6=months6.map(()=>db.players.length);
  let matchTrend6=months6.map(m=>db.matches.filter(x=>monthKey(x.date)===m.mk).length);
  let assessTrend6=months6.map(m=>db.assessments.filter(a=>monthKey(a.date)===m.mk).length);
- let hrsTrend6=months6.map(m=>db.sessions.filter(s=>monthKey(s.date)===m.mk).reduce((a,s)=>a+(+s.duration||0),0)/60);
+ let hrsTrend6=months6.map(m=>activeSessions().filter(s=>monthKey(s.date)===m.mk).reduce((a,s)=>a+(+s.duration||0),0)/60);
  let ratingTrend6=months6.map(m=>{let rr=db.reflections.filter(r=>monthKey(r.date)===m.mk).map(r=>Number(r.rating)).filter(Number.isFinite);return rr.length?rr.reduce((a,b)=>a+b,0)/rr.length:0});
  let devTrend6=months6.map(m=>{let aa=db.assessments.filter(a=>monthKey(a.date)===m.mk).map(a=>Number(assessmentAvg(a))).filter(Number.isFinite);return aa.length?aa.reduce((a,b)=>a+b,0)/aa.length:0});
- let attendTrend6=months6.map(m=>db.sessions.filter(s=>monthKey(s.date)===m.mk).reduce((a,s)=>a+((s.attendees&&s.attendees.length)||0),0));
+ let attendTrend6=months6.map(m=>activeSessions().filter(s=>monthKey(s.date)===m.mk).reduce((a,s)=>a+((s.attendees&&s.attendees.length)||0),0));
  let score=coachingActivityScore();
  let goal=db.settings.hoursGoal;
  let goalPct=goal?Math.min(100,Math.round(hrs/goal*100)):0;
@@ -2843,7 +2843,7 @@ function reports(){
  ${todayEvents.map(e=>`<div class="item"><div><b>${esc(e.title)}</b><div class="muted">${e.time?esc(e.time):""}</div></div><span class="tag">${esc(e.type||"Event")}</span></div>`).join("")}
  `:empty("Nothing scheduled today.")}</div>
  <div class="statPillRow">
- <div class="statPill"><span>Sessions</span><b>${db.sessions.length}</b></div>
+ <div class="statPill"><span>Sessions</span><b>${activeSessions().length}</b></div>
  <div class="statPill"><span>Players</span><b>${activePlayers().length}</b></div>
  <div class="statPill"><span>Matches</span><b>${db.matches.length}</b></div>
  <div class="statPill"><span>Assessments</span><b>${db.assessments.length}</b></div>
@@ -3027,7 +3027,7 @@ function reflectionSearchableText(r){
   r.learnings!==undefined?r.learnings:[r.players,r.change].filter(Boolean).join(" ")
  ];
 }
-function venueOptions(){let venues=[...new Set([...db.sessions.map(s=>s.venue),...db.matches.map(m=>m.venue)].filter(Boolean))];return venues.map(v=>`<option value="${esc(v)}">`).join("")}
+function venueOptions(){let venues=[...new Set([...activeSessions().map(s=>s.venue),...db.matches.map(m=>m.venue)].filter(Boolean))];return venues.map(v=>`<option value="${esc(v)}">`).join("")}
 function reportShell(title,sub,body){modal(`<div class="sheetHead noPrint"><h2>${title}</h2><button class="x" onclick="closeM()">×</button></div><div class="report"><h1>${title}</h1><div class="muted">${sub}</div>${body}<div class="reportActions noPrint"><button class="btn primary" onclick="printReport()">Print / Save PDF</button></div></div>`)}
 function monthKey(d){return String(d||"").slice(0,7)}
 function fmtMonthKey(mk){if(!mk||!/^\d{4}-\d{2}/.test(mk))return mk||"";let[y,m]=mk.split("-");let names=["January","February","March","April","May","June","July","August","September","October","November","December"];return `${names[Number(m)-1]||m} ${y}`}
@@ -3038,7 +3038,7 @@ function monthlyReport(){
 }
 function buildMonthlyReport(){
  let mk=(document.getElementById("monthlyReportMonth").value||today().slice(0,7));
- let ss=db.sessions.filter(x=>monthKey(x.date)===mk),aa=db.assessments.filter(x=>monthKey(x.date)===mk),rr=db.reflections.filter(x=>monthKey(x.date)===mk),mm=db.matches.filter(x=>monthKey(x.date)===mk),hrs=ss.reduce((a,s)=>a+(+s.duration||0),0)/60;
+ let ss=activeSessions().filter(x=>monthKey(x.date)===mk),aa=db.assessments.filter(x=>monthKey(x.date)===mk),rr=db.reflections.filter(x=>monthKey(x.date)===mk),mm=db.matches.filter(x=>monthKey(x.date)===mk),hrs=ss.reduce((a,s)=>a+(+s.duration||0),0)/60;
  reportShell("Monthly Coaching Report",fmtMonthKey(mk),`<div class="grid g4"><div class="card stat"><span>Sessions</span><b>${ss.length}</b></div><div class="card stat"><span>Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Assessments</span><b>${aa.length}</b></div><div class="card stat"><span>Reflections</span><b>${rr.length}</b></div></div><h2>Sessions</h2>${ss.length?ss.map(s=>`<div class="card"><b>${esc(fmtDate(s.date))} · ${esc(s.title||"—")}</b> <span class="tag">${esc(sessionTypeLabel(s.sessionType))}</span><p>${esc(s.objectives||"")}</p></div>`).join(""):empty("No sessions in this month.")}<h2>Assessments</h2>${aa.length?aa.map(a=>`<div class="card"><b>${esc(a.player)} · ${assessmentAvg(a)}/10</b><p>${esc(a.priority||"")}</p></div>`).join(""):empty("No assessments in this month.")}<h2>Match actions</h2>${mm.length?mm.map(m=>`<div class="card"><b>${esc(m.team)} vs ${esc(m.opp)}</b><p>${esc(m.actions||m.notes||"")}</p></div>`).join(""):empty("No match notes in this month.")}`)}
 function playerReport(){
  if(!activePlayers().length){alert("Add a player first.");return}
@@ -3092,7 +3092,7 @@ function buildPlayerReport(){
   }
   matchTrendHtml=`<h2>Match Performance Trend</h2><div class="card"><p class="muted" style="margin-bottom:8px">Earlier matches in this range vs more recent ones.</p>${rows.map(r=>{let diff=(r.last-r.first).toFixed(1);let sign=r.last>=r.first?"+":"";let color=r.last>=r.first?"var(--g)":"var(--red)";return `<div style="margin-bottom:6px"><b>${esc(r.label)}:</b> ${r.first.toFixed(1)} → ${r.last.toFixed(1)} <span style="color:${color};font-weight:700">(${sign}${diff})</span></div>`}).join("")}</div>`;
  }
- let teamSessions=(p.team&&p.available!=="no")?db.sessions.filter(s=>s.squad===p.team&&s.sessionType!=="player"&&inRange(s.date,from,to)):[];
+ let teamSessions=(p.team&&p.available!=="no")?activeSessions().filter(s=>s.squad===p.team&&s.sessionType!=="player"&&inRange(s.date,from,to)):[];
  let attended=teamSessions.filter(s=>(s.attendees||[]).includes(p.name)).length;
  let attendanceRate=teamSessions.length?Math.round(attended/teamSessions.length*100):null;
  let goalProgressHtml="";
@@ -3134,7 +3134,7 @@ function buildSeasonReport(){
  let{from,to}=reportRangeValues();
  let roster=playersInScope(scope);
  let rosterNames=new Set(roster.map(p=>p.name));
- let sessions=db.sessions.filter(s=>inRange(s.date,from,to));
+ let sessions=activeSessions().filter(s=>inRange(s.date,from,to));
  let reflections=db.reflections.filter(r=>inRange(r.date,from,to));
  let matches=db.matches.filter(m=>inRange(m.date,from,to));
  let hrs=sessions.reduce((a,s)=>a+(+s.duration||0),0)/60;
@@ -3169,7 +3169,7 @@ function sessionReport(){reportRangeModal("Session Report","buildSessionReport")
 function sessionTypeLabel(t){return t==="team"?"Team":t==="player"?"1-on-1":t==="custom"?"Group":"—"}
 function buildSessionReport(){
  let{from,to}=reportRangeValues();
- let sessions=db.sessions.filter(s=>inRange(s.date,from,to));
+ let sessions=activeSessions().filter(s=>inRange(s.date,from,to));
  let categoryCounts=OBJECTIVE_CATEGORIES.map(c=>({name:c,count:sessions.filter(s=>(s.objectiveTags||[]).includes(c)).length})).sort((a,b)=>b.count-a.count);
  let hasAnyTags=categoryCounts.some(c=>c.count>0);
  reportShell("Session Report",rangeLabel(from,to),sessions.length?`
@@ -3224,7 +3224,7 @@ function exportExcel(){
  if(typeof XLSX==='undefined'){alert('Excel library failed to load.');return;}
  const wb=XLSX.utils.book_new();
  const sheets={
-  Sessions:db.sessions.map(s=>({
+  Sessions:activeSessions().map(s=>({
     date:s.date,title:s.title,squad:s.squad,duration:s.duration,focus:s.focus,venue:s.venue,
     attendees:(s.attendees||[]).join('; '),
     objectiveCategories:(s.objectiveTags||[]).join('; '),
@@ -3293,7 +3293,7 @@ function exportExcel(){
 
 /* ===== Calendar ===== */
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calEventQuery="",calSearchFocused=false,editingEventId=null;
-function calItemsForDate(ds){return{sessions:db.sessions.filter(s=>s.date===ds),matches:db.matches.filter(m=>m.date===ds),events:db.events.filter(e=>e.date===ds)}}
+function calItemsForDate(ds){return{sessions:activeSessions().filter(s=>s.date===ds),matches:db.matches.filter(m=>m.date===ds),events:db.events.filter(e=>e.date===ds)}}
 function fmtCalDate(ds){let d=new Date(ds+"T00:00:00");return d.toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long",year:"numeric"})}
 function calPrevMonth(){calMonth--;if(calMonth<0){calMonth=11;calYear--}calendar()}
 function calNextMonth(){calMonth++;if(calMonth>11){calMonth=0;calYear++}calendar()}
@@ -3366,7 +3366,7 @@ function saveCalEvent(e){
 function delCalEvent(id){if(confirm("Delete this reminder/event?")){db.events=db.events.filter(x=>x.id!==id);save()}}
 function calMonthReport(){
  let mk=`${calYear}-${String(calMonth+1).padStart(2,"0")}`;
- let ss=db.sessions.filter(s=>String(s.date||"").slice(0,7)===mk).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b)));
+ let ss=activeSessions().filter(s=>String(s.date||"").slice(0,7)===mk).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b)));
  let mm=db.matches.filter(m=>String(m.date||"").slice(0,7)===mk).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
  let ee=db.events.filter(e=>String(e.date||"").slice(0,7)===mk).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
  let label=new Date(calYear,calMonth,1).toLocaleDateString(undefined,{month:"long",year:"numeric"});
@@ -3877,7 +3877,7 @@ function globalSearchResultsHtml(){
  let q=globalSearchQuery.trim().toLowerCase();
  if(!q)return `<div class="muted">Start typing to search sessions, players, drills, assessments, matches and calendar events.</div>`;
  let hit=v=>String(v||"").toLowerCase().includes(q);
- let sessionHits=db.sessions.filter(s=>[s.title,s.squad,s.focus,s.venue,s.objectives,...(s.objectiveTags||[]),s.warmup,s.main,s.game,s.cues,s.success,s.attachment&&s.attachment.name,...(s.mainDrillIds||[]).map(id=>{let d=db.drills.find(x=>x.id===id);return d&&d.name}),...(s.gameDrillIds||[]).map(id=>{let d=db.drills.find(x=>x.id===id);return d&&d.name})].some(hit));
+ let sessionHits=activeSessions().filter(s=>[s.title,s.squad,s.focus,s.venue,s.objectives,...(s.objectiveTags||[]),s.warmup,s.main,s.game,s.cues,s.success,s.attachment&&s.attachment.name,...(s.mainDrillIds||[]).map(id=>{let d=db.drills.find(x=>x.id===id);return d&&d.name}),...(s.gameDrillIds||[]).map(id=>{let d=db.drills.find(x=>x.id===id);return d&&d.name})].some(hit));
  let reflectionHits=db.reflections.filter(r=>reflectionSearchableText(r).some(hit));
  let playerHits=db.players.filter(p=>[p.name,p.team,p.group,p.role,p.strengths,p.areas,p.focus,p.notes].some(hit));
  let drillHits=db.drills.filter(d=>[d.name,d.cat,d.equipment,d.points,d.progressions,d.regressions].some(hit));
