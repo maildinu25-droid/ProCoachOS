@@ -134,6 +134,15 @@
   .checkbox-list { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 12px; }
   .checkbox-list label { display: flex; align-items: center; gap: 6px; font-size: 13px; background: var(--surface); border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 6px 10px; }
   .checkbox-list label.dim { opacity: 0.55; }
+  .collapsible-multiselect { margin: 6px 0 12px; }
+  .collapsible-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; background: var(--surface); border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 13.5px; font-weight: 650; color: var(--text); font-family: inherit; text-align: left; cursor: pointer; }
+  .collapsible-count { color: var(--text-dim); font-weight: 400; font-size: 12.5px; margin-left: auto; margin-right: 6px; }
+  .collapsible-chevron { color: var(--green); flex-shrink: 0; }
+  .grid-check-list { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; margin-top: 8px; }
+  @media (max-width: 420px) { .grid-check-list { grid-template-columns: 1fr; } }
+  .grid-check-btn { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 400; background: var(--surface); border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 9px 10px; cursor: pointer; font-family: inherit; color: var(--text); }
+  .grid-check-btn input { width: auto; margin: 0; flex-shrink: 0; }
+  .grid-check-btn.is-checked { border-color: var(--green); background: var(--mint); }
   .subrow { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
   .member-teams { margin-top: 6px; }
   .stat-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
@@ -1101,7 +1110,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-13-05:52';
+const APP_BUILD_VERSION = '2026-09-16-17:33';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -1847,15 +1856,67 @@ function attachPresetHandlers(container) {
 // ---------- Checkbox-based multi-select: replaces native <select multiple>, which ----------
 // ---------- needs an undiscoverable Ctrl/Cmd-click on desktop but allows plain    ----------
 // ---------- multi-tap on mobile — this behaves identically on both.              ----------
-function checkboxMultiSelectHtml(fieldId, options, selectedValues) {
+function checkboxMultiSelectHtml(fieldId, options, selectedValues, title) {
   const selectedSet = new Set(selectedValues || []);
+  const count = selectedSet.size;
   const rows = options.length
-    ? options.map(o => `<label style="display:flex; align-items:center; gap:8px; padding:7px 8px; cursor:pointer; font-size:13px; font-weight:400;"><input type="checkbox" value="${esc(o.id)}" ${selectedSet.has(o.id) ? 'checked' : ''} style="margin:0; width:16px; height:16px; flex-shrink:0;"><span>${esc(o.label)}</span></label>`).join('')
-    : '<div class="empty-state" style="padding:8px;">None available yet.</div>';
-  return `<div class="checkbox-multiselect" id="${esc(fieldId)}" style="border:1px solid var(--surface-border); border-radius:10px; max-height:170px; overflow-y:auto; padding:2px;">${rows}</div>`;
+    ? options.map(o => `<label class="grid-check-btn ${selectedSet.has(o.id) ? 'is-checked' : ''}"><input type="checkbox" value="${esc(o.id)}" ${selectedSet.has(o.id) ? 'checked' : ''}><span>${esc(o.label)}</span></label>`).join('')
+    : '<div class="empty-state" style="padding:8px; grid-column:1 / -1;">None available yet.</div>';
+  return `<div class="collapsible-multiselect" id="${esc(fieldId)}">
+    <button type="button" class="collapsible-header" data-collapse-target="${esc(fieldId)}-body">${esc(title)} <span class="collapsible-count">(${count} selected)</span> <span class="collapsible-chevron">▾</span></button>
+    <div class="grid-check-list" id="${esc(fieldId)}-body" style="display:none;">${rows}</div>
+  </div>`;
 }
 function checkboxMultiSelectValues(fieldId) {
   return Array.from(document.querySelectorAll(`#${fieldId} input[type="checkbox"]:checked`)).map(cb => cb.value);
+}
+// Shared by every collapsible section in the session form (objective
+// categories, drills, equipment, attendance) — toggles visibility, rotates
+// the chevron, and keeps the header's live count in sync with what's checked.
+function wireCollapsibleSection(headerBtn) {
+  const targetId = headerBtn.dataset.collapseTarget;
+  const body = document.getElementById(targetId);
+  const chevron = headerBtn.querySelector('.collapsible-chevron');
+  headerBtn.onclick = () => {
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : '';
+    if (chevron) chevron.textContent = isOpen ? '▾' : '▴';
+  };
+  body.querySelectorAll('input[type="checkbox"]').forEach(cb => {
+    cb.addEventListener('change', () => updateCollapsibleCount(headerBtn, body));
+  });
+}
+function updateCollapsibleCount(headerBtn, body) {
+  const countEl = headerBtn.querySelector('.collapsible-count');
+  if (!countEl) return;
+  const n = body.querySelectorAll('input[type="checkbox"]:checked').length;
+  countEl.textContent = `(${n} selected)`;
+  body.querySelectorAll('.grid-check-btn').forEach(btn => {
+    btn.classList.toggle('is-checked', btn.querySelector('input').checked);
+  });
+}
+// Attendance uses a 4-state dropdown per player (present/absent/late/
+// excused), not a checkbox — genuinely different input, so it needs its own
+// wiring rather than being forced into the checkbox-counting function above.
+function wireAttendanceCollapsible(headerBtn) {
+  const targetId = headerBtn.dataset.collapseTarget;
+  const body = document.getElementById(targetId);
+  const chevron = headerBtn.querySelector('.collapsible-chevron');
+  headerBtn.onclick = () => {
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : '';
+    if (chevron) chevron.textContent = isOpen ? '▾' : '▴';
+  };
+  updateAttendanceCollapsibleCount(headerBtn, body);
+  body.querySelectorAll('.attendance-status').forEach(sel => {
+    sel.addEventListener('change', () => updateAttendanceCollapsibleCount(headerBtn, body));
+  });
+}
+function updateAttendanceCollapsibleCount(headerBtn, body) {
+  const countEl = headerBtn.querySelector('.collapsible-count');
+  if (!countEl) return;
+  const n = Array.from(body.querySelectorAll('.attendance-status')).filter(sel => sel.value === 'present' || sel.value === 'late').length;
+  countEl.textContent = `(${n} marked present)`;
 }
 
 // ---------- Session templates: whole-form reuse, distinct from per-field text presets ----------
@@ -3918,7 +3979,7 @@ function sessionItemCard(s) {
 
 function attendanceRowsHtml(teamPlayers, attendance) {
   if (!teamPlayers.length) return '<div class="empty-state">No players on this team yet.</div>';
-  return teamPlayers.map(p => `<div class="attendanceRow"><span>${esc(p.name)}</span><select class="attendance-status" data-player="${p.id}">${ATTENDANCE_STATUSES.map(st => `<option value="${st}" ${attendanceStatus(attendance, p.id) === st ? 'selected' : ''}>${ATTENDANCE_LABELS[st]}</option>`).join('')}</select></div>`).join('');
+  return teamPlayers.map(p => `<div class="grid-check-btn" style="justify-content:space-between; cursor:default;"><span>${esc(p.name)}</span><select class="attendance-status" data-player="${p.id}" style="width:auto; margin:0; padding:4px 6px; font-size:12px;">${ATTENDANCE_STATUSES.map(st => `<option value="${st}" ${attendanceStatus(attendance, p.id) === st ? 'selected' : ''}>${ATTENDANCE_LABELS[st]}</option>`).join('')}</select></div>`).join('');
 }
 function sessionFormHtml(s) {
   const teamPlayers = cache.players.filter(p => p.team_id === (s?.team_id || cache.teams[0]?.id));
@@ -3934,20 +3995,21 @@ function sessionFormHtml(s) {
       <label class="full">Venue <span class="muted" style="font-weight:400;">(free text — for an opponent's ground, etc.)</span><input id="sheet-session-venue" value="${esc(s?.venue || '')}"></label>
       <label class="full">Facility used <span class="muted" style="font-weight:400;">(optional — links this session to a tracked net/ground for usage reporting)</span><select id="sheet-session-facility"><option value="">— Not a tracked facility —</option>${cache.facilities.map(f => `<option value="${f.id}" ${s?.facility_id === f.id ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select></label>
     </div>
-    <label class="field-label" style="margin-top:10px; display:flex; justify-content:space-between; align-items:center;">Attendance<button type="button" class="btn ghost" id="mark-all-present-btn" style="width:auto; padding:4px 10px; font-size:12px;">Mark All Present</button></label>
-    <div id="sheet-session-attendees">${attendanceRowsHtml(teamPlayers, s?.attendance)}</div>
-    <label class="full" style="margin-top:10px; display:block;">Objective category <span class="muted" style="font-weight:400;">(select any that apply)</span></label>
-    ${checkboxMultiSelectHtml('sheet-session-objcategory', OBJECTIVE_CATEGORIES.map(c => ({ id: c, label: c })), s?.objective_category)}
+    <div class="collapsible-multiselect" id="sheet-session-attendance-wrap">
+      <button type="button" class="collapsible-header" data-collapse-target="sheet-session-attendance-body">Attendance <span class="collapsible-count">(${attendedCount(s?.attendance)} marked present)</span> <span class="collapsible-chevron">▾</span></button>
+      <div id="sheet-session-attendance-body" style="display:none; margin-top:8px;">
+        <button type="button" class="btn ghost" id="mark-all-present-btn" style="width:auto; padding:4px 10px; font-size:12px; margin-bottom:8px;">Mark All Present</button>
+        <div id="sheet-session-attendees">${attendanceRowsHtml(teamPlayers, s?.attendance)}</div>
+      </div>
+    </div>
+    ${checkboxMultiSelectHtml('sheet-session-objcategory', OBJECTIVE_CATEGORIES.map(c => ({ id: c, label: c })), s?.objective_category, 'Objective Categories')}
     <label class="full" style="display:block;">Objectives</label>${presetRowHtml('session_objectives', 'sheet-session-objectives')}<textarea id="sheet-session-objectives">${esc(s?.objectives || '')}</textarea>
     <label class="full" style="display:block;">Warm-up / Preparation</label>${presetRowHtml('session_warmup', 'sheet-session-warmup')}<textarea id="sheet-session-warmup">${esc(s?.warmup || '')}</textarea>
     <label class="full" style="display:block;">Main Skill Block</label>${presetRowHtml('session_main', 'sheet-session-main')}<textarea id="sheet-session-main">${esc(s?.main || '')}</textarea>
-    <label class="field-label">Main activity drills (optional)</label>
-    ${checkboxMultiSelectHtml('sheet-session-main-drills', cache.drills.map(d => ({ id: d.id, label: d.name })), s?.main_drill_ids)}
+    ${checkboxMultiSelectHtml('sheet-session-main-drills', cache.drills.map(d => ({ id: d.id, label: d.name })), s?.main_drill_ids, 'Main activity drills (optional)')}
     <label class="full" style="display:block; margin-top:10px;">Competitive / Game Block</label>${presetRowHtml('session_game', 'sheet-session-game')}<textarea id="sheet-session-game">${esc(s?.game || '')}</textarea>
-    <label class="field-label">Game drills (optional)</label>
-    ${checkboxMultiSelectHtml('sheet-session-game-drills', cache.drills.map(d => ({ id: d.id, label: d.name })), s?.game_drill_ids)}
-    <label class="field-label" style="margin-top:10px;">Equipment used (optional) <span class="muted" style="font-weight:400;">— shows up on the session card, visible to the whole team</span></label>
-    ${checkboxMultiSelectHtml('sheet-session-equipment', cache.equipment.map(eq => ({ id: eq.id, label: eq.name })), s?.equipment_ids)}
+    ${checkboxMultiSelectHtml('sheet-session-game-drills', cache.drills.map(d => ({ id: d.id, label: d.name })), s?.game_drill_ids, 'Game drills (optional)')}
+    ${checkboxMultiSelectHtml('sheet-session-equipment', cache.equipment.map(eq => ({ id: eq.id, label: eq.name })), s?.equipment_ids, 'Equipment used (optional)')}
     <label class="full" style="display:block; margin-top:10px;">Coaching Cues</label>${presetRowHtml('session_cues', 'sheet-session-cues')}<textarea id="sheet-session-cues">${esc(s?.cues || '')}</textarea>
     <label class="full" style="display:block;">Success Criteria</label>${presetRowHtml('session_success', 'sheet-session-success')}<textarea id="sheet-session-success">${esc(s?.success || '')}</textarea>
     <div style="display:flex; gap:8px; margin-top:14px;">
@@ -3965,6 +4027,8 @@ async function openSessionForm(s) {
   await loadSessionTemplatesCache();
   openSheet(sessionFormHtml(s));
   attachPresetHandlers(document);
+  document.querySelectorAll('#sheet-session-objcategory .collapsible-header, #sheet-session-main-drills .collapsible-header, #sheet-session-game-drills .collapsible-header, #sheet-session-equipment .collapsible-header').forEach(wireCollapsibleSection);
+  wireAttendanceCollapsible(document.querySelector('#sheet-session-attendance-wrap .collapsible-header'));
   if (!s?.id && document.getElementById('sheet-session-template-picker')) {
     document.getElementById('sheet-session-template-picker').addEventListener('change', (e) => {
       const t = sessionTemplatesCache.find(t => t.id === e.target.value);
@@ -3980,6 +4044,12 @@ async function openSessionForm(s) {
       const applyChecks = (fieldId, values) => {
         const set = new Set(values || []);
         document.querySelectorAll(`#${fieldId} input[type="checkbox"]`).forEach(cb => { cb.checked = set.has(cb.value); });
+        // Programmatic .checked assignment doesn't fire 'change', so the
+        // collapsible's live count and checked-styling need an explicit
+        // refresh here rather than relying on the event listener.
+        const headerBtn = document.querySelector(`#${fieldId} .collapsible-header`);
+        const body = document.querySelector(`#${fieldId} .grid-check-list`);
+        if (headerBtn && body) updateCollapsibleCount(headerBtn, body);
       };
       applyChecks('sheet-session-objcategory', t.objective_category);
       applyChecks('sheet-session-main-drills', t.main_drill_ids);
@@ -4014,9 +4084,11 @@ async function openSessionForm(s) {
   document.getElementById('sheet-session-team').addEventListener('change', (e) => {
     const teamPlayers = cache.players.filter(p => p.team_id === e.target.value);
     document.getElementById('sheet-session-attendees').innerHTML = attendanceRowsHtml(teamPlayers, null);
+    wireAttendanceCollapsible(document.querySelector('#sheet-session-attendance-wrap .collapsible-header'));
   });
   document.getElementById('mark-all-present-btn').addEventListener('click', () => {
     document.querySelectorAll('.attendance-status').forEach(sel => { sel.value = 'present'; });
+    updateAttendanceCollapsibleCount(document.querySelector('#sheet-session-attendance-wrap .collapsible-header'), document.getElementById('sheet-session-attendance-body'));
   });
   document.getElementById('sheet-save-session-btn').addEventListener('click', async () => {
     const teamId = document.getElementById('sheet-session-team').value;
