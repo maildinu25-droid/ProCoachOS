@@ -45,7 +45,8 @@ const token = params.get("t");
 const checkId = params.get("check");
 const app = document.getElementById("app");
 
-let state = { openSlots: [], selected: null, submitting: false, submitted: false, submittedId: null, error: null, formValues: { parentName:"", playerName:"", note:"" }, statusResult: null, statusLoaded: false };
+let state = { openSlots: [], selectedSlots: [], step: "pick", submitting: false, submitted: false, submittedIds: [], failedCount: 0, error: null, formValues: { parentName:"", playerName:"", note:"" }, statusResults: null, statusLoaded: false };
+const MAX_SLOTS_PER_REQUEST = 6;
 
 function fmtDateLabel(dateStr){
   const d = new Date(dateStr + "T00:00:00");
@@ -77,11 +78,13 @@ function render(){
     return;
   }
   if (state.submitted){
-    const checkLink = `${location.origin}${location.pathname}?t=${encodeURIComponent(token)}&check=${encodeURIComponent(state.submittedId)}`;
+    const checkLink = `${location.origin}${location.pathname}?t=${encodeURIComponent(token)}&check=${encodeURIComponent(state.submittedIds.join(","))}`;
+    const countLabel = state.submittedIds.length === 1 ? "Request sent" : `${state.submittedIds.length} requests sent`;
     app.innerHTML = `<div class="card confirmCard">
       <div class="tick">✓</div>
-      <h2 style="margin:0 0 6px">Request sent</h2>
-      <p style="color:var(--muted);margin:0">Your coach hasn't confirmed it yet. Use the link below to check — bookmark it or save it now, since this is the only way to see whether it's been confirmed.</p>
+      <h2 style="margin:0 0 6px">${countLabel}</h2>
+      <p style="color:var(--muted);margin:0">Your coach hasn't confirmed ${state.submittedIds.length===1?"it":"them"} yet. Use the link below to check — bookmark it or save it now, since this is the only way to see whether ${state.submittedIds.length===1?"it's":"they're"} confirmed.</p>
+      ${state.failedCount>0?`<p style="color:var(--red);font-size:13px;margin-top:10px">${state.failedCount} of the selected times couldn't be sent — please try requesting those again.</p>`:""}
       <a href="${checkLink}" class="btn primary" style="display:block;margin-top:18px;text-decoration:none;box-sizing:border-box">Check Your Request Status</a>
     </div>`;
     return;
@@ -99,23 +102,33 @@ function render(){
     return;
   }
 
-  let html = `<h1 class="coachName">Book a session</h1><p class="sub">Pick a time that works, then send your request.</p>`;
+  let html = `<h1 class="coachName">Book a session</h1><p class="sub">Pick one or more times that work, then send your request.</p>`;
 
-  if (!state.selected){
+  if (state.step === "pick"){
+    const atMax = state.selectedSlots.length >= MAX_SLOTS_PER_REQUEST;
     groupByDate(state.openSlots).forEach(([date, slots]) => {
       html += `<div class="dateGroup"><div class="dateLabel">${fmtDateLabel(date)}</div><div class="slotGrid">`;
       slots.forEach(s => {
-        html += `<button class="slotBtn" data-date="${s.date}" data-time="${s.time}" onclick="selectSlot('${s.date}','${s.time}')">${fmtTimeLabel(s.time)}</button>`;
+        const isSelected = state.selectedSlots.some(sel => sel.date===s.date && sel.time===s.time);
+        const disabled = !isSelected && atMax;
+        html += `<button class="slotBtn${isSelected?" selected":""}" ${disabled?"disabled style=\"opacity:.4\"":""} data-date="${s.date}" data-time="${s.time}" onclick="toggleSlot('${s.date}','${s.time}')">${fmtTimeLabel(s.time)}</button>`;
       });
       html += `</div></div>`;
     });
+    if (state.selectedSlots.length){
+      html += `<div class="chosenSlot">${state.selectedSlots.length} time${state.selectedSlots.length!==1?"s":""} selected${atMax?` (max ${MAX_SLOTS_PER_REQUEST})`:""}</div>
+      <button class="btn primary" onclick="goToDetails()" style="margin-top:4px">Continue</button>`;
+    }
   } else {
-    html += `<div class="chosenSlot">${fmtDateLabel(state.selected.date)} at ${fmtTimeLabel(state.selected.time)} <a class="backLink" onclick="changeSlot()">Change</a></div>
+    html += `<div class="card" style="margin-bottom:14px">
+      ${state.selectedSlots.map(s=>`<div class="chosenSlot" style="margin-bottom:6px"><span>${fmtDateLabel(s.date)} at ${fmtTimeLabel(s.time)}</span><a class="backLink" onclick="removeSlot('${s.date}','${s.time}')">Remove</a></div>`).join("")}
+      <a class="backLink" onclick="state.step='pick';render()">+ Add another time</a>
+    </div>
     <div class="card">
       <div class="formRow"><label>Your name</label><input id="fParent" placeholder="e.g. Priya Sharma" value="${state.formValues.parentName.replace(/"/g,"&quot;")}" oninput="state.formValues.parentName=this.value"></div>
       <div class="formRow"><label>Player's name</label><input id="fPlayer" placeholder="e.g. Arjun Sharma" value="${state.formValues.playerName.replace(/"/g,"&quot;")}" oninput="state.formValues.playerName=this.value"></div>
       <div class="formRow"><label>Note <span style="color:var(--muted);font-weight:400">(optional)</span></label><textarea id="fNote" placeholder="Anything your coach should know" oninput="state.formValues.note=this.value">${state.formValues.note.replace(/</g,"&lt;")}</textarea></div>
-      <button class="btn" id="submitBtn" onclick="submitRequest()" ${state.submitting?"disabled":""}>${state.submitting?"Sending…":"Send Request"}</button>
+      <button class="btn" id="submitBtn" onclick="submitRequest()" ${state.submitting?"disabled":""}>${state.submitting?"Sending…":state.selectedSlots.length>1?`Send ${state.selectedSlots.length} Requests`:"Send Request"}</button>
       <p style="color:var(--muted);font-size:12.5px;margin:10px 0 0;text-align:center">You won't get an email — after sending, you'll get a link to check whether it's been confirmed.</p>
       ${state.error==="missing-fields"?`<div class="errMsg">Please fill in your name and the player's name.</div>`:""}
       ${state.error==="submit-failed"?`<div class="errMsg">Something went wrong sending your request. Please try again.</div>`:""}
@@ -124,8 +137,19 @@ function render(){
   app.innerHTML = html;
 }
 
-function selectSlot(date, time){ state.selected = { date, time }; state.error=null; render(); }
-function changeSlot(){ state.selected = null; state.error=null; render(); }
+function toggleSlot(date, time){
+  const idx = state.selectedSlots.findIndex(s => s.date===date && s.time===time);
+  if (idx>=0) state.selectedSlots.splice(idx,1);
+  else if (state.selectedSlots.length < MAX_SLOTS_PER_REQUEST) state.selectedSlots.push({date,time});
+  state.error = null;
+  render();
+}
+function removeSlot(date, time){
+  state.selectedSlots = state.selectedSlots.filter(s => !(s.date===date && s.time===time));
+  if (!state.selectedSlots.length) state.step = "pick";
+  render();
+}
+function goToDetails(){ state.step = "details"; state.error=null; render(); }
 
 async function loadSlots(){
   try{
@@ -146,18 +170,25 @@ async function submitRequest(){
   const note = state.formValues.note.trim();
   if (!parentName || !playerName){ state.error = "missing-fields"; render(); return; }
   state.submitting = true; state.error = null; render();
-  try{
-    const res = await fetch(`${BOOKING_API}/api/booking/request?t=${encodeURIComponent(token)}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ parentName, playerName, note, date: state.selected.date, time: state.selected.time })
-    });
-    if (!res.ok) throw new Error("failed");
-    const data = await res.json();
-    state.submitting = false; state.submitted = true; state.submittedId = data.id; render();
-  } catch(e){
-    state.submitting = false; state.error = "submit-failed"; render();
+  const successIds = [];
+  let failedCount = 0;
+  for (const slot of state.selectedSlots){
+    try{
+      const res = await fetch(`${BOOKING_API}/api/booking/request?t=${encodeURIComponent(token)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ parentName, playerName, note, date: slot.date, time: slot.time })
+      });
+      if (!res.ok) throw new Error("failed");
+      const data = await res.json();
+      successIds.push(data.id);
+    } catch(e){
+      failedCount++;
+    }
   }
+  state.submitting = false;
+  if (!successIds.length){ state.error = "submit-failed"; render(); return; }
+  state.submitted = true; state.submittedIds = successIds; state.failedCount = failedCount; render();
 }
 
 function renderStatusView(){
@@ -166,20 +197,24 @@ function renderStatusView(){
     loadStatus();
     return;
   }
-  if (!state.statusResult){
+  if (!state.statusResults || !state.statusResults.length){
     app.innerHTML = `<div class="state"><h2>Couldn't find that request</h2><p>The link may be out of date. Ask your coach directly if you're unsure.</p></div>`;
     return;
   }
-  const r = state.statusResult;
-  const when = `${fmtDateLabel(r.date)} at ${fmtTimeLabel(r.time)}`;
-  const statusLabel = r.status === "approved" ? "Confirmed" : r.status === "declined" ? "Not confirmed" : "Still pending";
-  const statusColor = r.status === "approved" ? "#10b981" : r.status === "declined" ? "#ef5350" : "#f59e0b";
-  app.innerHTML = `<div class="card confirmCard">
-    <div class="tick" style="background:${statusColor}22;color:${statusColor}">${r.status==="approved"?"✓":r.status==="declined"?"✕":"…"}</div>
-    <h2 style="margin:0 0 6px">${statusLabel}</h2>
-    <p style="color:var(--muted);margin:0">${esc(r.playerName)} — ${esc(when)}</p>
-    ${r.status==="pending"?`<p style="color:var(--muted);font-size:13px;margin-top:14px">Your coach hasn't responded yet — check back later.</p>`:""}
-  </div>`;
+  const oneCard = (r) => {
+    const when = `${fmtDateLabel(r.date)} at ${fmtTimeLabel(r.time)}`;
+    const statusLabel = r.status === "approved" ? "Confirmed" : r.status === "declined" ? "Not confirmed" : "Still pending";
+    const statusColor = r.status === "approved" ? "#10b981" : r.status === "declined" ? "#ef5350" : "#f59e0b";
+    return `<div class="card" style="margin-bottom:10px;display:flex;align-items:center;gap:12px">
+      <div class="tick" style="background:${statusColor}22;color:${statusColor};width:38px;height:38px;font-size:17px;margin:0">${r.status==="approved"?"✓":r.status==="declined"?"✕":"…"}</div>
+      <div>
+        <div style="font-weight:700">${statusLabel}</div>
+        <div style="color:var(--muted);font-size:13px">${esc(r.playerName)} — ${esc(when)}</div>
+      </div>
+    </div>`;
+  };
+  const headerLabel = state.statusResults.length === 1 ? "Your Request" : `Your ${state.statusResults.length} Requests`;
+  app.innerHTML = `<h1 class="coachName" style="font-size:20px">${headerLabel}</h1>${state.statusResults.map(oneCard).join("")}`;
 }
 function esc(s){
   const d = document.createElement("div"); d.textContent = String(s); return d.innerHTML;
@@ -187,12 +222,13 @@ function esc(s){
 async function loadStatus(){
   try{
     const res = await fetch(`${BOOKING_API}/api/booking/status?t=${encodeURIComponent(token)}&check=${encodeURIComponent(checkId)}`);
-    if (!res.ok){ state.statusResult = null; state.statusLoaded = true; render(); return; }
-    state.statusResult = await res.json();
+    if (!res.ok){ state.statusResults = null; state.statusLoaded = true; render(); return; }
+    const data = await res.json();
+    state.statusResults = data.results || null;
     state.statusLoaded = true;
     render();
   } catch(e){
-    state.statusResult = null; state.statusLoaded = true; render();
+    state.statusResults = null; state.statusLoaded = true; render();
   }
 }
 
