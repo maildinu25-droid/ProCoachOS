@@ -663,6 +663,8 @@ function icon(name,size){
  const paths={
  home:'<path d="M3 11.5 12 4l9 7.5"/><path d="M5.5 10v9.5a1 1 0 0 0 1 1H10v-6h4v6h3.5a1 1 0 0 0 1-1V10"/>',
  plus:'<path d="M12 5v14M5 12h14"/>',
+ refresh:'<polyline points="23 4 23 10 17 10"/><polyline points="1 20 1 14 7 14"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/>',
+ target:'<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5.2"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/>',
  sessions:'<rect x="4" y="3" width="16" height="18" rx="2.5"/><line x1="8" y1="8.5" x2="16" y2="8.5"/><line x1="8" y1="12.5" x2="16" y2="12.5"/><line x1="8" y1="16.5" x2="12.5" y2="16.5"/>',
  reflections:'<path d="M21 11.5a8.4 8.4 0 0 1-8.6 8.4H12a8.4 8.4 0 0 1-4.4-1.3L3 20l1.8-4.6A8.4 8.4 0 0 1 21 11.5z"/>',
  players:'<path d="M16.5 20.5v-1.8a3.7 3.7 0 0 0-3.7-3.7H6.9a3.7 3.7 0 0 0-3.7 3.7v1.8"/><circle cx="10.2" cy="7.8" r="3.7"/><path d="M21 20.5v-1.8a3.7 3.7 0 0 0-2.8-3.6"/><path d="M15 4.3a3.7 3.7 0 0 1 0 7.2"/>',
@@ -687,7 +689,7 @@ function icon(name,size){
  };
  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px">${paths[name]||""}</svg>`;
 }
-const PAGE_ICONS={dashboard:icon("home",20),sessions:icon("sessions",20),reflections:icon("reflections",20),players:icon("players",20),assessments:icon("assessments",20),drills:icon("drills",20),matches:icon("trophy",20),analysisTools:icon("search",20),reports:icon("reports",20),booking:icon("clock",20),calendar:icon("calendar",20),organisation:icon("layers",20),account:icon("account",20)};
+const PAGE_ICONS={dashboard:icon("home",20),sessions:icon("sessions",20),reflections:icon("reflections",20),players:icon("players",20),assessments:icon("assessments",20),drills:icon("drills",20),matches:icon("trophy",20),analysisTools:icon("target",20),reports:icon("reports",20),booking:icon("clock",20),calendar:icon("calendar",20),organisation:icon("layers",20),account:icon("account",20)};
 const BOTTOM_NAV_ITEMS=["dashboard","players","__new__","sessions","reports"];
 const BOTTOM_NAV_LABELS={dashboard:"Dashboard",players:"Players",sessions:"Sessions",reports:"Reports"};
 function bottomNav(){
@@ -709,11 +711,31 @@ function backupStatusBadge(){
 function bookingPendingCount(){
  return bookingState.requests.filter(b=>b.status==="pending").length;
 }
-function totalPendingCount(){
+function getPendingItems(){
  let reflectionToday=db.reflections.some(r=>r.date===today());
  let assessmentToday=db.assessments.some(a=>a.date===today());
  let unassessedCount=db.players.filter(p=>!db.assessments.some(a=>a.player===p.name)).length;
- return (reflectionToday?0:1)+(assessmentToday?0:1)+(unassessedCount>0?1:0)+bookingPendingCount();
+ let reassessDueCount=db.players.filter(p=>{
+  let pa=db.assessments.filter(a=>a.player===p.name);
+  if(!pa.length)return false;
+  let latestDate=pa.map(a=>a.date).filter(Boolean).sort().slice(-1)[0];
+  if(!latestDate)return false;
+  let daysSince=Math.floor((new Date(today()+"T00:00:00Z")-new Date(latestDate+"T00:00:00Z"))/86400000);
+  return daysSince>=30;
+ }).length;
+ let workloadCount=workloadFlagPlayerNames().length;
+ let bookingCount=bookingPendingCount();
+ let items=[];
+ if(!reflectionToday)items.push({text:"Log today's reflection",action:"go('reflections');newReflection()"});
+ if(!assessmentToday)items.push({text:"Log a player assessment",action:"go('assessments');newAssessment()"});
+ if(unassessedCount>0)items.push({text:`${unassessedCount} player${unassessedCount!==1?"s":""} awaiting first assessment`,action:"assessPendingPlayers()"});
+ if(reassessDueCount>0)items.push({text:`${reassessDueCount} player${reassessDueCount!==1?"s":""} due for reassessment`,action:"reassessDuePlayers()"});
+ if(workloadCount>0)items.push({text:`${workloadCount} player${workloadCount!==1?"s":""} with back-to-back match workload`,action:"showWorkloadFlags()"});
+ if(bookingCount>0)items.push({text:`${bookingCount} pending booking request${bookingCount!==1?"s":""}`,action:"go('booking')"});
+ return items;
+}
+function totalPendingCount(){
+ return getPendingItems().length;
 }
 function refreshNotificationBadge(){
  let btn=document.querySelector(".bellBtn:not(.whatsNewBtn)");
@@ -864,7 +886,7 @@ const CHANGELOG=[
   "Bulk-archive unused assessment metrics in one tap instead of one at a time.",
   "Assessment Coverage heatmap and Skill Trends (improving/stagnant/declining) added to the Assessment Report.",
   "Copy Last Session's Plan to start a new session from your most recent one.",
-  "A new Quick Add button for adding a player, session, assessment, or match in one tap."
+  "A new Refresh button next to search — useful if the app's on your Home Screen, where there's no other way to pull a fresh update."
  ]},
  {date:"2026-09-13",items:[
   "Custom assessment metrics — add your own rating metric to any discipline, with an option to archive ones you no longer use.",
@@ -890,38 +912,19 @@ function refreshWhatsNewBadge(){
  let btn=document.querySelector(".whatsNewBtn");
  if(btn)btn.innerHTML=`${icon("star",16)}${hasUnseenChangelog()?`<span class="badge"></span>`:""}`;
 }
-function openQuickAdd(){
- let items=[
-  {text:"New Player",action:"go('players');newPlayer()"},
-  {text:"New Session Plan",action:"go('sessions');newSession()"},
-  {text:"New Assessment",action:"go('assessments');newAssessment()"},
-  {text:"New Match",action:"go('matches');newMatch()"},
- ];
- modal(`<div class="sheetHead"><h2>Quick Add</h2><button class="x" onclick="closeM()">×</button></div>
- <div class="list">${items.map(i=>`<div class="item" style="cursor:pointer" onclick="closeM();${i.action}"><div><b>${esc(i.text)}</b></div></div>`).join("")}</div>`);
+function forceRefreshApp(){
+ // A plain location.reload() isn't reliable here — iOS Safari (especially
+ // in standalone Home Screen mode, where there's no pull-to-refresh or URL
+ // bar at all) can still serve an already-cached copy on a normal reload.
+ // Appending a fresh, unique query param forces every caching layer
+ // (browser HTTP cache, any CDN in front of GitHub Pages) to treat this as
+ // a genuinely new request and fetch the real, current file from origin.
+ let params=new URLSearchParams(location.search);
+ params.set("_r",Date.now());
+ location.href=location.pathname+"?"+params.toString()+location.hash;
 }
 function openNotifications(){
- let reflectionToday=db.reflections.some(r=>r.date===today());
- let assessmentToday=db.assessments.some(a=>a.date===today());
- let unassessedCount=db.players.filter(p=>!db.assessments.some(a=>a.player===p.name)).length;
- let reassessDueCount=db.players.filter(p=>{
-  let pa=db.assessments.filter(a=>a.player===p.name);
-  if(!pa.length)return false;
-  let latestDate=pa.map(a=>a.date).filter(Boolean).sort().slice(-1)[0];
-  if(!latestDate)return false;
-  let daysSince=Math.floor((new Date(today()+"T00:00:00Z")-new Date(latestDate+"T00:00:00Z"))/86400000);
-  return daysSince>=30;
- }).length;
- let workloadFlaggedNames=workloadFlagPlayerNames();
- let workloadCount=workloadFlaggedNames.length;
- let items=[];
- if(!reflectionToday)items.push({text:"Log today's reflection",action:"go('reflections');newReflection()"});
- if(!assessmentToday)items.push({text:"Log a player assessment",action:"go('assessments');newAssessment()"});
- if(unassessedCount>0)items.push({text:`${unassessedCount} player${unassessedCount!==1?"s":""} awaiting first assessment`,action:"assessPendingPlayers()"});
- if(reassessDueCount>0)items.push({text:`${reassessDueCount} player${reassessDueCount!==1?"s":""} due for reassessment`,action:"reassessDuePlayers()"});
- if(workloadCount>0)items.push({text:`${workloadCount} player${workloadCount!==1?"s":""} with back-to-back match workload`,action:"showWorkloadFlags()"});
- let bookingCount=bookingPendingCount();
- if(bookingCount>0)items.push({text:`${bookingCount} pending booking request${bookingCount!==1?"s":""}`,action:"go('booking')"});
+ let items=getPendingItems();
  modal(`<div class="sheetHead"><h2>Pending Items</h2><button class="x" onclick="closeM()">×</button></div>
  <div class="list">${items.length?items.map(i=>`<div class="item" style="cursor:pointer" onclick="closeM();${i.action}"><div><b>${esc(i.text)}</b></div></div>`).join(""):empty("Nothing pending — you're all caught up!")}</div>`);
 }
@@ -990,7 +993,7 @@ function dashboard(){
  <button class="bellBtn whatsNewBtn" onclick="openWhatsNew()" aria-label="What's new">${icon("star",16)}${hasUnseenChangelog()?`<span class="badge"></span>`:""}</button>
  <button class="bellBtn" onclick="openNotifications()" aria-label="Pending items">${icon("bell",17)}${pendingCount?`<span class="badge">${pendingCount}</span>`:""}</button>
  <button class="searchIconBtn" onclick="openGlobalSearch()" aria-label="Search">${icon("search",16)}</button>
- <button class="bellBtn" onclick="openQuickAdd()" aria-label="Quick add">${icon("plus",18)}</button>
+ <button class="bellBtn" onclick="forceRefreshApp()" aria-label="Refresh app">${icon("refresh",17)}</button>
  </div>
  </div>
  ${(daysSinceActivity!==null&&daysSinceActivity>=5)?`<div class="card" style="margin-top:12px;border:1px solid var(--red);background:var(--redTint)"><b style="color:var(--red)">It's been ${daysSinceActivity} days since anything was logged</b><div class="muted" style="margin-top:4px">No sessions, reflections, assessments or matches recorded since ${esc(fmtDate(lastActivityDate))}. A quick log now keeps your trends and reports meaningful.</div></div>`:""}
