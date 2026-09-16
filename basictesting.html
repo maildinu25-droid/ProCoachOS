@@ -639,6 +639,7 @@ function initApp(){
   db.tournaments=Array.isArray(db.tournaments)?db.tournaments:[];
   db.sessionTemplates=Array.isArray(db.sessionTemplates)?db.sessionTemplates:[];
   db.seasons=Array.isArray(db.seasons)?db.seasons:[];
+  db.events=Array.isArray(db.events)?db.events:[];
   db.teams.forEach(t=>{if(!t.id)t.id=uid("team")});
   db.tournaments.forEach(t=>{if(!t.id)t.id=uid("tourn");if(!Array.isArray(t.fixtures))t.fixtures=[];if(!Array.isArray(t.squadPlayerIds))t.squadPlayerIds=[]});
   db.seasons.forEach(s=>{if(!s.id)s.id=uid("season");if(!Array.isArray(s.phases))s.phases=[]});
@@ -1099,12 +1100,32 @@ function sessions(){
  }).join("")}</div>`:empty("No sessions match your search.")}</div>`;
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
+function attendanceOptionsHtml(s,teamFilter,checkedOverride){
+ let players=teamFilter?activePlayers().filter(p=>p.team===teamFilter):activePlayers();
+ if(!players.length)return `<div class="muted">${teamFilter?"No players in this team yet.":"No players yet — add players to enable attendance tracking."}</div>`;
+ return `<div class="skillPick">${players.map(p=>{
+  let isChecked=checkedOverride?checkedOverride.includes(p.name):(s.attendees||[]).includes(p.name);
+  return `<label><input type="checkbox" name="attendees" value="${esc(p.name)}" ${isChecked?"checked":""} onchange="updateFormSectionCount('attendance','marked present')"> ${esc(p.name)}</label>`;
+ }).join("")}</div>`;
+}
+function updateAttendanceForTeam(teamName){
+ let checkedNow=[...document.querySelectorAll('input[name="attendees"]:checked')].map(cb=>cb.value);
+ let container=document.getElementById("attendanceListInner");
+ if(container)container.innerHTML=attendanceOptionsHtml({},teamName,checkedNow);
+ updateFormSectionCount("attendance","marked present");
+}
 function toggleSessionType(val){
  document.getElementById("sessionTypeTeamWrap").style.display=val==="team"?"":"none";
  document.getElementById("sessionTypePlayerWrap").style.display=val==="player"?"":"none";
  document.getElementById("sessionTypeCustomWrap").style.display=val==="custom"?"":"none";
  let attWrap=document.getElementById("sessionAttendanceWrap");
  if(attWrap)attWrap.style.display=val==="player"?"none":"";
+ if(val==="team"){
+  let teamSelect=document.querySelector('select[name="squadTeam"]');
+  updateAttendanceForTeam(teamSelect?teamSelect.value:"");
+ } else {
+  updateAttendanceForTeam("");
+ }
 }
 function sessionFormHtml(s,mode){
  s=s||{};
@@ -1119,14 +1140,14 @@ function sessionFormHtml(s,mode){
  <label>Session title <span class="muted" style="font-weight:400">(optional)</span><input name="title" value="${esc(s.title||"")}" placeholder="Leave blank to show time + squad instead"></label>
  <label class="full">Session type<select name="sessionType" id="sessionTypeSelect" onchange="toggleSessionType(this.value)"><option value="team" ${sType==="team"?"selected":""}>Team / Squad session</option><option value="player" ${sType==="player"?"selected":""}>Individual Player (1-on-1)</option><option value="custom" ${sType==="custom"?"selected":""}>Custom Group</option></select></label>
  ${mode==="new"?`<div class="full"><label><input type="checkbox" id="sessionRepeatCheck" onchange="document.getElementById('sessionRepeatWeeksWrap').style.display=this.checked?'':'none'" style="width:auto;margin-right:6px">Repeat this session weekly</label><div id="sessionRepeatWeeksWrap" style="display:none;margin-top:8px"><label>For how many weeks (including this one)<input type="number" id="sessionRepeatWeeks" min="2" max="26" value="4"></label></div></div>`:""}
- <div class="full" id="sessionTypeTeamWrap" style="${sType==="team"?"":"display:none"}"><label>Team<select name="squadTeam">${db.teams.length?db.teams.map(t=>`<option value="${esc(t.name)}" ${s.squad===t.name?"selected":""}>${esc(t.name)}</option>`).join(""):`<option value="">No teams yet — add one in Teams & Seasons</option>`}</select></label></div>
+ <div class="full" id="sessionTypeTeamWrap" style="${sType==="team"?"":"display:none"}"><label>Team<select name="squadTeam" onchange="updateAttendanceForTeam(this.value)">${db.teams.length?db.teams.map(t=>`<option value="${esc(t.name)}" ${s.squad===t.name?"selected":""}>${esc(t.name)}</option>`).join(""):`<option value="">No teams yet — add one in Teams & Seasons</option>`}</select></label></div>
  <div class="full" id="sessionTypePlayerWrap" style="${sType==="player"?"":"display:none"}"><label>Player<select name="sessionPlayerId">${activePlayers().length?activePlayers().map(p=>`<option value="${p.id}" ${s.sessionPlayerId===p.id?"selected":""}>${esc(p.name)}</option>`).join(""):`<option value="">No players yet — add one in Players</option>`}</select></label></div>
  <div class="full" id="sessionTypeCustomWrap" style="${sType==="custom"?"":"display:none"}"><label>Group name<input name="squadCustom" value="${esc(squadCustomVal)}" placeholder="e.g. Weekend intensive group"></label></div>
  <label>Duration (minutes)<input type="number" name="duration" value="${esc(s.duration||90)}"></label>
  <label>Primary focus<select name="focus">${["Batting","Bowling","Fielding","Wicketkeeping","Team","Fitness"].map(f=>`<option ${s.focus===f?"selected":""}>${f}</option>`).join("")}</select></label>
  <label>Venue<input name="venue" list="venueDatalist" value="${esc(s.venue||"")}"><datalist id="venueDatalist">${venueOptions()}</datalist></label>
  <div class="full" id="sessionAttendanceWrap" style="${sType==="player"?"display:none":""}">${formSectionHead("attendance","Attendance",false)}
- <div id="formSec-attendance" style="display:none;margin-top:10px">${activePlayers().length?`<div class="skillPick">${activePlayers().map(p=>`<label><input type="checkbox" name="attendees" value="${esc(p.name)}" ${(s.attendees||[]).includes(p.name)?"checked":""} onchange="updateFormSectionCount('attendance','marked present')"> ${esc(p.name)}</label>`).join("")}</div>`:`<div class="muted">No players yet — add players to enable attendance tracking.</div>`}</div>
+ <div id="formSec-attendance" style="display:none;margin-top:10px"><div id="attendanceListInner">${attendanceOptionsHtml(s,sType==="team"?(s.squad||(db.teams[0]&&db.teams[0].name)||""):"")}</div></div>
  </div>
  <div class="full">${formSectionHead("objectiveTags","Objective Categories",false)}
  <div id="formSec-objectiveTags" style="display:none;margin-top:10px"><div class="chipGrid2">${OBJECTIVE_CATEGORIES.map(c=>`<label><input type="checkbox" name="objectiveTags" value="${esc(c)}" ${(s.objectiveTags||[]).includes(c)?"checked":""} onchange="updateFormSectionCount('objectiveTags','selected')"> ${esc(c)}</label>`).join("")}</div></div>
