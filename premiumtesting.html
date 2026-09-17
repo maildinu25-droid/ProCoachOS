@@ -1229,6 +1229,17 @@ function copyLastSessionPlan(){
  let form=document.querySelector('form[onsubmit*="saveSession"]');
  if(!form)return;
  let setVal=(name,val)=>{let el=form.querySelector(`[name="${name}"]`);if(el)el.value=val||""};
+ let lastType=last.sessionType||"custom";
+ let typeSelect=document.getElementById("sessionTypeSelect");
+ if(typeSelect){typeSelect.value=lastType;toggleSessionType(lastType)}
+ if(lastType==="team"){
+  let teamSelect=form.querySelector('select[name="squadTeam"]');
+  if(teamSelect){teamSelect.value=last.squad||"";updateAttendanceForTeam(teamSelect.value)}
+ } else if(lastType==="custom"){
+  setVal("squadCustom",last.squad);
+ } else if(lastType==="player"){
+  setVal("sessionPlayerId",last.sessionPlayerId);
+ }
  setVal("duration",last.duration);setVal("focus",last.focus);setVal("venue",last.venue);
  setVal("objectives",last.objectives);setVal("warmup",last.warmup);setVal("main",last.main);
  setVal("game",last.game);setVal("cues",last.cues);setVal("success",last.success);
