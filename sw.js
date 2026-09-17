@@ -1,9 +1,12 @@
 // ProCoach OS service worker.
 //
-// Purpose: let the app's own shell (app.html) load when there's genuinely no
-// network connection — e.g. mid-session at a ground with no signal — since
-// everything else (players, sessions, assessments) already works offline via
-// IndexedDB. This only needs to solve "can the page itself load," nothing more.
+// Purpose: let the app's own shells load when there's genuinely no network
+// connection — e.g. mid-session at a ground with no signal. This covers the
+// main app plus the three Analysis Tools (Pitch Map, Batting Map, Live
+// Session), since a coach is just as likely, maybe more likely, to open one
+// of those specifically during a session with patchy signal. Each of these
+// already works offline once loaded (local data, no live dependency) — this
+// only solves "can the page itself load in the first place."
 //
 // Strategy: network-first, cache as fallback only. Every load with a real
 // connection always fetches the current file fresh from the server; the
@@ -19,18 +22,28 @@
 // doesn't leave a stale cache lingering for someone who hasn't opened the
 // app in a while.
 
-const CACHE_VERSION = "procoachos-v1";
+const CACHE_VERSION = "procoachos-v2";
+
+// Every real, installable shell this service worker covers. Each entry's
+// filename is also what the fetch handler matches request URLs against, and
+// what a failed shell falls back to caching-wise — matched to its OWN
+// cached copy, never a different tool's shell.
+const SHELL_FILES = ["app.html", "pitchmap.html", "battingmap.html", "livesession.html"];
+
 const PRECACHE_URLS = [
-  "./app.html",
+  ...SHELL_FILES.map((f) => `./${f}`),
+  // app.html's font stack
   "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap",
+  // the Analysis Tools' shared font stack
+  "https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap",
 ];
 
 self.addEventListener("install", (event) => {
   event.waitUntil(
     caches.open(CACHE_VERSION).then((cache) => {
-      // Best-effort — a font or the page itself failing to precache
-      // shouldn't block installation; the fetch handler still falls back
-      // to whatever's genuinely available at request time.
+      // Best-effort — a font or a page itself failing to precache shouldn't
+      // block installation; the fetch handler still falls back to whatever's
+      // genuinely available at request time.
       return Promise.allSettled(PRECACHE_URLS.map((url) => cache.add(url)));
     })
   );
@@ -53,14 +66,14 @@ self.addEventListener("activate", (event) => {
 self.addEventListener("fetch", (event) => {
   const req = event.request;
 
-  // Only handle GET requests for our own app shell and the font assets it
-  // needs — never intercept anything else (the booking Worker's API calls,
+  // Only handle GET requests for our own shells and the font assets they
+  // need — never intercept anything else (the booking Worker's API calls,
   // the QR code image, etc.), so those always behave exactly as if no
   // service worker were present at all.
   if (req.method !== "GET") return;
-  const isAppShell = req.url.includes("/app.html");
+  const matchedShell = SHELL_FILES.find((f) => req.url.includes(`/${f}`));
   const isFontAsset = req.url.startsWith("https://fonts.googleapis.com") || req.url.startsWith("https://fonts.gstatic.com");
-  if (!isAppShell && !isFontAsset) return;
+  if (!matchedShell && !isFontAsset) return;
 
   event.respondWith(
     fetch(req)
@@ -73,13 +86,14 @@ self.addEventListener("fetch", (event) => {
         return networkResponse;
       })
       .catch(() => {
-        // Network genuinely failed — fall back to whatever's cached. For
-        // the app shell specifically, fall back to the plain app.html entry
-        // even if this exact URL (with its own cache-busting query string,
-        // if the refresh button was used) was never itself cached.
+        // Network genuinely failed — fall back to whatever's cached. For a
+        // shell page specifically, fall back to THAT SAME shell's own plain
+        // entry even if this exact URL (with its own cache-busting query
+        // string, if the refresh button was used) was never itself cached —
+        // never a different tool's shell.
         return caches.match(req).then((cached) => {
           if (cached) return cached;
-          if (isAppShell) return caches.match("./app.html");
+          if (matchedShell) return caches.match(`./${matchedShell}`);
           return undefined;
         });
       })

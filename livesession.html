@@ -1747,5 +1747,12 @@ function showPremiumLockedMessage(){
   }
 })();
 </script>
+<script>
+if("serviceWorker" in navigator && /(^|\/)livesession\.html$/.test(location.pathname)){
+ window.addEventListener("load",()=>{
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+ });
+}
+</script>
 </body>
 </html>
