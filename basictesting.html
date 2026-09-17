@@ -293,8 +293,50 @@ function showEmailGate(){
    <label class="full">Email address<input type="email" id="emailGateInput" required placeholder="you@example.com"></label>
    <button class="btn primary full" style="margin-top:14px">Send Verification Code</button>
   </form>
+  <button type="button" class="btn secondary full" style="margin-top:10px" onclick="showEmailGateLicenseKeyForm()">Already have a license key?</button>
   </div>`;
  document.body.appendChild(overlay);
+}
+function showEmailGateLicenseKeyForm(){
+ let overlay=document.getElementById("emailGateOverlay");
+ if(!overlay)return;
+ let card=overlay.querySelector(".card");
+ if(!card)return;
+ card.innerHTML=`<h1 style="margin-top:0;font-size:var(--fs-7)">Enter Your License Key</h1>
+ <p class="muted">Already a Basic or Premium coach? Enter your key below — no trial or email needed.</p>
+ <form onsubmit="submitEmailGateLicenseKey(event)">
+  <label class="full">License key<input type="text" id="emailGateLicenseKeyInput" required placeholder="e.g. PCOS-XXXX-XXXX-XXXX"></label>
+  <button class="btn primary full" style="margin-top:14px">Activate</button>
+ </form>
+ <button type="button" class="btn secondary full" style="margin-top:10px" onclick="showEmailGate()">← Back</button>`;
+}
+async function submitEmailGateLicenseKey(e){
+ e.preventDefault();
+ let input=document.getElementById("emailGateLicenseKeyInput");
+ let key=input?input.value.trim():"";
+ if(!key){alert("Enter a license key.");return}
+ let submitBtn=e&&e.target?e.target.querySelector("button"):null;
+ if(submitBtn){submitBtn.disabled=true;submitBtn.textContent="Checking..."}
+ let{tier,networkError,deviceLimitReached}=await validateLicenseKey(key);
+ if(networkError){
+  if(submitBtn){submitBtn.disabled=false;submitBtn.textContent="Activate"}
+  alert("Couldn't reach the license server. Check your connection and try again.");
+  return;
+ }
+ if(deviceLimitReached){
+  if(submitBtn){submitBtn.disabled=false;submitBtn.textContent="Activate"}
+  alert("This license key is already active on the maximum number of devices. Remove it from another device first, or contact support if you need a higher limit.");
+  return;
+ }
+ if(!tier){
+  if(submitBtn){submitBtn.disabled=false;submitBtn.textContent="Activate"}
+  alert("That license key doesn't look valid. Please check and try again.");
+  return;
+ }
+ let lic={status:tier,licenseKey:key,trialStartedAt:today(),trialEndedNoticeShown:false,email:"",lastRevalidatedAt:Date.now()};
+ saveLicenseState(lic);
+ let overlay=document.getElementById("emailGateOverlay");if(overlay)overlay.remove();
+ nav();renderAll();applyTheme(document.documentElement.classList.contains("light")?"light":"dark");checkPlanTransition();
 }
 const EMAIL_GATE_API="https://coachbook-email.maildinu25.workers.dev/";
 const SEND_CODE_API="https://coachbook-email.maildinu25.workers.dev/send-code";
