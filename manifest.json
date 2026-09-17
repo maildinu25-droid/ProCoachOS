@@ -1,8 +1,25 @@
 {
-  "name": "Cricket Coach OS",
-  "short_name": "Coach OS",
-  "start_url": "/",
+  "name": "ProCoach OS",
+  "short_name": "ProCoach OS",
+  "description": "Cricket coaching companion — session planning, assessments, and player development, on your device.",
+  "start_url": "./app.html",
+  "scope": "./app.html",
   "display": "standalone",
-  "background_color": "#f4f7fa",
-  "theme_color": "#132d46"
+  "background_color": "#08121e",
+  "theme_color": "#08121e",
+  "orientation": "portrait-primary",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
 }

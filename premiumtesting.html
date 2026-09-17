@@ -6,6 +6,11 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#08121e">
 <title>ProCoach OS — Premium Testing</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="ProCoach OS">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
 <style>
@@ -3917,4 +3922,9 @@ function globalSearchResultsHtml(){
 
 function quick(){modal(`<div class="sheetHead"><h2>Create</h2><button class="x" onclick="closeM()">×</button></div><div class="grid g2"><button class="btn secondary" onclick="closeM();newSession()">Session Plan</button><button class="btn secondary" onclick="closeM();newReflection()">Self Reflection</button><button class="btn secondary" onclick="closeM();newPlayer()">Player</button><button class="btn secondary" onclick="closeM();newAssessment()">Assessment</button><button class="btn secondary" onclick="closeM();newDrill()">Drill</button><button class="btn secondary" onclick="closeM();newMatch()">Match</button><button class="btn secondary" onclick="closeM();newCalEvent()">Reminder / Event</button></div>`)}
 function renderAll(){dashboard();sessions();reflections();players();assessments();drills();matches();analysisTools();reports();booking();calendar();organisation();accountPage()}initApp();
+if("serviceWorker" in navigator && /(^|\/)app\.html$/.test(location.pathname)){
+ window.addEventListener("load",()=>{
+  navigator.serviceWorker.register("sw.js").catch(()=>{});
+ });
+}
 </script></body></html>
