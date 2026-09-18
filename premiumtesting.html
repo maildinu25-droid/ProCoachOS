@@ -655,6 +655,12 @@ function idbSet(key,value){
  }));
 }
 function uid(p){return (p||"id")+"_"+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4)}
+function isStandaloneMode(){
+ // iOS Safari uses its own non-standard property; Android/Chrome and other
+ // modern browsers report this through the standard display-mode media
+ // query instead — checking both covers every real device this matters for.
+ return window.navigator.standalone===true||window.matchMedia("(display-mode: standalone)").matches;
+}
 let db;
 function initApp(){
  return idbGet(DB_KEY).then(stored=>{
@@ -1025,6 +1031,8 @@ function dashboard(){
  // backup has ever been made, rather than hiding this warning forever
  // after a single tap.
  let showBackupNotice=hasRealData&&!lastBackupDash&&dismissedDaysAgo>=14;
+ let homeScreenDismissed=localStorage.getItem("coachbook_homescreen_notice_dismissed")==="1";
+ let showHomeScreenNotice=!isStandaloneMode()&&!homeScreenDismissed&&window.innerWidth<=850;
 
  dashboardEl.innerHTML=`
  ${showBackupNotice?`<div class="card" style="border-color:var(--blue2);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
@@ -1034,6 +1042,18 @@ function dashboard(){
  <button class="btn primary" onclick="exportBackup()">Export Backup</button>
  </div>
  </div>`:""}
+ ${showHomeScreenNotice?(hasRealData?`<div class="card" style="border-color:var(--blue2);margin-bottom:14px">
+ <b>Add ProCoach OS to your Home Screen</b>
+ <div class="muted" style="font-size:var(--fs-2);margin-top:2px">It opens faster and works without signal at the ground. One thing first — Home Screen installs use separate storage from your browser, so back up your data before switching, then restore it on the new icon.</div>
+ <div class="muted" style="font-size:var(--fs-2);margin-top:8px">1. Export a backup below &nbsp;·&nbsp; 2. Share → Add to Home Screen &nbsp;·&nbsp; 3. Open the new icon and restore from Account &amp; Backup</div>
+ <div style="display:flex;gap:8px;margin-top:10px">
+ <button class="btn secondary" onclick="localStorage.setItem('coachbook_homescreen_notice_dismissed','1');dashboard()">Later</button>
+ <button class="btn primary" onclick="exportBackup()">Export Backup</button>
+ </div>
+ </div>`:`<div class="card" style="border-color:var(--blue2);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+ <div><b>Add ProCoach OS to your Home Screen</b><div class="muted" style="font-size:var(--fs-2);margin-top:2px">It opens instantly and works without signal at the ground — tap Share, then Add to Home Screen.</div></div>
+ <button class="btn secondary" style="flex-shrink:0" onclick="localStorage.setItem('coachbook_homescreen_notice_dismissed','1');dashboard()">Got it</button>
+ </div>`):""}
  <div class="homeHeader">
  <div><div class="homeGreeting">${greetingWord()}, <b>${esc(profile.name||"Coach")}</b> 👋</div><div class="homeSub">${esc(fmtCalDate(today()))}</div></div>
  <div style="display:flex;gap:8px;align-items:center">
