@@ -20,8 +20,10 @@ self.addEventListener('push', (event) => {
   const options = {
     body: payload.body || '',
     data: { url: payload.url || './' },
-    // No icon/badge set deliberately — no real app icon image exists yet.
-    // Browsers fall back to a generic icon until one is provided.
+    icon: './icon-512.png',
+    // No badge set — Android expects a simple monochrome silhouette for
+    // this specifically (it gets auto-tinted), and using the full-color
+    // icon here would likely look worse than omitting it.
     tag: payload.tag || undefined,
   };
   event.waitUntil(self.registration.showNotification(payload.title || 'ProCoach OS Academy', options));
