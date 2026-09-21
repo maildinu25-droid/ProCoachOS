@@ -37,7 +37,7 @@ input[type=range]{accent-color:var(--g);width:100%;height:6px;padding:0;backgrou
 .voiceBtn:hover{background:var(--surface);color:var(--ink)}
 .voiceBtn.listening{background:var(--red);color:#fff;border-color:var(--red);animation:voicePulse 1.2s infinite}
 @keyframes voicePulse{0%{box-shadow:0 0 0 0 var(--redGlow)}70%{box-shadow:0 0 0 8px transparent}100%{box-shadow:0 0 0 0 transparent}}
-.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:flex-end;justify-content:center}.modal.open{display:flex}.sheet{background:var(--surface);width:min(780px,100%);max-height:92vh;max-height:92dvh;overflow:auto;border-radius:22px 22px 0 0;padding:22px}.sheetHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.sheetHead h2{margin:0}.x{border:0;border-radius:50%;width:38px;height:38px;background:var(--surface2);color:var(--ink)}.rating{display:grid;grid-template-columns:1fr 80px;gap:10px;align-items:center;margin:8px 0}.skillPick{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}.skillPick label{display:flex;flex-direction:row;align-items:center;border:1px solid var(--line);padding:10px;border-radius:10px}.skillPick input{width:auto}.chipGrid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 18px}.chipGrid2 label{display:flex;flex-direction:row;align-items:center;border:1px solid var(--line);padding:10px;border-radius:10px;font-size:var(--fs-3)}.chipGrid2 input{width:auto;flex-shrink:0}.fab{position:fixed;right:22px;bottom:22px;width:58px;height:58px;border:0;border-radius:50%;background:var(--g);color:#fff;font-size:30px;z-index:30}
+.modal{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;align-items:flex-end;justify-content:center}.modal.open{display:flex}.sheet{background:var(--surface);width:min(780px,100%);max-height:92vh;max-height:92dvh;overflow:auto;border-radius:22px 22px 0 0;padding:22px}.sheetHead{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px}.sheetHead h2{margin:0}.x{border:0;border-radius:50%;width:38px;height:38px;background:var(--surface2);color:var(--ink)}.rating{display:grid;grid-template-columns:1fr 80px;gap:10px;align-items:center;margin:8px 0}.skillPick{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 18px}.skillPick label{display:flex;flex-direction:row;align-items:center;border:1px solid var(--line);padding:10px;border-radius:10px}.skillPick input{width:auto}.matchEntryTable{width:100%;border-collapse:collapse;font-size:var(--fs-2)}.matchEntryTable th{text-align:left;padding:4px 3px;font-size:var(--fs-1);color:var(--muted);font-weight:600}.matchEntryTable td{padding:3px 2px;vertical-align:middle;border-bottom:1px solid var(--line)}.matchEntryTable select,.matchEntryTable input{width:100%;padding:6px 4px;font-size:var(--fs-2);min-width:0}.matchEntryTable .miniBtn{width:26px;height:26px;padding:0;border-radius:6px;background:var(--surface2);border:1px solid var(--line);color:var(--ink);flex-shrink:0}.matchEntryWrap{overflow-x:auto}.chipGrid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 18px}.chipGrid2 label{display:flex;flex-direction:row;align-items:center;border:1px solid var(--line);padding:10px;border-radius:10px;font-size:var(--fs-3)}.chipGrid2 input{width:auto;flex-shrink:0}.fab{position:fixed;right:22px;bottom:22px;width:58px;height:58px;border:0;border-radius:50%;background:var(--g);color:#fff;font-size:30px;z-index:30}
 .report{background:#fff;color:#18211e}.report h1{color:var(--g)}.report h2{margin-top:24px}.report .card{background:#fbfbfa;border-color:#e2e8e4}.report .item{border-color:#e2e8e4;background:#fff;color:#18211e}.report .empty{border-color:#cfd8d2;color:#707a76}.reportTable{width:100%;border-collapse:collapse}.reportTable th,.reportTable td{border-bottom:1px solid #e2e8e4;padding:9px;text-align:left;vertical-align:top}.reportActions{position:sticky;bottom:0;background:#fff;padding:12px 0}
 #dashboard.page{padding:0}
 .homeScroll{padding-bottom:20px}
@@ -2216,13 +2216,59 @@ function matches(){
 }
 function matchCardHtml(m){return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div><b>${esc(m.team||"My Team")} vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.date||"")} ${m.venue?"· "+esc(m.venue):""} ${m.format?"· "+esc(m.format):""}</div></div><span class="tag">${esc(matchResultOutcome(m))}</span></div><p>${esc(m.result||"No result recorded")}</p>${(m.battingReview&&m.battingReview.length)||(m.bowlingReview&&m.bowlingReview.length)?`<div class="muted">${(m.battingReview&&m.battingReview.length)?m.battingReview.length+" batting entries":""}${(m.battingReview&&m.battingReview.length)&&(m.bowlingReview&&m.bowlingReview.length)?" · ":""}${(m.bowlingReview&&m.bowlingReview.length)?m.bowlingReview.length+" bowling entries":""}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary" onclick="matchReportView('${m.id}')">Report</button><button class="btn secondary" onclick="editMatch('${m.id}')">Edit</button><button class="btn secondary" onclick="duplicateMatch('${m.id}')">Duplicate</button><button class="btn danger" onclick="delMatch('${m.id}')">Delete</button></div></div>`}
 
-function battingRowHtml(row,i){return `<div class="item" style="align-items:flex-start"><div class="formgrid" style="flex:1"><label>Batter<input value="${esc(row.name||"")}" list="matchPlayersDatalist" oninput="matchDraft.batting[${i}].name=this.value"></label><label>Runs<input type="number" value="${esc(row.runs||"")}" oninput="matchDraft.batting[${i}].runs=this.value"></label><label>Balls<input type="number" value="${esc(row.balls||"")}" oninput="matchDraft.batting[${i}].balls=this.value"></label><label>Dismissal<input value="${esc(row.dismissal||"")}" oninput="matchDraft.batting[${i}].dismissal=this.value" placeholder="e.g. c&b, lbw, not out"></label><label class="full">Notes<textarea oninput="matchDraft.batting[${i}].notes=this.value">${esc(row.notes||"")}</textarea></label></div><button type="button" class="btn danger" onclick="removeBattingRow(${i})">×</button></div>`}
-function renderBattingRows(){document.getElementById("battingRows").innerHTML=matchDraft.batting.length?matchDraft.batting.map(battingRowHtml).join(""):empty("No batting entries yet.");enhanceTextareasWithVoice(document.getElementById("battingRows"))}
-function addBattingRow(){matchDraft.batting.push({name:"",runs:"",balls:"",dismissal:"",notes:""});renderBattingRows()}
+const DISMISSAL_TYPES=["Not out","Bowled","Caught","LBW","Run out","Stumped","Hit wicket","Retired hurt","Other"];
+let battingNotesOpen=new WeakSet(),bowlingNotesOpen=new WeakSet();
+function currentXINames(){return [...document.querySelectorAll('input[name="playingXI"]:checked')].map(cb=>cb.value)}
+function nameOptionsHtml(currentName,xiNames){
+ let names=[...xiNames];
+ if(currentName&&!names.includes(currentName))names.push(currentName);
+ return `<option value="">— Select —</option>${names.map(n=>`<option ${n===currentName?"selected":""}>${esc(n)}</option>`).join("")}`;
+}
+function battingRowHtml(row,i){
+ let dismissal=row.dismissal||"";
+ let isStandard=DISMISSAL_TYPES.includes(dismissal);
+ let selected=isStandard?dismissal:"Other";
+ let notesOpen=battingNotesOpen.has(row)||!!row.notes;
+ return `<tr>
+  <td><select onchange="matchDraft.batting[${i}].name=this.value">${nameOptionsHtml(row.name,currentXINames())}</select></td>
+  <td><input type="number" value="${esc(row.runs||"")}" oninput="matchDraft.batting[${i}].runs=this.value"></td>
+  <td><input type="number" value="${esc(row.balls||"")}" oninput="matchDraft.batting[${i}].balls=this.value"></td>
+  <td><select onchange="updateBattingDismissal(${i},this.value)">${DISMISSAL_TYPES.map(d=>`<option ${selected===d?"selected":""}>${d}</option>`).join("")}</select></td>
+  <td style="white-space:nowrap"><button type="button" class="miniBtn" onclick="toggleBattingNotes(${i})">✎</button></td>
+ </tr>
+ ${selected==="Other"?`<tr><td colspan="5"><input style="width:100%" placeholder="Describe dismissal" value="${esc(isStandard?"":dismissal)}" oninput="matchDraft.batting[${i}].dismissal=this.value"></td></tr>`:""}
+ ${notesOpen?`<tr><td colspan="5"><textarea rows="1" style="width:100%;min-height:36px" placeholder="Notes (optional)" oninput="matchDraft.batting[${i}].notes=this.value">${esc(row.notes||"")}</textarea></td></tr>`:""}`;
+}
+function updateBattingDismissal(i,value){
+ matchDraft.batting[i].dismissal=value==="Other"?"":value;
+ renderBattingRows();
+}
+function toggleBattingNotes(i){
+ let row=matchDraft.batting[i];
+ if(battingNotesOpen.has(row))battingNotesOpen.delete(row);else battingNotesOpen.add(row);
+ renderBattingRows();
+}
+function renderBattingRows(){document.getElementById("battingRows").innerHTML=matchDraft.batting.length?matchDraft.batting.map(battingRowHtml).join(""):`<tr><td colspan="5">${empty("No batting entries yet.")}</td></tr>`;enhanceTextareasWithVoice(document.getElementById("battingRows"))}
+function addBattingRow(){matchDraft.batting.push({name:"",runs:"",balls:"",dismissal:"Not out",notes:""});renderBattingRows()}
 function removeBattingRow(i){matchDraft.batting.splice(i,1);renderBattingRows()}
 
-function bowlingRowHtml(row,i){return `<div class="item" style="align-items:flex-start"><div class="formgrid" style="flex:1"><label>Bowler<input value="${esc(row.name||"")}" list="matchPlayersDatalist" oninput="matchDraft.bowling[${i}].name=this.value"></label><label>Overs<input type="number" step="0.1" inputmode="decimal" value="${esc(row.overs||"")}" oninput="matchDraft.bowling[${i}].overs=this.value"></label><label>Runs conceded<input type="number" value="${esc(row.runs||"")}" oninput="matchDraft.bowling[${i}].runs=this.value"></label><label>Wickets<input type="number" value="${esc(row.wickets||"")}" oninput="matchDraft.bowling[${i}].wickets=this.value"></label><label class="full">Notes<textarea oninput="matchDraft.bowling[${i}].notes=this.value">${esc(row.notes||"")}</textarea></label></div><button type="button" class="btn danger" onclick="removeBowlingRow(${i})">×</button></div>`}
-function renderBowlingRows(){document.getElementById("bowlingRows").innerHTML=matchDraft.bowling.length?matchDraft.bowling.map(bowlingRowHtml).join(""):empty("No bowling entries yet.");enhanceTextareasWithVoice(document.getElementById("bowlingRows"))}
+function bowlingRowHtml(row,i){
+ let notesOpen=bowlingNotesOpen.has(row)||!!row.notes;
+ return `<tr>
+  <td><select onchange="matchDraft.bowling[${i}].name=this.value">${nameOptionsHtml(row.name,currentXINames())}</select></td>
+  <td><input type="number" step="0.1" inputmode="decimal" value="${esc(row.overs||"")}" oninput="matchDraft.bowling[${i}].overs=this.value"></td>
+  <td><input type="number" value="${esc(row.runs||"")}" oninput="matchDraft.bowling[${i}].runs=this.value"></td>
+  <td><input type="number" value="${esc(row.wickets||"")}" oninput="matchDraft.bowling[${i}].wickets=this.value"></td>
+  <td style="white-space:nowrap"><button type="button" class="miniBtn" onclick="toggleBowlingNotes(${i})">✎</button></td>
+ </tr>
+ ${notesOpen?`<tr><td colspan="5"><textarea rows="1" style="width:100%;min-height:36px" placeholder="Notes (optional)" oninput="matchDraft.bowling[${i}].notes=this.value">${esc(row.notes||"")}</textarea></td></tr>`:""}`;
+}
+function toggleBowlingNotes(i){
+ let row=matchDraft.bowling[i];
+ if(bowlingNotesOpen.has(row))bowlingNotesOpen.delete(row);else bowlingNotesOpen.add(row);
+ renderBowlingRows();
+}
+function renderBowlingRows(){document.getElementById("bowlingRows").innerHTML=matchDraft.bowling.length?matchDraft.bowling.map(bowlingRowHtml).join(""):`<tr><td colspan="5">${empty("No bowling entries yet.")}</td></tr>`;enhanceTextareasWithVoice(document.getElementById("bowlingRows"))}
 function addBowlingRow(){matchDraft.bowling.push({name:"",overs:"",runs:"",wickets:"",notes:""});renderBowlingRows()}
 function removeBowlingRow(i){matchDraft.bowling.splice(i,1);renderBowlingRows()}
 
@@ -2289,12 +2335,11 @@ ${matchSectionHead("teamreview","Team Review",false)}
 ${matchSectionHead("xi","Playing XI",false)}
 <div id="matchSec-xi" style="display:none;margin-top:10px">
 <div class="muted" style="font-size:var(--fs-3);margin-bottom:8px">Who actually played this match — so match counts in Player Reports are accurate even for players who fielded but didn't bat or bowl.</div>
-${activePlayers().length?`<button type="button" class="btn secondary" style="margin-bottom:10px" onclick="copyLastPlayingXI()">Copy from last match</button><div class="skillPick">${activePlayers().map(p=>`<label style="${p.available==="no"?"opacity:.55":""}"><input type="checkbox" name="playingXI" value="${esc(p.name)}" ${(m.playingXI||[]).includes(p.name)?"checked":""}> ${esc(p.name)}${p.available==="no"?` <span class="muted">(unavailable)</span>`:""}</label>`).join("")}</div>`:`<div class="muted">No players yet — add players to select a Playing XI.</div>`}
+${activePlayers().length?`<button type="button" class="btn secondary" style="margin-bottom:10px" onclick="copyLastPlayingXI()">Copy from last match</button><div class="skillPick">${activePlayers().map(p=>`<label style="${p.available==="no"?"opacity:.55":""}"><input type="checkbox" name="playingXI" value="${esc(p.name)}" onchange="renderBattingRows();renderBowlingRows()" ${(m.playingXI||[]).includes(p.name)?"checked":""}> ${esc(p.name)}${p.available==="no"?` <span class="muted">(unavailable)</span>`:""}</label>`).join("")}</div>`:`<div class="muted">No players yet — add players to select a Playing XI.</div>`}
 </div>
 ${matchSectionHead("batting","Batting Review",false)}
 <div id="matchSec-batting" style="display:none;margin-top:10px">
-<datalist id="matchPlayersDatalist">${activePlayers().map(p=>`<option value="${esc(p.name)}">`).join("")}</datalist>
-<div id="battingRows"></div>
+<div class="matchEntryWrap"><table class="matchEntryTable"><thead><tr><th style="width:44%">Batter</th><th style="width:15%">R</th><th style="width:15%">B</th><th style="width:20%">Dismissal</th><th style="width:34px"></th></tr></thead><tbody id="battingRows"></tbody></table></div>
 <button type="button" class="btn secondary" style="margin:10px 0" onclick="addBattingRow()">+ Add batter</button>
 <div class="card" style="margin-top:10px">
 ${BATTING_METRICS.map((metric,i)=>sliderRow(metric,`batRating_${i}`,(m.battingRatings&&m.battingRatings[metric])||5)).join("")}
@@ -2303,7 +2348,7 @@ ${BATTING_METRICS.map((metric,i)=>sliderRow(metric,`batRating_${i}`,(m.battingRa
 </div>
 ${matchSectionHead("bowling","Bowling Review",false)}
 <div id="matchSec-bowling" style="display:none;margin-top:10px">
-<div id="bowlingRows"></div>
+<div class="matchEntryWrap"><table class="matchEntryTable"><thead><tr><th style="width:50%">Bowler</th><th style="width:15%">Ov</th><th style="width:15%">R</th><th style="width:14%">W</th><th style="width:34px"></th></tr></thead><tbody id="bowlingRows"></tbody></table></div>
 <button type="button" class="btn secondary" style="margin:10px 0" onclick="addBowlingRow()">+ Add bowler</button>
 <div class="card" style="margin-top:10px">
 ${BOWLING_METRICS.map((metric,i)=>sliderRow(metric,`bowlRating_${i}`,(m.bowlingRatings&&m.bowlingRatings[metric])||5)).join("")}
@@ -2328,6 +2373,7 @@ ${matchSectionHead("learnings","Key Learnings & Training Actions",false)}
 
 function openMatchForm(existing,mode){
  matchDraft={batting:existing&&existing.battingReview?JSON.parse(JSON.stringify(existing.battingReview)):[],bowling:existing&&existing.bowlingReview?JSON.parse(JSON.stringify(existing.bowlingReview)):[]};
+ battingNotesOpen=new WeakSet();bowlingNotesOpen=new WeakSet();
  editingMatchId=mode==="edit"?existing.id:null;
  modal(matchFormHtml(existing,mode));
  renderBattingRows();renderBowlingRows();
@@ -2344,6 +2390,7 @@ function copyLastPlayingXI(){
  if(!matches.length){alert("No previous match with a Playing XI found.");return}
  let lastXI=matches[0].playingXI;
  document.querySelectorAll('input[name="playingXI"]').forEach(cb=>{cb.checked=lastXI.includes(cb.value)});
+ renderBattingRows();renderBowlingRows();
 }
 function editMatch(id){let m=db.matches.find(x=>x.id===id);if(!m)return;openMatchForm(m,"edit")}
 function duplicateMatch(id){let src=db.matches.find(x=>x.id===id);if(!src)return;let m=JSON.parse(JSON.stringify(src));delete m.id;m.date=today();openMatchForm(m,"duplicate")}
