@@ -1242,11 +1242,23 @@ function openSessionForm(existing,mode){
 }
 function newSession(){openSessionForm(null,"new")}
 function editSession(id){let s=db.sessions.find(x=>x.id===id);if(!s)return;openSessionForm(s,"edit")}
+function findSessionConflict(s,excludeId){
+ if(!s.date||!s.time)return null;
+ let toMinutes=t=>{let[h,m]=String(t).split(":").map(Number);return h*60+(m||0)};
+ let startA=toMinutes(s.time),endA=startA+(Number(s.duration)||60);
+ return activeSessions().find(other=>{
+  if(other.id===excludeId||other.date!==s.date||!other.time)return false;
+  let startB=toMinutes(other.time),endB=startB+(Number(other.duration)||60);
+  return startA<endB&&startB<endA;
+ })||null;
+}
 function saveSession(e){
  e.preventDefault();
  if(!requireWriteAccess())return;
  let fd=new FormData(e.target);
  let s=Object.fromEntries(fd);
+ let conflict=findSessionConflict(s,editingSessionId);
+ if(conflict&&!confirm(`This overlaps with "${sessionLabel(conflict)}" at ${conflict.time} on the same day. Save anyway?`))return;
  let sessionType=fd.get("sessionType")||"team";
  s.sessionType=sessionType;
  if(sessionType==="team"){
@@ -1803,6 +1815,56 @@ function deletePlayerGoal(playerId,goalId){
  p.goals=p.goals.filter(x=>x.id!==goalId);
  save();playerView(playerId);
 }
+function computePlayerMatchPatterns(p){
+ let matches=playerMatches(p);
+ let battingEntries=matches.map(m=>{let r=(m.battingReview||[]).find(x=>x.name===p.name);return r?{...r,date:m.date}:null}).filter(Boolean);
+ let bowlingEntries=matches.map(m=>{let r=(m.bowlingReview||[]).find(x=>x.name===p.name);return r?{...r,date:m.date}:null}).filter(Boolean);
+ let flags=[];
+
+ if(battingEntries.length>=3){
+  let recentDismissals=battingEntries.slice(0,3).map(r=>r.dismissal).filter(d=>d&&d!=="Not out");
+  if(recentDismissals.length===3&&recentDismissals[0]===recentDismissals[1]&&recentDismissals[1]===recentDismissals[2]){
+   flags.push({text:`Out ${recentDismissals[0].toLowerCase()} in each of the last 3 innings — worth a technical look.`,tone:"watch"});
+  }
+ }
+ if(battingEntries.length>=4){
+  let allRuns=battingEntries.map(r=>Number(r.runs)||0);
+  let overallAvg=allRuns.reduce((a,b)=>a+b,0)/allRuns.length;
+  let recentArr=allRuns.slice(0,3);
+  let recentAvg=recentArr.reduce((a,b)=>a+b,0)/recentArr.length;
+  if(overallAvg>=5&&recentAvg<overallAvg*0.5){
+   flags.push({text:`Averaging ${recentAvg.toFixed(1)} across the last 3 innings, well below their overall average of ${overallAvg.toFixed(1)}.`,tone:"watch"});
+  } else if(overallAvg>=5&&recentAvg>overallAvg*1.5){
+   flags.push({text:`Averaging ${recentAvg.toFixed(1)} across the last 3 innings, well above their overall average of ${overallAvg.toFixed(1)}.`,tone:"good"});
+  }
+ }
+ if(bowlingEntries.length>=3){
+  let recentWickets=bowlingEntries.slice(0,3);
+  if(recentWickets.every(r=>Number(r.wickets||0)===0)){
+   flags.push({text:`No wickets in the last 3 bowling spells.`,tone:"watch"});
+  }
+ }
+ if(bowlingEntries.length>=3){
+  let econOf=r=>{let overs=Number(r.overs)||0,runs=Number(r.runs)||0;return overs>0?runs/overs:null};
+  let allEcon=bowlingEntries.map(econOf).filter(e=>e!==null);
+  if(allEcon.length>=3){
+   let overallEcon=allEcon.reduce((a,b)=>a+b,0)/allEcon.length;
+   let recentArr=allEcon.slice(0,3);
+   let recentEcon=recentArr.reduce((a,b)=>a+b,0)/recentArr.length;
+   if(overallEcon>0&&recentEcon>overallEcon*1.4){
+    flags.push({text:`Economy has crept up to ${recentEcon.toFixed(1)} in recent spells, up from their usual ${overallEcon.toFixed(1)}.`,tone:"watch"});
+   } else if(overallEcon>0&&recentEcon<overallEcon*0.7){
+    flags.push({text:`Economy has improved to ${recentEcon.toFixed(1)} in recent spells, down from their usual ${overallEcon.toFixed(1)}.`,tone:"good"});
+   }
+  }
+ }
+ return flags;
+}
+function matchPatternsHtml(p){
+ let flags=computePlayerMatchPatterns(p);
+ if(!flags.length)return "";
+ return `<h2 class="section">Match Patterns</h2><div class="card">${flags.map(f=>`<p style="margin:6px 0;color:${f.tone==="watch"?"var(--red)":"var(--muted)"}">${f.tone==="watch"?"⚠ ":""}${esc(f.text)}</p>`).join("")}</div>`;
+}
 function playerViewBody(p,forPrint){
  let assessments=playerAssessments(p);
  let latest=assessments.slice(-1)[0];
@@ -1820,6 +1882,7 @@ function playerViewBody(p,forPrint){
  ${latest?`<h2 class="section">Latest assessment</h2><div class="card"><b>Overall ${assessmentAvg(latest)}/10</b><br>${assessmentDisciplines(latest).map(d=>`<span class="tag">${d} ${disciplineAvg(latest,d)}/10</span>`).join("")}</div>${assessmentDetailHTML(latest)}`:""}
  <h2 class="section">Assessment history (${assessments.length})</h2>${assessments.length?`<div class="card">${assessments.map(a=>`<div class="item"><div><b>${esc(fmtDate(a.date))}</b><div class="muted">Overall ${assessmentAvg(a)}/10</div>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div></div>`).join("")}</div>`:empty("No assessments yet.")}
  <h2 class="section">Session attendance (${sessions.length})</h2>${sessions.length?`<div class="card">${sessions.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}</div></div></div>`).join("")}</div>`:empty("No recorded attendance yet.")}
+ ${matchPatternsHtml(p)}
  <h2 class="section">Match history (${matches.length})</h2>${matches.length?`<div class="card">${matches.map(m=>{let bat=(m.battingReview||[]).find(r=>r.name===p.name);let bowl=(m.bowlingReview||[]).find(r=>r.name===p.name);return `<div class="item"><div><b>vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(fmtDate(m.date))}${bat?" · "+esc(bat.runs||0)+"("+esc(bat.balls||0)+")":""}${bowl?" · "+esc(bowl.wickets||0)+"/"+esc(bowl.runs||0):""}</div></div><button class="btn secondary" onclick="closeM();matchReportView('${m.id}')">Report</button></div>`}).join("")}</div>`:empty("No match entries yet.")}`;
 }
 function playerView(id){let p=db.players.find(x=>x.id===id);if(!p)return;modal(`<div class="sheetHead"><h2>${esc(p.name)}</h2><button class="x" onclick="closeM()">×</button></div>${playerViewBody(p)}<button class="btn secondary" style="margin-top:14px" onclick="playerProfileReport('${p.id}')">Print Profile</button>
@@ -2217,21 +2280,25 @@ function matches(){
 }
 function matchCardHtml(m){return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div><b>${esc(m.team||"My Team")} vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.date||"")} ${m.venue?"· "+esc(m.venue):""} ${m.format?"· "+esc(m.format):""}</div></div><span class="tag">${esc(matchResultOutcome(m))}</span></div><p>${esc(m.result||"No result recorded")}</p>${(m.battingReview&&m.battingReview.length)||(m.bowlingReview&&m.bowlingReview.length)?`<div class="muted">${(m.battingReview&&m.battingReview.length)?m.battingReview.length+" batting entries":""}${(m.battingReview&&m.battingReview.length)&&(m.bowlingReview&&m.bowlingReview.length)?" · ":""}${(m.bowlingReview&&m.bowlingReview.length)?m.bowlingReview.length+" bowling entries":""}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary" onclick="matchReportView('${m.id}')">Report</button><button class="btn secondary" onclick="editMatch('${m.id}')">Edit</button><button class="btn secondary" onclick="duplicateMatch('${m.id}')">Duplicate</button><button class="btn danger" onclick="delMatch('${m.id}')">Delete</button></div></div>`}
 
-const DISMISSAL_TYPES=["Not out","Bowled","Caught","LBW","Run out","Stumped","Hit wicket","Retired hurt","Other"];
+const DISMISSAL_TYPES=["Not out","Bowled","Caught","Caught and bowled","LBW","Run out","Stumped","Hit wicket","Retired hurt","Other"];
 let battingNotesOpen=new WeakSet(),bowlingNotesOpen=new WeakSet();
 function currentXINames(){return [...document.querySelectorAll('input[name="playingXI"]:checked')].map(cb=>cb.value)}
-function nameOptionsHtml(currentName,xiNames){
+function nameOptionsHtml(currentName,xiNames,takenNames){
  let names=[...xiNames];
  if(currentName&&!names.includes(currentName))names.push(currentName);
- return `<option value="">— Select —</option>${names.map(n=>`<option ${n===currentName?"selected":""}>${esc(n)}</option>`).join("")}`;
+ return `<option value="">— Select —</option>${names.map(n=>{
+  let isTaken=takenNames.includes(n)&&n!==currentName;
+  return `<option value="${esc(n)}" ${n===currentName?"selected":""} ${isTaken?"disabled":""}>${esc(n)}${isTaken?" (already added)":""}</option>`;
+ }).join("")}`;
 }
 function battingRowHtml(row,i){
  let dismissal=row.dismissal||"";
  let isStandard=DISMISSAL_TYPES.includes(dismissal);
  let selected=isStandard?dismissal:"Other";
  let notesOpen=battingNotesOpen.has(row)||!!row.notes;
+ let takenNames=matchDraft.batting.filter((r,idx)=>idx!==i).map(r=>r.name).filter(Boolean);
  return `<tr>
-  <td><select onchange="matchDraft.batting[${i}].name=this.value">${nameOptionsHtml(row.name,currentXINames())}</select></td>
+  <td><select onchange="matchDraft.batting[${i}].name=this.value;renderBattingRows()">${nameOptionsHtml(row.name,currentXINames(),takenNames)}</select></td>
   <td><input type="number" value="${esc(row.runs||"")}" oninput="matchDraft.batting[${i}].runs=this.value"></td>
   <td><input type="number" value="${esc(row.balls||"")}" oninput="matchDraft.batting[${i}].balls=this.value"></td>
   <td><select onchange="updateBattingDismissal(${i},this.value)">${DISMISSAL_TYPES.map(d=>`<option ${selected===d?"selected":""}>${d}</option>`).join("")}</select></td>
@@ -2255,8 +2322,9 @@ function removeBattingRow(i){matchDraft.batting.splice(i,1);renderBattingRows()}
 
 function bowlingRowHtml(row,i){
  let notesOpen=bowlingNotesOpen.has(row)||!!row.notes;
+ let takenNames=matchDraft.bowling.filter((r,idx)=>idx!==i).map(r=>r.name).filter(Boolean);
  return `<tr>
-  <td><select onchange="matchDraft.bowling[${i}].name=this.value">${nameOptionsHtml(row.name,currentXINames())}</select></td>
+  <td><select onchange="matchDraft.bowling[${i}].name=this.value;renderBowlingRows()">${nameOptionsHtml(row.name,currentXINames(),takenNames)}</select></td>
   <td><input type="number" step="0.1" inputmode="decimal" value="${esc(row.overs||"")}" oninput="matchDraft.bowling[${i}].overs=this.value"></td>
   <td><input type="number" value="${esc(row.runs||"")}" oninput="matchDraft.bowling[${i}].runs=this.value"></td>
   <td><input type="number" value="${esc(row.wickets||"")}" oninput="matchDraft.bowling[${i}].wickets=this.value"></td>
@@ -3909,6 +3977,47 @@ function booking(){
  el.innerHTML=head("Booking","Let parents/players request a 1-on-1 slot against your real availability — no back-and-forth.")
   +errorHtml+linkSectionHtml+availabilitySectionHtml+exceptionsSectionHtml+pendingSectionHtml+historySectionHtml;
 }
+function icsEscape(str){return String(str||"").replace(/\\/g,"\\\\").replace(/,/g,"\\,").replace(/;/g,"\\;").replace(/\n/g,"\\n")}
+function icsTimedDate(dateStr,timeStr,addMinutes){
+ let d=new Date(`${dateStr}T${timeStr||"00:00"}:00`);
+ if(addMinutes)d.setMinutes(d.getMinutes()+addMinutes);
+ let pad=n=>String(n).padStart(2,"0");
+ return `${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}T${pad(d.getHours())}${pad(d.getMinutes())}00`;
+}
+function exportCalendarICS(){
+ let lines=["BEGIN:VCALENDAR","VERSION:2.0","PRODID:-//ProCoach OS//Calendar Export//EN","CALSCALE:GREGORIAN"];
+ activeSessions().filter(s=>s.date).forEach(s=>{
+  let durMin=Number(s.duration)||60;
+  lines.push("BEGIN:VEVENT");
+  lines.push(`UID:session-${s.id}@procoachos.in`);
+  lines.push(`DTSTAMP:${icsTimedDate(today(),"00:00")}`);
+  lines.push(`DTSTART:${icsTimedDate(s.date,s.time)}`);
+  lines.push(`DTEND:${icsTimedDate(s.date,s.time,durMin)}`);
+  lines.push(`SUMMARY:${icsEscape(sessionLabel(s))}`);
+  if(s.venue)lines.push(`LOCATION:${icsEscape(s.venue)}`);
+  lines.push("END:VEVENT");
+ });
+ db.matches.filter(m=>m.date).forEach(m=>{
+  let dateCompact=m.date.replace(/-/g,"");
+  let nextDay=new Date(m.date+"T00:00:00");nextDay.setDate(nextDay.getDate()+1);
+  let pad=n=>String(n).padStart(2,"0");
+  let nextDayCompact=`${nextDay.getFullYear()}${pad(nextDay.getMonth()+1)}${pad(nextDay.getDate())}`;
+  lines.push("BEGIN:VEVENT");
+  lines.push(`UID:match-${m.id}@procoachos.in`);
+  lines.push(`DTSTAMP:${icsTimedDate(today(),"00:00")}`);
+  lines.push(`DTSTART;VALUE=DATE:${dateCompact}`);
+  lines.push(`DTEND;VALUE=DATE:${nextDayCompact}`);
+  lines.push(`SUMMARY:${icsEscape("Match vs "+(m.opp||"Opposition"))}`);
+  if(m.venue)lines.push(`LOCATION:${icsEscape(m.venue)}`);
+  lines.push("END:VEVENT");
+ });
+ lines.push("END:VCALENDAR");
+ let blob=new Blob([lines.join("\r\n")],{type:"text/calendar"});
+ let url=URL.createObjectURL(blob);
+ let a=document.createElement("a");a.href=url;a.download="ProCoach-OS-Calendar-"+today()+".ics";
+ document.body.appendChild(a);a.click();document.body.removeChild(a);
+ URL.revokeObjectURL(url);
+}
 function accountPage(){
  let profiles=getProfiles();
  let active=getActiveProfile();
@@ -3968,6 +4077,7 @@ function accountPage(){
  <button class="btn primary" onclick="exportBackup()">Export Backup (.json)</button>
  <label class="btn secondary" style="cursor:pointer">Restore from Backup<input type="file" accept="application/json" style="display:none" onchange="handleRestoreFile(this)"></label>
  <button class="btn secondary" onclick="exportExcel()">Export Excel</button>
+ <button class="btn secondary" onclick="exportCalendarICS()">Export Calendar (.ics)</button>
  </div>
  ${lastBackup?`<div class="muted" style="margin-top:8px">Last backup: ${esc(lastBackup)}</div>`:""}
  </div>
