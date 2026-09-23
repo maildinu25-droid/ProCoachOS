@@ -2059,6 +2059,12 @@ function stepBulkAssessmentRating(playerName,skillIndex,delta){
 function renderBulkAssessmentGrid(){
  let box=document.getElementById("bulkAssessmentBody");
  if(!box)return;
+ // Re-rendering replaces the table's markup entirely, which would
+ // otherwise silently reset horizontal scroll back to the first column
+ // every time a rating is stepped — capture and restore it here so the
+ // grid only moves when the coach actually scrolls it.
+ let existingWrap=box.querySelector(".matchEntryWrap");
+ let scrollLeft=existingWrap?existingWrap.scrollLeft:0;
  let discipline=bulkAssessmentDraft.discipline;
  let skills=allSkillsFor(discipline).filter(s=>!isSkillArchived(discipline,s));
  let players=activePlayers();
@@ -2069,6 +2075,8 @@ function renderBulkAssessmentGrid(){
  }).join("")}</tr>`).join("")}
  </tbody></table></div>
  <button class="btn primary full" style="margin-top:14px" onclick="saveBulkAssessment()">Save ${players.length} Assessments</button>`;
+ let newWrap=box.querySelector(".matchEntryWrap");
+ if(newWrap)newWrap.scrollLeft=scrollLeft;
 }
 function saveBulkAssessment(){
  if(!requireWriteAccess())return;
