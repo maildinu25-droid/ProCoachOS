@@ -298,6 +298,7 @@ function showEmailGate(){
   <button type="button" class="btn secondary full" style="margin-top:10px" onclick="showEmailGateLicenseKeyForm()">Already have a license key?</button>
   </div>`;
  document.body.appendChild(overlay);
+ document.getElementById("emailGateInput").focus();
 }
 function showEmailGateLicenseKeyForm(){
  let overlay=document.getElementById("emailGateOverlay");
@@ -311,6 +312,7 @@ function showEmailGateLicenseKeyForm(){
   <button class="btn primary full" style="margin-top:14px">Activate</button>
  </form>
  <button type="button" class="btn secondary full" style="margin-top:10px" onclick="showEmailGate()">← Back</button>`;
+ document.getElementById("emailGateLicenseKeyInput").focus();
 }
 async function submitEmailGateLicenseKey(e){
  e.preventDefault();
@@ -403,6 +405,7 @@ function showEmailGateStep2(email){
   <button class="btn primary full" style="margin-top:14px">Verify &amp; Start Trial</button>
  </form>
  <button type="button" class="btn secondary full" style="margin-top:10px" onclick="resendEmailGateCode()">Resend Code</button>`;
+ document.getElementById("emailGateCodeInput").focus();
 }
 async function resendEmailGateCode(){
  if(!pendingVerificationEmail)return;
@@ -662,6 +665,28 @@ function isStandaloneMode(){
  // query instead — checking both covers every real device this matters for.
  return window.navigator.standalone===true||window.matchMedia("(display-mode: standalone)").matches;
 }
+async function checkTodaysSessionReminder(){
+ // This is a LOCAL notification — shown directly by this device when the
+ // app happens to be open, not a server push. Session-plan data never
+ // leaves this device, so there is nothing server-side to trigger this
+ // from while the app is closed, unlike the booking push notifications.
+ if(!("serviceWorker" in navigator)||typeof Notification==="undefined"||Notification.permission!=="granted")return;
+ let todaysSessions=activeSessions().filter(s=>s.date===today());
+ if(!todaysSessions.length)return;
+ let flagKey="coachbook_reminder_shown_"+today();
+ if(localStorage.getItem(flagKey))return;
+ let hour=new Date().getHours();
+ if(hour<5||hour>=11)return; // only fires as a genuine "this morning" reminder
+ try{
+  let reg=await navigator.serviceWorker.ready;
+  let title=todaysSessions.length===1?"Session today":`${todaysSessions.length} sessions today`;
+  let body=todaysSessions.length===1
+   ?sessionLabel(todaysSessions[0])
+   :todaysSessions.map(s=>s.time).filter(Boolean).sort().join(", ");
+  await reg.showNotification(title,{body,icon:"icon-192.png",badge:"icon-192.png",data:{url:"./app.html"}});
+  localStorage.setItem(flagKey,"1");
+ }catch(e){}
+}
 let db;
 function initApp(){
  return idbGet(DB_KEY).then(stored=>{
@@ -700,6 +725,7 @@ function initApp(){
   if(needsEmailGate()){showEmailGate()}
   else{
    nav();renderAll();applyTheme(document.documentElement.classList.contains("light")?"light":"dark");checkPlanTransition();revalidateLicenseIfNeeded();
+   checkTodaysSessionReminder();
    // Restore whichever page was open before this load — iOS can fully
    // reload a standalone Home Screen app when returning from a
    // window.open() tool (e.g. opening an Analysis Tool and closing it),
@@ -815,7 +841,16 @@ function applyTheme(t){
  if(meta)meta.setAttribute("content",t==="light"?"#f4f6f5":"#08121e");
 }
 function toggleTheme(){applyTheme(document.documentElement.classList.contains("light")?"dark":"light")}
-function modal(h){sheet.innerHTML=h;modalEl.classList.add("open");enhanceTextareasWithVoice(sheet)}function closeM(){modalEl.classList.remove("open")}const modalEl=document.getElementById("modal"),sheet=document.getElementById("sheet"),side=document.getElementById("side");modalEl.onclick=e=>{if(e.target===modalEl)closeM()}
+function autoFocusFirstField(container){
+ // A generic, one-time hook covering every current and future form, rather
+ // than editing each template individually — far less risk of missing one
+ // or subtly breaking a form's markup along the way.
+ let selector='input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([disabled]):not([readonly]), textarea:not([disabled]):not([readonly]), select:not([disabled])';
+ let candidates=[...container.querySelectorAll(selector)];
+ let target=candidates.find(el=>el.offsetParent!==null);
+ if(target)target.focus({preventScroll:true});
+}
+function modal(h){sheet.innerHTML=h;modalEl.classList.add("open");enhanceTextareasWithVoice(sheet);autoFocusFirstField(sheet)}function closeM(){modalEl.classList.remove("open")}const modalEl=document.getElementById("modal"),sheet=document.getElementById("sheet"),side=document.getElementById("side");modalEl.onclick=e=>{if(e.target===modalEl)closeM()}
 const SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
 let activeVoice=null;
 function enhanceTextareasWithVoice(container){
@@ -1167,18 +1202,24 @@ function sessions(){
  }).join("")}</div>`:empty("No sessions match your search.")}</div>`;
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
-function attendanceOptionsHtml(s,teamFilter,checkedOverride){
+function attendanceOptionsHtml(s,teamFilter,checkedOverride,defaultAllChecked){
  let players=teamFilter?activePlayers().filter(p=>p.team===teamFilter):activePlayers();
  if(!players.length)return `<div class="muted">${teamFilter?"No players in this team yet.":"No players yet — add players to enable attendance tracking."}</div>`;
+ // Priority: an explicit override (e.g. switching teams mid-form) > a
+ // session's own real saved attendance, even if it's genuinely empty >
+ // only for a brand-new session with nothing saved yet, default to
+ // everyone checked, since most sessions involve most of the squad.
+ let namesToCheck=checkedOverride?checkedOverride:(Array.isArray(s.attendees)?s.attendees:(defaultAllChecked?players.map(p=>p.name):[]));
  return `<div class="skillPick">${players.map(p=>{
-  let isChecked=checkedOverride?checkedOverride.includes(p.name):(s.attendees||[]).includes(p.name);
+  let isChecked=namesToCheck.includes(p.name);
   return `<label><input type="checkbox" name="attendees" value="${esc(p.name)}" ${isChecked?"checked":""} onchange="updateFormSectionCount('attendance','marked present')"> ${esc(p.name)}</label>`;
  }).join("")}</div>`;
 }
 function updateAttendanceForTeam(teamName){
  let checkedNow=[...document.querySelectorAll('input[name="attendees"]:checked')].map(cb=>cb.value);
  let container=document.getElementById("attendanceListInner");
- if(container)container.innerHTML=attendanceOptionsHtml({},teamName,checkedNow);
+ let defaultAllChecked=checkedNow.length===0&&editingSessionId===null;
+ if(container)container.innerHTML=attendanceOptionsHtml({},teamName,checkedNow.length?checkedNow:null,defaultAllChecked);
  updateFormSectionCount("attendance","marked present");
 }
 function toggleSessionType(val){
@@ -1214,7 +1255,7 @@ function sessionFormHtml(s,mode){
  <label>Primary focus<select name="focus">${["Batting","Bowling","Fielding","Wicketkeeping","Team","Fitness"].map(f=>`<option ${s.focus===f?"selected":""}>${f}</option>`).join("")}</select></label>
  <label>Venue<input name="venue" list="venueDatalist" value="${esc(s.venue||"")}"><datalist id="venueDatalist">${venueOptions()}</datalist></label>
  <div class="full" id="sessionAttendanceWrap" style="${sType==="player"?"display:none":""}">${formSectionHead("attendance","Attendance",false)}
- <div id="formSec-attendance" style="display:none;margin-top:10px"><div id="attendanceListInner">${attendanceOptionsHtml(s,sType==="team"?(s.squad||(db.teams[0]&&db.teams[0].name)||""):"")}</div></div>
+ <div id="formSec-attendance" style="display:none;margin-top:10px"><div id="attendanceListInner">${attendanceOptionsHtml(s,sType==="team"?(s.squad||(db.teams[0]&&db.teams[0].name)||""):"",null,mode==="new")}</div></div>
  </div>
  <div class="full">${formSectionHead("objectiveTags","Objective Categories",false)}
  <div id="formSec-objectiveTags" style="display:none;margin-top:10px"><div class="chipGrid2">${OBJECTIVE_CATEGORIES.map(c=>`<label><input type="checkbox" name="objectiveTags" value="${esc(c)}" ${(s.objectiveTags||[]).includes(c)?"checked":""} onchange="updateFormSectionCount('objectiveTags','selected')"> ${esc(c)}</label>`).join("")}</div></div>
@@ -3647,6 +3688,7 @@ function storageUsageBytes(){
  try{return JSON.stringify(db).length*2}catch(e){return 0}
 }
 let bookingState={availability:{rules:[],blockedDates:[],extraSlots:[]},requests:[],loaded:false,error:null};
+let expandedRecurringGroups=new Set();
 function bookingTokens(){
  return{
   management:localStorage.getItem("coachbook_booking_mgmt_token")||"",
@@ -3728,13 +3770,14 @@ function removeBlockedDate(date){
 function addExtraSlot(){
  let dateInput=document.getElementById("bookingExtraDateInput");
  let timeInput=document.getElementById("bookingExtraTimeInput");
+ let venueInput=document.getElementById("bookingExtraVenueInput");
  if(!dateInput||!timeInput||!dateInput.value||!timeInput.value)return;
  let exists=bookingState.availability.extraSlots.some(s=>s.date===dateInput.value&&s.time===timeInput.value);
  if(!exists){
-  bookingState.availability.extraSlots.push({date:dateInput.value,time:timeInput.value});
+  bookingState.availability.extraSlots.push({date:dateInput.value,time:timeInput.value,venue:venueInput?venueInput.value:""});
   bookingState.availability.extraSlots.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));
  }
- dateInput.value="";timeInput.value="";
+ dateInput.value="";timeInput.value="";if(venueInput)venueInput.value="";
  booking();
 }
 function removeExtraSlot(date,time){
@@ -3750,7 +3793,7 @@ function normalizeAvailabilityRules(){
  });
 }
 function addAvailabilityRule(){
- bookingState.availability.rules.push({days:[],startTime:"16:00",endTime:"18:00",slotMinutes:30});
+ bookingState.availability.rules.push({days:[],startTime:"16:00",endTime:"18:00",slotMinutes:30,venue:""});
  booking();
 }
 function removeAvailabilityRule(idx){
@@ -3856,6 +3899,17 @@ async function respondToBooking(id,decision,confirmedPlayerName){
   alert("Couldn't update this request right now. Check your connection and try again.");
  }
 }
+async function respondToBookingGroup(groupId,decision){
+ if(!requireWriteAccess())return;
+ let matching=bookingState.requests.filter(b=>b.recurringGroupId===groupId&&b.status==="pending");
+ for(let b of matching){
+  await respondToBooking(b.id,decision);
+ }
+}
+function toggleRecurringGroupExpand(groupId){
+ if(expandedRecurringGroups.has(groupId))expandedRecurringGroups.delete(groupId);else expandedRecurringGroups.add(groupId);
+ booking();
+}
 const DAYS_OF_WEEK=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
 function booking(){
  let el=document.getElementById("booking");
@@ -3910,6 +3964,7 @@ function booking(){
     <label>From<input type="time" value="${r.startTime}" onchange="updateAvailabilityRule(${i},'startTime',this.value)"></label>
     <label>To<input type="time" value="${r.endTime}" onchange="updateAvailabilityRule(${i},'endTime',this.value)"></label>
     <label>Slot length<select onchange="updateAvailabilityRule(${i},'slotMinutes',this.value)"><option value="30" ${r.slotMinutes===30?"selected":""}>30 min</option><option value="45" ${r.slotMinutes===45?"selected":""}>45 min</option><option value="60" ${r.slotMinutes===60?"selected":""}>60 min</option></select></label>
+    <label>Venue <span class="muted" style="font-weight:400">(optional)</span><input value="${esc(r.venue||"")}" placeholder="e.g. Main Ground" onchange="updateAvailabilityRule(${i},'venue',this.value)"></label>
     <button type="button" class="btn danger full" onclick="removeAvailabilityRule(${i})">Remove</button>
    </div>
   </div>`;
@@ -3934,7 +3989,7 @@ function booking(){
   :`<p class="muted" style="font-size:var(--fs-1)">No dates blocked.</p>`;
 
  let oneExtraSlotHtml=function(s){
-  return `<div class="item"><span>${esc(fmtDate(s.date))} at ${esc(s.time)}</span><button type="button" class="btn secondary" onclick="removeExtraSlot('${s.date}','${s.time}')">Remove</button></div>`;
+  return `<div class="item"><span>${esc(fmtDate(s.date))} at ${esc(s.time)}${s.venue?" · "+esc(s.venue):""}</span><button type="button" class="btn secondary" onclick="removeExtraSlot('${s.date}','${s.time}')">Remove</button></div>`;
  };
  let extraSlotsListHtml=bookingState.availability.extraSlots.length
   ?bookingState.availability.extraSlots.map(oneExtraSlotHtml).join("")
@@ -3955,16 +4010,42 @@ function booking(){
   <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
    <input type="date" id="bookingExtraDateInput" style="flex:1;min-width:140px">
    <input type="time" id="bookingExtraTimeInput" style="flex:1;min-width:100px">
-   <button type="button" class="btn secondary" onclick="addExtraSlot()">Add This Slot</button>
   </div>
+  <input id="bookingExtraVenueInput" placeholder="Venue (optional)" style="width:100%;margin-top:8px">
+  <button type="button" class="btn secondary full" style="margin-top:8px" onclick="addExtraSlot()">Add This Slot</button>
   <button type="button" class="btn primary full" id="bookingSaveExceptionsBtn" style="margin-top:10px" onclick="saveAvailability()">Save Exceptions</button>
  </div>`;
 
  let onePendingHtml=function(b){
   let noteHtml=b.note?`<p class="muted" style="font-size:var(--fs-2)">"${esc(b.note)}"</p>`:"";
-  return `<div class="card" style="margin-bottom:8px"><b>${esc(b.playerName)}</b> <span class="muted">requested by ${esc(b.parentName)}</span><p style="margin:4px 0">${esc(fmtDate(b.date))} at ${esc(b.time)}</p>${noteHtml}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn primary" onclick="bookingApproveClick('${b.id}')">Approve</button><button class="btn secondary" onclick="respondToBooking('${b.id}','declined')">Decline</button></div></div>`;
+  return `<div class="card" style="margin-bottom:8px"><b>${esc(b.playerName)}</b> <span class="muted">requested by ${esc(b.parentName)}</span><p style="margin:4px 0">${esc(fmtDate(b.date))} at ${esc(b.time)}${b.venue?" · "+esc(b.venue):""}</p>${noteHtml}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn primary" onclick="bookingApproveClick('${b.id}')">Approve</button><button class="btn secondary" onclick="respondToBooking('${b.id}','declined')">Decline</button></div></div>`;
  };
- let pendingListHtml=pending.length?pending.map(onePendingHtml).join(""):empty("No pending requests right now.");
+ let recurringGroups={};
+ let standalonePending=[];
+ pending.forEach(b=>{
+  if(b.recurringGroupId){
+   (recurringGroups[b.recurringGroupId]=recurringGroups[b.recurringGroupId]||[]).push(b);
+  } else standalonePending.push(b);
+ });
+ let oneRecurringGroupHtml=function(bookings){
+  let first=bookings[0];
+  let total=first.recurringTotal||bookings.length;
+  let datesLabel=bookings.map(b=>fmtDate(b.date)).join(", ");
+  let expanded=expandedRecurringGroups.has(first.recurringGroupId);
+  return `<div class="card" style="margin-bottom:8px;border-color:var(--blue2)">
+  <b>${esc(first.playerName)}</b> <span class="muted">requested by ${esc(first.parentName)} — weekly</span>
+  <p style="margin:4px 0">${esc(first.time)}${first.venue?" · "+esc(first.venue):""} — ${bookings.length} of ${total} weeks still pending</p>
+  <p class="muted" style="font-size:var(--fs-1)">${esc(datesLabel)}</p>
+  ${first.note?`<p class="muted" style="font-size:var(--fs-2)">"${esc(first.note)}"</p>`:""}
+  <div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
+   <button class="btn primary" onclick="respondToBookingGroup('${first.recurringGroupId}','approved')">Approve All ${bookings.length}</button>
+   <button class="btn secondary" onclick="respondToBookingGroup('${first.recurringGroupId}','declined')">Decline All</button>
+   <button class="btn secondary" onclick="toggleRecurringGroupExpand('${first.recurringGroupId}')">${expanded?"Hide weeks":"Manage individually"}</button>
+  </div>
+  ${expanded?`<div style="margin-top:10px">${bookings.map(onePendingHtml).join("")}</div>`:""}
+  </div>`;
+ };
+ let pendingListHtml=(Object.values(recurringGroups).map(oneRecurringGroupHtml).join("")+standalonePending.map(onePendingHtml).join(""))||empty("No pending requests right now.");
  let pendingCountLabel=pending.length?`(${pending.length})`:"";
  let pendingSectionHtml=`<h2 class="section">Pending Requests ${pendingCountLabel}</h2>${pendingListHtml}`;
 
