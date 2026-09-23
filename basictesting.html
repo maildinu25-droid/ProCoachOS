@@ -1126,11 +1126,11 @@ function dashboard(){
 
  <div class="bentoTile bento-sm tap" onclick="go('calendar')"><div class="bIcon">${icon("sessions",20)}</div><div><div class="bNum">${todayCount}</div><div class="bLabel">today</div></div></div>
 
- <div class="bentoTile bento-sm tap" onclick="go('players')"><div class="bIcon">${icon("trophy",20)}</div><div><div class="bNum">${unassessedCount}</div><div class="bLabel">awaiting assessment</div></div></div>
+ <div class="bentoTile bento-sm tap" onclick="assessPendingPlayers()"><div class="bIcon">${icon("trophy",20)}</div><div><div class="bNum">${unassessedCount}</div><div class="bLabel">awaiting assessment</div></div></div>
 
  <div class="bentoTile bento-wide">
  <div class="homeSectionTitle">Today <a onclick="go('calendar')">View all</a></div>
- ${todayCount?`${todaySessions.map(s=>`<div class="taskItem"><div class="taskDot done"></div><div class="taskText"><b>${esc(sessionLabel(s))}</b><span>${s.duration?esc(s.duration)+" min":""}</span></div></div>`).join("")}${todayMatches.map(m=>`<div class="taskItem"><div class="taskDot done"></div><div class="taskText"><b>vs ${esc(m.opp||"Opposition")}</b><span>Match day</span></div></div>`).join("")}${todayEvents.map(e=>`<div class="taskItem"><div class="taskDot done"></div><div class="taskText"><b>${esc(e.title)}</b><span>${esc(e.time||e.type||"Event")}</span></div></div>`).join("")}`:empty("Nothing scheduled today.")}
+ ${todayCount?`${todaySessions.map(s=>`<div class="taskItem" style="cursor:pointer" onclick="editSession('${s.id}')"><div class="taskDot done"></div><div class="taskText"><b>${esc(sessionLabel(s))}</b><span>${s.duration?esc(s.duration)+" min":""}</span></div></div>`).join("")}${todayMatches.map(m=>`<div class="taskItem" style="cursor:pointer" onclick="editMatch('${m.id}')"><div class="taskDot done"></div><div class="taskText"><b>vs ${esc(m.opp||"Opposition")}</b><span>Match day</span></div></div>`).join("")}${todayEvents.map(e=>`<div class="taskItem" style="cursor:pointer" onclick="editCalEvent('${e.id}')"><div class="taskDot done"></div><div class="taskText"><b>${esc(e.title)}</b><span>${esc(e.time||e.type||"Event")}</span></div></div>`).join("")}`:empty("Nothing scheduled today.")}
  </div>
 
  <div class="bentoTile bento-wide" id="todayFocusCard">
@@ -2036,13 +2036,67 @@ function toggleArchivedSkillsPanel(d){
 // Old assessments still have 10 stored values — this preserves them exactly as
 // originally entered rather than silently corrupting/relabeling them.
 const legacyBowlingSkills=["Run-up / Approach","Action & Alignment","Accuracy","Length Control","Consistency","Pace / Revolutions","Swing / Seam / Spin","Variations","Tactical Awareness","Execution Under Pressure"];
-function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<button class="btn primary" onclick="newAssessment()">+ New Assessment</button><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(a.date)} · Overall ${assessmentAvg(a)}/10</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="editAssessment('${a.id}')">Edit</button><button class="btn danger" onclick="delAssessment('${a.id}')">×</button></div></div>`).join(""):empty("No assessments yet.")}</div>`}
+let bulkAssessmentDraft={discipline:null,ratings:{}};
+function openBulkAssessment(){
+ if(!activePlayers().length){alert("Add a player first.");return}
+ bulkAssessmentDraft={discipline:null,ratings:{}};
+ modal(`<div class="sheetHead"><h2>Bulk Assess Squad</h2><button class="x" onclick="closeM()">×</button></div>
+ <p class="muted">Pick one skill area to rate across the whole squad in one pass. Each player's last rating for this area is pre-filled — adjust rather than start from scratch.</p>
+ <div class="skillPick">${Object.keys(skillSets).map(d=>`<label><input type="radio" name="bulkDiscipline" value="${d}" onchange="selectBulkDiscipline('${d}')"> ${d}</label>`).join("")}</div>
+ <div id="bulkAssessmentBody"></div>`);
+}
+function bulkCarryForwardFor(playerName,discipline){
+ let prior=db.assessments.filter(a=>a.player===playerName&&a.ratings&&a.ratings[discipline]).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))[0];
+ return prior?prior.ratings[discipline]:null;
+}
+function selectBulkDiscipline(discipline){
+ bulkAssessmentDraft.discipline=discipline;
+ let skills=allSkillsFor(discipline).filter(s=>!isSkillArchived(discipline,s));
+ let players=activePlayers();
+ bulkAssessmentDraft.ratings={};
+ players.forEach(p=>{
+  let oldVals=bulkCarryForwardFor(p.name,discipline);
+  bulkAssessmentDraft.ratings[p.name]=skills.map((s,i)=>oldVals&&oldVals[i]!==undefined?Number(oldVals[i]):5);
+ });
+ renderBulkAssessmentGrid();
+}
+function renderBulkAssessmentGrid(){
+ let box=document.getElementById("bulkAssessmentBody");
+ if(!box)return;
+ let discipline=bulkAssessmentDraft.discipline;
+ let skills=allSkillsFor(discipline).filter(s=>!isSkillArchived(discipline,s));
+ let players=activePlayers();
+ box.innerHTML=`<div class="matchEntryWrap" style="margin-top:12px"><table class="matchEntryTable"><thead><tr><th style="min-width:110px">Player</th>${skills.map(s=>`<th style="min-width:60px;text-align:center">${esc(s)}</th>`).join("")}</tr></thead><tbody>
+ ${players.map((p,pi)=>`<tr><td><b>${esc(p.name)}</b></td>${skills.map((s,si)=>`<td><input type="number" min="1" max="10" style="width:44px;text-align:center" value="${esc(bulkAssessmentDraft.ratings[p.name][si])}" oninput="bulkAssessmentDraft.ratings['${p.name.replace(/'/g,"\\'")}'][${si}]=this.value"></td>`).join("")}</tr>`).join("")}
+ </tbody></table></div>
+ <button class="btn primary full" style="margin-top:14px" onclick="saveBulkAssessment()">Save ${players.length} Assessments</button>`;
+}
+function saveBulkAssessment(){
+ if(!requireWriteAccess())return;
+ let discipline=bulkAssessmentDraft.discipline;
+ if(!discipline)return;
+ let skills=allSkillsFor(discipline).filter(s=>!isSkillArchived(discipline,s));
+ let d=today();
+ activePlayers().forEach(p=>{
+  let vals=bulkAssessmentDraft.ratings[p.name];
+  if(!vals)return;
+  let clamped=skills.map((s,i)=>Math.max(1,Math.min(10,Number(vals[i])||5)));
+  db.assessments.push({
+   id:uid("assess"),player:p.name,date:d,disciplines:[discipline],
+   ratings:{[discipline]:clamped},disciplineNotes:{},priority:"",comments:"",mediaLinks:[]
+  });
+ });
+ save();
+ closeM();
+ assessments();
+}
+function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" onclick="newAssessment()">+ New Assessment</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess Squad</button></div><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(a.date)} · Overall ${assessmentAvg(a)}/10</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="editAssessment('${a.id}')">Edit</button><button class="btn danger" onclick="delAssessment('${a.id}')">×</button></div></div>`).join(""):empty("No assessments yet.")}</div>`}
 function assessmentFormHtml(a,mode){
  a=a||{};
  return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Assessment":"Player Assessment"}</h2><button class="x" onclick="closeM()">×</button></div>
  <form onsubmit="saveAssessment(event)">
  <div class="formgrid">
- <label>Player<select name="player">${activePlayers().map(p=>`<option ${a.player===p.name?"selected":""}>${esc(p.name)}</option>`).join("")}</select></label>
+ <label>Player<select name="player" onchange="renderAssessmentSkills()">${activePlayers().map(p=>`<option ${a.player===p.name?"selected":""}>${esc(p.name)}</option>`).join("")}</select></label>
  <label>Date<input type="date" name="date" value="${esc(a.date||today())}"></label>
  </div>
  <label style="margin-bottom:6px">Choose Skill Areas</label>
@@ -2117,7 +2171,15 @@ function renderAssessmentSkills(){
  let box=document.getElementById("assessmentSkills");
  if(!box)return;
  let sel=[...document.querySelectorAll('input[name="disciplines"]:checked')].map(x=>x.value);
- let existing=editingAssessmentId?db.assessments.find(x=>x.id===editingAssessmentId):null;
+ let selectedPlayerName=document.querySelector('select[name="player"]')?.value;
+ // For an edit, carry forward that exact record's own ratings, as before.
+ // For a genuinely new assessment, carry forward the same player's most
+ // recent past assessment instead of starting every rating from a flat
+ // mid-point default — the coach is adjusting from where they left off,
+ // not re-rating from scratch every time.
+ let existing=editingAssessmentId
+  ?db.assessments.find(x=>x.id===editingAssessmentId)
+  :(selectedPlayerName?db.assessments.filter(x=>x.player===selectedPlayerName).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))[0]:null);
  box.innerHTML=sel.map(d=>{
   let oldVals=(existing&&existing.ratings&&existing.ratings[d])?existing.ratings[d]:null;
   let isLegacyBowling=d==="Bowling"&&oldVals&&oldVals.length===10;
@@ -2360,14 +2422,29 @@ function renderBattingRows(){document.getElementById("battingRows").innerHTML=ma
 function addBattingRow(){matchDraft.batting.push({name:"",runs:"",balls:"",dismissal:"Not out",notes:""});renderBattingRows()}
 function removeBattingRow(i){matchDraft.batting.splice(i,1);renderBattingRows()}
 
+function numberStepperHtml(value,onDecrement,onIncrement,width){
+ return `<div style="display:flex;align-items:center;gap:2px">
+  <button type="button" class="miniBtn" style="width:22px;height:28px;flex-shrink:0;font-size:15px" onclick="${onDecrement}">−</button>
+  <span style="min-width:${width||18}px;text-align:center;font-variant-numeric:tabular-nums">${esc(value)}</span>
+  <button type="button" class="miniBtn" style="width:22px;height:28px;flex-shrink:0;font-size:15px" onclick="${onIncrement}">+</button>
+ </div>`;
+}
+function stepBowlingField(i,field,delta,min,max){
+ let current=Number(matchDraft.bowling[i][field])||0;
+ let next=Math.round((current+delta)*10)/10;
+ if(min!==undefined&&next<min)next=min;
+ if(max!==undefined&&next>max)next=max;
+ matchDraft.bowling[i][field]=next;
+ renderBowlingRows();
+}
 function bowlingRowHtml(row,i){
  let notesOpen=bowlingNotesOpen.has(row)||!!row.notes;
  let takenNames=matchDraft.bowling.filter((r,idx)=>idx!==i).map(r=>r.name).filter(Boolean);
  return `<tr>
   <td><select onchange="matchDraft.bowling[${i}].name=this.value;renderBowlingRows()">${nameOptionsHtml(row.name,currentXINames(),takenNames)}</select></td>
-  <td><input type="number" step="0.1" inputmode="decimal" value="${esc(row.overs||"")}" oninput="matchDraft.bowling[${i}].overs=this.value"></td>
+  <td>${numberStepperHtml(row.overs||0,`stepBowlingField(${i},'overs',-0.1,0)`,`stepBowlingField(${i},'overs',0.1,0)`,24)}</td>
   <td><input type="number" value="${esc(row.runs||"")}" oninput="matchDraft.bowling[${i}].runs=this.value"></td>
-  <td><input type="number" value="${esc(row.wickets||"")}" oninput="matchDraft.bowling[${i}].wickets=this.value"></td>
+  <td>${numberStepperHtml(row.wickets||0,`stepBowlingField(${i},'wickets',-1,0,10)`,`stepBowlingField(${i},'wickets',1,0,10)`,14)}</td>
   <td style="white-space:nowrap"><button type="button" class="miniBtn" onclick="toggleBowlingNotes(${i})">✎</button></td>
  </tr>
  ${notesOpen?`<tr><td colspan="5"><textarea rows="1" style="width:100%;min-height:36px" placeholder="Notes (optional)" oninput="matchDraft.bowling[${i}].notes=this.value">${esc(row.notes||"")}</textarea></td></tr>`:""}`;
@@ -2457,7 +2534,7 @@ ${BATTING_METRICS.map((metric,i)=>sliderRow(metric,`batRating_${i}`,(m.battingRa
 </div>
 ${matchSectionHead("bowling","Bowling Review",false)}
 <div id="matchSec-bowling" style="display:none;margin-top:10px">
-<div class="matchEntryWrap"><table class="matchEntryTable"><thead><tr><th style="width:50%">Bowler</th><th style="width:15%">Ov</th><th style="width:15%">R</th><th style="width:14%">W</th><th style="width:34px"></th></tr></thead><tbody id="bowlingRows"></tbody></table></div>
+<div class="matchEntryWrap"><table class="matchEntryTable"><thead><tr><th style="width:38%">Bowler</th><th style="width:22%">Ov</th><th style="width:15%">R</th><th style="width:22%">W</th><th style="width:34px"></th></tr></thead><tbody id="bowlingRows"></tbody></table></div>
 <button type="button" class="btn secondary" style="margin:10px 0" onclick="addBowlingRow()">+ Add bowler</button>
 <div class="card" style="margin-top:10px">
 ${BOWLING_METRICS.map((metric,i)=>sliderRow(metric,`bowlRating_${i}`,(m.bowlingRatings&&m.bowlingRatings[metric])||5)).join("")}
@@ -2537,12 +2614,12 @@ function matchReportView(id){
  let battingRows=(m.battingReview||[]).map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.runs||"-")}</td><td>${esc(r.balls||"-")}</td><td>${esc(r.dismissal||"-")}</td><td>${esc(r.notes||"")}</td></tr>`).join("");
  let bowlingRows=(m.bowlingReview||[]).map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.overs||"-")}</td><td>${esc(r.runs||"-")}</td><td>${esc(r.wickets||"-")}</td><td>${esc(r.notes||"")}</td></tr>`).join("");
  let metricRows=obj=>Object.entries(obj||{}).map(([k,v])=>`<div class="item"><div>${esc(k)}</div><b>${esc(v)}/10</b></div>`).join("");
- let body=`${tournament?`<div class="tag" style="margin-bottom:10px">🏆 ${esc(tournament.name)}</div>`:""}<div class="grid g4">
+ let body=`${tournament?`<div class="tag" style="margin-bottom:10px">🏆 ${esc(tournament.name)}</div>`:""}<div class="grid g3">
  <div class="card stat"><span>Format</span><b style="font-size:var(--fs-5)">${esc(m.format||"—")}</b></div>
- <div class="card stat"><span>Venue</span><b style="font-size:var(--fs-5)">${esc(m.venue||"—")}</b></div>
  <div class="card stat"><span>Toss</span><b style="font-size:var(--fs-5)">${esc(m.toss||"—")}${m.tossDecision?" · "+esc(m.tossDecision):""}</b></div>
  <div class="card stat"><span>Result</span><b style="font-size:var(--fs-5)">${esc(m.result||"—")}</b></div>
  </div>
+ <div class="card" style="margin-top:12px"><p><b>Venue:</b> ${esc(m.venue||"—")}</p></div>
  <h2>Foundation</h2><div class="card"><p><b>Conditions:</b> ${esc(m.conditions||"—")}</p></div>
  <h2>Batting Review</h2>${battingRows?`<table class="reportTable"><tr><th>Batter</th><th>Runs</th><th>Balls</th><th>Dismissal</th><th>Notes</th></tr>${battingRows}</table>`:empty("No batting entries recorded.")}
  ${m.battingRatings?`<div class="card" style="margin-top:10px"><b>Batting Assessment · ${avgRatingObj(m.battingRatings).toFixed(1)}/10 avg</b>${metricRows(m.battingRatings)}${m.battingAssessmentNotes?`<p style="margin-top:8px">${esc(m.battingAssessmentNotes)}</p>`:""}</div>`:""}
