@@ -347,6 +347,7 @@ const SEND_CODE_API="https://coachbook-email.maildinu25.workers.dev/send-code";
 const VERIFY_CODE_API="https://coachbook-email.maildinu25.workers.dev/verify-code";
 const TRIAL_CHECK_API="https://procoachos-dodo.maildinu25.workers.dev/api/trial/check";
 const BOOKING_API="https://procoachos-booking.maildinu25.workers.dev";
+const VAPID_PUBLIC_KEY="BHq_pmj2jPQrZ76WOGKR7ppOCRtBm_NKPkbKJCLJAbuLyxJNf-5YFofvQFrfHYSCspPMR0xaH5kxc8eqRW9FoKY";
 let pendingVerificationEmail="";
 async function checkTrialEmailUsed(email){
  try{
@@ -3766,6 +3767,70 @@ function storageUsageBytes(){
 }
 let bookingState={availability:{rules:[],blockedDates:[],extraSlots:[]},requests:[],loaded:false,error:null};
 let expandedRecurringGroups=new Set();
+let pushNotificationState="checking"; // "checking" | "unsupported" | "denied" | "off" | "on"
+function urlBase64ToUint8Array(base64String){
+ let padding="=".repeat((4-base64String.length%4)%4);
+ let base64=(base64String+padding).replace(/-/g,"+").replace(/_/g,"/");
+ let raw=atob(base64),arr=new Uint8Array(raw.length);
+ for(let i=0;i<raw.length;i++)arr[i]=raw.charCodeAt(i);
+ return arr;
+}
+async function refreshPushNotificationState(){
+ if(!("serviceWorker" in navigator)||!("PushManager" in window)){
+  // On iOS specifically, this is also true whenever the app hasn't been
+  // added to the Home Screen yet — the Push API genuinely doesn't exist in
+  // a regular Safari tab there, not just non-functional.
+  pushNotificationState="unsupported";
+ } else if(Notification.permission==="denied"){
+  pushNotificationState="denied";
+ } else {
+  try{
+   let reg=await navigator.serviceWorker.ready;
+   let sub=await reg.pushManager.getSubscription();
+   pushNotificationState=sub?"on":"off";
+  }catch(e){
+   pushNotificationState="off";
+  }
+ }
+ booking();
+}
+async function enablePushNotifications(){
+ if(!requireWriteAccess())return;
+ try{
+  let permission=await Notification.requestPermission();
+  if(permission!=="granted"){pushNotificationState="denied";booking();return}
+  let reg=await navigator.serviceWorker.ready;
+  let sub=await reg.pushManager.subscribe({userVisibleOnly:true,applicationServerKey:urlBase64ToUint8Array(VAPID_PUBLIC_KEY)});
+  let t=bookingTokens();
+  await fetch(`${BOOKING_API}/api/booking/push-subscribe?t=${t.management}`,{
+   method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(sub)
+  });
+  pushNotificationState="on";
+  booking();
+ }catch(e){
+  alert("Couldn't enable notifications right now. Check your connection and try again.");
+  refreshPushNotificationState();
+ }
+}
+async function disablePushNotifications(){
+ if(!requireWriteAccess())return;
+ try{
+  let reg=await navigator.serviceWorker.ready;
+  let sub=await reg.pushManager.getSubscription();
+  if(sub){
+   let t=bookingTokens();
+   await fetch(`${BOOKING_API}/api/booking/push-unsubscribe?t=${t.management}`,{
+    method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({endpoint:sub.endpoint})
+   });
+   await sub.unsubscribe();
+  }
+  pushNotificationState="off";
+  booking();
+ }catch(e){
+  alert("Couldn't turn off notifications right now. Check your connection and try again.");
+  refreshPushNotificationState();
+ }
+}
 function bookingTokens(){
  return{
   management:localStorage.getItem("coachbook_booking_mgmt_token")||"",
@@ -4014,6 +4079,14 @@ function booking(){
 
  let errorHtml=bookingState.error?`<div class="card" style="border-color:var(--red);margin-bottom:12px">${esc(bookingState.error)}</div>`:"";
 
+ let pushCardHtml=(function(){
+  if(pushNotificationState==="checking"){refreshPushNotificationState();return "";}
+  if(pushNotificationState==="unsupported")return `<div class="card" style="margin-bottom:12px"><b>Get notified about new requests</b><p class="muted" style="font-size:var(--fs-2);margin:4px 0 0">On iPhone, this needs ProCoach OS added to your Home Screen first — push notifications don't work in a regular browser tab there.</p></div>`;
+  if(pushNotificationState==="denied")return `<div class="card" style="margin-bottom:12px"><b>Notifications are blocked</b><p class="muted" style="font-size:var(--fs-2);margin:4px 0 0">You'll need to allow notifications for this app in your device's settings to turn this on.</p></div>`;
+  if(pushNotificationState==="on")return `<div class="card" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px"><div><b>Push notifications are on</b><p class="muted" style="font-size:var(--fs-2);margin:2px 0 0">You'll be notified here when a new request comes in.</p></div><button class="btn secondary" style="flex-shrink:0" onclick="disablePushNotifications()">Turn Off</button></div>`;
+  return `<div class="card" style="margin-bottom:12px;display:flex;justify-content:space-between;align-items:center;gap:10px"><div><b>Get notified about new requests</b><p class="muted" style="font-size:var(--fs-2);margin:2px 0 0">A notification the moment someone requests a slot.</p></div><button class="btn primary" style="flex-shrink:0" onclick="enablePushNotifications()">Enable</button></div>`;
+ })();
+
  let linkSectionHtml=`<h2 class="section">Your Booking Link</h2>
  <div class="card">
   <div style="display:flex;gap:12px;align-items:center">
@@ -4133,7 +4206,7 @@ function booking(){
  let historySectionHtml=past.length?`<h2 class="section">Recent History <span class="muted" style="font-weight:400;font-size:var(--fs-1)">(last ${past.length}, most recent first)</span></h2>${past.map(oneHistoryHtml).join("")}`:"";
 
  el.innerHTML=head("Booking","Let parents/players request a 1-on-1 slot against your real availability — no back-and-forth.")
-  +errorHtml+linkSectionHtml+availabilitySectionHtml+exceptionsSectionHtml+pendingSectionHtml+historySectionHtml;
+  +errorHtml+pushCardHtml+linkSectionHtml+availabilitySectionHtml+exceptionsSectionHtml+pendingSectionHtml+historySectionHtml;
 }
 function icsEscape(str){return String(str||"").replace(/\\/g,"\\\\").replace(/,/g,"\\,").replace(/;/g,"\\;").replace(/\n/g,"\\n")}
 function icsTimedDate(dateStr,timeStr,addMinutes){
