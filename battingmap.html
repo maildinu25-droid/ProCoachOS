@@ -471,7 +471,7 @@ function showPremiumLockedMessage(){
     sessionDate: new Date().toISOString().slice(0,10),
     idleView: "ground", // 'ground' | 'pitch' — what to show when no delivery is in progress
     // pendingDelivery.stage: 'mark-pitch' -> 'awaiting-shot' -> 'shot-type' -> 'outcome' -> 'dismissal'
-    pendingDelivery: null,
+    pendingDelivery: freshDelivery(),
     viewMode: "dots",
     overFilter: "all",
     outcomeFilter: {},
@@ -514,6 +514,10 @@ function showPremiumLockedMessage(){
   state.batters[firstId] = { name: "Batter 1", hand: "RHB", balls: [] };
 
   function cb(){ return state.batters[state.currentBatterId]; }
+  // A fresh, empty delivery already sitting at the pitch-tap stage — used
+  // everywhere a delivery flow (re)starts, so the coach is never dropped
+  // into an idle state needing a manual "Mark new delivery" tap.
+  function freshDelivery(){ return { xPct:null, yPct:null, wagonX:null, wagonY:null, shotType:null, dismissal:null, footwork:null, beaten:false, stage:"mark-pitch" }; }
   function currentBowlerProfile(){
     return state.bowlerRoster[state.currentBowlerId] || { name:null, bowlArm:"RA", bowlPace:"Pace", bowlSpin:null, bowlSide:"Over" };
   }
@@ -1027,7 +1031,7 @@ function showPremiumLockedMessage(){
     var el = e.target.closest("[data-action]");
     if (!el) return;
     var action = el.getAttribute("data-action");
-    if (action==="switch-batter"){ state.currentBatterId = el.getAttribute("data-id"); render(); }
+    if (action==="switch-batter"){ state.currentBatterId = el.getAttribute("data-id"); state.pendingDelivery = freshDelivery(); render(); }
     else if (action==="add-batter"){
       var name = window.prompt("Batter name? (add several at once separated by commas, e.g. Arjun, Priya, Dev)", "");
       if (name===null) return;
@@ -1158,7 +1162,7 @@ function showPremiumLockedMessage(){
       state.pendingDelivery = { xPct:null, yPct:null, wagonX:null, wagonY:null, shotType:lastBall?lastBall.shotType:null, dismissal:null, footwork:lastBall?lastBall.footwork:null, beaten:lastBall?!!lastBall.beaten:false, stage:"mark-pitch", repeatingContext:true };
       render();
     }
-    else if (action==="cancel-delivery"){ state.pendingDelivery = null; render(); }
+    else if (action==="cancel-delivery"){ state.pendingDelivery = freshDelivery(); render(); }
     else if (action==="skip-shot"){
       if (state.pendingDelivery && state.pendingDelivery.stage==="awaiting-shot"){
         var wrapEl = document.getElementById("combo-wrap");
@@ -1203,7 +1207,7 @@ function showPremiumLockedMessage(){
           var bp1 = currentBowlerProfile();
           var drillHit1 = evaluateDrillHit(pd);
           cb().balls.push({ id:uid(), xPct:pd.xPct, yPct:pd.yPct, wagonX:pd.wagonX, wagonY:pd.wagonY, shotType:pd.shotType, outcome:outcomeId, dismissal:null, footwork:pd.footwork, beaten:!!pd.beaten, drillHit:drillHit1, bowlArm:bp1.bowlArm, bowlPace:bp1.bowlPace, bowlSpin:bp1.bowlSpin, bowlSide:bp1.bowlSide, t:Date.now() });
-          state.pendingDelivery = null; autoSaveSession(); render();
+          state.pendingDelivery = freshDelivery(); autoSaveSession(); render();
         }
       }
     }
@@ -1213,7 +1217,7 @@ function showPremiumLockedMessage(){
         var bp2 = currentBowlerProfile();
         var drillHit2 = evaluateDrillHit(pd2);
         cb().balls.push({ id:uid(), xPct:pd2.xPct, yPct:pd2.yPct, wagonX:pd2.wagonX, wagonY:pd2.wagonY, shotType:pd2.shotType, outcome:"W", dismissal:el.getAttribute("data-dismissal"), footwork:pd2.footwork, beaten:!!pd2.beaten, drillHit:drillHit2, bowlArm:bp2.bowlArm, bowlPace:bp2.bowlPace, bowlSpin:bp2.bowlSpin, bowlSide:bp2.bowlSide, t:Date.now() });
-        state.pendingDelivery = null; autoSaveSession(); render();
+        state.pendingDelivery = freshDelivery(); autoSaveSession(); render();
       }
     }
     else if (action==="remove-ball"){ var id = el.getAttribute("data-id"); cb().balls = cb().balls.filter(function(b){return b.id!==id;}); render(); }
@@ -1255,7 +1259,7 @@ function showPremiumLockedMessage(){
         state.currentBowlerId = Object.keys(state.bowlerRoster)[0] || null;
         state.currentBatterId = Object.keys(state.batters)[0];
         state.sessionKey = key;
-        state.pendingDelivery = null; state.idleView = "ground";
+        state.pendingDelivery = freshDelivery(); state.idleView = "ground";
         state.showLoad = false;
       } catch(err){ state.status = "Couldn't load that session."; }
       render();
