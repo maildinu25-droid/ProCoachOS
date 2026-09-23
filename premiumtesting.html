@@ -296,7 +296,6 @@ function showEmailGate(){
   <button type="button" class="btn secondary full" style="margin-top:10px" onclick="showEmailGateLicenseKeyForm()">Already have a license key?</button>
   </div>`;
  document.body.appendChild(overlay);
- document.getElementById("emailGateInput").focus();
 }
 function showEmailGateLicenseKeyForm(){
  let overlay=document.getElementById("emailGateOverlay");
@@ -310,7 +309,6 @@ function showEmailGateLicenseKeyForm(){
   <button class="btn primary full" style="margin-top:14px">Activate</button>
  </form>
  <button type="button" class="btn secondary full" style="margin-top:10px" onclick="showEmailGate()">← Back</button>`;
- document.getElementById("emailGateLicenseKeyInput").focus();
 }
 async function submitEmailGateLicenseKey(e){
  e.preventDefault();
@@ -404,7 +402,6 @@ function showEmailGateStep2(email){
   <button class="btn primary full" style="margin-top:14px">Verify &amp; Start Trial</button>
  </form>
  <button type="button" class="btn secondary full" style="margin-top:10px" onclick="resendEmailGateCode()">Resend Code</button>`;
- document.getElementById("emailGateCodeInput").focus();
 }
 async function resendEmailGateCode(){
  if(!pendingVerificationEmail)return;
@@ -841,16 +838,7 @@ function applyTheme(t){
  if(meta)meta.setAttribute("content",t==="light"?"#f4f6f5":"#08121e");
 }
 function toggleTheme(){applyTheme(document.documentElement.classList.contains("light")?"dark":"light")}
-function autoFocusFirstField(container){
- // A generic, one-time hook covering every current and future form, rather
- // than editing each template individually — far less risk of missing one
- // or subtly breaking a form's markup along the way.
- let selector='input:not([type="hidden"]):not([type="checkbox"]):not([type="radio"]):not([type="file"]):not([type="submit"]):not([type="button"]):not([disabled]):not([readonly]), textarea:not([disabled]):not([readonly]), select:not([disabled])';
- let candidates=[...container.querySelectorAll(selector)];
- let target=candidates.find(el=>el.offsetParent!==null);
- if(target)target.focus({preventScroll:true});
-}
-function modal(h){sheet.innerHTML=h;modalEl.classList.add("open");enhanceTextareasWithVoice(sheet);autoFocusFirstField(sheet)}function closeM(){modalEl.classList.remove("open")}const modalEl=document.getElementById("modal"),sheet=document.getElementById("sheet"),side=document.getElementById("side");modalEl.onclick=e=>{if(e.target===modalEl)closeM()}
+function modal(h){sheet.innerHTML=h;modalEl.classList.add("open");enhanceTextareasWithVoice(sheet)}function closeM(){modalEl.classList.remove("open")}const modalEl=document.getElementById("modal"),sheet=document.getElementById("sheet"),side=document.getElementById("side");modalEl.onclick=e=>{if(e.target===modalEl)closeM()}
 const SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
 let activeVoice=null;
 function enhanceTextareasWithVoice(container){
