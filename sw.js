@@ -99,3 +99,39 @@ self.addEventListener("fetch", (event) => {
       })
   );
 });
+
+// --- Push notifications ---
+// A push arriving carries the exact { title, body, url } payload the
+// booking Worker encrypted and sent — display it, and route a tap on it
+// to the right page rather than just opening the app's front door.
+self.addEventListener("push", (event) => {
+  let data = { title: "ProCoach OS", body: "You have a new notification.", url: "./app.html" };
+  try {
+    if (event.data) data = { ...data, ...event.data.json() };
+  } catch (e) {}
+  event.waitUntil(
+    self.registration.showNotification(data.title, {
+      body: data.body,
+      icon: "icon-192.png",
+      badge: "icon-192.png",
+      data: { url: data.url || "./app.html" },
+    })
+  );
+});
+
+self.addEventListener("notificationclick", (event) => {
+  event.notification.close();
+  const targetUrl = new URL(event.notification.data?.url || "./app.html", self.location.origin).href;
+  event.waitUntil(
+    self.clients.matchAll({ type: "window", includeUncontrolled: true }).then((clients) => {
+      // Prefer focusing an already-open tab over opening a duplicate one.
+      for (const client of clients) {
+        if (client.url.includes("app.html") && "focus" in client) {
+          client.navigate(targetUrl);
+          return client.focus();
+        }
+      }
+      return self.clients.openWindow(targetUrl);
+    })
+  );
+});
