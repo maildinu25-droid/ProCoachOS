@@ -2049,14 +2049,23 @@ function selectBulkDiscipline(discipline){
  });
  renderBulkAssessmentGrid();
 }
+function stepBulkAssessmentRating(playerName,skillIndex,delta){
+ let current=Number(bulkAssessmentDraft.ratings[playerName][skillIndex])||1;
+ let next=Math.max(1,Math.min(10,current+delta));
+ bulkAssessmentDraft.ratings[playerName][skillIndex]=next;
+ renderBulkAssessmentGrid();
+}
 function renderBulkAssessmentGrid(){
  let box=document.getElementById("bulkAssessmentBody");
  if(!box)return;
  let discipline=bulkAssessmentDraft.discipline;
  let skills=allSkillsFor(discipline).filter(s=>!isSkillArchived(discipline,s));
  let players=activePlayers();
- box.innerHTML=`<div class="matchEntryWrap" style="margin-top:12px"><table class="matchEntryTable"><thead><tr><th style="min-width:110px">Player</th>${skills.map(s=>`<th style="min-width:60px;text-align:center">${esc(s)}</th>`).join("")}</tr></thead><tbody>
- ${players.map((p,pi)=>`<tr><td><b>${esc(p.name)}</b></td>${skills.map((s,si)=>`<td><input type="number" min="1" max="10" style="width:44px;text-align:center" value="${esc(bulkAssessmentDraft.ratings[p.name][si])}" oninput="bulkAssessmentDraft.ratings['${p.name.replace(/'/g,"\\'")}'][${si}]=this.value"></td>`).join("")}</tr>`).join("")}
+ box.innerHTML=`<div class="matchEntryWrap" style="margin-top:12px"><table class="matchEntryTable"><thead><tr><th style="min-width:110px">Player</th>${skills.map(s=>`<th style="min-width:78px;text-align:center">${esc(s)}</th>`).join("")}</tr></thead><tbody>
+ ${players.map((p,pi)=>`<tr><td><b>${esc(p.name)}</b></td>${skills.map((s,si)=>{
+  let safeName=p.name.replace(/'/g,"\\'");
+  return `<td>${numberStepperHtml(bulkAssessmentDraft.ratings[p.name][si],`stepBulkAssessmentRating('${safeName}',${si},-1)`,`stepBulkAssessmentRating('${safeName}',${si},1)`,16)}</td>`;
+ }).join("")}</tr>`).join("")}
  </tbody></table></div>
  <button class="btn primary full" style="margin-top:14px" onclick="saveBulkAssessment()">Save ${players.length} Assessments</button>`;
 }
@@ -2418,22 +2427,14 @@ function numberStepperHtml(value,onDecrement,onIncrement,width){
   <button type="button" class="miniBtn" style="width:22px;height:28px;flex-shrink:0;font-size:15px" onclick="${onIncrement}">+</button>
  </div>`;
 }
-function stepBowlingField(i,field,delta,min,max){
- let current=Number(matchDraft.bowling[i][field])||0;
- let next=Math.round((current+delta)*10)/10;
- if(min!==undefined&&next<min)next=min;
- if(max!==undefined&&next>max)next=max;
- matchDraft.bowling[i][field]=next;
- renderBowlingRows();
-}
 function bowlingRowHtml(row,i){
  let notesOpen=bowlingNotesOpen.has(row)||!!row.notes;
  let takenNames=matchDraft.bowling.filter((r,idx)=>idx!==i).map(r=>r.name).filter(Boolean);
  return `<tr>
   <td><select onchange="matchDraft.bowling[${i}].name=this.value;renderBowlingRows()">${nameOptionsHtml(row.name,currentXINames(),takenNames)}</select></td>
-  <td>${numberStepperHtml(row.overs||0,`stepBowlingField(${i},'overs',-0.1,0)`,`stepBowlingField(${i},'overs',0.1,0)`,24)}</td>
+  <td><input type="number" step="0.1" inputmode="decimal" value="${esc(row.overs||"")}" oninput="matchDraft.bowling[${i}].overs=this.value"></td>
   <td><input type="number" value="${esc(row.runs||"")}" oninput="matchDraft.bowling[${i}].runs=this.value"></td>
-  <td>${numberStepperHtml(row.wickets||0,`stepBowlingField(${i},'wickets',-1,0,10)`,`stepBowlingField(${i},'wickets',1,0,10)`,14)}</td>
+  <td><input type="number" value="${esc(row.wickets||"")}" oninput="matchDraft.bowling[${i}].wickets=this.value"></td>
   <td style="white-space:nowrap"><button type="button" class="miniBtn" onclick="toggleBowlingNotes(${i})">✎</button></td>
  </tr>
  ${notesOpen?`<tr><td colspan="5"><textarea rows="1" style="width:100%;min-height:36px" placeholder="Notes (optional)" oninput="matchDraft.bowling[${i}].notes=this.value">${esc(row.notes||"")}</textarea></td></tr>`:""}`;
