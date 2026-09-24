@@ -3764,6 +3764,19 @@ function storageUsageBytes(){
 }
 let bookingState={availability:{rules:[],blockedDates:[],extraSlots:[]},requests:[],loaded:false,error:null};
 let expandedRecurringGroups=new Set();
+let selectedPendingIds=new Set();
+function togglePendingSelection(id){
+ if(selectedPendingIds.has(id))selectedPendingIds.delete(id);else selectedPendingIds.add(id);
+ booking();
+}
+async function respondToSelectedBookings(decision){
+ if(!requireWriteAccess())return;
+ let ids=[...selectedPendingIds];
+ for(let id of ids){
+  await respondToBooking(id,decision);
+  selectedPendingIds.delete(id);
+ }
+}
 let pushNotificationState="checking"; // "checking" | "unsupported" | "denied" | "off" | "on"
 function urlBase64ToUint8Array(base64String){
  let padding="=".repeat((4-base64String.length%4)%4);
@@ -3865,7 +3878,7 @@ async function bookingLoadEverything(){
   if(availRes.ok){
    let data=await availRes.json();
    let a=data.availability||{};
-   bookingState.availability={rules:a.rules||[],blockedDates:a.blockedDates||[],extraSlots:a.extraSlots||[]};
+   bookingState.availability={rules:a.rules||[],blockedDates:a.blockedDates||[],extraSlots:a.extraSlots||[],minNoticeHours:a.minNoticeHours||0};
    normalizeAvailabilityRules();
   }
   if(reqRes.ok){let data=await reqRes.json();bookingState.requests=data.bookings||[]}
@@ -4072,6 +4085,8 @@ function booking(){
  }
  let link=bookingLink();
  let pending=bookingState.requests.filter(b=>b.status==="pending").sort((a,b)=>a.date.localeCompare(b.date));
+ let upcomingConfirmed=bookingState.requests.filter(b=>b.status==="approved"&&b.date>=today()).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).slice(0,10);
+ let upcomingConfirmedHtml=upcomingConfirmed.length?`<h2 class="section">Upcoming Confirmed Sessions</h2><div class="card">${upcomingConfirmed.map(b=>`<div class="item"><div><b>${esc(b.playerName)}</b><div class="muted">${esc(fmtDate(b.date))} at ${esc(b.time)}${b.venue?" · "+esc(b.venue):""}</div></div></div>`).join("")}</div>`:"";
  let past=bookingState.requests.filter(b=>b.status!=="pending").sort((a,b)=>b.requestedAt-a.requestedAt).slice(0,20);
 
  // A recurring request creates several individual booking records (one per
@@ -4168,11 +4183,16 @@ function booking(){
   ?bookingState.availability.rules.map(oneRuleHtml).join("")
   :`<p class="muted">No availability set yet — add a time block below, then tap the days it applies to.</p>`;
 
+ let noticeOptions=[0,1,2,4,6,12,24,48];
+ let noticeLabel=h=>h===0?"No minimum":h<24?`${h} hour${h===1?"":"s"}`:`${h/24} day${h===24?"":"s"}`;
  let availabilitySectionHtml=`<h2 class="section">Your Weekly Availability</h2>
  <p class="muted" style="font-size:var(--fs-1);margin-top:-4px">Tap the days a time block applies to — pick several days at once if they share the same hours.</p>
  <div class="card">
   ${rulesListHtml}
   <button type="button" class="btn secondary" onclick="addAvailabilityRule()">+ Add a time block</button>
+  <label style="display:block;margin-top:14px">Minimum notice required <span class="muted" style="font-weight:400">(a parent can't request a slot sooner than this)</span>
+   <select onchange="bookingState.availability.minNoticeHours=Number(this.value)">${noticeOptions.map(h=>`<option value="${h}" ${(bookingState.availability.minNoticeHours||0)===h?"selected":""}>${noticeLabel(h)}</option>`).join("")}</select>
+  </label>
   <button type="button" class="btn primary full" id="bookingSaveAvailBtn" style="margin-top:10px" onclick="saveAvailability()">Save Availability</button>
  </div>`;
 
@@ -4211,9 +4231,10 @@ function booking(){
   <button type="button" class="btn primary full" id="bookingSaveExceptionsBtn" style="margin-top:10px" onclick="saveAvailability()">Save Exceptions</button>
  </div>`;
 
- let onePendingHtml=function(b){
+ let onePendingHtml=function(b,showCheckbox){
   let noteHtml=b.note?`<p class="muted" style="font-size:var(--fs-2)">"${esc(b.note)}"</p>`:"";
-  return `<div class="card" style="margin-bottom:8px"><b>${esc(b.playerName)}</b> <span class="muted">requested by ${esc(b.parentName)}</span><p style="margin:4px 0">${esc(fmtDate(b.date))} at ${esc(b.time)}${b.venue?" · "+esc(b.venue):""}</p>${noteHtml}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn primary" onclick="bookingApproveClick('${b.id}')">Approve</button><button class="btn secondary" onclick="respondToBooking('${b.id}','declined')">Decline</button></div></div>`;
+  let checkboxHtml=showCheckbox?`<label style="display:flex;align-items:center;gap:8px;margin-bottom:6px;cursor:pointer"><input type="checkbox" style="width:auto" ${selectedPendingIds.has(b.id)?"checked":""} onchange="togglePendingSelection('${b.id}')"> <span class="muted" style="font-size:var(--fs-1)">Select</span></label>`:"";
+  return `<div class="card" style="margin-bottom:8px">${checkboxHtml}<b>${esc(b.playerName)}</b> <span class="muted">requested by ${esc(b.parentName)}</span><p style="margin:4px 0">${esc(fmtDate(b.date))} at ${esc(b.time)}${b.venue?" · "+esc(b.venue):""}</p>${noteHtml}<div style="display:flex;gap:8px;margin-top:8px"><button class="btn primary" onclick="bookingApproveClick('${b.id}')">Approve</button><button class="btn secondary" onclick="respondToBooking('${b.id}','declined')">Decline</button></div></div>`;
  };
  let recurringGroups={};
  let standalonePending=[];
@@ -4237,10 +4258,17 @@ function booking(){
    <button class="btn secondary" onclick="respondToBookingGroup('${first.recurringGroupId}','declined')">Decline All</button>
    <button class="btn secondary" onclick="toggleRecurringGroupExpand('${first.recurringGroupId}')">${expanded?"Hide weeks":"Manage individually"}</button>
   </div>
-  ${expanded?`<div style="margin-top:10px">${bookings.map(onePendingHtml).join("")}</div>`:""}
+  ${expanded?`<div style="margin-top:10px">${bookings.map(b=>onePendingHtml(b,false)).join("")}</div>`:""}
   </div>`;
  };
- let pendingListHtml=(Object.values(recurringGroups).map(oneRecurringGroupHtml).join("")+standalonePending.map(onePendingHtml).join(""))||empty("No pending requests right now.");
+ let bulkBarHtml=selectedPendingIds.size?`<div class="card" style="margin-bottom:8px;border-color:var(--blue2);display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap">
+  <b>${selectedPendingIds.size} selected</b>
+  <div style="display:flex;gap:8px">
+   <button class="btn primary" onclick="respondToSelectedBookings('approved')">Approve Selected</button>
+   <button class="btn secondary" onclick="respondToSelectedBookings('declined')">Decline Selected</button>
+  </div>
+ </div>`:"";
+ let pendingListHtml=(Object.values(recurringGroups).map(oneRecurringGroupHtml).join("")+bulkBarHtml+standalonePending.map(b=>onePendingHtml(b,true)).join(""))||empty("No pending requests right now.");
  let pendingCountLabel=pending.length?`(${pending.length})`:"";
  let pendingSectionHtml=`<h2 class="section">Pending Requests ${pendingCountLabel}</h2>${pendingListHtml}`;
 
@@ -4251,7 +4279,7 @@ function booking(){
  let historySectionHtml=past.length?`<h2 class="section">Recent History <span class="muted" style="font-weight:400;font-size:var(--fs-1)">(last ${past.length}, most recent first)</span></h2>${past.map(oneHistoryHtml).join("")}`:"";
 
  el.innerHTML=head("Booking","Let parents/players request a 1-on-1 slot against your real availability — no back-and-forth.")
-  +errorHtml+pushCardHtml+linkSectionHtml+availabilitySectionHtml+exceptionsSectionHtml+pendingSectionHtml+bookingActivityHtml+historySectionHtml;
+  +errorHtml+pushCardHtml+linkSectionHtml+availabilitySectionHtml+exceptionsSectionHtml+pendingSectionHtml+upcomingConfirmedHtml+bookingActivityHtml+historySectionHtml;
 }
 function icsEscape(str){return String(str||"").replace(/\\/g,"\\\\").replace(/,/g,"\\,").replace(/;/g,"\\;").replace(/\n/g,"\\n")}
 function icsTimedDate(dateStr,timeStr,addMinutes){
