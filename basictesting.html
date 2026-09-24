@@ -3771,9 +3771,20 @@ function togglePendingSelection(id){
 async function respondToSelectedBookings(decision){
  if(!requireWriteAccess())return;
  let ids=[...selectedPendingIds];
+ let needsReview=[];
  for(let id of ids){
-  await respondToBooking(id,decision);
+  let b=bookingState.requests.find(x=>x.id===id);
+  if(decision==="approved"&&b){
+   let exact=findExactPlayerMatch(b.playerName);
+   if(!exact){needsReview.push(b.playerName);selectedPendingIds.delete(id);continue}
+   await respondToBooking(id,decision,exact.name);
+  } else {
+   await respondToBooking(id,decision);
+  }
   selectedPendingIds.delete(id);
+ }
+ if(needsReview.length){
+  alert(`Approved the rest — "${needsReview.join('", "')}" doesn't exactly match anyone in your roster, so ${needsReview.length===1?"it was":"those were"} left pending. Use the individual Approve button to match the right player.`);
  }
 }
 let pushNotificationState="checking"; // "checking" | "unsupported" | "denied" | "off" | "on"
@@ -4053,8 +4064,19 @@ async function respondToBooking(id,decision,confirmedPlayerName){
 async function respondToBookingGroup(groupId,decision){
  if(!requireWriteAccess())return;
  let matching=bookingState.requests.filter(b=>b.recurringGroupId===groupId&&b.status==="pending");
+ let needsReview=[];
  for(let b of matching){
-  await respondToBooking(b.id,decision);
+  if(decision==="approved"){
+   let exact=findExactPlayerMatch(b.playerName);
+   if(!exact){needsReview.push(b.playerName);continue}
+   await respondToBooking(b.id,decision,exact.name);
+  } else {
+   await respondToBooking(b.id,decision);
+  }
+ }
+ if(needsReview.length){
+  let uniqueNames=[...new Set(needsReview)];
+  alert(`Approved the rest — "${uniqueNames.join('", "')}" doesn't exactly match anyone in your roster, so ${needsReview.length===1?"it was":"those were"} left pending. Use the individual Approve button to match the right player.`);
  }
 }
 function toggleRecurringGroupExpand(groupId){
