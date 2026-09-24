@@ -4189,7 +4189,7 @@ function booking(){
  <div class="card">
   ${rulesListHtml}
   <button type="button" class="btn secondary" onclick="addAvailabilityRule()">+ Add a time block</button>
-  <label style="display:block;margin-top:14px">Minimum notice required <span class="muted" style="font-weight:400">(a parent can't request a slot sooner than this)</span>
+  <label style="display:block;margin-top:14px">Minimum notice required <span class="muted" style="font-weight:400">(requests must come in at least this far ahead of the slot)</span>
    <select onchange="bookingState.availability.minNoticeHours=Number(this.value)">${noticeOptions.map(h=>`<option value="${h}" ${(bookingState.availability.minNoticeHours||0)===h?"selected":""}>${noticeLabel(h)}</option>`).join("")}</select>
   </label>
   <button type="button" class="btn primary full" id="bookingSaveAvailBtn" style="margin-top:10px" onclick="saveAvailability()">Save Availability</button>
