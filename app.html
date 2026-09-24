@@ -4074,6 +4074,54 @@ function booking(){
  let pending=bookingState.requests.filter(b=>b.status==="pending").sort((a,b)=>a.date.localeCompare(b.date));
  let past=bookingState.requests.filter(b=>b.status!=="pending").sort((a,b)=>b.requestedAt-a.requestedAt).slice(0,20);
 
+ // A recurring request creates several individual booking records (one per
+ // week) — counting each of those as a separate "request" would inflate
+ // the numbers a coach actually cares about. Group by recurringGroupId so
+ // a 4-week ask reads as the one real request it is, and treat it as
+ // approved if any week of it was, since that's a real win even if not
+ // every week landed.
+ let requestEvents=(function(){
+  let groups={};
+  bookingState.requests.forEach(b=>{
+   let key=b.recurringGroupId||b.id;
+   (groups[key]=groups[key]||[]).push(b);
+  });
+  return Object.values(groups).map(group=>{
+   // A parent cancelling isn't a coach decision — keep it out of the
+   // approved/declined split entirely so it doesn't skew the approval
+   // rate either way, but it's also clearly not "still pending" anymore.
+   let status=group.some(b=>b.status==="approved")?"approved"
+    :group.every(b=>b.status==="declined")?"declined"
+    :group.some(b=>b.status==="cancelled")&&group.every(b=>b.status==="cancelled"||b.status==="declined")?"cancelled"
+    :"pending";
+   return {status,requestedAt:Math.min(...group.map(b=>b.requestedAt||0))};
+  });
+ })();
+ let decidedEvents=requestEvents.filter(e=>e.status==="approved"||e.status==="declined");
+ let approvedEvents=requestEvents.filter(e=>e.status==="approved");
+ let conversionPct=decidedEvents.length?Math.round(approvedEvents.length/decidedEvents.length*100):null;
+ let thisMonthKey=today().slice(0,7);
+ let thisMonthCount=requestEvents.filter(e=>{
+  let d=new Date(e.requestedAt);
+  return !isNaN(d)&&d.toISOString().slice(0,7)===thisMonthKey;
+ }).length;
+ let topSlots=(function(){
+  let counts={};
+  bookingState.requests.forEach(b=>{
+   let key=b.time;
+   if(!key)return;
+   counts[key]=(counts[key]||0)+1;
+  });
+  return Object.entries(counts).sort((a,b)=>b[1]-a[1]).slice(0,5);
+ })();
+ let bookingActivityHtml=requestEvents.length?`<h2 class="section">Booking Activity</h2>
+ <div class="grid g3" style="margin-bottom:12px">
+  <div class="card stat"><span>Requests this month</span><b style="font-size:var(--fs-5)">${thisMonthCount}</b></div>
+  <div class="card stat"><span>All-time requests</span><b style="font-size:var(--fs-5)">${requestEvents.length}</b></div>
+  <div class="card stat"><span>Approval rate</span><b style="font-size:var(--fs-5)">${conversionPct===null?"—":conversionPct+"%"}</b></div>
+ </div>
+ ${topSlots.length?`<div class="card" style="margin-bottom:12px"><b>Most-requested times</b><div style="margin-top:6px">${topSlots.map(([time,count])=>`<div style="display:flex;justify-content:space-between;padding:3px 0"><span>${esc(time)}</span><span class="muted">${count} request${count===1?"":"s"}</span></div>`).join("")}</div></div>`:""}`:"";
+
  let errorHtml=bookingState.error?`<div class="card" style="border-color:var(--red);margin-bottom:12px">${esc(bookingState.error)}</div>`:"";
 
  let pushCardHtml=(function(){
@@ -4197,13 +4245,13 @@ function booking(){
  let pendingSectionHtml=`<h2 class="section">Pending Requests ${pendingCountLabel}</h2>${pendingListHtml}`;
 
  let oneHistoryHtml=function(b){
-  let statusColor=b.status==="approved"?"var(--g)":"var(--red)";
+  let statusColor=b.status==="approved"?"var(--g)":b.status==="cancelled"?"var(--muted)":"var(--red)";
   return `<div class="card" style="margin-bottom:6px;opacity:.75;display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>${esc(b.playerName)}</b> · ${esc(fmtDate(b.date))} at ${esc(b.time)} <span style="color:${statusColor}">· ${b.status}</span></span><button type="button" class="btn danger" onclick="deleteBookingHistoryEntry('${b.id}')">Delete</button></div>`;
  };
  let historySectionHtml=past.length?`<h2 class="section">Recent History <span class="muted" style="font-weight:400;font-size:var(--fs-1)">(last ${past.length}, most recent first)</span></h2>${past.map(oneHistoryHtml).join("")}`:"";
 
  el.innerHTML=head("Booking","Let parents/players request a 1-on-1 slot against your real availability — no back-and-forth.")
-  +errorHtml+pushCardHtml+linkSectionHtml+availabilitySectionHtml+exceptionsSectionHtml+pendingSectionHtml+historySectionHtml;
+  +errorHtml+pushCardHtml+linkSectionHtml+availabilitySectionHtml+exceptionsSectionHtml+pendingSectionHtml+bookingActivityHtml+historySectionHtml;
 }
 function icsEscape(str){return String(str||"").replace(/\\/g,"\\\\").replace(/,/g,"\\,").replace(/;/g,"\\;").replace(/\n/g,"\\n")}
 function icsTimedDate(dateStr,timeStr,addMinutes){

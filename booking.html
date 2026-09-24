@@ -45,7 +45,22 @@ const token = params.get("t");
 const checkId = params.get("check");
 const app = document.getElementById("app");
 
-let state = { openSlots: [], selectedSlots: [], step: "pick", submitting: false, submitted: false, submittedIds: [], failedCount: 0, error: null, formValues: { parentName:"", playerName:"", note:"", recurring:false, recurringWeeks:4 }, statusResults: null, statusLoaded: false };
+function loadRememberedParentInfo(){
+ try{
+  return {
+   parentName: localStorage.getItem("procoachos_booking_parent_name")||"",
+   playerName: localStorage.getItem("procoachos_booking_player_name")||"",
+  };
+ }catch(e){ return { parentName:"", playerName:"" }; }
+}
+function rememberParentInfo(parentName, playerName){
+ try{
+  localStorage.setItem("procoachos_booking_parent_name", parentName);
+  localStorage.setItem("procoachos_booking_player_name", playerName);
+ }catch(e){}
+}
+let remembered = loadRememberedParentInfo();
+let state = { openSlots: [], selectedSlots: [], step: "pick", submitting: false, submitted: false, submittedIds: [], failedCount: 0, error: null, formValues: { parentName:remembered.parentName, playerName:remembered.playerName, note:"", recurring:false, recurringWeeks:4 }, statusResults: null, statusLoaded: false, rescheduling: false };
 const MAX_SLOTS_PER_REQUEST = 6;
 
 function fmtDateLabel(dateStr){
@@ -73,7 +88,7 @@ function render(){
     app.innerHTML = `<div class="state"><h2>This link isn't valid</h2><p>Ask your coach to resend the booking link.</p></div>`;
     return;
   }
-  if (checkId){
+  if (checkId && !state.rescheduling){
     renderStatusView();
     return;
   }
@@ -213,6 +228,7 @@ async function submitRequest(){
   }
   state.submitting = false;
   if (!successIds.length){ state.error = "submit-failed"; render(); return; }
+  rememberParentInfo(parentName, playerName);
   state.submitted = true; state.submittedIds = successIds; state.failedCount = failedCount; render();
 }
 
@@ -228,14 +244,22 @@ function renderStatusView(){
   }
   const oneCard = (r) => {
     const when = `${fmtDateLabel(r.date)} at ${fmtTimeLabel(r.time)}`;
-    const statusLabel = r.status === "approved" ? "Confirmed" : r.status === "declined" ? "Not confirmed" : "Still pending";
-    const statusColor = r.status === "approved" ? "#10b981" : r.status === "declined" ? "#ef5350" : "#f59e0b";
-    return `<div class="card" style="margin-bottom:10px;display:flex;align-items:center;gap:12px">
-      <div class="tick" style="background:${statusColor}22;color:${statusColor};width:38px;height:38px;font-size:17px;margin:0">${r.status==="approved"?"✓":r.status==="declined"?"✕":"…"}</div>
-      <div>
-        <div style="font-weight:700">${statusLabel}</div>
-        <div style="color:var(--muted);font-size:13px">${esc(r.playerName)} — ${esc(when)}${r.venue?" · "+esc(r.venue):""}</div>
+    const statusLabel = r.status === "approved" ? "Confirmed" : r.status === "declined" ? "Not confirmed" : r.status === "cancelled" ? "Cancelled" : "Still pending";
+    const statusColor = r.status === "approved" ? "#10b981" : r.status === "declined" ? "#ef5350" : r.status === "cancelled" ? "#8a94a6" : "#f59e0b";
+    const canManage = r.status === "approved" || r.status === "pending";
+    const actionsHtml = canManage ? `<div style="display:flex;gap:8px;margin-top:10px">
+      <button class="btn secondary" style="flex:1;padding:8px" onclick="handleRescheduleBooking('${r.id}')">Reschedule</button>
+      <button class="btn secondary" style="flex:1;padding:8px;color:#ef5350" onclick="handleCancelBooking('${r.id}')">Cancel</button>
+    </div>` : "";
+    return `<div class="card" style="margin-bottom:10px">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div class="tick" style="background:${statusColor}22;color:${statusColor};width:38px;height:38px;font-size:17px;margin:0">${r.status==="approved"?"✓":r.status==="declined"||r.status==="cancelled"?"✕":"…"}</div>
+        <div>
+          <div style="font-weight:700">${statusLabel}</div>
+          <div style="color:var(--muted);font-size:13px">${esc(r.playerName)} — ${esc(when)}${r.venue?" · "+esc(r.venue):""}</div>
+        </div>
       </div>
+      ${actionsHtml}
     </div>`;
   };
   const headerLabel = state.statusResults.length === 1 ? "Your Request" : `Your ${state.statusResults.length} Requests`;
@@ -255,6 +279,48 @@ async function loadStatus(){
   } catch(e){
     state.statusResults = null; state.statusLoaded = true; render();
   }
+}
+
+async function handleCancelBooking(bookingId){
+  if (!confirm("Cancel this request? Your coach will be notified.")) return;
+  try{
+    const res = await fetch(`${BOOKING_API}/api/booking/cancel?t=${encodeURIComponent(token)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId })
+    });
+    if (!res.ok) throw new Error("failed");
+    const match = state.statusResults.find(r => r.id === bookingId);
+    if (match) match.status = "cancelled";
+    render();
+  } catch(e){
+    alert("Couldn't cancel that right now. Please try again.");
+  }
+}
+async function handleRescheduleBooking(bookingId){
+  if (!confirm("This will cancel your current request so you can pick a new time. Continue?")) return;
+  try{
+    const res = await fetch(`${BOOKING_API}/api/booking/cancel?t=${encodeURIComponent(token)}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId })
+    });
+    if (!res.ok) throw new Error("failed");
+  } catch(e){
+    alert("Couldn't cancel that right now. Please try again.");
+    return;
+  }
+  // Breaks out of the permanent status-view gate below, back into the
+  // normal slot-picking flow, with the parent's name already remembered
+  // from last time so they aren't retyping it.
+  state.rescheduling = true;
+  state.step = "pick";
+  state.selectedSlots = [];
+  state.submitted = false;
+  state.submittedIds = [];
+  state.error = null;
+  state.loaded = false;
+  loadSlots();
 }
 
 if (checkId) render(); else loadSlots();
