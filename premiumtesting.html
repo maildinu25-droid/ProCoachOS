@@ -1186,7 +1186,7 @@ function sessions(){
   let gameDrills=(s.gameDrillIds||[]).map(id=>db.drills.find(d=>d.id===id)).filter(Boolean);
   let linkedReflection=db.reflections.find(r=>r.sessionId===s.id);
   let showReflectionStatus=s.date<=today();
-  return `<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}${gameDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${s.netPlan.length} set${s.netPlan.length===1?"":"s"} · ${s.netPlan.reduce((sum,set)=>sum+set.nets.length,0)} nets</span></div>`:""}${s.attachment?`<div style="margin-top:6px"><a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="copySessionSummary('${s.id}')">Copy Summary</button><button class="btn secondary" onclick="editSession('${s.id}')">Edit</button><button class="btn danger" onclick="delSession('${s.id}')">×</button></div></div>`;
+  return `<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}${gameDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${s.netPlan.length} set${s.netPlan.length===1?"":"s"} · ${s.netPlan.reduce((sum,set)=>sum+set.nets.length,0)} nets</span></div>`:""}${s.attachment?`<div style="margin-top:6px"><a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="copySessionSummary('${s.id}')">Copy Summary</button><button class="btn secondary" onclick="printSessionPlan('${s.id}')">Print Plan</button><button class="btn secondary" onclick="editSession('${s.id}')">Edit</button><button class="btn danger" onclick="delSession('${s.id}')">×</button></div></div>`;
  }).join("")}</div>`:empty("No sessions match your search.")}</div>`;
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -1441,6 +1441,50 @@ function netPlanSummaryText(netPlan){
   }).join("; ");
   return setHeader+netsText;
  }).join("\n");
+}
+function netPlanPrintHtml(netPlan){
+ if(!netPlan||!netPlan.length)return "";
+ return `<h2>Net Plan</h2>${netPlan.map((set,si)=>`
+  <div class="card" style="margin-bottom:12px">
+   <b>Set ${si+1}</b>${set.focus?` <span class="muted">— ${esc(set.focus)}</span>`:""}
+   <table class="reportTable" style="margin-top:8px">
+    <tr><th>Net</th><th>Batters</th><th>Bowlers</th><th>Duration</th><th>Focus</th></tr>
+    ${set.nets.map((n,ni)=>`<tr>
+     <td>Net ${ni+1}</td>
+     <td>${esc(n.batters!=null&&n.batters!==""?n.batters:"—")}${(n.battersNames&&n.battersNames.length)?`<br><span class="muted" style="font-size:var(--fs-1)">${n.battersNames.map(x=>esc(x)).join(", ")}</span>`:""}</td>
+     <td>${esc(n.bowlers||"—")}${(n.bowlersNames&&n.bowlersNames.length)?`<br><span class="muted" style="font-size:var(--fs-1)">${n.bowlersNames.map(x=>esc(x)).join(", ")}</span>`:""}</td>
+     <td>${n.duration?esc(n.duration)+" min":"—"}</td>
+     <td>${esc(n.focus||"—")}</td>
+    </tr>`).join("")}
+   </table>
+  </div>`).join("")}`;
+}
+// Formatted single-session printable page — pulls in everything a coach
+// (or an assistant standing in) would need on the day: the net plan
+// front and centre, plus the rest of the plan below it.
+function printSessionPlan(id){
+ let s=db.sessions.find(x=>x.id===id);
+ if(!s)return;
+ let mainDrills=(s.mainDrillIds||[]).map(did=>db.drills.find(d=>d.id===did)).filter(Boolean);
+ let gameDrills=(s.gameDrillIds||[]).map(did=>db.drills.find(d=>d.id===did)).filter(Boolean);
+ let body=`
+  <div class="grid g3">
+   <div class="card stat"><span>Duration</span><b>${s.duration?esc(s.duration)+" min":"—"}</b></div>
+   <div class="card stat"><span>Focus</span><b style="font-size:var(--fs-6)">${esc(s.focus||"—")}</b></div>
+   <div class="card stat"><span>Type</span><b style="font-size:var(--fs-6)">${esc(sessionTypeLabel(s.sessionType))}</b></div>
+  </div>
+  ${s.venue?`<div class="card" style="margin-top:16px"><b>Venue:</b> ${esc(s.venue)}</div>`:""}
+  ${(s.attendees&&s.attendees.length)?`<h2>Attendance (${s.attendees.length})</h2><div class="card">${s.attendees.map(a=>esc(a)).join(", ")}</div>`:""}
+  ${(s.objectiveTags&&s.objectiveTags.length)?`<h2>Objective Categories</h2><div class="card">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}
+  ${s.objectives?`<h2>Objectives</h2><div class="card">${esc(s.objectives)}</div>`:""}
+  ${netPlanPrintHtml(s.netPlan)}
+  ${s.warmup?`<h2>Warm-up / Preparation</h2><div class="card">${esc(s.warmup)}</div>`:""}
+  ${(s.main||mainDrills.length)?`<h2>Main Skill Block</h2><div class="card">${s.main?esc(s.main):""}${mainDrills.length?`<div style="margin-top:8px">${mainDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}</div>`:""}
+  ${(s.game||gameDrills.length)?`<h2>Competitive / Game Block</h2><div class="card">${s.game?esc(s.game):""}${gameDrills.length?`<div style="margin-top:8px">${gameDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}</div>`:""}
+  ${s.cues?`<h2>Coaching Cues</h2><div class="card">${esc(s.cues)}</div>`:""}
+  ${s.success?`<h2>Success Criteria</h2><div class="card">${esc(s.success)}</div>`:""}
+ `;
+ reportShell(sessionLabel(s),fmtDate(s.date),body);
 }
 function newSession(){openSessionForm(null,"new")}
 function editSession(id){let s=db.sessions.find(x=>x.id===id);if(!s)return;openSessionForm(s,"edit")}
@@ -3662,7 +3706,7 @@ function buildSessionReport(){
  let hasAnyTags=categoryCounts.some(c=>c.count>0);
  reportShell("Session Report",rangeLabel(from,to),sessions.length?`
  ${hasAnyTags?`<h2>Objective Category Breakdown</h2><div class="card">${categoryCounts.map(c=>`<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${esc(c.name)}</span><b>${c.count} session${c.count!==1?"s":""}</b></div>`).join("")}</div>`:""}
- <table class="reportTable"><tr><th>Date</th><th>Title</th><th>Type</th><th>Focus</th><th>Categories</th><th>Objectives</th></tr>${sessions.slice().sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b))).map(s=>`<tr><td>${esc(fmtDate(s.date))}</td><td>${esc(s.title||"—")}</td><td>${esc(sessionTypeLabel(s.sessionType))}</td><td>${esc(s.focus)}</td><td>${(s.objectiveTags||[]).map(t=>esc(t)).join(", ")||"—"}</td><td>${esc(s.objectives)}</td></tr>`).join("")}</table>`:empty("No sessions documented."));
+ <table class="reportTable"><tr><th>Date</th><th>Title</th><th>Type</th><th>Focus</th><th>Categories</th><th>Objectives</th><th>Net Plan</th></tr>${sessions.slice().sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b))).map(s=>`<tr><td>${esc(fmtDate(s.date))}</td><td>${esc(s.title||"—")}</td><td>${esc(sessionTypeLabel(s.sessionType))}</td><td>${esc(s.focus)}</td><td>${(s.objectiveTags||[]).map(t=>esc(t)).join(", ")||"—"}</td><td>${esc(s.objectives)}</td><td>${s.netPlan&&s.netPlan.length?esc(netPlanSummaryText(s.netPlan)).replace(/\n/g,"<br>"):"—"}</td></tr>`).join("")}</table>`:empty("No sessions documented."));
 }
 function matchReport(){reportRangeModal("Match Report","buildMatchReport")}
 function buildMatchReport(){
