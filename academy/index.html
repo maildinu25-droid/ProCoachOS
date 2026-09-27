@@ -164,6 +164,25 @@
   .net-player-picker-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; background: none; border: none; padding: 4px 0; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-dim); font-weight: 650; font-family: inherit; text-align: left; cursor: pointer; }
   .net-player-selected-names { margin-top: 2px; }
   .net-player-selected-name { font-size: 13.5px; color: var(--text); padding: 1px 0; }
+  .fd-section-label { margin: 16px 0 6px; font-weight: 700; font-size: 13.5px; }
+  .fd-tabs-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .fd-shape-row, .fd-tools-row { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 8px; }
+  .fd-step-label-input { width: 100%; margin-bottom: 8px; }
+  .fd-hint { font-size: 12px; color: var(--text-dim); margin-bottom: 6px; }
+  .fd-canvas-wrap { max-width: min(480px, 100%); margin: 0 auto; }
+  .fd-bottom-bar { display: flex; gap: 8px; margin-top: 8px; flex-wrap: wrap; }
+  .fdMarker, .fdArrow { cursor: pointer; }
+  .fdFsOverlay { display: flex; flex-direction: column; }
+  .fdFsToolbar { display: flex; flex-direction: row; flex-wrap: wrap; gap: 4px; flex-shrink: 0; padding: 4px; padding-bottom: max(4px, env(safe-area-inset-bottom)); align-content: flex-start; order: 2; }
+  .fdFsToolbar button { width: 34px; height: 34px; padding: 0; display: flex; align-items: center; justify-content: center; flex-shrink: 0; border-radius: 8px; }
+  .fdFsStepPill { border-radius: 50% !important; font-size: 12px; font-weight: 700; }
+  .fdFsCanvasArea { flex: 1 1 auto; min-height: 80px; display: flex; align-items: center; justify-content: center; overflow: hidden; position: relative; order: 1; }
+  @media (orientation: landscape) {
+    .fdFsOverlay { flex-direction: row; padding-left: max(4px, env(safe-area-inset-left)); padding-right: max(4px, env(safe-area-inset-right)); }
+    .fdFsToolbar { flex-direction: column; flex-wrap: nowrap; overflow-y: auto; max-height: 100%; padding-bottom: 4px; order: 0; }
+    .fdFsCanvasArea { order: 0; justify-content: flex-start; }
+  }
+  .fieldStepPreviewWrap { display: flex; gap: 8px; flex-wrap: wrap; margin: 10px 0; }
   .subrow { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
   .member-teams { margin-top: 6px; }
   .stat-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
@@ -416,6 +435,7 @@
       <div class="navGroupLabel">Resources</div>
       <button data-role-gate="assistant_coach" data-panel="panel-equipment"><span class="navIcon"><svg viewBox="0 0 21 21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 2.5l8 4.5v7l-8 4.5-8-4.5v-7z"/><polyline points="2.5,7 10.5,11.5 18.5,7"/><line x1="10.5" y1="11.5" x2="10.5" y2="19"/></svg></span>Equipment</button>
       <button data-role-gate="assistant_coach" data-panel="panel-facilities"><span class="navIcon"><svg viewBox="0 0 21 21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.5 18.5S3.5 12.3 3.5 8a7 7 0 0 1 14 0c0 4.3-7 10.5-7 10.5z"/><circle cx="10.5" cy="8" r="2.5"/></svg></span>Facilities</button>
+      <button data-role-gate="assistant_coach" data-panel="panel-booking"><span class="navIcon"><svg viewBox="0 0 21 21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="16" height="14.5" rx="2"/><line x1="2.5" y1="8.5" x2="18.5" y2="8.5"/><path d="M7 12h2M12 12h2M7 15h2"/></svg></span>Booking</button>
       <button data-role-gate="assistant_coach" data-panel="panel-fees"><span class="navIcon"><svg viewBox="0 0 21 21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="5" width="16" height="11" rx="2"/><line x1="2.5" y1="9" x2="18.5" y2="9"/><line x1="5.5" y1="12.5" x2="9" y2="12.5"/></svg></span>Fees</button>
 
       <div class="navGroupLabel">Settings</div>
@@ -430,6 +450,7 @@
       <button data-panel="panel-my-dashboard" data-show-only-for="player,parent"><span class="navIcon"><svg viewBox="0 0 21 21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="2.5" width="7" height="7" rx="1.5"/><rect x="11.5" y="2.5" width="7" height="7" rx="1.5"/><rect x="2.5" y="11.5" width="7" height="7" rx="1.5"/><rect x="11.5" y="11.5" width="7" height="7" rx="1.5"/></svg></span>My Dashboard</button>
       <button data-panel="panel-my-schedule" data-show-only-for="player,parent"><span class="navIcon"><svg viewBox="0 0 21 21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="16" height="14.5" rx="2"/><line x1="2.5" y1="8.5" x2="18.5" y2="8.5"/><line x1="6.5" y1="2" x2="6.5" y2="6"/><line x1="14.5" y1="2" x2="14.5" y2="6"/></svg></span>My Schedule</button>
       <button data-panel="panel-my-development" data-show-only-for="player,parent"><span class="navIcon"><svg viewBox="0 0 21 21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polyline points="2.5,16 8,10 12,13.5 18.5,5.5"/><polyline points="13.5,5.5 18.5,5.5 18.5,10.5"/></svg></span>My Development</button>
+      <button data-panel="panel-my-booking" data-show-only-for="player,parent"><span class="navIcon"><svg viewBox="0 0 21 21" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="4" width="16" height="14.5" rx="2"/><line x1="2.5" y1="8.5" x2="18.5" y2="8.5"/><path d="M7 12h2M12 12h2M7 15h2"/></svg></span>Book a Session</button>
     </nav>
     <button id="logout-btn">Sign out</button>
   </div>
@@ -562,6 +583,8 @@
           <input type="text" id="drill-equipment" placeholder="Equipment (optional)">
         </div>
         <input type="text" id="drill-diagram" placeholder="Diagram / video URL (optional)">
+        <label class="fd-section-label">Field Diagram <span class="muted" style="font-weight:400;">(optional — build one by tapping the ground below)</span></label>
+        <div id="fieldEditorBody"></div>
         <textarea id="drill-points" placeholder="Coaching points (optional)"></textarea>
         <button class="advanced-toggle" data-toggle="drills-advanced">+ Progressions &amp; regressions</button>
         <div class="advanced-fields" id="drills-advanced">
@@ -804,8 +827,16 @@
         </div>
       </div>
       <div id="facilities-list"></div>
-      <div class="sectionHeading" style="margin-top:20px;">Facility Booking Requests</div>
+    </div>
+
+    <!-- BOOKING (approvals for both facility and coach 1-on-1 requests) -->
+    <div class="panel" id="panel-booking">
+      <h2>Booking</h2>
+      <p style="color:var(--text-dim); font-size:13px; margin-top:-8px;">Review and approve facility and 1-on-1 coach booking requests from parents/players. Set a coach's bookable hours in Coaches.</p>
+      <div class="sectionHeading">Facility Booking Requests</div>
       <div id="facility-bookings-list"></div>
+      <div class="sectionHeading" style="margin-top:20px;">Coach Booking Requests</div>
+      <div id="coach-bookings-list"></div>
     </div>
 
     <!-- FEES (fee tracking / recording only — no payment processing) -->
@@ -903,6 +934,11 @@
       <h2>My Development</h2>
       <div id="my-portal-child-switch-3" style="max-width:280px; margin-bottom:16px;"></div>
       <div id="my-development-content"></div>
+    </div>
+    <div class="panel" id="panel-my-booking">
+      <h2>Book a Session</h2>
+      <div id="my-portal-child-switch-4" style="max-width:280px; margin-bottom:16px;"></div>
+      <div id="my-booking-content"></div>
     </div>
 
     <!-- PROFILE -->
@@ -1133,7 +1169,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-27-18:34';
+const APP_BUILD_VERSION = '2026-09-27-21:32';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -1583,7 +1619,7 @@ async function applyOrgContext(isInitialBoot) {
     // at this point, so restore wherever the person actually was instead
     // of always dropping them back on the dashboard.
     const restored = localStorage.getItem('academy_current_panel');
-    const PORTAL_PANELS = ['panel-my-dashboard', 'panel-my-schedule', 'panel-my-development'];
+    const PORTAL_PANELS = ['panel-my-dashboard', 'panel-my-schedule', 'panel-my-development', 'panel-my-booking'];
     if (restored === 'panel-player-profile' && !isPortalRole) {
       // Doesn't fit the generic zero-argument restoration path below —
       // openPlayerProfile needs to know WHICH player, which the plain
@@ -1866,11 +1902,11 @@ const panelLoaders = {
   'panel-sessions': loadSessions, 'panel-matches': loadMatches,
   'panel-assessments': loadAssessments, 'panel-analysis': loadAnalysis, 'panel-reflections': loadReflections,
   'panel-development': loadDevelopmentPanel, 'panel-testing': loadTestingPanel,
-  'panel-equipment': loadEquipment, 'panel-facilities': loadFacilities, 'panel-fees': loadFees, 'panel-branches': loadBranches,
+  'panel-equipment': loadEquipment, 'panel-facilities': loadFacilities, 'panel-booking': loadBookingPanel, 'panel-fees': loadFees, 'panel-branches': loadBranches,
   'panel-activity': loadActivity, 'panel-alerts': loadSmartAlerts, 'panel-reports': loadReportsPanel,
   'panel-coaches': loadCoachesPanel, 'panel-members': loadMembers, 'panel-profile': loadProfile,
   'panel-branding': loadBranding, 'panel-subscription': loadSubscription, 'panel-platform-admin': loadPlatformAdmin,
-  'panel-my-dashboard': loadMyDashboard, 'panel-my-schedule': loadMySchedule, 'panel-my-development': loadMyDevelopment,
+  'panel-my-dashboard': loadMyDashboard, 'panel-my-schedule': loadMySchedule, 'panel-my-development': loadMyDevelopment, 'panel-my-booking': loadMyBooking,
 };
 document.querySelectorAll('#main-nav button[data-panel]').forEach(btn => {
   btn.addEventListener('click', () => { showOnlyPanel(btn.dataset.panel); panelLoaders[btn.dataset.panel](); });
@@ -3952,6 +3988,403 @@ document.getElementById('player-search').addEventListener('input', (e) => { play
 document.getElementById('player-team-filter').addEventListener('change', (e) => { playerTeamFilterVal = e.target.value; renderPlayersList(); });
 
 // ============================================================
+// FIELD DIAGRAM BUILDER (drills) — tap-to-place markers + tap-to-draw arrows
+// on a ground, for fielding (or any) drills where a picture says more than a
+// paragraph. Up to 3 steps per drill (e.g. Setup -> Execution -> Rotation).
+// Each step stores one flat `items` array (markers and arrows mixed, in the
+// order they were added) so "Undo" is just popping the last item, and
+// render order (arrows under markers) is a simple filter at draw time.
+// Ported from the single-coach app 1:1 (same data shape, same SVG math),
+// adapted only to this app's icon()/esc()/btn class conventions.
+// ============================================================
+function fdUid(p) { return (p || 'id') + '_' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
+let fieldDraft = { steps: [], activeStep: 0, tool: null, pendingArrowStart: null };
+const FIELD_TOOLS = [
+  { id: 'coach', label: 'Coach' },
+  { id: 'player', label: 'Player' },
+  { id: 'cone', label: 'Cone' },
+  { id: 'ball', label: 'Ball' },
+  { id: 'stumps', label: 'Stumps' },
+  { id: 'arrowBall', label: 'Ball →' },
+  { id: 'arrowPlayer', label: 'Player →' }
+];
+// Small colored glyphs (mirroring the actual on-ground marker/arrow look) used
+// for the icon-only fullscreen toolbar, so each button is recognizable without
+// a text label — the normal (non-fullscreen) editor keeps full text buttons.
+function fieldToolIconSvg(id) {
+  if (id === 'coach') return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#f2994a" stroke="#3d2410" stroke-width="1.3"/><text x="12" y="16" text-anchor="middle" font-size="10" font-weight="800" fill="#2b1200" font-family="inherit">C</text></svg>`;
+  if (id === 'player') return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#f4f1e8" stroke="#0a1420" stroke-width="1.3"/><text x="12" y="15.5" text-anchor="middle" font-size="9" font-weight="700" fill="#0a1420" font-family="inherit">P</text></svg>`;
+  if (id === 'cone') return `<svg width="20" height="20" viewBox="0 0 24 24"><polygon points="12,4 4,20 20,20" fill="#f97316" stroke="#5c2c06" stroke-width="1.2"/></svg>`;
+  if (id === 'ball') return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5" fill="#c0392b" stroke="#3d0f0a" stroke-width="1.2"/></svg>`;
+  if (id === 'stumps') {
+    const sw = 1.6, sh = 13, gap = 4.2, x1 = 12 - gap, x2 = 12, x3 = 12 + gap, topY = 12 - 6.5;
+    return `<svg width="20" height="20" viewBox="0 0 24 24">
+     <rect x="${x1 - sw / 2}" y="${topY}" width="${sw}" height="${sh}" rx="0.5" fill="#e8c896" stroke="#4a3620" stroke-width="0.7"/>
+     <rect x="${x2 - sw / 2}" y="${topY}" width="${sw}" height="${sh}" rx="0.5" fill="#e8c896" stroke="#4a3620" stroke-width="0.7"/>
+     <rect x="${x3 - sw / 2}" y="${topY}" width="${sw}" height="${sh}" rx="0.5" fill="#e8c896" stroke="#4a3620" stroke-width="0.7"/>
+     <rect x="${x1 - sw / 2}" y="${topY - 1.3}" width="${gap + sw}" height="1.4" rx="0.4" fill="#c9a86a" stroke="#4a3620" stroke-width="0.6"/>
+     <rect x="${x2 - sw / 2}" y="${topY - 1.3}" width="${gap + sw}" height="1.4" rx="0.4" fill="#c9a86a" stroke="#4a3620" stroke-width="0.6"/>
+    </svg>`;
+  }
+  if (id === 'arrowBall' || id === 'arrowPlayer') {
+    const isBall = id === 'arrowBall';
+    const color = isBall ? '#c0392b' : '#3b82f6';
+    const dash = isBall ? '' : ' stroke-dasharray="3 2"';
+    return `<svg width="20" height="20" viewBox="0 0 24 24"><line x1="5" y1="19" x2="15.5" y2="8.5" stroke="${color}" stroke-width="2.2" stroke-linecap="round"${dash}/><polygon points="19,5 17.7,10.9 13.1,7" fill="${color}"/></svg>`;
+  }
+  if (id === 'shapeFull') return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/></svg>`;
+  if (id === 'shapeHalf') return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="7" width="17" height="10" rx="1.5"/></svg>`;
+  if (id === 'plus') return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`;
+  if (id === 'undo') return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`;
+  if (id === 'trash') return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12.5a2 2 0 0 0 2 1.8h6a2 2 0 0 0 2-1.8L18 7"/><path d="M9.5 7V4.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V7"/></svg>`;
+  return '';
+}
+// opts.xComp counter-scales a marker's x-extent so it still looks round/upright
+// even when the diagram itself is drawn wider than tall (see fieldDiagramSvg) —
+// the ground boundary is allowed to stretch into a wide oval to use the space,
+// but individual markers are compensated back to their normal proportions.
+// opts.compact additionally shrinks Coach/Player specifically (used only in the
+// fullscreen editor, where the bigger canvas made these tokens look oversized).
+function fieldMarkerSvg(m, opts) {
+  opts = opts || {};
+  const xComp = opts.xComp || 1;
+  const k = opts.compact ? 0.72 : 1;
+  function textWrap(x, inner) { return xComp !== 1 ? `<g transform="translate(${x} 0) scale(${xComp} 1) translate(${-x} 0)">${inner}</g>` : inner; }
+  if (m.type === 'player') {
+    const r = 2.3 * k, fs = 1.5 * k;
+    return `<g class="fdMarker" data-id="${m.id}"><ellipse cx="${m.x}" cy="${m.y}" rx="${r * xComp}" ry="${r}" fill="#f4f1e8" stroke="#0a1420" stroke-width="0.45"/>${textWrap(m.x, `<text x="${m.x}" y="${m.y + 0.5 * k}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="#0a1420" font-family="inherit">${esc(m.label || '')}</text>`)}</g>`;
+  }
+  if (m.type === 'coach') {
+    const r = 2.5 * k, fs = 1.7 * k;
+    return `<g class="fdMarker" data-id="${m.id}"><ellipse cx="${m.x}" cy="${m.y}" rx="${r * xComp}" ry="${r}" fill="#f2994a" stroke="#3d2410" stroke-width="0.45"/>${textWrap(m.x, `<text x="${m.x}" y="${m.y + 0.65 * k}" text-anchor="middle" font-size="${fs}" font-weight="800" fill="#2b1200" font-family="inherit">${esc(m.label || 'C')}</text>`)}</g>`;
+  }
+  if (m.type === 'cone') {
+    const numHtml = m.label ? textWrap(m.x, `<text x="${m.x}" y="${m.y + 2.75}" text-anchor="middle" font-size="1.5" font-weight="700" fill="#f4f1e8" font-family="inherit">${esc(m.label)}</text>`) : '';
+    return `<g class="fdMarker" data-id="${m.id}"><polygon points="${m.x},${m.y - 1.9} ${m.x - 1.65 * xComp},${m.y + 1.5} ${m.x + 1.65 * xComp},${m.y + 1.5}" fill="#f97316" stroke="#5c2c06" stroke-width="0.35"/>${numHtml}</g>`;
+  }
+  if (m.type === 'ball') return `<g class="fdMarker" data-id="${m.id}"><ellipse cx="${m.x}" cy="${m.y}" rx="${1.4 * xComp}" ry="1.4" fill="#c0392b" stroke="#3d0f0a" stroke-width="0.35"/></g>`;
+  if (m.type === 'stumps') {
+    const sw = 0.45 * xComp, sh = 3.2, gap = 1.1 * xComp, x1 = m.x - gap, x2 = m.x, x3 = m.x + gap, topY = m.y - 1.7;
+    return `<g class="fdMarker" data-id="${m.id}">
+     <rect x="${x1 - sw / 2}" y="${topY}" width="${sw}" height="${sh}" rx="0.13" fill="#e8c896" stroke="#4a3620" stroke-width="0.2"/>
+     <rect x="${x2 - sw / 2}" y="${topY}" width="${sw}" height="${sh}" rx="0.13" fill="#e8c896" stroke="#4a3620" stroke-width="0.2"/>
+     <rect x="${x3 - sw / 2}" y="${topY}" width="${sw}" height="${sh}" rx="0.13" fill="#e8c896" stroke="#4a3620" stroke-width="0.2"/>
+     <rect x="${x1 - sw / 2}" y="${topY - 0.35}" width="${gap + sw}" height="0.38" rx="0.1" fill="#c9a86a" stroke="#4a3620" stroke-width="0.16"/>
+     <rect x="${x2 - sw / 2}" y="${topY - 0.35}" width="${gap + sw}" height="0.38" rx="0.1" fill="#c9a86a" stroke="#4a3620" stroke-width="0.16"/>
+    </g>`;
+  }
+  return '';
+}
+function fieldArrowSvg(a, opts) {
+  opts = opts || {};
+  const xComp = opts.xComp || 1;
+  const isBall = a.style === 'ball';
+  const color = isBall ? '#c0392b' : '#3b82f6';
+  const dashAttr = isBall ? '' : ' stroke-dasharray="1.4 1"';
+  const markerId = isBall ? 'fdArrowBall' : 'fdArrowPlayer';
+  const line = `<line class="fdArrow" data-id="${a.id}" x1="${a.x1}" y1="${a.y1}" x2="${a.x2}" y2="${a.y2}" stroke="${color}" stroke-width="0.65" ${dashAttr} marker-end="url(#${markerId})"/>`;
+  let badge = '';
+  if (isBall && a.label) {
+    const mx = (a.x1 + a.x2) / 2, my = (a.y1 + a.y2) / 2;
+    const textEl = `<text x="${mx}" y="${my + 0.5}" text-anchor="middle" font-size="1.6" font-weight="700" fill="#f4f1e8" font-family="inherit">${esc(a.label)}</text>`;
+    const textWrapped = xComp !== 1 ? `<g transform="translate(${mx} 0) scale(${xComp} 1) translate(${-mx} 0)">${textEl}</g>` : textEl;
+    badge = `<g class="fdArrow" data-id="${a.id}"><ellipse cx="${mx}" cy="${my}" rx="${1.5 * xComp}" ry="1.5" fill="#0a1420" stroke="${color}" stroke-width="0.3"/>${textWrapped}</g>`;
+  }
+  return line + badge;
+}
+// Each diagram step keeps a fully separate marker/arrow list per ground shape
+// (step.full.items and step.half.items) so switching the Full/Half Ground
+// toggle never mixes or loses a drawing — what's drawn on one shape's
+// canvas stays there when you switch to the other and switch back.
+function normalizeFieldStep(st) {
+  st = st || {};
+  if (st.full || st.half) {
+    return { label: st.label || '', activeShape: st.activeShape === 'half' ? 'half' : 'full', full: { items: (st.full && st.full.items) || [] }, half: { items: (st.half && st.half.items) || [] } };
+  }
+  const shape = st.shape === 'half' ? 'half' : 'full';
+  const items = st.items || [];
+  return { label: st.label || '', activeShape: shape, full: { items: shape === 'half' ? [] : items }, half: { items: shape === 'half' ? items : [] } };
+}
+function curFieldShape(step) { return step.activeShape === 'half' ? 'half' : 'full'; }
+function curFieldItems(step) {
+  const shape = curFieldShape(step);
+  if (!step[shape]) step[shape] = { items: [] };
+  if (!step[shape].items) step[shape].items = [];
+  return step[shape].items;
+}
+function fieldDiagramSvg(view, opts) {
+  opts = opts || {};
+  const interactive = !!opts.interactive;
+  const shape = view.shape === 'half' ? 'half' : 'full';
+  const vb = shape === 'half' ? { w: 100, h: 60 } : { w: 100, h: 100 };
+  // opts.aspect (Full Ground fullscreen-in-landscape only) lets the wrapper be
+  // drawn wider than tall so the ground uses the extra landscape width — the
+  // boundary/pitch shapes below are left unscaled on purpose so they naturally
+  // stretch into a wide oval; fieldMarkerSvg/fieldArrowSvg counter-scale (xComp)
+  // so individual markers and labels still look round/upright on top of it.
+  const dispAspect = opts.aspect || 1;
+  const xComp = dispAspect !== 1 ? 1 / dispAspect : 1;
+  const bg = shape === 'half'
+    ? `<rect x="0" y="0" width="100" height="60" fill="#1c4726"/><rect x="38" y="50" width="24" height="8" fill="rgba(244,241,232,0.12)" stroke="rgba(244,241,232,0.5)" stroke-width="0.4"/>`
+    : `<circle cx="50" cy="50" r="48" fill="#1c4726" stroke="#f4f1e8" stroke-width="1"/><circle cx="50" cy="50" r="30" fill="none" stroke="rgba(238,242,246,0.4)" stroke-width="0.5" stroke-dasharray="2 2"/><rect x="46" y="40" width="8" height="20" fill="rgba(244,241,232,0.12)" stroke="rgba(244,241,232,0.5)" stroke-width="0.4"/>`;
+  const defs = `<defs><marker id="fdArrowBall" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="3" markerHeight="3" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#c0392b"/></marker><marker id="fdArrowPlayer" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="2.6" markerHeight="2.6" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#3b82f6"/></marker></defs>`;
+  const items = view.items || [];
+  const markerOpts = { xComp: xComp, compact: !!opts.compactMarkers };
+  const arrowsHtml = items.filter(it => it.kind === 'arrow').map(it => fieldArrowSvg(it, markerOpts)).join('');
+  const markersHtml = items.filter(it => it.kind === 'marker').map(it => fieldMarkerSvg(it, markerOpts)).join('');
+  let pendingHtml = '';
+  if (interactive && fieldDraft.pendingArrowStart) {
+    const p = fieldDraft.pendingArrowStart;
+    pendingHtml = `<ellipse cx="${p.x}" cy="${p.y}" rx="${1.6 * xComp}" ry="1.6" fill="none" stroke="#f4f1e8" stroke-width="0.4" stroke-dasharray="0.9 0.7"/>`;
+  }
+  // fill mode (used in the fullscreen editor): the svg exactly fills its wrapper,
+  // whose exact pixel size is computed by sizeFullscreenCanvas() — this is what
+  // lets the ground grow to the actual maximum the screen allows.
+  const sizeStyle = opts.fill ? 'width:100%;height:100%;display:block;border-radius:10px' : 'width:100%;height:auto;display:block;border-radius:10px';
+  const clickAttr = interactive ? ` onclick="handleFieldCanvasClick(event,this)" style="cursor:crosshair;${sizeStyle}"` : ` style="${sizeStyle}"`;
+  return `<svg viewBox="0 0 ${vb.w} ${vb.h}" preserveAspectRatio="none"${clickAttr}>${defs}${bg}${arrowsHtml}${markersHtml}${pendingHtml}</svg>`;
+}
+function fieldCanvasCoords(evt, svgEl) {
+  const rect = svgEl.getBoundingClientRect();
+  const vb = svgEl.viewBox.baseVal;
+  const px = (evt.clientX - rect.left) / rect.width;
+  const py = (evt.clientY - rect.top) / rect.height;
+  return { x: Math.max(0, Math.min(vb.width, px * vb.width)), y: Math.max(0, Math.min(vb.height, py * vb.height)) };
+}
+function handleFieldCanvasClick(evt, svgEl) {
+  const step = fieldDraft.steps[fieldDraft.activeStep];
+  if (!step) return;
+  const items = curFieldItems(step);
+  // Tapping any existing marker or arrow always deletes it — a quick way
+  // to correct a mistake without a separate delete mode.
+  const markerEl = evt.target.closest && evt.target.closest('.fdMarker');
+  if (markerEl) {
+    const id = markerEl.getAttribute('data-id');
+    const idx = items.findIndex(it => it.id === id);
+    if (idx > -1) items.splice(idx, 1);
+    renderFieldEditor();
+    return;
+  }
+  const arrowEl = evt.target.closest && evt.target.closest('.fdArrow');
+  if (arrowEl) {
+    const id = arrowEl.getAttribute('data-id');
+    const idx = items.findIndex(it => it.id === id);
+    if (idx > -1) items.splice(idx, 1);
+    renderFieldEditor();
+    return;
+  }
+  if (!fieldDraft.tool) return; // no tool selected — tapping empty ground does nothing
+  const pos = fieldCanvasCoords(evt, svgEl);
+  if (fieldDraft.tool === 'arrowBall' || fieldDraft.tool === 'arrowPlayer') {
+    if (!fieldDraft.pendingArrowStart) {
+      fieldDraft.pendingArrowStart = pos;
+    } else {
+      const isBall = fieldDraft.tool === 'arrowBall';
+      // Ball-path arrows are numbered in tap order (1st ball, 2nd ball...) so the
+      // sequence of a drill is readable at a glance; player-path arrows aren't.
+      let label = '';
+      if (isBall) {
+        const ballArrowCount = items.filter(it => it.kind === 'arrow' && it.style === 'ball').length;
+        label = String(ballArrowCount + 1);
+      }
+      items.push({ id: fdUid('fditem'), kind: 'arrow', style: isBall ? 'ball' : 'player', x1: fieldDraft.pendingArrowStart.x, y1: fieldDraft.pendingArrowStart.y, x2: pos.x, y2: pos.y, label });
+      fieldDraft.pendingArrowStart = null;
+    }
+    renderFieldEditor();
+    return;
+  }
+  // Player, Coach and Cone markers are numbered in the order they're tapped
+  // (P1/P2..., C1/C2..., 1/2...) so a drill's structure reads clearly; Ball
+  // and Stumps markers are unlabeled since they're usually single/fixed points.
+  let label = '';
+  if (fieldDraft.tool === 'player') {
+    const playerCount = items.filter(it => it.kind === 'marker' && it.type === 'player').length;
+    label = 'P' + (playerCount + 1);
+  } else if (fieldDraft.tool === 'coach') {
+    const coachCount = items.filter(it => it.kind === 'marker' && it.type === 'coach').length;
+    label = 'C' + (coachCount + 1);
+  } else if (fieldDraft.tool === 'cone') {
+    const coneCount = items.filter(it => it.kind === 'marker' && it.type === 'cone').length;
+    label = String(coneCount + 1);
+  }
+  items.push({ id: fdUid('fditem'), kind: 'marker', type: fieldDraft.tool, x: pos.x, y: pos.y, label });
+  renderFieldEditor();
+}
+function fieldEditorHtml(fullscreen) {
+  fullscreen = !!fullscreen;
+  const step = fieldDraft.steps[fieldDraft.activeStep];
+  if (!step) return `<button type="button" class="btn small ghost" onclick="addFieldStep()">+ Add Diagram Step</button>`;
+  const shape = curFieldShape(step);
+  const view = { shape: shape, items: curFieldItems(step) };
+  if (fullscreen) {
+    // Fullscreen shows ONLY the ground and an icon-only toolbar for every control
+    // (exit, step switch, shape, markers/arrows, undo, clear) — no text labels, no
+    // step-label box, no instructions — so nearly the whole screen goes to the
+    // ground. Rename a step or read the instructions in the normal (non-fullscreen)
+    // editor; every action here is still fully available, just condensed to icons
+    // with a `title` tooltip on hover for reference.
+    const stepPills = fieldDraft.steps.length > 1 ? fieldDraft.steps.map((st, i) => `<button type="button" class="btn small ${i === fieldDraft.activeStep ? '' : 'ghost'} fdFsStepPill" title="${esc(st.label || ('Step ' + (i + 1)))}" onclick="switchFieldStep(${i})">${i + 1}</button>`).join('') : '';
+    const addStepBtn = fieldDraft.steps.length < 3 ? `<button type="button" class="btn small ghost" title="Add Diagram Step" onclick="addFieldStep()">${fieldToolIconSvg('plus')}</button>` : '';
+    const removeStepBtn = fieldDraft.steps.length > 1 ? `<button type="button" class="btn small danger" title="Remove This Step" onclick="removeFieldStep(${fieldDraft.activeStep})">${fieldToolIconSvg('trash')}</button>` : '';
+    const shapeBtns = `<button type="button" class="btn small ${shape !== 'half' ? '' : 'ghost'}" title="Full Ground" onclick="updateFieldStepShape('full')">${fieldToolIconSvg('shapeFull')}</button><button type="button" class="btn small ${shape === 'half' ? '' : 'ghost'}" title="Half Ground" onclick="updateFieldStepShape('half')">${fieldToolIconSvg('shapeHalf')}</button>`;
+    const toolBtns = FIELD_TOOLS.map(t => `<button type="button" class="btn small ${fieldDraft.tool === t.id ? '' : 'ghost'}" title="${esc(t.label)}" onclick="setFieldTool('${t.id}')">${fieldToolIconSvg(t.id)}</button>`).join('');
+    const exitBtn = `<button type="button" class="btn small ghost" title="Exit Fullscreen" onclick="closeFieldFullscreen()" style="font-size:16px;font-weight:700">✕</button>`;
+    const undoBtn = `<button type="button" class="btn small ghost" title="Undo" onclick="undoFieldLast()">${fieldToolIconSvg('undo')}</button>`;
+    const clearBtn = `<button type="button" class="btn small danger" title="Clear Drawing" onclick="clearFieldStep()">${fieldToolIconSvg('trash')}</button>`;
+    const toolbar = `<div class="fdFsToolbar">${exitBtn}${stepPills}${addStepBtn}${removeStepBtn}${shapeBtns}${toolBtns}${undoBtn}${clearBtn}</div>`;
+    // The wrapper's exact pixel width/height is computed and set by
+    // sizeFullscreenCanvas() right after this markup is inserted — CSS
+    // aspect-ratio inside a flex layout distorts under flex-shrink, so JS
+    // measurement is what actually gets the ground to the true maximum size
+    // the screen allows, correctly proportioned, in both portrait (toolbar on
+    // top) and landscape (toolbar as a side rail).
+    const dispAspect = fieldFsAspect(shape);
+    const canvasArea = `<div id="fieldFsCanvasArea" class="fdFsCanvasArea"><div id="fieldFsCanvasWrap">${fieldDiagramSvg(view, { interactive: true, fill: true, aspect: dispAspect, compactMarkers: true })}</div></div>`;
+    return `${toolbar}${canvasArea}`;
+  }
+  const tabsHtml = fieldDraft.steps.map((st, i) => `<button type="button" class="btn small ${i === fieldDraft.activeStep ? '' : 'ghost'}" style="padding:6px 10px;font-size:12.5px" onclick="switchFieldStep(${i})">${esc(st.label || ('Step ' + (i + 1)))}</button>`).join('');
+  const toolsHtml = FIELD_TOOLS.map(t => `<button type="button" class="btn small ${fieldDraft.tool === t.id ? '' : 'ghost'}" style="padding:6px 9px;font-size:12px;white-space:nowrap" onclick="setFieldTool('${t.id}')">${t.label}</button>`).join('');
+  const controlsHtml = `
+   <div class="fd-tabs-row">${tabsHtml}${fieldDraft.steps.length < 3 ? `<button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12.5px" onclick="addFieldStep()">+ Step</button>` : ''}${fieldDraft.steps.length > 1 ? `<button type="button" class="btn small danger" style="padding:6px 10px;font-size:12.5px" onclick="removeFieldStep(${fieldDraft.activeStep})">Remove Step</button>` : ''}</div>
+   <input type="text" class="fd-step-label-input" placeholder="Step label (optional) — e.g. Setup" value="${esc(step.label || '')}" onchange="updateFieldStepLabel(this.value)">
+   <div class="fd-shape-row">
+    <button type="button" class="btn small ${shape !== 'half' ? '' : 'ghost'}" style="padding:6px 12px;font-size:12px" onclick="updateFieldStepShape('full')">Full Ground</button>
+    <button type="button" class="btn small ${shape === 'half' ? '' : 'ghost'}" style="padding:6px 12px;font-size:12px" onclick="updateFieldStepShape('half')">Half Ground</button>
+   </div>
+   <div class="fd-tools-row">${toolsHtml}</div>
+   <div class="fd-hint">Tap the ground to place a marker, or to draw an arrow (tap start, then end). Tap an existing marker or arrow to remove it. Full Ground and Half Ground each keep their own separate drawing for this step.</div>`;
+  const bottomBar = `<div class="fd-bottom-bar">
+    <button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12px" onclick="undoFieldLast()">Undo</button>
+    <button type="button" class="btn small danger" style="padding:6px 10px;font-size:12px" onclick="clearFieldStep()">Clear Step</button>
+    <button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12px" onclick="openFieldFullscreen()">⛶ Fullscreen</button>
+   </div>`;
+  return `${controlsHtml}<div class="fd-canvas-wrap">${fieldDiagramSvg(view, { interactive: true })}</div>${bottomBar}`;
+}
+// Full Ground stays a true circle (aspect 1) in every orientation. Half Ground
+// is already wide (100:60) and needs no change either way.
+function isLandscapeNow() { return !!(window.matchMedia && window.matchMedia('(orientation: landscape)').matches); }
+function fieldFsAspect(shape) { return shape === 'half' ? (100 / 60) : 1; }
+function sizeFullscreenCanvas() {
+  const area = document.getElementById('fieldFsCanvasArea');
+  const wrap = document.getElementById('fieldFsCanvasWrap');
+  if (!area || !wrap) return;
+  const step = fieldDraft.steps[fieldDraft.activeStep];
+  if (!step) return;
+  const aspect = fieldFsAspect(curFieldShape(step));
+  const availW = area.clientWidth, availH = area.clientHeight;
+  if (availW <= 0 || availH <= 0) return;
+  let w = availW, h = w / aspect;
+  if (h > availH) { h = availH; w = h * aspect; }
+  wrap.style.width = w + 'px';
+  wrap.style.height = h + 'px';
+}
+function renderFieldEditor() {
+  const box = document.getElementById('fieldEditorBody');
+  if (box) box.innerHTML = fieldEditorHtml(false);
+  const fsBox = document.getElementById('fieldEditorFullscreenBody');
+  if (fsBox) { fsBox.innerHTML = fieldEditorHtml(true); sizeFullscreenCanvas(); }
+}
+function openFieldFullscreen() {
+  const overlay = document.createElement('div');
+  overlay.id = 'fieldFullscreenOverlay';
+  overlay.style.cssText = 'position:fixed;inset:0;z-index:9990;background:var(--navy);padding:4px';
+  // #fieldEditorFullscreenBody (.fdFsOverlay) is a flex column filling the
+  // overlay's full height. In portrait the toolbar sits at the BOTTOM (CSS
+  // `order`, below the ground) rather than the top, since a top bar can get
+  // clipped by a phone's status bar/notch/camera cutout inside some in-app
+  // browsers — the bottom is both clear of that and easier to reach with a
+  // thumb. In landscape a media query flips it to a row (toolbar back to
+  // natural DOM order, a side rail on the left). Either way the ground gets
+  // nearly the entire screen. 100dvh (where supported) accounts for mobile
+  // browser chrome more accurately than 100vh; the vh line is a fallback.
+  overlay.innerHTML = `<div id="fieldEditorFullscreenBody" class="fdFsOverlay" style="height:calc(100vh - 8px);height:calc(100dvh - 8px);min-height:0;width:100%">${fieldEditorHtml(true)}</div>`;
+  document.body.appendChild(overlay);
+  sizeFullscreenCanvas();
+  window.addEventListener('resize', sizeFullscreenCanvas);
+  window.addEventListener('orientationchange', sizeFullscreenCanvas);
+  maybeShowLandscapeHint();
+}
+function closeFieldFullscreen() {
+  window.removeEventListener('resize', sizeFullscreenCanvas);
+  window.removeEventListener('orientationchange', sizeFullscreenCanvas);
+  const el = document.getElementById('fieldFullscreenOverlay');
+  if (el) el.remove();
+}
+// One-time (ever) nudge to rotate for a bigger view — only worth showing for
+// Half Ground, since that wide shape is the one that actually gains a lot from
+// landscape's side-rail toolbar; Full Ground (a circle) doesn't grow from it.
+function maybeShowLandscapeHint() {
+  if (localStorage.getItem('procoach_academy_landscape_hint_shown')) return;
+  const step = fieldDraft.steps[fieldDraft.activeStep];
+  if (!step || curFieldShape(step) !== 'half') return;
+  if (!window.matchMedia || !window.matchMedia('(orientation: portrait)').matches) return;
+  const overlay = document.getElementById('fieldFullscreenOverlay');
+  if (!overlay) return;
+  localStorage.setItem('procoach_academy_landscape_hint_shown', '1');
+  const hint = document.createElement('div');
+  hint.id = 'fdLandscapeHint';
+  hint.style.cssText = 'position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:2;background:var(--surface);border:1px solid var(--surface-border);border-radius:12px;padding:8px 12px;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow);max-width:88vw';
+  hint.innerHTML = `<span style="font-size:13px">Rotate your phone for a bigger view</span><button type="button" class="btn small ghost" style="padding:3px 9px;font-size:12px" onclick="document.getElementById('fdLandscapeHint').remove()">Got it</button>`;
+  overlay.appendChild(hint);
+}
+function setFieldTool(t) {
+  fieldDraft.tool = fieldDraft.tool === t ? null : t;
+  fieldDraft.pendingArrowStart = null;
+  renderFieldEditor();
+}
+function switchFieldStep(i) {
+  fieldDraft.activeStep = i; fieldDraft.tool = null; fieldDraft.pendingArrowStart = null;
+  renderFieldEditor();
+}
+function addFieldStep() {
+  if (fieldDraft.steps.length >= 3) return;
+  fieldDraft.steps.push({ label: '', activeShape: 'full', full: { items: [] }, half: { items: [] } });
+  fieldDraft.activeStep = fieldDraft.steps.length - 1; fieldDraft.tool = null; fieldDraft.pendingArrowStart = null;
+  renderFieldEditor();
+}
+function removeFieldStep(i) {
+  fieldDraft.steps.splice(i, 1);
+  fieldDraft.activeStep = Math.max(0, Math.min(fieldDraft.activeStep, fieldDraft.steps.length - 1));
+  fieldDraft.tool = null; fieldDraft.pendingArrowStart = null;
+  renderFieldEditor();
+}
+function updateFieldStepLabel(value) {
+  const step = fieldDraft.steps[fieldDraft.activeStep];
+  if (step) step.label = value;
+}
+function updateFieldStepShape(shape) {
+  const step = fieldDraft.steps[fieldDraft.activeStep];
+  if (!step) return;
+  // Just switches which of the step's two independent drawings (full/half)
+  // is being viewed and edited — never moves or copies items between them.
+  step.activeShape = shape === 'half' ? 'half' : 'full';
+  fieldDraft.tool = null; fieldDraft.pendingArrowStart = null;
+  renderFieldEditor();
+}
+function undoFieldLast() {
+  const step = fieldDraft.steps[fieldDraft.activeStep];
+  if (!step) return;
+  const items = curFieldItems(step);
+  if (!items.length) return;
+  items.pop();
+  renderFieldEditor();
+}
+function clearFieldStep() {
+  const step = fieldDraft.steps[fieldDraft.activeStep];
+  if (!step) return;
+  const shapeLabel = curFieldShape(step) === 'half' ? 'Half Ground' : 'Full Ground';
+  if (!confirm(`Clear everything on this step's ${shapeLabel} diagram?`)) return;
+  step[curFieldShape(step)].items = [];
+  renderFieldEditor();
+}
+function fieldStepsPreviewHtml(fieldSteps, size) {
+  if (!fieldSteps || !fieldSteps.length) return '';
+  size = size || 130;
+  const steps = fieldSteps.map(normalizeFieldStep);
+  return `<div class="fieldStepPreviewWrap">${steps.map(st => { const shape = curFieldShape(st); const view = { shape: shape, items: curFieldItems(st) }; return `<div style="width:${size}px"><div style="font-size:${size >= 200 ? '13px' : '11px'};color:var(--text-dim);margin-bottom:3px;text-align:center">${esc(st.label || '')}</div>${fieldDiagramSvg(view, { interactive: false })}</div>`; }).join('')}</div>`;
+}
+
+// ============================================================
 // DRILLS (org-wide)
 // ============================================================
 async function loadDrills() {
@@ -3962,10 +4395,11 @@ async function loadDrills() {
   if (error) { listEl.innerHTML = `<div class="empty-state">${error.message}</div>`; return; }
   cache.drills = data || [];
   if (!cache.drills.length) { listEl.innerHTML = '<div class="empty-state">No drills yet.</div>'; return; }
-  renderPagedList(listEl, cache.drills, d => listRow(esc(d.name), d.category || '',
+  renderPagedList(listEl, cache.drills, d => listRow(esc(d.name) + fieldStepsPreviewHtml(d.field_steps, 70), d.category || '',
     roleAtLeast('head_coach') ? () => editDrill(d) : null,
     roleAtLeast('head_coach') ? async () => { if (!confirmDelete(d.name)) return; await supabase.from('drills').delete().eq('id', d.id); loadDrills(); } : null
   ));
+  if (!editing.drills) { fieldDraft = { steps: [], activeStep: 0, tool: null, pendingArrowStart: null }; renderFieldEditor(); }
 }
 function editDrill(d) {
   editing.drills = d.id;
@@ -3979,12 +4413,16 @@ function editDrill(d) {
   document.getElementById('drill-regressions').value = d.regressions || '';
   document.getElementById('save-drill-btn').textContent = 'Save changes';
   document.getElementById('cancel-drill-btn').style.display = 'inline-block';
+  fieldDraft = { steps: (d.field_steps || []).map(st => JSON.parse(JSON.stringify(normalizeFieldStep(st)))), activeStep: 0, tool: null, pendingArrowStart: null };
+  renderFieldEditor();
 }
 document.getElementById('cancel-drill-btn').addEventListener('click', () => {
   editing.drills = null;
   ['drill-name','drill-category','drill-duration','drill-equipment','drill-diagram','drill-points','drill-progressions','drill-regressions'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('save-drill-btn').textContent = 'Add drill';
   document.getElementById('cancel-drill-btn').style.display = 'none';
+  fieldDraft = { steps: [], activeStep: 0, tool: null, pendingArrowStart: null };
+  renderFieldEditor();
 });
 document.getElementById('save-drill-btn').addEventListener('click', async () => {
   const name = document.getElementById('drill-name').value.trim();
@@ -3998,6 +4436,7 @@ document.getElementById('save-drill-btn').addEventListener('click', async () => 
     points: document.getElementById('drill-points').value.trim() || null,
     progressions: document.getElementById('drill-progressions').value.trim() || null,
     regressions: document.getElementById('drill-regressions').value.trim() || null,
+    field_steps: JSON.parse(JSON.stringify(fieldDraft.steps)),
   };
   const { error } = editing.drills
     ? await supabase.from('drills').update(row).eq('id', editing.drills)
@@ -5983,7 +6422,6 @@ async function renderMyDashboardFor(player) {
   const pastMatchesPlayed = (pastMatchesRes.data || []).filter(m => (m.playing_xi || []).includes(player.id));
 
   let html = `<div class="entityCard"><b>${esc(player.name)}</b><div class="muted">${esc(player.teams?.name || '—')}${player.teams?.branches?.name ? ' · ' + esc(player.teams.branches.name) : ''}${player.role ? ' · ' + esc(player.role) : ''}</div></div>`;
-  html += `<button type="button" class="btn primary" id="open-facility-booking-btn" style="margin:10px 0; width:auto;">📅 Book a Facility</button>`;
   const announcements = announceRes.data || [];
   if (announcements.length) {
     html += '<div class="sectionHeading">Announcements</div>';
@@ -6015,29 +6453,10 @@ async function renderMyDashboardFor(player) {
     return `<div class="list-item"><span>vs ${esc(m.opponent || '—')} <span class="muted">${esc(summary)}</span></span><span class="role-tag">${esc(m.date)}</span></div>`;
   }).join('');
 
-  const { data: myBookings } = await supabase.from('facility_bookings')
-    .select('id, date, start_time, end_time, status, rejection_reason, facilities(name)')
-    .eq('requested_by', session.user.id).gte('date', today).order('date').order('start_time');
-  html += '<div class="sectionHeading">My facility bookings</div>';
-  if (!myBookings || !myBookings.length) html += '<div class="empty-state">No upcoming bookings.</div>';
-  else html += myBookings.map(b => `<div class="list-item" data-my-booking-id="${b.status === 'pending' ? esc(b.id) : ''}"><span>${esc(b.facilities?.name || 'Facility')} <span class="muted">${esc(b.start_time?.slice(0, 5))}–${esc(b.end_time?.slice(0, 5))}</span>${b.status === 'rejected' && b.rejection_reason ? `<div class="muted">${esc(b.rejection_reason)}</div>` : ''}</span><span class="role-tag" style="${b.status === 'rejected' || b.status === 'cancelled' ? 'background:var(--danger-tint); color:var(--danger);' : ''}">${esc(b.status)} · ${esc(b.date)}${b.status === 'pending' ? ' · tap to cancel' : ''}</span></div>`).join('');
-
   contentEl.innerHTML = html;
-
-  document.getElementById('open-facility-booking-btn').addEventListener('click', () => openFacilityBookingForm(player));
-  contentEl.querySelectorAll('[data-my-booking-id]').forEach(el => {
-    el.style.cursor = 'pointer';
-    el.addEventListener('click', async () => {
-      if (!confirm('Cancel this booking request?')) return;
-      const { error } = await supabase.from('facility_bookings').update({ status: 'cancelled' }).eq('id', el.dataset.myBookingId);
-      if (error) { showToast(error.message, 'error'); return; }
-      showToast('Cancelled.', 'ok');
-      renderMyDashboardFor(player);
-    });
-  });
 }
 
-async function openFacilityBookingForm(player) {
+async function openFacilityBookingForm(player, onDone) {
   const { data: facilities, error: facErr } = await supabase.from('facilities').select('id, name, open_time, close_time, closed_days').eq('org_id', currentOrgId).order('name');
   if (facErr || !facilities?.length) { showToast('No facilities available to book yet.', 'error'); return; }
 
@@ -6103,9 +6522,126 @@ async function openFacilityBookingForm(player) {
     if (error) { statusEl.textContent = error.message; statusEl.className = 'status-msg error'; return; }
     showToast('Booking requested — waiting for approval.', 'ok');
     const facilityName = facilities.find(f => f.id === facilityId)?.name || 'a facility';
-    notifyOrgCoaches('New facility booking request', `${player.name} requested ${facilityName}, ${start.slice(0, 5)}–${end.slice(0, 5)} on ${date}`, 'panel-facilities');
+    notifyOrgCoaches('New facility booking request', `${player.name} requested ${facilityName}, ${start.slice(0, 5)}–${end.slice(0, 5)} on ${date}`, 'panel-booking');
     closeSheet();
-    renderMyDashboardFor(player);
+    if (onDone) onDone();
+  });
+}
+async function loadMyBooking() {
+  const contentEl = document.getElementById('my-booking-content');
+  contentEl.innerHTML = '<div class="empty-state">Loading...</div>';
+  const players = await fetchMyPortalPlayers();
+  document.getElementById('my-portal-child-switch-4').innerHTML = '';
+  if (!players.length) { contentEl.innerHTML = '<div class="empty-state">No linked player found yet. Ask your coach to link your account to a player profile.</div>'; return; }
+  renderChildSwitcher('my-portal-child-switch-4', players, (id) => renderMyBookingFor(players.find(p => p.id === id)));
+  renderMyBookingFor(players[0]);
+}
+async function renderMyBookingFor(player) {
+  const contentEl = document.getElementById('my-booking-content');
+  contentEl.innerHTML = '<div class="empty-state">Loading...</div>';
+  const today = new Date().toISOString().slice(0, 10);
+  const [facilityBookingsRes, coachBookingsRes] = await Promise.all([
+    supabase.from('facility_bookings').select('id, date, start_time, end_time, status, rejection_reason, facilities(name)')
+      .eq('requested_by', session.user.id).gte('date', today).order('date').order('start_time'),
+    supabase.from('coach_bookings').select('id, date, start_time, end_time, status, rejection_reason, coach_user_id')
+      .eq('requested_by', session.user.id).gte('date', today).order('date').order('start_time'),
+  ]);
+  const coachNameByUser = await profilesByIds((coachBookingsRes.data || []).map(b => b.coach_user_id));
+
+  let html = `<button type="button" class="btn primary" id="open-facility-booking-btn" style="margin:10px 0 6px; width:auto;">📅 Book a Facility</button>`;
+  const myFacilityBookings = facilityBookingsRes.data || [];
+  html += '<div class="sectionHeading">My facility bookings</div>';
+  html += myFacilityBookings.length ? myFacilityBookings.map(b => `<div class="list-item" data-my-facility-booking-id="${b.status === 'pending' ? esc(b.id) : ''}"><span>${esc(b.facilities?.name || 'Facility')} <span class="muted">${esc(b.start_time?.slice(0, 5))}–${esc(b.end_time?.slice(0, 5))}</span>${b.status === 'rejected' && b.rejection_reason ? `<div class="muted">${esc(b.rejection_reason)}</div>` : ''}</span><span class="role-tag" style="${b.status === 'rejected' || b.status === 'cancelled' ? 'background:var(--danger-tint); color:var(--danger);' : ''}">${esc(b.status)} · ${esc(b.date)}${b.status === 'pending' ? ' · tap to cancel' : ''}</span></div>`).join('') : '<div class="empty-state">No upcoming bookings.</div>';
+
+  html += `<button type="button" class="btn primary" id="open-coach-booking-btn" style="margin:20px 0 6px; width:auto;">🧑‍🏫 Book a Coach</button>`;
+  const myCoachBookings = coachBookingsRes.data || [];
+  html += '<div class="sectionHeading">My coach bookings</div>';
+  html += myCoachBookings.length ? myCoachBookings.map(b => `<div class="list-item" data-my-coach-booking-id="${b.status === 'pending' ? esc(b.id) : ''}"><span>Coach ${esc(coachNameByUser[b.coach_user_id] || 'Unknown')} <span class="muted">${esc(b.start_time?.slice(0, 5))}–${esc(b.end_time?.slice(0, 5))}</span>${b.status === 'rejected' && b.rejection_reason ? `<div class="muted">${esc(b.rejection_reason)}</div>` : ''}</span><span class="role-tag" style="${b.status === 'rejected' || b.status === 'cancelled' ? 'background:var(--danger-tint); color:var(--danger);' : ''}">${esc(b.status)} · ${esc(b.date)}${b.status === 'pending' ? ' · tap to cancel' : ''}</span></div>`).join('') : '<div class="empty-state">No upcoming bookings.</div>';
+
+  contentEl.innerHTML = html;
+
+  document.getElementById('open-facility-booking-btn').addEventListener('click', () => openFacilityBookingForm(player, () => renderMyBookingFor(player)));
+  document.getElementById('open-coach-booking-btn').addEventListener('click', () => openCoachBookingForm(player, () => renderMyBookingFor(player)));
+  contentEl.querySelectorAll('[data-my-facility-booking-id]').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', async () => {
+      if (!confirm('Cancel this booking request?')) return;
+      const { error } = await supabase.from('facility_bookings').update({ status: 'cancelled' }).eq('id', el.dataset.myFacilityBookingId);
+      if (error) { showToast(error.message, 'error'); return; }
+      showToast('Cancelled.', 'ok');
+      renderMyBookingFor(player);
+    });
+  });
+  contentEl.querySelectorAll('[data-my-coach-booking-id]').forEach(el => {
+    el.style.cursor = 'pointer';
+    el.addEventListener('click', async () => {
+      if (!confirm('Cancel this booking request?')) return;
+      const { error } = await supabase.from('coach_bookings').update({ status: 'cancelled' }).eq('id', el.dataset.myCoachBookingId);
+      if (error) { showToast(error.message, 'error'); return; }
+      showToast('Cancelled.', 'ok');
+      renderMyBookingFor(player);
+    });
+  });
+}
+async function openCoachBookingForm(player, onDone) {
+  const { data: coaches, error: coachErr } = await supabase.rpc('list_bookable_coaches', { p_org_id: currentOrgId });
+  if (coachErr || !coaches?.length) { showToast('No coaches available to book yet.', 'error'); return; }
+  const nameByUser = await profilesByIds(coaches.map(c => c.user_id));
+
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().slice(0, 10);
+  openSheet(sheetHead('Book a Coach') + `
+    <div class="formgrid">
+      <label class="full">Coach<select id="coach-booking-coach">${coaches.map(c => `<option value="${esc(c.user_id)}">${esc(nameByUser[c.user_id] || 'Coach')}</option>`).join('')}</select></label>
+      <label class="full">Date<input type="date" id="coach-booking-date" value="${tomorrow}" min="${new Date().toISOString().slice(0, 10)}"></label>
+    </div>
+    <div id="coach-booking-existing" style="margin:10px 0;"></div>
+    <div class="formgrid">
+      <label>Start time<input type="time" id="coach-booking-start"></label>
+      <label>End time<input type="time" id="coach-booking-end"></label>
+      <label class="full">Purpose <span class="muted" style="font-weight:400;">(optional)</span><textarea id="coach-booking-purpose" placeholder="e.g. Batting technique work"></textarea></label>
+    </div>
+    <div class="status-msg" id="coach-booking-status"></div>
+    <button class="btn primary" id="coach-booking-submit-btn" style="margin-top:10px; width:auto;">Request booking</button>`);
+
+  async function refreshExisting() {
+    const coachId = document.getElementById('coach-booking-coach').value;
+    const date = document.getElementById('coach-booking-date').value;
+    const existingEl = document.getElementById('coach-booking-existing');
+    if (!date) { existingEl.innerHTML = ''; return; }
+    const coach = coaches.find(c => c.user_id === coachId);
+    const dayName = new Date(date + 'T00:00:00').toLocaleDateString('en-US', { weekday: 'long' });
+    if (coach.booking_closed_days?.includes(dayName)) { existingEl.innerHTML = `<div class="empty-state">Not bookable on ${esc(dayName)}s.</div>`; return; }
+    const hoursNote = (coach.booking_open_time || coach.booking_close_time) ? `Available ${esc((coach.booking_open_time || '00:00').slice(0, 5))}–${esc((coach.booking_close_time || '23:59').slice(0, 5))}` : 'No fixed hours set';
+    const { data: existing } = await supabase.from('coach_bookings').select('start_time, end_time').eq('coach_user_id', coachId).eq('org_id', currentOrgId).eq('date', date).in('status', ['pending', 'confirmed']);
+    const taken = (existing || []).map(b => `${b.start_time.slice(0, 5)}–${b.end_time.slice(0, 5)} (requested)`);
+    existingEl.innerHTML = `<div class="muted">${hoursNote}</div>` + (taken.length ? taken.map(t => `<div class="list-item"><span>${esc(t)}</span></div>`).join('') : '<div class="empty-state">Nothing booked yet that day.</div>');
+  }
+  document.getElementById('coach-booking-coach').addEventListener('change', refreshExisting);
+  document.getElementById('coach-booking-date').addEventListener('change', refreshExisting);
+  refreshExisting();
+
+  document.getElementById('coach-booking-submit-btn').addEventListener('click', async () => {
+    const coachId = document.getElementById('coach-booking-coach').value;
+    const date = document.getElementById('coach-booking-date').value;
+    const start = document.getElementById('coach-booking-start').value;
+    const end = document.getElementById('coach-booking-end').value;
+    const statusEl = document.getElementById('coach-booking-status');
+    if (!date || !start || !end) { statusEl.textContent = 'Date, start time, and end time are required.'; statusEl.className = 'status-msg error'; return; }
+    if (start >= end) { statusEl.textContent = 'End time must be after start time.'; statusEl.className = 'status-msg error'; return; }
+    statusEl.textContent = 'Checking availability...'; statusEl.className = 'status-msg';
+    const { data: available, error: checkErr } = await supabase.rpc('is_coach_available', { p_org_id: currentOrgId, p_coach_user_id: coachId, p_date: date, p_start: start, p_end: end });
+    if (checkErr) { statusEl.textContent = checkErr.message; statusEl.className = 'status-msg error'; return; }
+    if (!available) { statusEl.textContent = 'That slot isn\'t available — check the list above and try a different time.'; statusEl.className = 'status-msg error'; return; }
+    const { error } = await supabase.from('coach_bookings').insert({
+      org_id: currentOrgId, coach_user_id: coachId, requested_by: session.user.id, player_id: player.id,
+      date, start_time: start, end_time: end, purpose: document.getElementById('coach-booking-purpose').value.trim() || null,
+    });
+    if (error) { statusEl.textContent = error.message; statusEl.className = 'status-msg error'; return; }
+    showToast('Booking requested — waiting for approval.', 'ok');
+    notifyUser(coachId, 'New coach booking request', `${player.name} requested you, ${start.slice(0, 5)}–${end.slice(0, 5)} on ${date}`, 'panel-booking');
+    notifyOrgCoaches('New coach booking request', `${player.name} requested ${nameByUser[coachId] || 'a coach'}, ${start.slice(0, 5)}–${end.slice(0, 5)} on ${date}`, 'panel-booking');
+    closeSheet();
+    if (onDone) onDone();
   });
 }
 async function loadMySchedule() {
@@ -7324,7 +7860,6 @@ document.getElementById('save-equipment-btn').addEventListener('click', async ()
 async function loadFacilities() {
   document.getElementById('facilities-add-form').style.display = roleAtLeast('head_coach') ? 'block' : 'none';
   await populateBranchSelect('facility-branch');
-  loadFacilityBookings();
   const listEl = document.getElementById('facilities-list');
   listEl.innerHTML = '<div class="empty-state">Loading...</div>';
   const { data, error } = await supabase.from('facilities').select('*').eq('org_id', currentOrgId).order('name');
@@ -7370,7 +7905,7 @@ async function loadFacilityBookings() {
       if (error) { showToast(error.message, 'error'); return; }
       if (!updated.length) { showToast('This request was already handled — refreshing.', 'error'); loadFacilityBookings(); return; }
       showToast('Approved.', 'ok');
-      notifyUser(booking.requested_by, 'Facility booking approved', `${booking.facilities?.name || 'Facility'}, ${booking.start_time.slice(0, 5)}–${booking.end_time.slice(0, 5)} on ${booking.date}`, 'panel-my-dashboard');
+      notifyUser(booking.requested_by, 'Facility booking approved', `${booking.facilities?.name || 'Facility'}, ${booking.start_time.slice(0, 5)}–${booking.end_time.slice(0, 5)} on ${booking.date}`, 'panel-my-booking');
       loadFacilityBookings();
     };
   });
@@ -7384,9 +7919,81 @@ async function loadFacilityBookings() {
       if (error) { showToast(error.message, 'error'); return; }
       if (!updated.length) { showToast('This request was already handled — refreshing.', 'error'); loadFacilityBookings(); return; }
       showToast('Rejected.', 'ok');
-      notifyUser(booking.requested_by, 'Facility booking rejected', `${booking.facilities?.name || 'Facility'}, ${booking.start_time.slice(0, 5)}–${booking.end_time.slice(0, 5)} on ${booking.date}${reason.trim() ? ' — ' + reason.trim() : ''}`, 'panel-my-dashboard');
+      notifyUser(booking.requested_by, 'Facility booking rejected', `${booking.facilities?.name || 'Facility'}, ${booking.start_time.slice(0, 5)}–${booking.end_time.slice(0, 5)} on ${booking.date}${reason.trim() ? ' — ' + reason.trim() : ''}`, 'panel-my-booking');
       loadFacilityBookings();
     };
+  });
+}
+async function loadBookingPanel() {
+  loadFacilityBookings();
+  loadCoachBookings();
+}
+async function loadCoachBookings() {
+  const listEl = document.getElementById('coach-bookings-list');
+  listEl.innerHTML = '<div class="empty-state">Loading...</div>';
+  const { data, error } = await supabase.from('coach_bookings')
+    .select('id, date, start_time, end_time, status, purpose, requested_by, coach_user_id, player_id, players(name)')
+    .eq('org_id', currentOrgId).eq('status', 'pending').order('date').order('start_time');
+  if (error) { reportError(error, 'Coach bookings'); listEl.innerHTML = `<div class="empty-state">${error.message}</div>`; return; }
+  if (!data.length) { listEl.innerHTML = '<div class="empty-state">No pending booking requests.</div>'; return; }
+  const nameByUser = await profilesByIds([...data.map(b => b.requested_by), ...data.map(b => b.coach_user_id)]);
+  const canApprove = roleAtLeast('head_coach');
+  listEl.innerHTML = data.map(b => `<div class="list-item" data-booking-id="${esc(b.id)}">
+    <span><b>Coach ${esc(nameByUser[b.coach_user_id] || 'Unknown')}</b> ${esc(b.start_time.slice(0, 5))}–${esc(b.end_time.slice(0, 5))} · ${esc(b.date)}
+      <div class="muted">${esc(b.players?.name ? 'For ' + b.players.name + ' · ' : '')}Requested by ${esc(nameByUser[b.requested_by] || 'someone')}${b.purpose ? ' · ' + esc(b.purpose) : ''}</div>
+    </span>
+    ${canApprove ? `<span style="display:flex; gap:6px;"><button class="btn small" data-approve-coach-booking="${esc(b.id)}">Approve</button><button class="btn small danger" data-reject-coach-booking="${esc(b.id)}">Reject</button></span>` : '<span class="role-tag">pending</span>'}
+  </div>`).join('');
+  listEl.querySelectorAll('[data-approve-coach-booking]').forEach(btn => {
+    btn.onclick = () => openApproveCoachBookingSheet(data.find(b => b.id === btn.dataset.approveCoachBooking), nameByUser);
+  });
+  listEl.querySelectorAll('[data-reject-coach-booking]').forEach(btn => {
+    btn.onclick = async () => {
+      const booking = data.find(b => b.id === btn.dataset.rejectCoachBooking);
+      const reason = prompt('Reason for rejecting (optional, shown to the requester):');
+      if (reason === null) return; // cancelled
+      const { data: updated, error } = await supabase.from('coach_bookings')
+        .update({ status: 'rejected', rejection_reason: reason.trim() || null }).eq('id', booking.id).eq('status', 'pending').select();
+      if (error) { showToast(error.message, 'error'); return; }
+      if (!updated.length) { showToast('This request was already handled — refreshing.', 'error'); loadCoachBookings(); return; }
+      showToast('Rejected.', 'ok');
+      notifyUser(booking.requested_by, 'Coach booking rejected', `Coach ${nameByUser[booking.coach_user_id] || ''}, ${booking.start_time.slice(0, 5)}–${booking.end_time.slice(0, 5)} on ${booking.date}${reason.trim() ? ' — ' + reason.trim() : ''}`, 'panel-my-booking');
+      loadCoachBookings();
+    };
+  });
+}
+// Approving a coach booking is also the natural point to bill for it — a
+// 1-on-1 session is usually a paid upsell on top of group training. The
+// amount is optional: leaving it blank just approves the slot with no
+// invoice, for academies that don't charge separately for these.
+async function openApproveCoachBookingSheet(booking, nameByUser) {
+  if (!booking) return;
+  openSheet(sheetHead('Approve Coach Booking') + `
+    <p class="muted" style="margin-top:0;">Coach ${esc(nameByUser[booking.coach_user_id] || '')} · ${esc(booking.start_time.slice(0, 5))}–${esc(booking.end_time.slice(0, 5))} on ${esc(booking.date)}${booking.players?.name ? ' · For ' + esc(booking.players.name) : ''}</p>
+    ${booking.player_id ? `<div class="formgrid">
+      <label>Invoice amount (₹) <span class="muted" style="font-weight:400;">(optional — leave blank to approve with no charge)</span><input type="number" id="coach-booking-invoice-amount" min="0" step="1"></label>
+    </div>` : `<div class="muted">No linked player on this request, so no invoice can be generated — it'll be approved with no charge.</div>`}
+    <button class="btn primary" id="coach-booking-approve-btn" style="margin-top:10px; width:auto;">Approve</button>`);
+  document.getElementById('coach-booking-approve-btn').addEventListener('click', async () => {
+    const { data: updated, error } = await supabase.from('coach_bookings')
+      .update({ status: 'confirmed' }).eq('id', booking.id).eq('status', 'pending').select();
+    if (error) { showToast(error.message, 'error'); return; }
+    if (!updated.length) { showToast('This request was already handled — refreshing.', 'error'); closeSheet(); loadCoachBookings(); return; }
+    const amountInput = document.getElementById('coach-booking-invoice-amount');
+    const amountVal = amountInput ? parseFloat(amountInput.value || '') : NaN;
+    if (booking.player_id && !isNaN(amountVal) && amountVal > 0) {
+      const amountCents = Math.round(amountVal * 100);
+      const { data: invoiceRows, error: invErr } = await supabase.from('fee_invoices').insert({
+        org_id: currentOrgId, player_id: booking.player_id, description: `1-on-1 coaching with ${nameByUser[booking.coach_user_id] || 'coach'} — ${booking.date}`,
+        amount_cents: amountCents, due_date: booking.date, created_by: session.user.id,
+      }).select();
+      if (invErr) { showToast('Approved, but invoice failed: ' + invErr.message, 'error'); }
+      else if (invoiceRows?.length) { await supabase.from('coach_bookings').update({ fee_invoice_id: invoiceRows[0].id }).eq('id', booking.id); }
+    }
+    showToast('Approved.', 'ok');
+    notifyUser(booking.requested_by, 'Coach booking approved', `Coach ${nameByUser[booking.coach_user_id] || ''}, ${booking.start_time.slice(0, 5)}–${booking.end_time.slice(0, 5)} on ${booking.date}`, 'panel-my-booking');
+    closeSheet();
+    loadCoachBookings();
   });
 }
 async function openFacilityMaintenanceLog(f) {
@@ -7769,6 +8376,7 @@ async function loadCoachesPanel() {
         <div><strong>Qualifications:</strong> ${esc(detail.qualifications || '—')}</div>
         <div><strong>Availability:</strong> ${esc(detail.availability || '—')}</div>
         <div><strong>Notes:</strong> ${esc(detail.notes || '—')}</div>
+        <div><strong>Bookable for 1-on-1 sessions:</strong> ${detail.bookable ? `Yes${(detail.booking_open_time || detail.booking_close_time) ? ` (${esc((detail.booking_open_time || '00:00').slice(0, 5))}–${esc((detail.booking_close_time || '23:59').slice(0, 5))})` : ''}${(detail.booking_closed_days || []).length ? ', closed ' + esc(detail.booking_closed_days.join(', ')) : ''}` : 'No'}</div>
       </div>`;
     if (roleAtLeast('admin')) {
       const editBtn = document.createElement('button'); editBtn.className = 'link-btn'; editBtn.textContent = 'Edit';
@@ -7777,6 +8385,15 @@ async function loadCoachesPanel() {
         <input type="text" class="coach-qual-input" placeholder="Qualifications" value="${esc(detail.qualifications || '')}">
         <input type="text" class="coach-avail-input" placeholder="Availability" value="${esc(detail.availability || '')}">
         <textarea class="coach-notes-input" placeholder="Notes">${esc(detail.notes || '')}</textarea>
+        <label style="display:flex; align-items:center; gap:6px; font-size:13px; font-weight:400; margin:10px 0 6px;"><input type="checkbox" class="coach-bookable-cb" style="width:auto;" ${detail.bookable ? 'checked' : ''}>Available for 1-on-1 bookings (via Booking &gt; Coaches)</label>
+        <div class="form-row">
+          <input type="time" class="coach-booking-open-input" value="${esc((detail.booking_open_time || '').slice(0, 5))}">
+          <input type="time" class="coach-booking-close-input" value="${esc((detail.booking_close_time || '').slice(0, 5))}">
+        </div>
+        <label class="field-label">Closed on</label>
+        <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;">
+          ${['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'].map(d => `<label style="display:flex; align-items:center; gap:4px; font-size:12px; font-weight:400;"><input type="checkbox" value="${d}" class="coach-closed-day-cb" ${(detail.booking_closed_days || []).includes(d) ? 'checked' : ''}>${d.slice(0, 3)}</label>`).join('')}
+        </div>
         <button class="btn small coach-save-btn" style="width:auto;">Save</button>`;
       editBtn.onclick = () => { formDiv.style.display = formDiv.style.display === 'none' ? 'block' : 'none'; };
       formDiv.querySelector('.coach-save-btn').onclick = async () => {
@@ -7785,6 +8402,10 @@ async function loadCoachesPanel() {
           qualifications: formDiv.querySelector('.coach-qual-input').value.trim() || null,
           availability: formDiv.querySelector('.coach-avail-input').value.trim() || null,
           notes: formDiv.querySelector('.coach-notes-input').value.trim() || null,
+          bookable: formDiv.querySelector('.coach-bookable-cb').checked,
+          booking_open_time: formDiv.querySelector('.coach-booking-open-input').value || null,
+          booking_close_time: formDiv.querySelector('.coach-booking-close-input').value || null,
+          booking_closed_days: Array.from(formDiv.querySelectorAll('.coach-closed-day-cb:checked')).map(cb => cb.value),
         }, { onConflict: 'org_id,user_id' });
         if (error) { showToast(error.message, 'error'); return; }
         loadCoachesPanel();
