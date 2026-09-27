@@ -1116,7 +1116,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-19-02:45';
+const APP_BUILD_VERSION = '2026-09-27-11:59';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -4063,6 +4063,154 @@ function attendanceRowsHtml(teamPlayers, attendance) {
   if (!teamPlayers.length) return '<div class="empty-state">No players on this team yet.</div>';
   return teamPlayers.map(p => `<div class="grid-check-btn" style="justify-content:space-between; cursor:default;"><span>${esc(p.name)}</span><select class="attendance-status" data-player="${p.id}" style="width:auto; margin:0; padding:4px 6px; font-size:12px;">${ATTENDANCE_STATUSES.map(st => `<option value="${st}" ${attendanceStatus(attendance, p.id) === st ? 'selected' : ''}>${ATTENDANCE_LABELS[st]}</option>`).join('')}</select></div>`).join('');
 }
+
+// ============================================================
+// NET PLANNER — nested Sets -> Nets structure inside Session Plan
+// ============================================================
+// Kept as a JS state array (not read live off a deep DOM tree) because it's
+// genuinely nested (sets -> nets -> capped batter/bowler picks). Any change
+// (add/remove set or net, edit a count) re-renders the whole section from
+// this state and rewires it — simpler and less error-prone than trying to
+// keep a nested DOM tree in sync by hand. Persisted as sessions.net_plan
+// (jsonb): an array of { focus, nets: [{ battersCount, bowlersCount,
+// durationMins, focus, batterIds, bowlerIds }] }.
+let netPlanState = [];
+
+function emptyNet() {
+  return { battersCount: 4, bowlersCount: 4, durationMins: 20, focus: '', batterIds: [], bowlerIds: [] };
+}
+function emptyNetSet() {
+  return { focus: '', nets: [emptyNet()] };
+}
+function netPlanSummary(plan) {
+  if (!plan.length) return '(no nets planned yet)';
+  const maxNets = plan.reduce((m, s) => Math.max(m, s.nets.length), 0);
+  return `(${plan.length} set${plan.length === 1 ? '' : 's'} · up to ${maxNets} net${maxNets === 1 ? '' : 's'} at a time)`;
+}
+function netPlayerCapPickerHtml(kind, label, max, teamPlayers, selectedIds) {
+  const selectedSet = new Set((selectedIds || []).slice(0, max));
+  const rows = teamPlayers.length
+    ? teamPlayers.map(p => `<label class="grid-check-btn ${selectedSet.has(p.id) ? 'is-checked' : ''}"><input type="checkbox" class="net-player-cb" data-kind="${kind}" value="${esc(p.id)}" ${selectedSet.has(p.id) ? 'checked' : ''}><span>${esc(p.name)}</span></label>`).join('')
+    : '<div class="empty-state" style="padding:6px; grid-column:1 / -1;">No players on this team yet.</div>';
+  return `<div class="net-player-picker" style="margin-top:6px;">
+    <div style="font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px;">${esc(label)} · MAX ${max}</div>
+    <div class="grid-check-list" style="max-height:160px; overflow-y:auto;">${rows}</div>
+  </div>`;
+}
+function netCardHtml(setIdx, netIdx, net, teamPlayers) {
+  return `<div class="net-card" data-set="${setIdx}" data-net="${netIdx}" style="border:1px solid var(--border); border-radius:10px; padding:10px; margin-top:10px;">
+    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
+      <strong>Net ${netIdx + 1}</strong>
+      <button type="button" class="net-remove-btn" data-set="${setIdx}" data-net="${netIdx}" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:15px; padding:0 4px;">✕</button>
+    </div>
+    <div class="formgrid">
+      <label>Batters<input type="number" min="0" class="net-batters-count" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.battersCount)}"></label>
+      <label>Bowlers<input type="number" min="0" class="net-bowlers-count" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.bowlersCount)}"></label>
+      <label>Duration (mins)<input type="number" min="0" class="net-duration" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.durationMins)}"></label>
+    </div>
+    <label class="full">Net focus <span class="muted" style="font-weight:400;">(optional)</span><input class="net-focus" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.focus || '')}"></label>
+    <div class="formgrid">
+      ${netPlayerCapPickerHtml('batter', 'Batters', net.battersCount, teamPlayers, net.batterIds)}
+      ${netPlayerCapPickerHtml('bowler', 'Bowlers', net.bowlersCount, teamPlayers, net.bowlerIds)}
+    </div>
+  </div>`;
+}
+function netSetCardHtml(setIdx, set, teamPlayers) {
+  return `<div class="net-set-card" data-set="${setIdx}" style="background:var(--navy-2); border-radius:12px; padding:12px; margin-top:12px;">
+    <div style="display:flex; justify-content:space-between; align-items:center;">
+      <strong>Set ${setIdx + 1}</strong>
+      <button type="button" class="btn ghost set-remove-btn" data-set="${setIdx}" style="width:auto; padding:2px 10px; font-size:12px; color:var(--danger);">Remove Set</button>
+    </div>
+    <label class="full" style="margin-top:6px;">Set focus <span class="muted" style="font-weight:400;">(optional)</span><input class="net-set-focus" data-set="${setIdx}" value="${esc(set.focus || '')}"></label>
+    <div class="net-cards-list">${set.nets.map((net, netIdx) => netCardHtml(setIdx, netIdx, net, teamPlayers)).join('')}</div>
+    <button type="button" class="btn ghost add-net-btn" data-set="${setIdx}" style="width:auto; margin-top:10px; padding:4px 10px; font-size:12px;">+ Add Net</button>
+  </div>`;
+}
+function netPlanBodyHtml(teamPlayers) {
+  return netPlanState.map((set, setIdx) => netSetCardHtml(setIdx, set, teamPlayers)).join('')
+    + `<button type="button" class="btn ghost" id="add-set-btn" style="width:auto; margin-top:12px; padding:6px 12px; font-size:12px;">+ Add Set</button>`;
+}
+function netPlanWrapHtml(teamPlayers) {
+  return `<div class="collapsible-multiselect" id="sheet-session-netplan-wrap">
+    <button type="button" class="collapsible-header" data-collapse-target="sheet-session-netplan-body">Net Plan <span class="collapsible-count" id="netplan-summary">${netPlanSummary(netPlanState)}</span> <span class="collapsible-chevron">▾</span></button>
+    <div id="sheet-session-netplan-body" style="display:none; margin-top:8px;">${netPlanBodyHtml(teamPlayers)}</div>
+  </div>`;
+}
+function wireNetPlanCollapse(headerBtn) {
+  const body = document.getElementById(headerBtn.dataset.collapseTarget);
+  const chevron = headerBtn.querySelector('.collapsible-chevron');
+  headerBtn.onclick = () => {
+    const isOpen = body.style.display !== 'none';
+    body.style.display = isOpen ? 'none' : '';
+    if (chevron) chevron.textContent = isOpen ? '▾' : '▴';
+  };
+}
+function currentNetPlanTeamPlayers() {
+  return cache.players.filter(p => p.team_id === document.getElementById('sheet-session-team')?.value);
+}
+function renderNetPlan() {
+  const body = document.getElementById('sheet-session-netplan-body');
+  const wasOpen = body.style.display !== 'none';
+  body.innerHTML = netPlanBodyHtml(currentNetPlanTeamPlayers());
+  body.style.display = wasOpen ? '' : 'none';
+  document.getElementById('netplan-summary').textContent = netPlanSummary(netPlanState);
+  wireNetPlanEvents();
+}
+function wireNetPlanEvents() {
+  const body = document.getElementById('sheet-session-netplan-body');
+  document.getElementById('add-set-btn')?.addEventListener('click', () => { netPlanState.push(emptyNetSet()); renderNetPlan(); });
+  body.querySelectorAll('.set-remove-btn').forEach(btn => btn.addEventListener('click', () => {
+    netPlanState.splice(Number(btn.dataset.set), 1); renderNetPlan();
+  }));
+  body.querySelectorAll('.add-net-btn').forEach(btn => btn.addEventListener('click', () => {
+    netPlanState[Number(btn.dataset.set)].nets.push(emptyNet()); renderNetPlan();
+  }));
+  body.querySelectorAll('.net-remove-btn').forEach(btn => btn.addEventListener('click', () => {
+    const s = Number(btn.dataset.set), n = Number(btn.dataset.net);
+    netPlanState[s].nets.splice(n, 1);
+    if (!netPlanState[s].nets.length) netPlanState[s].nets.push(emptyNet()); // a set always keeps at least one net
+    renderNetPlan();
+  }));
+  body.querySelectorAll('.net-set-focus').forEach(inp => inp.addEventListener('input', () => {
+    netPlanState[Number(inp.dataset.set)].focus = inp.value;
+  }));
+  body.querySelectorAll('.net-focus').forEach(inp => inp.addEventListener('input', () => {
+    netPlanState[Number(inp.dataset.set)].nets[Number(inp.dataset.net)].focus = inp.value;
+  }));
+  body.querySelectorAll('.net-batters-count').forEach(inp => inp.addEventListener('change', () => {
+    const s = Number(inp.dataset.set), n = Number(inp.dataset.net);
+    const net = netPlanState[s].nets[n];
+    net.battersCount = Math.max(0, Number(inp.value) || 0);
+    net.batterIds = net.batterIds.slice(0, net.battersCount);
+    renderNetPlan();
+  }));
+  body.querySelectorAll('.net-bowlers-count').forEach(inp => inp.addEventListener('change', () => {
+    const s = Number(inp.dataset.set), n = Number(inp.dataset.net);
+    const net = netPlanState[s].nets[n];
+    net.bowlersCount = Math.max(0, Number(inp.value) || 0);
+    net.bowlerIds = net.bowlerIds.slice(0, net.bowlersCount);
+    renderNetPlan();
+  }));
+  body.querySelectorAll('.net-duration').forEach(inp => inp.addEventListener('input', () => {
+    netPlanState[Number(inp.dataset.set)].nets[Number(inp.dataset.net)].durationMins = Number(inp.value) || 0;
+  }));
+  body.querySelectorAll('.net-player-cb').forEach(cb => cb.addEventListener('change', () => {
+    const card = cb.closest('.net-card');
+    const s = Number(card.dataset.set), n = Number(card.dataset.net);
+    const net = netPlanState[s].nets[n];
+    const isBatter = cb.dataset.kind === 'batter';
+    const idsKey = isBatter ? 'batterIds' : 'bowlerIds';
+    const cap = isBatter ? net.battersCount : net.bowlersCount;
+    if (cb.checked) {
+      if (net[idsKey].length >= cap) { cb.checked = false; showToast(`Max ${cap} ${isBatter ? 'batters' : 'bowlers'} for this net.`, 'error'); return; }
+      net[idsKey].push(cb.value);
+    } else {
+      net[idsKey] = net[idsKey].filter(id => id !== cb.value);
+    }
+    cb.closest('.grid-check-btn').classList.toggle('is-checked', cb.checked);
+  }));
+}
+
 function sessionFormHtml(s) {
   const teamPlayers = cache.players.filter(p => p.team_id === (s?.team_id || cache.teams[0]?.id));
   return sheetHead(s?.id ? 'Edit Session Plan' : 'New Session Plan') + (s?.id ? '' : sessionTemplatePickerHtml()) + `
@@ -4089,6 +4237,7 @@ function sessionFormHtml(s) {
     <label class="full" style="display:block;">Warm-up / Preparation</label>${presetRowHtml('session_warmup', 'sheet-session-warmup')}<textarea id="sheet-session-warmup">${esc(s?.warmup || '')}</textarea>
     <label class="full" style="display:block;">Main Skill Block</label>${presetRowHtml('session_main', 'sheet-session-main')}<textarea id="sheet-session-main">${esc(s?.main || '')}</textarea>
     ${checkboxMultiSelectHtml('sheet-session-main-drills', cache.drills.map(d => ({ id: d.id, label: d.name })), s?.main_drill_ids, 'Main activity drills (optional)')}
+    ${netPlanWrapHtml(teamPlayers)}
     <label class="full" style="display:block; margin-top:10px;">Competitive / Game Block</label>${presetRowHtml('session_game', 'sheet-session-game')}<textarea id="sheet-session-game">${esc(s?.game || '')}</textarea>
     ${checkboxMultiSelectHtml('sheet-session-game-drills', cache.drills.map(d => ({ id: d.id, label: d.name })), s?.game_drill_ids, 'Game drills (optional)')}
     ${checkboxMultiSelectHtml('sheet-session-equipment', cache.equipment.map(eq => ({ id: eq.id, label: eq.name })), s?.equipment_ids, 'Equipment used (optional)')}
@@ -4102,6 +4251,7 @@ function sessionFormHtml(s) {
 async function openSessionForm(s) {
   if (!cache.teams.length) { showToast('Add a team before creating a session.', 'error'); return; }
   editing.sessions = s?.id || null;
+  netPlanState = JSON.parse(JSON.stringify(s?.net_plan || []));
   if (!cache.drills.length) { const { data } = await supabase.from('drills').select('*').eq('org_id', currentOrgId).order('name'); cache.drills = data || []; }
   if (!cache.equipment.length) { const { data } = await supabase.from('equipment').select('*').eq('org_id', currentOrgId).order('name'); cache.equipment = data || []; }
   if (!cache.facilities.length) { const { data } = await supabase.from('facilities').select('*').eq('org_id', currentOrgId).order('name'); cache.facilities = data || []; }
@@ -4111,6 +4261,8 @@ async function openSessionForm(s) {
   attachPresetHandlers(document);
   document.querySelectorAll('#sheet-session-objcategory .collapsible-header, #sheet-session-main-drills .collapsible-header, #sheet-session-game-drills .collapsible-header, #sheet-session-equipment .collapsible-header').forEach(wireCollapsibleSection);
   wireAttendanceCollapsible(document.querySelector('#sheet-session-attendance-wrap .collapsible-header'));
+  wireNetPlanCollapse(document.querySelector('#sheet-session-netplan-wrap .collapsible-header'));
+  wireNetPlanEvents();
   if (!s?.id && document.getElementById('sheet-session-template-picker')) {
     document.getElementById('sheet-session-template-picker').addEventListener('change', (e) => {
       const t = sessionTemplatesCache.find(t => t.id === e.target.value);
@@ -4167,6 +4319,15 @@ async function openSessionForm(s) {
     const teamPlayers = cache.players.filter(p => p.team_id === e.target.value);
     document.getElementById('sheet-session-attendees').innerHTML = attendanceRowsHtml(teamPlayers, null);
     wireAttendanceCollapsible(document.querySelector('#sheet-session-attendance-wrap .collapsible-header'));
+    // Net plan picks are scoped to whichever team is selected — drop any
+    // picks that don't belong to the newly selected team rather than
+    // silently keeping stale player ids from the previous team.
+    const validIds = new Set(teamPlayers.map(p => p.id));
+    netPlanState.forEach(set => set.nets.forEach(net => {
+      net.batterIds = net.batterIds.filter(id => validIds.has(id));
+      net.bowlerIds = net.bowlerIds.filter(id => validIds.has(id));
+    }));
+    renderNetPlan();
   });
   document.getElementById('mark-all-present-btn').addEventListener('click', () => {
     document.querySelectorAll('.attendance-status').forEach(sel => { sel.value = 'present'; });
@@ -4198,6 +4359,7 @@ async function openSessionForm(s) {
       main_drill_ids: checkboxMultiSelectValues('sheet-session-main-drills'),
       game_drill_ids: checkboxMultiSelectValues('sheet-session-game-drills'),
       equipment_ids: checkboxMultiSelectValues('sheet-session-equipment'),
+      net_plan: netPlanState,
     };
     const { error } = editing.sessions
       ? await supabase.from('sessions').update(row).eq('id', editing.sessions)
