@@ -148,6 +148,18 @@
   .grid-check-btn { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 400; background: var(--surface); border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 9px 10px; cursor: pointer; font-family: inherit; color: var(--text); }
   .grid-check-btn input { width: auto; margin: 0; flex-shrink: 0; }
   .grid-check-btn.is-checked { border-color: var(--green); background: var(--mint); }
+  .skill-radio-grid { display: flex; flex-wrap: wrap; gap: 10px; margin: 14px 0; }
+  .skill-radio-btn { display: flex; align-items: center; gap: 10px; padding: 14px 16px; border: 1px solid var(--surface-border); border-radius: 12px; background: var(--surface); cursor: pointer; font-weight: 700; font-size: 15px; color: var(--text); flex: 1 1 140px; }
+  .skill-radio-btn input[type="radio"] { width: 20px; height: 20px; margin: 0; accent-color: var(--green); flex-shrink: 0; }
+  .bulk-assess-table-wrap { overflow-x: auto; margin-top: 14px; border: 1px solid var(--surface-border); border-radius: 12px; }
+  .bulk-assess-table { border-collapse: collapse; width: 100%; }
+  .bulk-assess-table th, .bulk-assess-table td { padding: 10px 14px; text-align: left; white-space: nowrap; border-bottom: 1px solid var(--surface-border); }
+  .bulk-assess-table th { color: var(--text-dim); font-size: 12px; font-weight: 650; }
+  .bulk-assess-table tr:last-child td { border-bottom: none; }
+  .bulk-assess-table th.player-name-th, .bulk-assess-table td.player-name-cell { position: sticky; left: 0; background: var(--navy-2); z-index: 1; white-space: normal; min-width: 130px; font-weight: 700; }
+  .bulk-stepper { display: inline-flex; align-items: center; gap: 6px; }
+  .bulk-stepper button { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--surface-border); background: var(--navy); color: var(--text); font-size: 16px; line-height: 1; cursor: pointer; font-family: inherit; }
+  .bulk-stepper-value { min-width: 18px; text-align: center; font-weight: 700; font-size: 14px; }
   .net-player-picker { margin-top: 10px; }
   .net-player-picker-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; background: none; border: none; padding: 4px 0; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-dim); font-weight: 650; font-family: inherit; text-align: left; cursor: pointer; }
   .net-player-selected-names { margin-top: 2px; }
@@ -606,6 +618,7 @@
       <h2>Player Assessments</h2>
       <div class="panelToolbar">
         <button class="btn primary" id="add-assessment-btn">+ New Assessment</button>
+        <button class="btn ghost" id="bulk-assess-btn">Bulk Assess Squad</button>
         <button class="btn ghost" id="manage-templates-btn" style="display:none;">Manage Templates</button>
       </div>
       <div class="filterCard">
@@ -1120,7 +1133,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-27-12:54';
+const APP_BUILD_VERSION = '2026-09-27-18:34';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -5115,6 +5128,100 @@ function openAssessmentForm(a) {
 document.getElementById('add-assessment-btn').addEventListener('click', () => openAssessmentForm(null));
 document.getElementById('assessment-search').addEventListener('input', (e) => { assessmentQuery = e.target.value; renderAssessmentsList(); });
 document.getElementById('assessment-player-filter').addEventListener('change', (e) => { assessmentPlayerFilterVal = e.target.value; renderAssessmentsList(); });
+
+// ---------- Bulk Assess Squad: one skill area, whole team, in one pass ----------
+// Always against the built-in Standard template (not an org's custom ones) —
+// a bulk pass across the whole squad needs one fixed metric set per skill
+// area to make "pre-fill last rating" and the table's columns meaningful;
+// a custom per-org template is still the right tool for the individual
+// New Assessment form, which stays available alongside this.
+function lastRatingForPlayerSkill(playerId, skillArea) {
+  const rows = cache.assessments
+    .filter(a => a.player_id === playerId && a.ratings && a.ratings[skillArea] && typeof a.ratings[skillArea] === 'object')
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+  return rows[0]?.ratings[skillArea] || {};
+}
+function bulkAssessTableHtml(skillArea, teamPlayers) {
+  const cat = DEFAULT_ASSESSMENT_TEMPLATE.categories.find(c => c.category === skillArea);
+  if (!cat) return '<div class="empty-state">Unknown skill area.</div>';
+  if (!teamPlayers.length) return '<div class="empty-state">No players on this team yet.</div>';
+  const rows = teamPlayers.map(p => {
+    const last = lastRatingForPlayerSkill(p.id, skillArea);
+    const cells = cat.criteria.map(metric => {
+      const value = Number(last[metric] ?? 5);
+      return `<td><div class="bulk-stepper" data-metric="${esc(metric)}">
+        <button type="button" class="bulk-stepper-minus" aria-label="Decrease">−</button>
+        <span class="bulk-stepper-value">${esc(value)}</span>
+        <button type="button" class="bulk-stepper-plus" aria-label="Increase">+</button>
+      </div></td>`;
+    }).join('');
+    return `<tr data-player="${esc(p.id)}"><td class="player-name-cell">${esc(p.name)}</td>${cells}</tr>`;
+  }).join('');
+  return `<div class="bulk-assess-table-wrap"><table class="bulk-assess-table">
+    <thead><tr><th class="player-name-th">Player</th>${cat.criteria.map(m => `<th>${esc(m)}</th>`).join('')}</tr></thead>
+    <tbody>${rows}</tbody>
+  </table></div>`;
+}
+function bulkAssessFormHtml() {
+  const categories = DEFAULT_ASSESSMENT_TEMPLATE.categories;
+  return sheetHead('Bulk Assess Squad') + `
+    <p style="color:var(--text-dim); font-size:14px; margin-top:0;">Pick one skill area to rate across the whole squad in one pass. Each player's last rating for this area is pre-filled — adjust rather than start from scratch.</p>
+    <label class="full">Team<select id="bulk-assess-team">${cache.teams.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select></label>
+    <div class="skill-radio-grid" id="bulk-assess-skill-grid">
+      ${categories.map((c, i) => `<label class="skill-radio-btn"><input type="radio" name="bulk-assess-skill" value="${esc(c.category)}" ${i === 0 ? 'checked' : ''}><span>${esc(c.category)}</span></label>`).join('')}
+    </div>
+    <div id="bulk-assess-table-box"></div>
+    <button class="btn primary" id="bulk-assess-save-btn" style="margin-top:16px; width:auto;">Save All Ratings</button>`;
+}
+function renderBulkAssessTable() {
+  const skillArea = document.querySelector('input[name="bulk-assess-skill"]:checked').value;
+  const teamId = document.getElementById('bulk-assess-team').value;
+  const teamPlayers = cache.players.filter(p => p.team_id === teamId);
+  document.getElementById('bulk-assess-table-box').innerHTML = bulkAssessTableHtml(skillArea, teamPlayers);
+  wireBulkAssessSteppers();
+}
+function wireBulkAssessSteppers() {
+  const box = document.getElementById('bulk-assess-table-box');
+  box.querySelectorAll('.bulk-stepper').forEach(stepper => {
+    const valueEl = stepper.querySelector('.bulk-stepper-value');
+    const clamp = (n) => Math.max(1, Math.min(10, n));
+    stepper.querySelector('.bulk-stepper-minus').onclick = () => { valueEl.textContent = clamp(Number(valueEl.textContent) - 1); };
+    stepper.querySelector('.bulk-stepper-plus').onclick = () => { valueEl.textContent = clamp(Number(valueEl.textContent) + 1); };
+  });
+}
+function openBulkAssessForm() {
+  if (!cache.teams.length) { showToast('Add a team before running a bulk assessment.', 'error'); return; }
+  openSheet(bulkAssessFormHtml());
+  renderBulkAssessTable();
+  document.getElementById('bulk-assess-team').addEventListener('change', renderBulkAssessTable);
+  document.getElementById('bulk-assess-skill-grid').addEventListener('change', renderBulkAssessTable);
+  document.getElementById('bulk-assess-save-btn').addEventListener('click', async () => {
+    const skillArea = document.querySelector('input[name="bulk-assess-skill"]:checked').value;
+    const today = new Date().toISOString().slice(0, 10);
+    const rowsByPlayer = [];
+    document.querySelectorAll('#bulk-assess-table-box tbody tr').forEach(tr => {
+      const playerId = tr.dataset.player;
+      const skillRatings = {};
+      tr.querySelectorAll('.bulk-stepper').forEach(stepper => {
+        skillRatings[stepper.dataset.metric] = Number(stepper.querySelector('.bulk-stepper-value').textContent);
+      });
+      rowsByPlayer.push({
+        org_id: currentOrgId, player_id: playerId, assessed_by: session.user.id, date: today,
+        disciplines: [skillArea], ratings: { [skillArea]: skillRatings },
+      });
+    });
+    if (!rowsByPlayer.length) { showToast('No players to assess for this team.', 'error'); return; }
+    const btn = document.getElementById('bulk-assess-save-btn');
+    btn.disabled = true; btn.textContent = 'Saving...';
+    const { error } = await supabase.from('assessments').insert(rowsByPlayer);
+    if (error) { showToast(error.message, 'error'); btn.disabled = false; btn.textContent = 'Save All Ratings'; return; }
+    closeSheet();
+    loadAssessments();
+    showToast(`Logged ${skillArea} ratings for ${rowsByPlayer.length} player${rowsByPlayer.length === 1 ? '' : 's'}.`, 'ok');
+    for (const row of rowsByPlayer) notifyPlayerCircle(row.player_id, 'New assessment logged', `${skillArea} ratings updated`);
+  });
+}
+document.getElementById('bulk-assess-btn').addEventListener('click', () => openBulkAssessForm());
 
 // ---------- Assessment templates (custom criteria, head_coach+) ----------
 function templateManagerHtml() {
