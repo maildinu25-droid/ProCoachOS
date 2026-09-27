@@ -148,6 +148,10 @@
   .grid-check-btn { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 400; background: var(--surface); border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 9px 10px; cursor: pointer; font-family: inherit; color: var(--text); }
   .grid-check-btn input { width: auto; margin: 0; flex-shrink: 0; }
   .grid-check-btn.is-checked { border-color: var(--green); background: var(--mint); }
+  .net-player-picker { margin-top: 10px; }
+  .net-player-picker-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; background: none; border: none; padding: 4px 0; font-size: 11px; letter-spacing: .04em; text-transform: uppercase; color: var(--text-dim); font-weight: 650; font-family: inherit; text-align: left; cursor: pointer; }
+  .net-player-selected-names { margin-top: 2px; }
+  .net-player-selected-name { font-size: 13.5px; color: var(--text); padding: 1px 0; }
   .subrow { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
   .member-teams { margin-top: 6px; }
   .stat-row { display: flex; gap: 6px; align-items: center; margin-bottom: 6px; flex-wrap: wrap; }
@@ -1116,7 +1120,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-27-12:18';
+const APP_BUILD_VERSION = '2026-09-27-12:54';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -4094,34 +4098,42 @@ function netPlanSummary(plan) {
 // existing wireCollapsibleSection/updateCollapsibleCount helpers, so the
 // header's "(n selected)" count and is-checked styling stay in sync for
 // free; the net-player-cb listener below only needs to enforce the cap.
+// Header is a plain, unboxed label + chevron (not the boxed collapsible-header
+// style used for Attendance/Objective Categories/Net Plan) — the picker itself
+// stays collapsed by default, but the currently-selected names are always
+// shown underneath as a plain read-only list, independent of that collapsed
+// state, exactly like the individual-coach app's net planner.
 function netPlayerCapPickerHtml(setIdx, netIdx, kind, label, max, teamPlayers, selectedIds) {
-  const selectedSet = new Set((selectedIds || []).slice(0, max));
-  const count = selectedSet.size;
+  const selected = (selectedIds || []).slice(0, max);
+  const selectedSet = new Set(selected);
   const fieldId = `netpick-${setIdx}-${netIdx}-${kind}`;
+  const namesHtml = selected.length
+    ? selected.map(id => { const p = teamPlayers.find(x => x.id === id); return p ? `<div class="net-player-selected-name">${esc(p.name)}</div>` : ''; }).join('')
+    : '<div class="net-player-selected-name" style="color:var(--text-dim);">None selected yet.</div>';
   const rows = teamPlayers.length
     ? teamPlayers.map(p => `<label class="grid-check-btn ${selectedSet.has(p.id) ? 'is-checked' : ''}"><input type="checkbox" class="net-player-cb" data-kind="${kind}" value="${esc(p.id)}" ${selectedSet.has(p.id) ? 'checked' : ''}><span>${esc(p.name)}</span></label>`).join('')
     : '<div class="empty-state" style="padding:6px; grid-column:1 / -1;">No players on this team yet.</div>';
-  return `<div class="collapsible-multiselect net-player-picker" id="${fieldId}">
-    <button type="button" class="collapsible-header" data-collapse-target="${fieldId}-body">${esc(label)} · MAX ${max} <span class="collapsible-count">(${count} selected)</span> <span class="collapsible-chevron">▾</span></button>
+  return `<div class="net-player-picker" id="${fieldId}">
+    <button type="button" class="net-player-picker-header" data-collapse-target="${fieldId}-body">${esc(label)} · MAX ${max} <span class="collapsible-chevron">▾</span></button>
+    <div class="net-player-selected-names" id="${fieldId}-names">${namesHtml}</div>
     <div class="grid-check-list" id="${fieldId}-body" style="display:none; max-height:160px; overflow-y:auto;">${rows}</div>
   </div>`;
 }
+// A net's fields sit flush in the Set card (no nested bordered box) — a thin
+// top divider is the only separation, matching the individual-coach app.
+// The "Net N" number is folded into the Batters label and the remove (X)
+// sits at the end of the same input row, rather than its own heading row.
 function netCardHtml(setIdx, netIdx, net, teamPlayers) {
-  return `<div class="net-card" data-set="${setIdx}" data-net="${netIdx}" style="border:1px solid var(--border); border-radius:10px; padding:10px; margin-top:10px;">
-    <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px;">
-      <strong>Net ${netIdx + 1}</strong>
-      <button type="button" class="net-remove-btn" data-set="${setIdx}" data-net="${netIdx}" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:15px; padding:0 4px;">✕</button>
+  return `<div class="net-card" data-set="${setIdx}" data-net="${netIdx}" style="margin-top:14px; padding-top:14px; border-top:1px solid var(--surface-border);">
+    <div style="display:flex; gap:8px; align-items:flex-end;">
+      <label style="flex:1; min-width:0;">Net ${netIdx + 1} — Batters<input type="number" min="0" class="net-batters-count" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.battersCount)}"></label>
+      <label style="flex:1; min-width:0;">Bowlers <span class="muted" style="font-weight:400;">(e.g. 4-5)</span><input type="number" min="0" class="net-bowlers-count" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.bowlersCount)}"></label>
+      <label style="flex:1; min-width:0;">Duration (mins)<input type="number" min="0" class="net-duration" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.durationMins)}"></label>
+      <button type="button" class="net-remove-btn" data-set="${setIdx}" data-net="${netIdx}" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px; padding:0 4px; flex-shrink:0; align-self:center;">✕</button>
     </div>
-    <div class="formgrid">
-      <label>Batters<input type="number" min="0" class="net-batters-count" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.battersCount)}"></label>
-      <label>Bowlers<input type="number" min="0" class="net-bowlers-count" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.bowlersCount)}"></label>
-      <label>Duration (mins)<input type="number" min="0" class="net-duration" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.durationMins)}"></label>
-    </div>
-    <label class="full">Net focus <span class="muted" style="font-weight:400;">(optional)</span><input class="net-focus" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.focus || '')}"></label>
-    <div class="formgrid">
-      ${netPlayerCapPickerHtml(setIdx, netIdx, 'batter', 'Batters', net.battersCount, teamPlayers, net.batterIds)}
-      ${netPlayerCapPickerHtml(setIdx, netIdx, 'bowler', 'Bowlers', net.bowlersCount, teamPlayers, net.bowlerIds)}
-    </div>
+    ${netPlayerCapPickerHtml(setIdx, netIdx, 'batter', 'Batters', net.battersCount, teamPlayers, net.batterIds)}
+    ${netPlayerCapPickerHtml(setIdx, netIdx, 'bowler', 'Bowlers', net.bowlersCount, teamPlayers, net.bowlerIds)}
+    <label class="full" style="margin-top:12px;">Net focus <span class="muted" style="font-weight:400;">(optional)</span><input class="net-focus" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.focus || '')}"></label>
   </div>`;
 }
 function netSetCardHtml(setIdx, set, teamPlayers) {
@@ -4132,7 +4144,9 @@ function netSetCardHtml(setIdx, set, teamPlayers) {
     </div>
     <label class="full" style="margin-top:6px;">Set focus <span class="muted" style="font-weight:400;">(optional)</span><input class="net-set-focus" data-set="${setIdx}" value="${esc(set.focus || '')}"></label>
     <div class="net-cards-list">${set.nets.map((net, netIdx) => netCardHtml(setIdx, netIdx, net, teamPlayers)).join('')}</div>
-    <button type="button" class="btn ghost add-net-btn" data-set="${setIdx}" style="width:auto; margin-top:10px; padding:4px 10px; font-size:12px;">+ Add Net</button>
+    <div style="border-top:1px solid var(--surface-border); margin-top:14px; padding-top:10px;">
+      <button type="button" class="btn ghost add-net-btn" data-set="${setIdx}" style="width:auto; padding:4px 10px; font-size:12px;">+ Add Net</button>
+    </div>
   </div>`;
 }
 function netPlanBodyHtml(teamPlayers) {
@@ -4203,9 +4217,6 @@ function wireNetPlanEvents() {
   body.querySelectorAll('.net-duration').forEach(inp => inp.addEventListener('input', () => {
     netPlanState[Number(inp.dataset.set)].nets[Number(inp.dataset.net)].durationMins = Number(inp.value) || 0;
   }));
-  // Registered before wireCollapsibleSection below adds its own listener to
-  // these same checkboxes, so a reverted-over-cap check is already back to
-  // unchecked by the time the shared count/is-checked refresh runs.
   body.querySelectorAll('.net-player-cb').forEach(cb => cb.addEventListener('change', () => {
     const card = cb.closest('.net-card');
     const s = Number(card.dataset.set), n = Number(card.dataset.net);
@@ -4219,11 +4230,20 @@ function wireNetPlanEvents() {
     } else {
       net[idsKey] = net[idsKey].filter(id => id !== cb.value);
     }
+    cb.closest('.grid-check-btn').classList.toggle('is-checked', cb.checked);
+    // The picker's always-visible name list is separate from the (collapsed
+    // by default) checkbox grid, so it needs its own refresh here.
+    const picker = cb.closest('.net-player-picker');
+    const namesList = picker.querySelector('.net-player-selected-names');
+    const teamPlayers = currentNetPlanTeamPlayers();
+    const ids = net[idsKey];
+    namesList.innerHTML = ids.length
+      ? ids.map(id => { const p = teamPlayers.find(x => x.id === id); return p ? `<div class="net-player-selected-name">${esc(p.name)}</div>` : ''; }).join('')
+      : '<div class="net-player-selected-name" style="color:var(--text-dim);">None selected yet.</div>';
   }));
-  // Same collapsible header/count/is-checked wiring used everywhere else in
-  // this form — collapsed by default so a net's two player pickers don't
-  // dump the whole roster open on the page.
-  body.querySelectorAll('.net-player-picker .collapsible-header').forEach(wireCollapsibleSection);
+  // Plain collapse toggle (no count badge to maintain) — the picker's header
+  // is unboxed text + chevron, not the boxed collapsible-header style.
+  body.querySelectorAll('.net-player-picker-header').forEach(wireNetPlanCollapse);
 }
 
 // ---------- Drill linker: "Link a drill from your library" + Add, matching ----------
