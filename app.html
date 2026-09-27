@@ -1187,7 +1187,7 @@ function sessions(){
   let gameDrills=(s.gameDrillIds||[]).map(id=>db.drills.find(d=>d.id===id)).filter(Boolean);
   let linkedReflection=db.reflections.find(r=>r.sessionId===s.id);
   let showReflectionStatus=s.date<=today();
-  return `<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}${gameDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${s.netPlan.length} set${s.netPlan.length===1?"":"s"} · ${s.netPlan.reduce((sum,set)=>sum+set.nets.length,0)} nets</span></div>`:""}${s.attachment?`<div style="margin-top:6px"><a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="copySessionSummary('${s.id}')">Copy Summary</button><button class="btn secondary" onclick="printSessionPlan('${s.id}')">Print Plan</button><button class="btn secondary" onclick="editSession('${s.id}')">Edit</button><button class="btn danger" onclick="delSession('${s.id}')">×</button></div></div>`;
+  return `<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}${gameDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px"><a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="copySessionSummary('${s.id}')">Copy Summary</button><button class="btn secondary" onclick="printSessionPlan('${s.id}')">Print Plan</button><button class="btn secondary" onclick="editSession('${s.id}')">Edit</button><button class="btn danger" onclick="delSession('${s.id}')">×</button></div></div>`;
  }).join("")}</div>`:empty("No sessions match your search.")}</div>`;
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -1286,6 +1286,16 @@ function openSessionForm(existing,mode){
 function rosterPlayerNames(){
  return activePlayers().map(p=>p.name);
 }
+// Sets run one after another; nets within a set run side by side. So the
+// useful count isn't "nets summed across every set" (that double-counts
+// "Net 1" reused set after set) — it's the sets, plus the most nets
+// running at once in any single set (i.e. how many net stations you need).
+function netPlanCountLabel(netPlan){
+ if(!netPlan||!netPlan.length)return "";
+ let setCount=netPlan.length;
+ let maxNets=Math.max(...netPlan.map(s=>s.nets.length));
+ return `${setCount} set${setCount===1?"":"s"} · up to ${maxNets} net${maxNets===1?"":"s"} at a time`;
+}
 // A count box can hold a plain number ("4") or a range ("4-5") — cap
 // selectable names at the largest number mentioned, or leave it uncapped
 // if the box is empty/non-numeric.
@@ -1353,8 +1363,7 @@ function renderNetPlanBuilder(){
  if(box)box.innerHTML=netPlanBuilderHtml();
  let countEl=document.getElementById("formSecCount-netPlan");
  if(countEl){
-  let setCount=sessionNetPlanDraft.length,netCount=sessionNetPlanDraft.reduce((sum,s)=>sum+s.nets.length,0);
-  countEl.textContent=setCount?`(${setCount} set${setCount===1?"":"s"}, ${netCount} net${netCount===1?"":"s"})`:"";
+  countEl.textContent=sessionNetPlanDraft.length?`(${netPlanCountLabel(sessionNetPlanDraft)})`:"";
  }
 }
 function toggleNetPlayerAssign(key){
@@ -1452,8 +1461,8 @@ function netPlanPrintHtml(netPlan){
     <tr><th>Net</th><th>Batters</th><th>Bowlers</th><th>Duration</th><th>Focus</th></tr>
     ${set.nets.map((n,ni)=>`<tr>
      <td>Net ${ni+1}</td>
-     <td>${esc(n.batters!=null&&n.batters!==""?n.batters:"—")}${(n.battersNames&&n.battersNames.length)?`<br><span class="muted" style="font-size:var(--fs-1)">${n.battersNames.map(x=>esc(x)).join(", ")}</span>`:""}</td>
-     <td>${esc(n.bowlers||"—")}${(n.bowlersNames&&n.bowlersNames.length)?`<br><span class="muted" style="font-size:var(--fs-1)">${n.bowlersNames.map(x=>esc(x)).join(", ")}</span>`:""}</td>
+     <td>${(n.battersNames&&n.battersNames.length)?n.battersNames.map(x=>esc(x)).join("<br>"):"—"}</td>
+     <td>${(n.bowlersNames&&n.bowlersNames.length)?n.bowlersNames.map(x=>esc(x)).join("<br>"):"—"}</td>
      <td>${n.duration?esc(n.duration)+" min":"—"}</td>
      <td>${esc(n.focus||"—")}</td>
     </tr>`).join("")}
