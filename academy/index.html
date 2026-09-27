@@ -1169,7 +1169,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-27-21:32';
+const APP_BUILD_VERSION = '2026-09-27-22:10';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -4141,7 +4141,7 @@ function fieldDiagramSvg(view, opts) {
   // whose exact pixel size is computed by sizeFullscreenCanvas() — this is what
   // lets the ground grow to the actual maximum the screen allows.
   const sizeStyle = opts.fill ? 'width:100%;height:100%;display:block;border-radius:10px' : 'width:100%;height:auto;display:block;border-radius:10px';
-  const clickAttr = interactive ? ` onclick="handleFieldCanvasClick(event,this)" style="cursor:crosshair;${sizeStyle}"` : ` style="${sizeStyle}"`;
+  const clickAttr = interactive ? ` class="fdCanvas" style="cursor:crosshair;${sizeStyle}"` : ` style="${sizeStyle}"`;
   return `<svg viewBox="0 0 ${vb.w} ${vb.h}" preserveAspectRatio="none"${clickAttr}>${defs}${bg}${arrowsHtml}${markersHtml}${pendingHtml}</svg>`;
 }
 function fieldCanvasCoords(evt, svgEl) {
@@ -4213,7 +4213,7 @@ function handleFieldCanvasClick(evt, svgEl) {
 function fieldEditorHtml(fullscreen) {
   fullscreen = !!fullscreen;
   const step = fieldDraft.steps[fieldDraft.activeStep];
-  if (!step) return `<button type="button" class="btn small ghost" onclick="addFieldStep()">+ Add Diagram Step</button>`;
+  if (!step) return `<button type="button" class="btn small ghost" data-action="addFieldStep">+ Add Diagram Step</button>`;
   const shape = curFieldShape(step);
   const view = { shape: shape, items: curFieldItems(step) };
   if (fullscreen) {
@@ -4223,14 +4223,14 @@ function fieldEditorHtml(fullscreen) {
     // ground. Rename a step or read the instructions in the normal (non-fullscreen)
     // editor; every action here is still fully available, just condensed to icons
     // with a `title` tooltip on hover for reference.
-    const stepPills = fieldDraft.steps.length > 1 ? fieldDraft.steps.map((st, i) => `<button type="button" class="btn small ${i === fieldDraft.activeStep ? '' : 'ghost'} fdFsStepPill" title="${esc(st.label || ('Step ' + (i + 1)))}" onclick="switchFieldStep(${i})">${i + 1}</button>`).join('') : '';
-    const addStepBtn = fieldDraft.steps.length < 3 ? `<button type="button" class="btn small ghost" title="Add Diagram Step" onclick="addFieldStep()">${fieldToolIconSvg('plus')}</button>` : '';
-    const removeStepBtn = fieldDraft.steps.length > 1 ? `<button type="button" class="btn small danger" title="Remove This Step" onclick="removeFieldStep(${fieldDraft.activeStep})">${fieldToolIconSvg('trash')}</button>` : '';
-    const shapeBtns = `<button type="button" class="btn small ${shape !== 'half' ? '' : 'ghost'}" title="Full Ground" onclick="updateFieldStepShape('full')">${fieldToolIconSvg('shapeFull')}</button><button type="button" class="btn small ${shape === 'half' ? '' : 'ghost'}" title="Half Ground" onclick="updateFieldStepShape('half')">${fieldToolIconSvg('shapeHalf')}</button>`;
-    const toolBtns = FIELD_TOOLS.map(t => `<button type="button" class="btn small ${fieldDraft.tool === t.id ? '' : 'ghost'}" title="${esc(t.label)}" onclick="setFieldTool('${t.id}')">${fieldToolIconSvg(t.id)}</button>`).join('');
-    const exitBtn = `<button type="button" class="btn small ghost" title="Exit Fullscreen" onclick="closeFieldFullscreen()" style="font-size:16px;font-weight:700">✕</button>`;
-    const undoBtn = `<button type="button" class="btn small ghost" title="Undo" onclick="undoFieldLast()">${fieldToolIconSvg('undo')}</button>`;
-    const clearBtn = `<button type="button" class="btn small danger" title="Clear Drawing" onclick="clearFieldStep()">${fieldToolIconSvg('trash')}</button>`;
+    const stepPills = fieldDraft.steps.length > 1 ? fieldDraft.steps.map((st, i) => `<button type="button" class="btn small ${i === fieldDraft.activeStep ? '' : 'ghost'} fdFsStepPill" title="${esc(st.label || ('Step ' + (i + 1)))}" data-action="switchFieldStep" data-i="${i}">${i + 1}</button>`).join('') : '';
+    const addStepBtn = fieldDraft.steps.length < 3 ? `<button type="button" class="btn small ghost" title="Add Diagram Step" data-action="addFieldStep">${fieldToolIconSvg('plus')}</button>` : '';
+    const removeStepBtn = fieldDraft.steps.length > 1 ? `<button type="button" class="btn small danger" title="Remove This Step" data-action="removeFieldStep" data-i="${fieldDraft.activeStep}">${fieldToolIconSvg('trash')}</button>` : '';
+    const shapeBtns = `<button type="button" class="btn small ${shape !== 'half' ? '' : 'ghost'}" title="Full Ground" data-action="updateFieldStepShape" data-shape="full">${fieldToolIconSvg('shapeFull')}</button><button type="button" class="btn small ${shape === 'half' ? '' : 'ghost'}" title="Half Ground" data-action="updateFieldStepShape" data-shape="half">${fieldToolIconSvg('shapeHalf')}</button>`;
+    const toolBtns = FIELD_TOOLS.map(t => `<button type="button" class="btn small ${fieldDraft.tool === t.id ? '' : 'ghost'}" title="${esc(t.label)}" data-action="setFieldTool" data-tool="${t.id}">${fieldToolIconSvg(t.id)}</button>`).join('');
+    const exitBtn = `<button type="button" class="btn small ghost" title="Exit Fullscreen" data-action="closeFieldFullscreen" style="font-size:16px;font-weight:700">✕</button>`;
+    const undoBtn = `<button type="button" class="btn small ghost" title="Undo" data-action="undoFieldLast">${fieldToolIconSvg('undo')}</button>`;
+    const clearBtn = `<button type="button" class="btn small danger" title="Clear Drawing" data-action="clearFieldStep">${fieldToolIconSvg('trash')}</button>`;
     const toolbar = `<div class="fdFsToolbar">${exitBtn}${stepPills}${addStepBtn}${removeStepBtn}${shapeBtns}${toolBtns}${undoBtn}${clearBtn}</div>`;
     // The wrapper's exact pixel width/height is computed and set by
     // sizeFullscreenCanvas() right after this markup is inserted — CSS
@@ -4242,23 +4242,49 @@ function fieldEditorHtml(fullscreen) {
     const canvasArea = `<div id="fieldFsCanvasArea" class="fdFsCanvasArea"><div id="fieldFsCanvasWrap">${fieldDiagramSvg(view, { interactive: true, fill: true, aspect: dispAspect, compactMarkers: true })}</div></div>`;
     return `${toolbar}${canvasArea}`;
   }
-  const tabsHtml = fieldDraft.steps.map((st, i) => `<button type="button" class="btn small ${i === fieldDraft.activeStep ? '' : 'ghost'}" style="padding:6px 10px;font-size:12.5px" onclick="switchFieldStep(${i})">${esc(st.label || ('Step ' + (i + 1)))}</button>`).join('');
-  const toolsHtml = FIELD_TOOLS.map(t => `<button type="button" class="btn small ${fieldDraft.tool === t.id ? '' : 'ghost'}" style="padding:6px 9px;font-size:12px;white-space:nowrap" onclick="setFieldTool('${t.id}')">${t.label}</button>`).join('');
+  const tabsHtml = fieldDraft.steps.map((st, i) => `<button type="button" class="btn small ${i === fieldDraft.activeStep ? '' : 'ghost'}" style="padding:6px 10px;font-size:12.5px" data-action="switchFieldStep" data-i="${i}">${esc(st.label || ('Step ' + (i + 1)))}</button>`).join('');
+  const toolsHtml = FIELD_TOOLS.map(t => `<button type="button" class="btn small ${fieldDraft.tool === t.id ? '' : 'ghost'}" style="padding:6px 9px;font-size:12px;white-space:nowrap" data-action="setFieldTool" data-tool="${t.id}">${t.label}</button>`).join('');
   const controlsHtml = `
-   <div class="fd-tabs-row">${tabsHtml}${fieldDraft.steps.length < 3 ? `<button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12.5px" onclick="addFieldStep()">+ Step</button>` : ''}${fieldDraft.steps.length > 1 ? `<button type="button" class="btn small danger" style="padding:6px 10px;font-size:12.5px" onclick="removeFieldStep(${fieldDraft.activeStep})">Remove Step</button>` : ''}</div>
-   <input type="text" class="fd-step-label-input" placeholder="Step label (optional) — e.g. Setup" value="${esc(step.label || '')}" onchange="updateFieldStepLabel(this.value)">
+   <div class="fd-tabs-row">${tabsHtml}${fieldDraft.steps.length < 3 ? `<button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12.5px" data-action="addFieldStep">+ Step</button>` : ''}${fieldDraft.steps.length > 1 ? `<button type="button" class="btn small danger" style="padding:6px 10px;font-size:12.5px" data-action="removeFieldStep" data-i="${fieldDraft.activeStep}">Remove Step</button>` : ''}</div>
+   <input type="text" class="fd-step-label-input" placeholder="Step label (optional) — e.g. Setup" value="${esc(step.label || '')}">
    <div class="fd-shape-row">
-    <button type="button" class="btn small ${shape !== 'half' ? '' : 'ghost'}" style="padding:6px 12px;font-size:12px" onclick="updateFieldStepShape('full')">Full Ground</button>
-    <button type="button" class="btn small ${shape === 'half' ? '' : 'ghost'}" style="padding:6px 12px;font-size:12px" onclick="updateFieldStepShape('half')">Half Ground</button>
+    <button type="button" class="btn small ${shape !== 'half' ? '' : 'ghost'}" style="padding:6px 12px;font-size:12px" data-action="updateFieldStepShape" data-shape="full">Full Ground</button>
+    <button type="button" class="btn small ${shape === 'half' ? '' : 'ghost'}" style="padding:6px 12px;font-size:12px" data-action="updateFieldStepShape" data-shape="half">Half Ground</button>
    </div>
    <div class="fd-tools-row">${toolsHtml}</div>
    <div class="fd-hint">Tap the ground to place a marker, or to draw an arrow (tap start, then end). Tap an existing marker or arrow to remove it. Full Ground and Half Ground each keep their own separate drawing for this step.</div>`;
   const bottomBar = `<div class="fd-bottom-bar">
-    <button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12px" onclick="undoFieldLast()">Undo</button>
-    <button type="button" class="btn small danger" style="padding:6px 10px;font-size:12px" onclick="clearFieldStep()">Clear Step</button>
-    <button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12px" onclick="openFieldFullscreen()">⛶ Fullscreen</button>
+    <button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12px" data-action="undoFieldLast">Undo</button>
+    <button type="button" class="btn small danger" style="padding:6px 10px;font-size:12px" data-action="clearFieldStep">Clear Step</button>
+    <button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12px" data-action="openFieldFullscreen">⛶ Fullscreen</button>
    </div>`;
   return `${controlsHtml}<div class="fd-canvas-wrap">${fieldDiagramSvg(view, { interactive: true })}</div>${bottomBar}`;
+}
+// Wires every control fieldEditorHtml() renders via data-action attributes
+// (addEventListener), never inline onclick/onchange — the whole app script
+// runs inside one top-level IIFE, so these functions are closure-scoped and
+// invisible to inline HTML event-handler attributes, which execute in global
+// scope. container is #fieldEditorBody or #fieldEditorFullscreenBody.
+function wireFieldEditor(container) {
+  if (!container) return;
+  container.querySelectorAll('[data-action]').forEach(el => {
+    el.addEventListener('click', () => {
+      const action = el.getAttribute('data-action');
+      if (action === 'addFieldStep') addFieldStep();
+      else if (action === 'removeFieldStep') removeFieldStep(parseInt(el.getAttribute('data-i'), 10));
+      else if (action === 'switchFieldStep') switchFieldStep(parseInt(el.getAttribute('data-i'), 10));
+      else if (action === 'updateFieldStepShape') updateFieldStepShape(el.getAttribute('data-shape'));
+      else if (action === 'setFieldTool') setFieldTool(el.getAttribute('data-tool'));
+      else if (action === 'undoFieldLast') undoFieldLast();
+      else if (action === 'clearFieldStep') clearFieldStep();
+      else if (action === 'openFieldFullscreen') openFieldFullscreen();
+      else if (action === 'closeFieldFullscreen') closeFieldFullscreen();
+    });
+  });
+  const labelInput = container.querySelector('.fd-step-label-input');
+  if (labelInput) labelInput.addEventListener('change', () => updateFieldStepLabel(labelInput.value));
+  const canvas = container.querySelector('.fdCanvas');
+  if (canvas) canvas.addEventListener('click', (evt) => handleFieldCanvasClick(evt, canvas));
 }
 // Full Ground stays a true circle (aspect 1) in every orientation. Half Ground
 // is already wide (100:60) and needs no change either way.
@@ -4280,9 +4306,9 @@ function sizeFullscreenCanvas() {
 }
 function renderFieldEditor() {
   const box = document.getElementById('fieldEditorBody');
-  if (box) box.innerHTML = fieldEditorHtml(false);
+  if (box) { box.innerHTML = fieldEditorHtml(false); wireFieldEditor(box); }
   const fsBox = document.getElementById('fieldEditorFullscreenBody');
-  if (fsBox) { fsBox.innerHTML = fieldEditorHtml(true); sizeFullscreenCanvas(); }
+  if (fsBox) { fsBox.innerHTML = fieldEditorHtml(true); wireFieldEditor(fsBox); sizeFullscreenCanvas(); }
 }
 function openFieldFullscreen() {
   const overlay = document.createElement('div');
@@ -4299,6 +4325,7 @@ function openFieldFullscreen() {
   // browser chrome more accurately than 100vh; the vh line is a fallback.
   overlay.innerHTML = `<div id="fieldEditorFullscreenBody" class="fdFsOverlay" style="height:calc(100vh - 8px);height:calc(100dvh - 8px);min-height:0;width:100%">${fieldEditorHtml(true)}</div>`;
   document.body.appendChild(overlay);
+  wireFieldEditor(document.getElementById('fieldEditorFullscreenBody'));
   sizeFullscreenCanvas();
   window.addEventListener('resize', sizeFullscreenCanvas);
   window.addEventListener('orientationchange', sizeFullscreenCanvas);
@@ -4324,8 +4351,10 @@ function maybeShowLandscapeHint() {
   const hint = document.createElement('div');
   hint.id = 'fdLandscapeHint';
   hint.style.cssText = 'position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:2;background:var(--surface);border:1px solid var(--surface-border);border-radius:12px;padding:8px 12px;display:flex;align-items:center;gap:8px;box-shadow:var(--shadow);max-width:88vw';
-  hint.innerHTML = `<span style="font-size:13px">Rotate your phone for a bigger view</span><button type="button" class="btn small ghost" style="padding:3px 9px;font-size:12px" onclick="document.getElementById('fdLandscapeHint').remove()">Got it</button>`;
+  hint.innerHTML = `<span style="font-size:13px">Rotate your phone for a bigger view</span><button type="button" class="btn small ghost" style="padding:3px 9px;font-size:12px" data-action="dismissLandscapeHint">Got it</button>`;
   overlay.appendChild(hint);
+  const gotItBtn = hint.querySelector('[data-action="dismissLandscapeHint"]');
+  if (gotItBtn) gotItBtn.addEventListener('click', () => hint.remove());
 }
 function setFieldTool(t) {
   fieldDraft.tool = fieldDraft.tool === t ? null : t;
@@ -4389,6 +4418,10 @@ function fieldStepsPreviewHtml(fieldSteps, size) {
 // ============================================================
 async function loadDrills() {
   document.getElementById('drills-add-form').style.display = roleAtLeast('head_coach') ? 'block' : 'none';
+  // Initialize/reset the Field Diagram editor up front so it always renders
+  // correctly, whether the drills list below ends up empty, errors out, or
+  // loads normally — this must not depend on any of those outcomes.
+  if (!editing.drills) { fieldDraft = { steps: [], activeStep: 0, tool: null, pendingArrowStart: null }; renderFieldEditor(); }
   const listEl = document.getElementById('drills-list');
   listEl.innerHTML = '<div class="empty-state">Loading...</div>';
   const { data, error } = await supabase.from('drills').select('*').eq('org_id', currentOrgId).order('name');
@@ -4399,7 +4432,6 @@ async function loadDrills() {
     roleAtLeast('head_coach') ? () => editDrill(d) : null,
     roleAtLeast('head_coach') ? async () => { if (!confirmDelete(d.name)) return; await supabase.from('drills').delete().eq('id', d.id); loadDrills(); } : null
   ));
-  if (!editing.drills) { fieldDraft = { steps: [], activeStep: 0, tool: null, pendingArrowStart: null }; renderFieldEditor(); }
 }
 function editDrill(d) {
   editing.drills = d.id;
