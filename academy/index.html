@@ -1116,7 +1116,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-27-11:59';
+const APP_BUILD_VERSION = '2026-09-27-12:18';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -4087,14 +4087,23 @@ function netPlanSummary(plan) {
   const maxNets = plan.reduce((m, s) => Math.max(m, s.nets.length), 0);
   return `(${plan.length} set${plan.length === 1 ? '' : 's'} · up to ${maxNets} net${maxNets === 1 ? '' : 's'} at a time)`;
 }
-function netPlayerCapPickerHtml(kind, label, max, teamPlayers, selectedIds) {
+// Collapsed by default, same collapsible-header pattern as every other
+// multi-select in this form (checkboxMultiSelectHtml) — showing the full
+// team roster open, twice per net (once for batters, once for bowlers),
+// made the form very tall with more than a couple of nets. Wired via the
+// existing wireCollapsibleSection/updateCollapsibleCount helpers, so the
+// header's "(n selected)" count and is-checked styling stay in sync for
+// free; the net-player-cb listener below only needs to enforce the cap.
+function netPlayerCapPickerHtml(setIdx, netIdx, kind, label, max, teamPlayers, selectedIds) {
   const selectedSet = new Set((selectedIds || []).slice(0, max));
+  const count = selectedSet.size;
+  const fieldId = `netpick-${setIdx}-${netIdx}-${kind}`;
   const rows = teamPlayers.length
     ? teamPlayers.map(p => `<label class="grid-check-btn ${selectedSet.has(p.id) ? 'is-checked' : ''}"><input type="checkbox" class="net-player-cb" data-kind="${kind}" value="${esc(p.id)}" ${selectedSet.has(p.id) ? 'checked' : ''}><span>${esc(p.name)}</span></label>`).join('')
     : '<div class="empty-state" style="padding:6px; grid-column:1 / -1;">No players on this team yet.</div>';
-  return `<div class="net-player-picker" style="margin-top:6px;">
-    <div style="font-size:11px; letter-spacing:.04em; text-transform:uppercase; color:var(--text-dim); margin-bottom:4px;">${esc(label)} · MAX ${max}</div>
-    <div class="grid-check-list" style="max-height:160px; overflow-y:auto;">${rows}</div>
+  return `<div class="collapsible-multiselect net-player-picker" id="${fieldId}">
+    <button type="button" class="collapsible-header" data-collapse-target="${fieldId}-body">${esc(label)} · MAX ${max} <span class="collapsible-count">(${count} selected)</span> <span class="collapsible-chevron">▾</span></button>
+    <div class="grid-check-list" id="${fieldId}-body" style="display:none; max-height:160px; overflow-y:auto;">${rows}</div>
   </div>`;
 }
 function netCardHtml(setIdx, netIdx, net, teamPlayers) {
@@ -4110,8 +4119,8 @@ function netCardHtml(setIdx, netIdx, net, teamPlayers) {
     </div>
     <label class="full">Net focus <span class="muted" style="font-weight:400;">(optional)</span><input class="net-focus" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.focus || '')}"></label>
     <div class="formgrid">
-      ${netPlayerCapPickerHtml('batter', 'Batters', net.battersCount, teamPlayers, net.batterIds)}
-      ${netPlayerCapPickerHtml('bowler', 'Bowlers', net.bowlersCount, teamPlayers, net.bowlerIds)}
+      ${netPlayerCapPickerHtml(setIdx, netIdx, 'batter', 'Batters', net.battersCount, teamPlayers, net.batterIds)}
+      ${netPlayerCapPickerHtml(setIdx, netIdx, 'bowler', 'Bowlers', net.bowlersCount, teamPlayers, net.bowlerIds)}
     </div>
   </div>`;
 }
@@ -4194,6 +4203,9 @@ function wireNetPlanEvents() {
   body.querySelectorAll('.net-duration').forEach(inp => inp.addEventListener('input', () => {
     netPlanState[Number(inp.dataset.set)].nets[Number(inp.dataset.net)].durationMins = Number(inp.value) || 0;
   }));
+  // Registered before wireCollapsibleSection below adds its own listener to
+  // these same checkboxes, so a reverted-over-cap check is already back to
+  // unchecked by the time the shared count/is-checked refresh runs.
   body.querySelectorAll('.net-player-cb').forEach(cb => cb.addEventListener('change', () => {
     const card = cb.closest('.net-card');
     const s = Number(card.dataset.set), n = Number(card.dataset.net);
@@ -4207,8 +4219,69 @@ function wireNetPlanEvents() {
     } else {
       net[idsKey] = net[idsKey].filter(id => id !== cb.value);
     }
-    cb.closest('.grid-check-btn').classList.toggle('is-checked', cb.checked);
   }));
+  // Same collapsible header/count/is-checked wiring used everywhere else in
+  // this form — collapsed by default so a net's two player pickers don't
+  // dump the whole roster open on the page.
+  body.querySelectorAll('.net-player-picker .collapsible-header').forEach(wireCollapsibleSection);
+}
+
+// ---------- Drill linker: "Link a drill from your library" + Add, matching ----------
+// ---------- the individual-coach app's session planner (a picker + a      ----------
+// ---------- growing list of chips), used for Main/Game drills instead of  ----------
+// ---------- the checkbox-grid style (that stays for Objective Categories  ----------
+// ---------- and Equipment, which are naturally short, fixed option sets). ----------
+let drillLinkState = { main: [], game: [] };
+function drillLinkerBodyHtml(key) {
+  const selected = drillLinkState[key];
+  const selectedSet = new Set(selected);
+  const available = cache.drills.filter(d => !selectedSet.has(d.id));
+  const linkedRows = selected.length
+    ? selected.map(id => {
+        const d = cache.drills.find(x => x.id === id);
+        return d ? `<span class="tagPill">${esc(d.name)} <a data-unlink-drill="${esc(id)}" style="cursor:pointer;">×</a></span>` : '';
+      }).join('')
+    : '<div class="muted" style="font-size:12.5px; margin-top:6px;">No drills linked yet.</div>';
+  return `<div style="display:flex; gap:8px; align-items:center;">
+      <select class="drill-linker-select" style="flex:1; margin-bottom:0;"><option value="">Link a drill from your library</option>${available.map(d => `<option value="${esc(d.id)}">${esc(d.name)}</option>`).join('')}</select>
+      <button type="button" class="btn ghost drill-linker-add-btn" style="width:auto; white-space:nowrap; flex-shrink:0;">+ Add Drill</button>
+    </div>
+    <div class="drill-linker-list">${linkedRows}</div>`;
+}
+function drillLinkerWrapHtml(key) {
+  return `<div class="drill-linker" id="sheet-session-${key}-drills" style="margin:8px 0 4px;">${drillLinkerBodyHtml(key)}</div>`;
+}
+function renderDrillLinker(key) {
+  const wrap = document.getElementById(`sheet-session-${key}-drills`);
+  wrap.innerHTML = drillLinkerBodyHtml(key);
+  wireDrillLinker(key);
+}
+function wireDrillLinker(key) {
+  const wrap = document.getElementById(`sheet-session-${key}-drills`);
+  wrap.querySelector('.drill-linker-add-btn').addEventListener('click', () => {
+    const sel = wrap.querySelector('.drill-linker-select');
+    if (!sel.value) return;
+    drillLinkState[key] = [...drillLinkState[key], sel.value];
+    renderDrillLinker(key);
+  });
+  wrap.querySelectorAll('[data-unlink-drill]').forEach(a => a.addEventListener('click', () => {
+    drillLinkState[key] = drillLinkState[key].filter(id => id !== a.dataset.unlinkDrill);
+    renderDrillLinker(key);
+  }));
+}
+
+// The uploaded file itself is left in storage (same as player-photos/org-logos
+// swaps elsewhere in this app) — only the row's pointer to it is cleared, so
+// clicking × can't accidentally break a link someone else still has open.
+function wireAttachmentRemove() {
+  const a = document.querySelector('#sheet-session-attachment-current [data-remove-attachment]');
+  if (!a) return;
+  a.onclick = () => {
+    document.getElementById('sheet-session-attachment-url').value = '';
+    document.getElementById('sheet-session-attachment-name').value = '';
+    document.getElementById('sheet-session-attachment-current').innerHTML = '';
+    document.getElementById('sheet-session-attachment-file').value = '';
+  };
 }
 
 function sessionFormHtml(s) {
@@ -4236,13 +4309,20 @@ function sessionFormHtml(s) {
     <label class="full" style="display:block;">Objectives</label>${presetRowHtml('session_objectives', 'sheet-session-objectives')}<textarea id="sheet-session-objectives">${esc(s?.objectives || '')}</textarea>
     <label class="full" style="display:block;">Warm-up / Preparation</label>${presetRowHtml('session_warmup', 'sheet-session-warmup')}<textarea id="sheet-session-warmup">${esc(s?.warmup || '')}</textarea>
     <label class="full" style="display:block;">Main Skill Block</label>${presetRowHtml('session_main', 'sheet-session-main')}<textarea id="sheet-session-main">${esc(s?.main || '')}</textarea>
-    ${checkboxMultiSelectHtml('sheet-session-main-drills', cache.drills.map(d => ({ id: d.id, label: d.name })), s?.main_drill_ids, 'Main activity drills (optional)')}
+    ${drillLinkerWrapHtml('main')}
     ${netPlanWrapHtml(teamPlayers)}
     <label class="full" style="display:block; margin-top:10px;">Competitive / Game Block</label>${presetRowHtml('session_game', 'sheet-session-game')}<textarea id="sheet-session-game">${esc(s?.game || '')}</textarea>
-    ${checkboxMultiSelectHtml('sheet-session-game-drills', cache.drills.map(d => ({ id: d.id, label: d.name })), s?.game_drill_ids, 'Game drills (optional)')}
+    ${drillLinkerWrapHtml('game')}
     ${checkboxMultiSelectHtml('sheet-session-equipment', cache.equipment.map(eq => ({ id: eq.id, label: eq.name })), s?.equipment_ids, 'Equipment used (optional)')}
     <label class="full" style="display:block; margin-top:10px;">Coaching Cues</label>${presetRowHtml('session_cues', 'sheet-session-cues')}<textarea id="sheet-session-cues">${esc(s?.cues || '')}</textarea>
     <label class="full" style="display:block;">Success Criteria</label>${presetRowHtml('session_success', 'sheet-session-success')}<textarea id="sheet-session-success">${esc(s?.success || '')}</textarea>
+    <label class="full" style="display:block; margin-top:10px;">Attachment <span class="muted" style="font-weight:400;">(optional)</span></label>
+    <p class="muted" style="font-size:12.5px; margin:2px 0 8px;">Upload a Word, Excel, PDF or image version of this session plan (under 2MB) — only if you have one.</p>
+    <input type="file" id="sheet-session-attachment-file" accept=".doc,.docx,.xls,.xlsx,.pdf,image/*">
+    <div id="sheet-session-attachment-status" class="status-msg"></div>
+    <div id="sheet-session-attachment-current" style="margin-top:4px;">${s?.attachment_url ? `<span class="tagPill">📎 <a href="${esc(s.attachment_url)}" target="_blank" rel="noopener" style="color:var(--green);">${esc(s.attachment_name || 'Current attachment')}</a> <a data-remove-attachment style="cursor:pointer;">×</a></span>` : ''}</div>
+    <input type="hidden" id="sheet-session-attachment-url" value="${esc(s?.attachment_url || '')}">
+    <input type="hidden" id="sheet-session-attachment-name" value="${esc(s?.attachment_name || '')}">
     <div style="display:flex; gap:8px; margin-top:14px;">
       <button class="btn primary" id="sheet-save-session-btn" style="width:auto;">${s?.id ? 'Save changes' : 'Save Session'}</button>
       <button type="button" class="btn ghost" id="sheet-save-template-btn" style="width:auto;">Save as template</button>
@@ -4252,6 +4332,7 @@ async function openSessionForm(s) {
   if (!cache.teams.length) { showToast('Add a team before creating a session.', 'error'); return; }
   editing.sessions = s?.id || null;
   netPlanState = JSON.parse(JSON.stringify(s?.net_plan || []));
+  drillLinkState = { main: [...(s?.main_drill_ids || [])], game: [...(s?.game_drill_ids || [])] };
   if (!cache.drills.length) { const { data } = await supabase.from('drills').select('*').eq('org_id', currentOrgId).order('name'); cache.drills = data || []; }
   if (!cache.equipment.length) { const { data } = await supabase.from('equipment').select('*').eq('org_id', currentOrgId).order('name'); cache.equipment = data || []; }
   if (!cache.facilities.length) { const { data } = await supabase.from('facilities').select('*').eq('org_id', currentOrgId).order('name'); cache.facilities = data || []; }
@@ -4259,10 +4340,30 @@ async function openSessionForm(s) {
   await loadSessionTemplatesCache();
   openSheet(sessionFormHtml(s));
   attachPresetHandlers(document);
-  document.querySelectorAll('#sheet-session-objcategory .collapsible-header, #sheet-session-main-drills .collapsible-header, #sheet-session-game-drills .collapsible-header, #sheet-session-equipment .collapsible-header').forEach(wireCollapsibleSection);
+  document.querySelectorAll('#sheet-session-objcategory .collapsible-header, #sheet-session-equipment .collapsible-header').forEach(wireCollapsibleSection);
   wireAttendanceCollapsible(document.querySelector('#sheet-session-attendance-wrap .collapsible-header'));
   wireNetPlanCollapse(document.querySelector('#sheet-session-netplan-wrap .collapsible-header'));
   wireNetPlanEvents();
+  wireDrillLinker('main');
+  wireDrillLinker('game');
+  document.getElementById('sheet-session-attachment-file').addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const statusEl = document.getElementById('sheet-session-attachment-status');
+    const MAX_BYTES = 2 * 1024 * 1024;
+    if (file.size > MAX_BYTES) { statusEl.textContent = 'That file is over 2MB — please attach a smaller version.'; statusEl.className = 'status-msg error'; e.target.value = ''; return; }
+    statusEl.textContent = 'Uploading...'; statusEl.className = 'status-msg';
+    const path = `${currentOrgId}/${Date.now()}-${file.name.replace(/[^a-zA-Z0-9._-]/g, '_')}`;
+    const { error: uploadErr } = await supabase.storage.from('session-attachments').upload(path, file);
+    if (uploadErr) { statusEl.textContent = uploadErr.message; statusEl.className = 'status-msg error'; return; }
+    const { data: urlData } = supabase.storage.from('session-attachments').getPublicUrl(path);
+    document.getElementById('sheet-session-attachment-url').value = urlData.publicUrl;
+    document.getElementById('sheet-session-attachment-name').value = file.name;
+    document.getElementById('sheet-session-attachment-current').innerHTML = `<span class="tagPill">📎 <a href="${esc(urlData.publicUrl)}" target="_blank" rel="noopener" style="color:var(--green);">${esc(file.name)}</a> <a data-remove-attachment style="cursor:pointer;">×</a></span>`;
+    wireAttachmentRemove();
+    statusEl.textContent = 'Uploaded.'; statusEl.className = 'status-msg ok';
+  });
+  wireAttachmentRemove();
   if (!s?.id && document.getElementById('sheet-session-template-picker')) {
     document.getElementById('sheet-session-template-picker').addEventListener('change', (e) => {
       const t = sessionTemplatesCache.find(t => t.id === e.target.value);
@@ -4286,9 +4387,11 @@ async function openSessionForm(s) {
         if (headerBtn && body) updateCollapsibleCount(headerBtn, body);
       };
       applyChecks('sheet-session-objcategory', t.objective_category);
-      applyChecks('sheet-session-main-drills', t.main_drill_ids);
-      applyChecks('sheet-session-game-drills', t.game_drill_ids);
       applyChecks('sheet-session-equipment', t.equipment_ids);
+      drillLinkState.main = [...(t.main_drill_ids || [])];
+      drillLinkState.game = [...(t.game_drill_ids || [])];
+      renderDrillLinker('main');
+      renderDrillLinker('game');
       showToast(`Loaded "${t.name}".`, 'ok');
     });
   }
@@ -4307,8 +4410,8 @@ async function openSessionForm(s) {
       game: document.getElementById('sheet-session-game').value.trim() || null,
       cues: document.getElementById('sheet-session-cues').value.trim() || null,
       success: document.getElementById('sheet-session-success').value.trim() || null,
-      main_drill_ids: checkboxMultiSelectValues('sheet-session-main-drills'),
-      game_drill_ids: checkboxMultiSelectValues('sheet-session-game-drills'),
+      main_drill_ids: drillLinkState.main,
+      game_drill_ids: drillLinkState.game,
       equipment_ids: checkboxMultiSelectValues('sheet-session-equipment'),
     };
     const { error } = await supabase.from('session_templates').insert(row);
@@ -4356,10 +4459,12 @@ async function openSessionForm(s) {
       game: document.getElementById('sheet-session-game').value.trim() || null,
       cues: document.getElementById('sheet-session-cues').value.trim() || null,
       success: document.getElementById('sheet-session-success').value.trim() || null,
-      main_drill_ids: checkboxMultiSelectValues('sheet-session-main-drills'),
-      game_drill_ids: checkboxMultiSelectValues('sheet-session-game-drills'),
+      main_drill_ids: drillLinkState.main,
+      game_drill_ids: drillLinkState.game,
       equipment_ids: checkboxMultiSelectValues('sheet-session-equipment'),
       net_plan: netPlanState,
+      attachment_url: document.getElementById('sheet-session-attachment-url').value || null,
+      attachment_name: document.getElementById('sheet-session-attachment-name').value || null,
     };
     const { error } = editing.sessions
       ? await supabase.from('sessions').update(row).eq('id', editing.sessions)
