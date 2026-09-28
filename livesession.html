@@ -581,11 +581,34 @@ function showPremiumLockedMessage(){
       state.nonStrikerBatterId = tmp;
     }
   }
-  function latestFieldForBowler(bowlerId){
-    var matches = state.fieldPlacements.filter(function(f){return f.bowlerId===bowlerId;});
+  // A field saved before hand-keying existed has no `hand` property — treat
+  // that as "applies to either hand" so old sessions don't lose their saved
+  // fields; they'll naturally split once re-saved under a specific hand.
+  function latestFieldForBowlerAndHand(bowlerId, hand){
+    var matches = state.fieldPlacements.filter(function(f){return f.bowlerId===bowlerId && (f.hand===hand || f.hand===undefined);});
     if (!matches.length) return null;
     var phaseMatch = matches.filter(function(f){return f.phase===state.currentPhase;});
     return phaseMatch.length ? phaseMatch[phaseMatch.length-1] : matches[matches.length-1];
+  }
+  // Loads whichever saved field matches the current bowler + the current
+  // batter's hand, so switching between a RHB and a LHB batter (or
+  // switching bowler) shows the right field instead of silently reusing
+  // the previous batter's fielder positions under swapped OFF/LEG labels.
+  // Never clobbers an unsaved in-progress placement (pendingField with no
+  // loadedFieldId) — that's a draft the coach hasn't committed yet.
+  function autoLoadFieldForCurrentHand(){
+    if (!state.currentBowlerId){ return; }
+    var isUnsavedDraft = state.pendingField.length>0 && !state.loadedFieldId;
+    if (isUnsavedDraft) return;
+    var handNow = curBatter() ? curBatter().hand : "RHB";
+    var match = latestFieldForBowlerAndHand(state.currentBowlerId, handNow);
+    if (match){
+      state.pendingField = match.positions.map(function(p){return {x:p.x, y:p.y};});
+      state.loadedFieldId = match.id;
+    } else {
+      state.pendingField = [];
+      state.loadedFieldId = null;
+    }
   }
 
   // ---------- IndexedDB (shared "procoachos" database) ----------
@@ -735,7 +758,7 @@ function showPremiumLockedMessage(){
         html += '<button class="pm-tab '+(id===state.currentBatterId?"active-bat":"")+'" data-action="select-batter" data-id="'+id+'">'+esc(btp.name)+'</button>';
       });
       html += '<button class="pm-tab add" data-action="add-batter">+ Batter</button>';
-      if (batter) html += '<button class="pm-seg" style="display:inline-flex;margin-left:6px;"><button data-action="set-hand" data-hand="RHB" class="'+(hand==="RHB"?"active":"")+'" style="padding:6px 10px;">RHB</button><button data-action="set-hand" data-hand="LHB" class="'+(hand==="LHB"?"active":"")+'" style="padding:6px 10px;">LHB</button></button>';
+      if (batter) html += '<div class="pm-seg" style="margin-left:6px;"><button data-action="set-hand" data-hand="RHB" class="'+(hand==="RHB"?"active":"")+'" style="padding:6px 10px;">RHB</button><button data-action="set-hand" data-hand="LHB" class="'+(hand==="LHB"?"active":"")+'" style="padding:6px 10px;">LHB</button></div>';
       html += '</div>';
       if (batterIds.length>1){
         html += '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;"><span style="font-size:11px;color:var(--text-dim);">Non-striker:</span>';
@@ -814,7 +837,7 @@ function showPremiumLockedMessage(){
         html += '</div>';
       } else {
         var pendingShotXY = (pd && pd.wagonX!==null) ? { x:pd.wagonX, y:pd.wagonY } : null;
-        var refField = curBowler() ? latestFieldForBowler(state.currentBowlerId) : null;
+        var refField = curBowler() ? latestFieldForBowlerAndHand(state.currentBowlerId, hand) : null;
         html += groundSvgMarkup(hand, visible, pendingShotXY, "ground-svg", false, refField?refField.positions:null, 0.4);
         if (pd && pd.stage==="awaiting-shot"){
           html += '<div class="pm-corner-btn" style="display:flex;gap:6px;"><button class="pm-btn small secondary" data-action="go-back">&larr; Back</button><button class="pm-btn small secondary" data-action="skip-shot">Skip &rarr;</button></div>';
@@ -854,12 +877,12 @@ function showPremiumLockedMessage(){
         BALL_POSITION_COLORS.forEach(function(c,i){ html += '<span><span class="pm-legend-dot" style="background:'+c+'"></span>Ball '+(i+1)+' of over</span>'; });
       } else {
         OUTCOMES.forEach(function(o){ if(o.id!=="wd"&&o.id!=="nb") html += '<span><span class="pm-legend-dot" style="background:'+o.color+'"></span>'+o.label+'</span>'; });
-        if (curBowler() && latestFieldForBowler(state.currentBowlerId)) html += '<span><span class="pm-legend-dot" style="background:rgba(238,242,246,0.85)"></span>Field set for '+esc(curBowler().name)+' (faint)</span>';
+        if (curBowler() && latestFieldForBowlerAndHand(state.currentBowlerId, hand)) html += '<span><span class="pm-legend-dot" style="background:rgba(238,242,246,0.85)"></span>Field set for '+esc(curBowler().name)+' vs '+esc(hand)+' (faint)</span>';
       }
       html += '</div>';
     } else {
       // ---------- field placement ----------
-      html += '<div style="background:var(--accent-dim);border:1px solid var(--accent);border-radius:12px;padding:8px 12px;margin-bottom:8px;font-size:12.5px;color:var(--text);"><b style="color:var(--accent);">Placing field for: '+esc(state.currentPhase)+'</b> — switch phase above before saving if this should be a different one.</div>';
+      html += '<div style="background:var(--accent-dim);border:1px solid var(--accent);border-radius:12px;padding:8px 12px;margin-bottom:8px;font-size:12.5px;color:var(--text);"><b style="color:var(--accent);">Placing field for: '+esc(state.currentPhase)+' vs '+esc(hand)+'</b> — switch phase or batter above before saving if this should be a different one.</div>';
       html += '<div class="pm-pitch-wrap" id="field-wrap" style="aspect-ratio:1/1;height:auto;max-height:90vh;padding:4px;">'+groundSvgMarkup(hand, [], null, "field-svg", false, state.pendingField, 1, true);
       html += '<div class="pm-corner-btn" style="display:flex;gap:6px;">';
       html += '<button class="pm-btn small secondary" data-action="undo-field">Undo</button>';
@@ -868,16 +891,25 @@ function showPremiumLockedMessage(){
       if (state.pendingField.length===0) html += '<div class="pm-empty-hint">Tap to place fielders (up to 9) — bowler and keeper are implied</div>';
       html += '</div>';
       html += '<div class="pm-btn-row">';
-      html += '<button class="pm-btn" data-action="save-field" '+(!bowler||state.pendingField.length===0?"disabled":"")+'>Save as '+esc(state.currentPhase)+' field for '+(bowler?esc(bowler.name):"—")+'</button>';
+      html += '<button class="pm-btn" data-action="save-field" '+(!bowler||state.pendingField.length===0?"disabled":"")+'>Save as '+esc(state.currentPhase)+' field for '+(bowler?esc(bowler.name):"—")+' vs '+esc(hand)+'</button>';
       html += '</div>';
+      if (bowler){
+        var oppHand = hand==="LHB" ? "RHB" : "LHB";
+        var oppField = latestFieldForBowlerAndHand(state.currentBowlerId, oppHand);
+        if (oppField && state.pendingField.length===0){
+          html += '<div class="pm-btn-row">';
+          html += '<button class="pm-btn secondary" data-action="mirror-field" data-opp="'+esc(oppHand)+'">&#8646; Mirror '+esc(bowler.name)+'\'s '+esc(oppHand)+' field for '+esc(hand)+'</button>';
+          html += '</div>';
+        }
+      }
 
-      var fieldsForBowler = state.fieldPlacements.filter(function(f){return f.bowlerId===state.currentBowlerId;});
-      html += '<div class="pm-panel"><div class="pm-panel-title">Saved fields '+(bowler?('<span class="dim">for '+esc(bowler.name)+'</span>'):'')+'</div>';
-      if (fieldsForBowler.length===0) html += '<div style="font-size:12px;color:var(--text-dim)">No field saved for this bowler yet.</div>';
+      var fieldsForBowler = state.fieldPlacements.filter(function(f){return f.bowlerId===state.currentBowlerId && (f.hand===hand || f.hand===undefined);});
+      html += '<div class="pm-panel"><div class="pm-panel-title">Saved fields '+(bowler?('<span class="dim">for '+esc(bowler.name)+' vs '+esc(hand)+'</span>'):'')+'</div>';
+      if (fieldsForBowler.length===0) html += '<div style="font-size:12px;color:var(--text-dim)">No field saved for this bowler vs '+esc(hand)+' yet.</div>';
       html += '<div class="pm-ball-list">';
       fieldsForBowler.forEach(function(f){
         var isLoaded = state.loadedFieldId===f.id;
-        html += '<div class="pm-ball-row"><span class="pm-ball-tag">'+f.positions.length+' fielders &middot; '+esc(f.phase||"—")+' &middot; '+new Date(f.t).toLocaleTimeString()+(isLoaded?' <span style="color:var(--accent);">&middot; loaded</span>':'')+'</span><span style="display:flex;gap:6px;"><button class="pm-btn secondary small" data-action="load-field" data-id="'+f.id+'">Load</button><button class="pm-x-btn" data-action="delete-field" data-id="'+f.id+'">&times;</button></span></div>';
+        html += '<div class="pm-ball-row"><span class="pm-ball-tag">'+f.positions.length+' fielders &middot; '+esc(f.phase||"—")+' &middot; '+(f.hand?"vs "+esc(f.hand):"any hand")+' &middot; '+new Date(f.t).toLocaleTimeString()+(isLoaded?' <span style="color:var(--accent);">&middot; loaded</span>':'')+'</span><span style="display:flex;gap:6px;"><button class="pm-btn secondary small" data-action="load-field" data-id="'+f.id+'">Load</button><button class="pm-x-btn" data-action="delete-field" data-id="'+f.id+'">&times;</button></span></div>';
       });
       html += '</div></div>';
     }
@@ -1191,8 +1223,8 @@ function showPremiumLockedMessage(){
     var action = el.getAttribute("data-action");
     if (state.openDetailChip && action!=="toggle-detail-chip"){ state.openDetailChip = null; }
 
-    if (action==="select-bowler"){ state.currentBowlerId = el.getAttribute("data-id"); render(); }
-    else if (action==="select-batter"){ state.currentBatterId = el.getAttribute("data-id"); render(); }
+    if (action==="select-bowler"){ state.currentBowlerId = el.getAttribute("data-id"); autoLoadFieldForCurrentHand(); render(); }
+    else if (action==="select-batter"){ state.currentBatterId = el.getAttribute("data-id"); autoLoadFieldForCurrentHand(); render(); }
     else if (action==="toggle-detail-chip"){
       var chipId = el.getAttribute("data-chip");
       state.openDetailChip = state.openDetailChip===chipId ? null : chipId;
@@ -1216,7 +1248,7 @@ function showPremiumLockedMessage(){
       state.showBatterAdder = false; render();
     }
     else if (action==="close-batter-adder"){ state.showBatterAdder = false; render(); }
-    else if (action==="set-hand"){ if (curBatter()) curBatter().hand = el.getAttribute("data-hand"); render(); }
+    else if (action==="set-hand"){ if (curBatter()){ curBatter().hand = el.getAttribute("data-hand"); autoLoadFieldForCurrentHand(); } render(); }
     else if (action==="open-bowler-editor"){
       var editId = el.getAttribute("data-id") || null;
       state.editingBowlerId = editId;
@@ -1339,11 +1371,24 @@ function showPremiumLockedMessage(){
     }
     else if (action==="save-field"){
       if (!curBowler() || state.pendingField.length===0) return;
-      state.fieldPlacements.push({ id:uid(), bowlerId:state.currentBowlerId, bowlerName:curBowler().name, positions:state.pendingField.slice(), phase:state.currentPhase, t:Date.now() });
+      var handToSave = curBatter() ? curBatter().hand : "RHB";
+      state.fieldPlacements.push({ id:uid(), bowlerId:state.currentBowlerId, bowlerName:curBowler().name, positions:state.pendingField.slice(), phase:state.currentPhase, hand:handToSave, t:Date.now() });
       state.pendingField = [];
       state.loadedFieldId = null;
-      state.status = "Field saved for "+curBowler().name+".";
+      state.status = "Field saved for "+curBowler().name+" vs "+handToSave+".";
       render(); setTimeout(function(){ state.status=""; render(); }, 2000);
+    }
+    else if (action==="mirror-field"){
+      var oppHandSrc = el.getAttribute("data-opp");
+      if (!state.currentBowlerId) return;
+      var srcField = latestFieldForBowlerAndHand(state.currentBowlerId, oppHandSrc);
+      if (srcField){
+        state.pendingField = srcField.positions.map(function(p){return {x: 2*GW_CX - p.x, y: p.y};});
+        state.loadedFieldId = null; // a fresh draft — not yet saved for this hand
+        var handNow2 = curBatter() ? curBatter().hand : "RHB";
+        state.status = "Mirrored the "+oppHandSrc+" field — tweak and save it for "+handNow2+".";
+        render(); setTimeout(function(){ state.status=""; render(); }, 3000);
+      }
     }
     else if (action==="delete-field"){ var fid = el.getAttribute("data-id"); state.fieldPlacements = state.fieldPlacements.filter(function(f){return f.id!==fid;}); if (state.loadedFieldId===fid) state.loadedFieldId = null; render(); }
     else if (action==="start-delivery"){
