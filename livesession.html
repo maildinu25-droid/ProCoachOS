@@ -758,7 +758,7 @@ function showPremiumLockedMessage(){
         html += '<button class="pm-tab '+(id===state.currentBatterId?"active-bat":"")+'" data-action="select-batter" data-id="'+id+'">'+esc(btp.name)+'</button>';
       });
       html += '<button class="pm-tab add" data-action="add-batter">+ Batter</button>';
-      if (batter) html += '<div class="pm-seg" style="margin-left:6px;"><button data-action="set-hand" data-hand="RHB" class="'+(hand==="RHB"?"active":"")+'" style="padding:6px 10px;">RHB</button><button data-action="set-hand" data-hand="LHB" class="'+(hand==="LHB"?"active":"")+'" style="padding:6px 10px;">LHB</button></div>';
+      if (batter) html += '<div class="pm-seg" style="margin-left:6px;flex-shrink:0;"><button data-action="set-hand" data-hand="RHB" class="'+(hand==="RHB"?"active":"")+'" style="padding:6px 10px;">RHB</button><button data-action="set-hand" data-hand="LHB" class="'+(hand==="LHB"?"active":"")+'" style="padding:6px 10px;">LHB</button></div>';
       html += '</div>';
       if (batterIds.length>1){
         html += '<div style="display:flex;align-items:center;gap:8px;margin-top:6px;flex-wrap:wrap;"><span style="font-size:11px;color:var(--text-dim);">Non-striker:</span>';
