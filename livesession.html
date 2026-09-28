@@ -735,7 +735,11 @@ function showPremiumLockedMessage(){
 
     if (!state.showSetup){
       html += '<div style="display:flex;align-items:center;justify-content:space-between;gap:8px;background:var(--card);border:1px solid var(--card-border);border-radius:14px;padding:9px 13px;margin-bottom:8px;flex-wrap:wrap;">';
-      html += '<div style="font-size:12px;line-height:1.5;display:flex;align-items:center;gap:6px;flex-wrap:wrap;"><span><span style="color:var(--bowl);font-weight:700;">'+esc(bowler.name)+'</span> <span style="color:var(--text-dim);">('+bowlTypeLabel(bowler)+')</span> &rarr; <span style="color:var(--bat);font-weight:700;">'+esc(batter.name)+'</span> <span style="color:var(--text-dim);">('+hand+')</span></span>';
+      html += '<div style="font-size:12px;line-height:1.5;display:flex;align-items:center;gap:6px;flex-wrap:wrap;">';
+      html += detailChip('bowler', bowler.name, bowlerIds.map(function(id){return {val:id, label:state.bowlerRoster[id].name};}), state.currentBowlerId, "select-bowler", "id");
+      html += '<span style="color:var(--text-dim);">('+bowlTypeLabel(bowler)+')</span> <span style="color:var(--text-dim);">&rarr;</span>';
+      html += detailChip('batter', batter.name, batterIds.map(function(id){return {val:id, label:state.batterRoster[id].name};}), state.currentBatterId, "select-batter", "id");
+      html += detailChip('hand', hand, [{val:"RHB",label:"RHB"},{val:"LHB",label:"LHB"}], hand, "set-hand", "hand");
       html += detailChip('format', state.format, [{val:"T20",label:"T20"},{val:"ODI",label:"ODI"},{val:"Test",label:"Test"}], state.format, "set-format", "format");
       html += detailChip('phase', state.currentPhase, phases.map(function(p){return {val:p,label:p};}), state.currentPhase, "set-phase", "phase");
       html += '</div>';
