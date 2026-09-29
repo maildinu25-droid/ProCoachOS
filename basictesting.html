@@ -6,7 +6,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#08121e">
 <title>ProCoach OS — Basic Testing</title>
-
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -272,18 +271,21 @@ const PROFILES_KEY="coachbook_profiles",ACTIVE_KEY="coachbook_active_profile";
  shown to the user. What's still NOT verified: the email address itself is
  real/deliverable — only its format is checked.
 */
-const LICENSE_KEY="coachbook_license_testing_basic",TRIAL_DAYS=14;
+const LICENSE_KEY="coachbook_license_basic_testing",TRIAL_DAYS=14;
 const BASIC_TEAM_CAP=1,BASIC_PROFILE_CAP=1;
 const OBJECTIVE_CATEGORIES=["Technical improvement","Tactical understanding","Physical development","Mental skills","Teamwork & communication","Match preparation","Specific skill development"];
 const RATING_LABELS={1:"Struggled",2:"Below Par",3:"Solid",4:"Good",5:"Excellent"};
 const BETTER_REASONS=["Time management","Group size","Weather / facility","Player attention","My own preparation"];
+const MATCH_BETTER_REASONS=["Team selection","Tactical calls","Player execution","Toss / conditions","Opposition strength","My own preparation"];
+function matchLabel(m){return `${m.team||"My Team"} vs ${m.opp||"Opposition"}`}
 function ratingSelectRow(name,label,currentValue){
  return `<label>${esc(label)}<select name="${name}">${[5,4,3,2,1].map(n=>`<option value="${n}" ${String(currentValue)===String(n)?"selected":""}>${n} — ${RATING_LABELS[n]}</option>`).join("")}</select></label>`;
 }
 const BASIC_CHECKOUT_URL="https://checkout.dodopayments.com/buy/pdt_0NlF4qxzPiVRkaHNhpa5M?quantity=1";
 const PREMIUM_CHECKOUT_URL="https://checkout.dodopayments.com/buy/pdt_0NlF4pFDxitmm3Oci73zh?quantity=1";
-function needsEmailGate(){
- return false; // TESTING BUILD — Basic: gate disabled
+function needsEmailGate(){return false;
+ let raw=null;try{raw=JSON.parse(localStorage.getItem(LICENSE_KEY))}catch(e){}
+ return !raw||typeof raw!=="object";
 }
 function showEmailGate(){
  let overlay=document.createElement("div");
@@ -471,7 +473,7 @@ function daysLeftFromStart(trialStartedAt){
 }
 function getLicenseState(){
  let raw=null;try{raw=JSON.parse(localStorage.getItem(LICENSE_KEY))}catch(e){}
- if(!raw||typeof raw!=="object"){raw={status:"basic",trialStartedAt:today(),licenseKey:"TEST-BASIC-KEY",trialEndedNoticeShown:false,email:"testing-basic@procoachos.in"}}
+ if(!raw||typeof raw!=="object"){raw={status:"basic",trialStartedAt:today(),licenseKey:"TESTING",trialEndedNoticeShown:false,email:"testing@procoachos.in"}}
  if(raw.status==="trial"&&daysLeftFromStart(raw.trialStartedAt)<=0){raw.status="expired"}
  try{localStorage.setItem(LICENSE_KEY,JSON.stringify(raw))}catch(e){}
  return raw;
@@ -601,8 +603,7 @@ async function activateLicense(){
 // only a definitive "no longer valid" answer from the server (subscription
 // cancelled, payment failed, device removed) actually locks the app.
 const LICENSE_REVALIDATE_INTERVAL_MS=24*60*60*1000;
-async function revalidateLicenseIfNeeded(){
- return; // TESTING BUILD — skip network revalidation against a fake key
+async function revalidateLicenseIfNeeded(){return;
  let lic=getLicenseState();
  if(lic.status!=="basic"&&lic.status!=="premium")return;
  if(!lic.licenseKey)return;
@@ -621,6 +622,52 @@ async function revalidateLicenseIfNeeded(){
  lic.status="expired";lic.lastRevalidatedAt=now;
  saveLicenseState(lic);
  renderAll();
+}
+const TRIAL_STATUS_API="https://procoachos-dodo.maildinu25.workers.dev/api/trial/status";
+// Mirrors revalidateLicenseIfNeeded()'s once-a-day, fail-open pattern, but for
+// an in-progress TRIAL (which otherwise has no ongoing server check at all —
+// only at signup and on a new-device restore). This is what lets an admin's
+// suspend/grant action actually take effect for a coach who is mid-trial on
+// their own device right now, without them doing anything:
+//  - if the admin suspended this trial email -> lock the app, same as an
+//    expired trial (a network error never does this — only a definitive
+//    "suspended" answer from the server does).
+//  - if the admin (or a real Dodo payment) has granted this email a license
+//    since the trial started -> the app quietly upgrades itself to that
+//    license, no manual key entry needed.
+//  - otherwise -> nothing changes, just records that a check happened today.
+const TRIAL_STATUS_CHECK_INTERVAL_MS=24*60*60*1000;
+async function checkTrialStatusIfNeeded(){
+ let lic=getLicenseState();
+ if(lic.status!=="trial")return;
+ if(!lic.email)return;
+ let now=Date.now();
+ let last=lic.lastTrialStatusCheckedAt||0;
+ if(now-last<TRIAL_STATUS_CHECK_INTERVAL_MS)return;
+ let result=null;
+ try{
+  let response=await fetch(TRIAL_STATUS_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:lic.email})});
+  try{result=await response.json()}catch(_){}
+  if(!response.ok||!result)return; // couldn't get a definitive answer — try again next time
+ }catch(err){
+  console.error("Trial status check failed:",err&&err.message?err.message:err);
+  return; // network error — fail open, don't touch access
+ }
+ if(result.status==="suspended"){
+  lic.status="expired";lic.lastTrialStatusCheckedAt=now;
+  saveLicenseState(lic);
+  renderAll();
+  return;
+ }
+ if(result.status==="licensed"&&(result.tier==="basic"||result.tier==="premium")&&result.licenseKey){
+  lic.status=result.tier;lic.licenseKey=result.licenseKey;lic.lastRevalidatedAt=now;lic.lastTrialStatusCheckedAt=now;
+  saveLicenseState(lic);
+  renderAll();
+  return;
+ }
+ // still a plain trial, nothing to change — just record that we checked
+ lic.lastTrialStatusCheckedAt=now;
+ saveLicenseState(lic);
 }
 function deactivateLicense(){
  if(!confirm("Remove this license from the app? You'll lose access to add or edit anything until a new plan is activated."))return;
@@ -724,7 +771,7 @@ function initApp(){
   [...new Set(db.players.map(p=>p.team).filter(Boolean))].forEach(name=>{if(!db.teams.some(t=>t.name===name))db.teams.push({id:uid("team"),name,category:"",notes:""})});
   if(needsEmailGate()){showEmailGate()}
   else{
-   nav();renderAll();applyTheme(document.documentElement.classList.contains("light")?"light":"dark");checkPlanTransition();revalidateLicenseIfNeeded();
+   nav();renderAll();applyTheme(document.documentElement.classList.contains("light")?"light":"dark");checkPlanTransition();revalidateLicenseIfNeeded();checkTrialStatusIfNeeded();
    checkTodaysSessionReminder();
    // Restore whichever page was open before this load — iOS can fully
    // reload a standalone Home Screen app when returning from a
@@ -820,7 +867,7 @@ function totalPendingCount(){
  return getPendingItems().length;
 }
 function refreshNotificationBadge(){
- let btn=document.querySelector(".bellBtn:not(.whatsNewBtn)");
+ let btn=document.querySelector(".bellBtn");
  if(!btn)return;
  let count=totalPendingCount();
  btn.innerHTML=`${icon("bell",17)}${count?`<span class="badge">${count}</span>`:""}`;
@@ -962,38 +1009,6 @@ function buildInsights(months,hrsTrend,ratingTrend,assessTrend,sessTrend){
  if(!out.length)out.push({icon:"👋",text:"Log a few sessions and reflections to start seeing insights here."});
  return out.slice(0,5);
 }
-const CHANGELOG=[
- {date:"2026-09-15",items:[
-  "Booking is here — share one link, set your availability, and let parents/players request a 1-on-1 session with zero back-and-forth. A Premium feature.",
-  "Bulk-archive unused assessment metrics in one tap instead of one at a time.",
-  "Assessment Coverage heatmap and Skill Trends (improving/stagnant/declining) added to the Assessment Report.",
-  "Copy Last Session's Plan to start a new session from your most recent one.",
-  "A new Refresh button next to search — useful if the app's on your Home Screen, where there's no other way to pull a fresh update."
- ]},
- {date:"2026-09-13",items:[
-  "Custom assessment metrics — add your own rating metric to any discipline, with an option to archive ones you no longer use.",
-  "Detailed playing style — batting hand, bowling arm, pace/spin, and spin type, right on the player profile.",
-  "Progress-over-time charts on player profiles — overall trend, by discipline, and by specific skill.",
-  "Fitness testing rebuilt — six standard tests plus fully custom-named tests (Bronco, Yo-yo, 40m dash, anything).",
-  "Analysis Tools now has its own place in the nav, linking straight to Pitch Map, Batting Map and Live Session.",
-  "You can now see, and restore, recently deleted players and sessions from Account & Backup.",
-  "A clear, persistent reminder that your data lives on this device only, with one tap to back it up."
- ]}
-];
-function openWhatsNew(){
- localStorage.setItem("coachbook_changelog_seen_at",CHANGELOG[0].date);
- refreshWhatsNewBadge();
- modal(`<div class="sheetHead"><h2>What's New</h2><button class="x" onclick="closeM()">×</button></div>
- ${CHANGELOG.map(entry=>`<div class="card" style="margin-bottom:10px"><b>${esc(fmtDate(entry.date))}</b><ul style="margin:8px 0 0;padding-left:18px">${entry.items.map(i=>`<li style="margin-bottom:4px">${esc(i)}</li>`).join("")}</ul></div>`).join("")}`);
-}
-function hasUnseenChangelog(){
- let seenAt=localStorage.getItem("coachbook_changelog_seen_at");
- return !seenAt||seenAt<CHANGELOG[0].date;
-}
-function refreshWhatsNewBadge(){
- let btn=document.querySelector(".whatsNewBtn");
- if(btn)btn.innerHTML=`${icon("star",16)}${hasUnseenChangelog()?`<span class="badge"></span>`:""}`;
-}
 function forceRefreshApp(){
  // A plain location.reload() isn't reliable here — iOS Safari (especially
  // in standalone Home Screen mode, where there's no pull-to-refresh or URL
@@ -1020,7 +1035,7 @@ function dashboard(){
  let reflectionToday=db.reflections.some(r=>r.date===today());
  let assessmentToday=db.assessments.some(a=>a.date===today());
  let unassessedCount=db.players.filter(p=>!db.assessments.some(a=>a.player===p.name)).length;
- let overdueReflections=activeSessions().filter(s=>s.date<today()&&!db.reflections.some(r=>r.sessionId===s.id)).length;
+ let overdueReflections=activeSessions().filter(s=>s.date<today()&&!db.reflections.some(r=>r.sessionId===s.id)).length+db.matches.filter(m=>m.date<today()&&!db.reflections.some(r=>r.matchId===m.id)).length;
  let reassessDueCount=db.players.filter(p=>{
   let pa=db.assessments.filter(a=>a.player===p.name);
   if(!pa.length)return false;
@@ -1086,7 +1101,6 @@ function dashboard(){
  <div class="homeHeader">
  <div><div class="homeGreeting">${greetingWord()}, <b>${esc(profile.name||"Coach")}</b> 👋</div><div class="homeSub">${esc(fmtCalDate(today()))}</div></div>
  <div style="display:flex;gap:8px;align-items:center">
- <button class="bellBtn whatsNewBtn" onclick="openWhatsNew()" aria-label="What's new">${icon("star",16)}${hasUnseenChangelog()?`<span class="badge"></span>`:""}</button>
  <button class="bellBtn" onclick="openNotifications()" aria-label="Pending items">${icon("bell",17)}${pendingCount?`<span class="badge">${pendingCount}</span>`:""}</button>
  <button class="searchIconBtn" onclick="openGlobalSearch()" aria-label="Search">${icon("search",16)}</button>
  <button class="bellBtn" onclick="forceRefreshApp()" aria-label="Refresh app">${icon("refresh",17)}</button>
@@ -1131,7 +1145,7 @@ function dashboard(){
  <div class="homeSectionTitle">Pending</div>
  <div class="taskItem"><div class="taskDot ${reflectionToday?"done":""}">${reflectionToday?icon("check",10):""}</div><div class="taskText"><b>Log today's reflection</b><span>${reflectionToday?"Done":"Not yet logged"}</span></div></div>
  <div class="taskItem"><div class="taskDot ${assessmentToday?"done":""}">${assessmentToday?icon("check",10):""}</div><div class="taskText"><b>Log a player assessment</b><span>${assessmentToday?"Done today":"None logged today"}</span></div></div>
- ${overdueReflections>0?`<div class="taskItem" style="cursor:pointer" onclick="reflectPendingSessions()"><div class="taskDot"></div><div class="taskText"><b>${overdueReflections} session${overdueReflections!==1?"s":""} awaiting reflection</b><span>From past sessions</span></div></div>`:""}
+ ${overdueReflections>0?`<div class="taskItem" style="cursor:pointer" onclick="reflectPendingSessions()"><div class="taskDot"></div><div class="taskText"><b>${overdueReflections} item${overdueReflections!==1?"s":""} awaiting reflection</b><span>Past sessions &amp; matches</span></div></div>`:""}
  ${reassessDueCount>0?`<div class="taskItem" style="cursor:pointer" onclick="reassessDuePlayers()"><div class="taskDot"></div><div class="taskText"><b>${reassessDueCount} player${reassessDueCount!==1?"s":""} due for reassessment</b><span>30+ days since last assessment</span></div></div>`:""}
  ${workloadCount>0?`<div class="taskItem" style="cursor:pointer" onclick="showWorkloadFlags()"><div class="taskDot"></div><div class="taskText"><b>${workloadCount} player${workloadCount!==1?"s":""} with back-to-back match workload</b><span>Matches on consecutive days recently</span></div></div>`:""}
  ${reflectionTrendPct!==null?`<div class="taskItem"><div class="taskDot done">${icon("check",10)}</div><div class="taskText"><b>Reflection ratings ${reflectionTrendPct>=0?"up":"down"} ${Math.abs(reflectionTrendPct)}%</b><span>Compared to last month</span></div></div>`:""}
@@ -1643,33 +1657,72 @@ function permanentlyDeleteSession(id){if(confirm("Permanently delete this sessio
 function reflections(){
  let list=db.reflections.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
  if(reflectionQuery){let q=reflectionQuery.toLowerCase();list=list.filter(x=>reflectionSearchableText(x).some(v=>String(v||"").toLowerCase().includes(q)))}
- document.getElementById("reflections").innerHTML=head("Self Reflections","Turn experience into deliberate coaching improvement.")
+ if(reflectionTypeFilter)list=list.filter(x=>(x.type==="match"?"match":"session")===reflectionTypeFilter);
+ document.getElementById("reflections").innerHTML=head("Self Reflections","Turn experience into deliberate coaching improvement — from practice sessions and matches alike.")
  +`<button class="btn primary" onclick="newReflection()">+ New Reflection</button>
- <div class="card" style="margin:15px 0"><label>Search<input id="reflectionSearch" value="${esc(reflectionQuery)}" oninput="reflectionQuery=this.value;reflections()" onfocus="reflectionSearchFocused=true" onblur="reflectionSearchFocused=false" placeholder="Session, notes, learning..."></label></div>
+ <div class="card" style="margin:15px 0"><div class="formgrid">
+ <label>Search<input id="reflectionSearch" value="${esc(reflectionQuery)}" oninput="reflectionQuery=this.value;reflections()" onfocus="reflectionSearchFocused=true" onblur="reflectionSearchFocused=false" placeholder="Session, notes, learning..."></label>
+ <label>Type<select onchange="reflectionTypeFilter=this.value;reflections()"><option value="">All</option><option value="session" ${reflectionTypeFilter==="session"?"selected":""}>Practice Session</option><option value="match" ${reflectionTypeFilter==="match"?"selected":""}>Match</option></select></label>
+ </div></div>
  <h2 class="section">Reflection history (${list.length})</h2>
- <div class="card">${list.length?list.map(x=>`<div class="item"><div><b>${esc(x.date)} · ${esc(x.session||"Reflection")}</b><div class="muted">Rating ${esc(x.rating)}/5</div><small>${esc(x.well)}</small></div><div class="toolbar"><button class="btn secondary" onclick="editReflection('${x.id}')">Edit</button><button class="btn danger" onclick="delReflection('${x.id}')">×</button></div></div>`).join(""):empty("No reflections match your search.")}</div>`;
+ <div class="card">${list.length?list.map(x=>`<div class="item"><div><b>${esc(x.date)} · ${esc(x.session||"Reflection")}</b> <span class="tag">${x.type==="match"?"Match":"Session"}</span><div class="muted">Rating ${esc(x.rating)}/5</div><small>${esc(x.well)}</small></div><div class="toolbar"><button class="btn secondary" onclick="editReflection('${x.id}')">Edit</button><button class="btn danger" onclick="delReflection('${x.id}')">×</button></div></div>`).join(""):empty("No reflections match your search.")}</div>`;
  let sEl=document.getElementById("reflectionSearch");if(sEl&&reflectionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
 function reflectionFormHtml(x,mode){
  x=x||{};
+ let type=x.type==="match"?"match":"session";
  let recentSessions=activeSessions().slice().sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a))).slice(0,60);
+ let recentMatches=db.matches.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).slice(0,60);
  return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Reflection":"Coach Self Reflection"}</h2><button class="x" onclick="closeM()">×</button></div>
  <form class="formgrid" onsubmit="saveReflection(event)">
+ <input type="hidden" name="type" id="reflectionTypeInput" value="${type}">
+ <div class="full"><label style="margin-bottom:6px">Reflecting on</label><div style="display:flex;gap:6px">
+  <button type="button" class="btn ${type!=="match"?"primary":"secondary"}" id="reflTypeSessionBtn" style="padding:8px 14px" onclick="setReflectionType('session')">Practice Session</button>
+  <button type="button" class="btn ${type==="match"?"primary":"secondary"}" id="reflTypeMatchBtn" style="padding:8px 14px" onclick="setReflectionType('match')">Match</button>
+ </div></div>
  <label>Date<input type="date" name="date" value="${esc(x.date||today())}"></label>
- <label>Session / Group<input name="session" id="reflectionSessionLabel" value="${esc(x.session||"")}"></label>
- <label class="full">Link to a specific session <span class="muted" style="font-weight:400">(optional)</span><select name="sessionId" id="reflectionSessionSelect" onchange="onReflectionSessionPick(this)"><option value="">— No specific session —</option>${recentSessions.map(s=>`<option value="${s.id}" ${x.sessionId===s.id?"selected":""}>${esc(fmtDate(s.date))} · ${esc(sessionLabel(s))}</option>`).join("")}</select></label>
+ <label>Session / Match label<input name="session" id="reflectionSessionLabel" value="${esc(x.session||"")}"></label>
+ <div id="reflSessionBlock" class="full formgrid" style="padding:0;margin:0;${type==="match"?"display:none":""}">
+  <label class="full">Link to a specific session <span class="muted" style="font-weight:400">(optional)</span><select name="sessionId" id="reflectionSessionSelect" onchange="onReflectionSessionPick(this)"><option value="">— No specific session —</option>${recentSessions.map(s=>`<option value="${s.id}" ${x.sessionId===s.id?"selected":""}>${esc(fmtDate(s.date))} · ${esc(sessionLabel(s))}</option>`).join("")}</select></label>
+  ${ratingSelectRow("sessionFlow","Session flow / pacing",x.sessionFlow)}
+  ${ratingSelectRow("playerEngagement","Player engagement",x.playerEngagement)}
+  <div class="full" id="reflectionObjectiveRatings" style="display:none"></div>
+ </div>
+ <div id="reflMatchBlock" class="full formgrid" style="padding:0;margin:0;${type==="match"?"":"display:none"}">
+  <label class="full">Link to a specific match <span class="muted" style="font-weight:400">(optional)</span><select name="matchId" id="reflectionMatchSelect" onchange="onReflectionMatchPick(this)"><option value="">— No specific match —</option>${recentMatches.map(m=>`<option value="${m.id}" ${x.matchId===m.id?"selected":""}>${esc(fmtDate(m.date))} · ${esc(matchLabel(m))}</option>`).join("")}</select></label>
+  ${ratingSelectRow("tacticalDecisions","Tactical decisions",x.tacticalDecisions)}
+  ${ratingSelectRow("playerManagement","Player management / rotation calls",x.playerManagement)}
+ </div>
  ${ratingSelectRow("rating","Overall rating",x.rating)}
  ${ratingSelectRow("communication","Communication",x.communication)}
- ${ratingSelectRow("sessionFlow","Session flow / pacing",x.sessionFlow)}
- ${ratingSelectRow("playerEngagement","Player engagement",x.playerEngagement)}
- <div class="full" id="reflectionObjectiveRatings" style="display:none"></div>
  <label class="full">What went well?<textarea name="well">${esc(x.well||"")}</textarea></label>
- <div class="full"><label style="margin-bottom:6px">What could be better?</label><div class="chipGrid2">${BETTER_REASONS.map(r=>`<label><input type="checkbox" name="betterReasons" value="${esc(r)}" ${(x.betterReasons||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
+ <div class="full"><label style="margin-bottom:6px">What could be better?</label>
+ <div class="chipGrid2" id="reflSessionReasons" style="${type==="match"?"display:none":""}">${BETTER_REASONS.map(r=>`<label><input type="checkbox" name="betterReasons" value="${esc(r)}" ${(x.betterReasons||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
+ <div class="chipGrid2" id="reflMatchReasons" style="${type==="match"?"":"display:none"}">${MATCH_BETTER_REASONS.map(r=>`<label><input type="checkbox" name="betterReasons" value="${esc(r)}" ${(x.betterReasons||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
  <textarea name="betterDetail" placeholder="Anything else? (optional)" style="margin-top:8px">${esc(x.betterDetail!==undefined?x.betterDetail:(x.better||""))}</textarea></div>
  <label class="full">What did I learn, and what will I change next time?<textarea name="learnings">${esc(x.learnings!==undefined?x.learnings:[x.players,x.change].filter(Boolean).join("\n\n"))}</textarea></label>
  <label class="full">Next focus<textarea name="next">${esc(x.next||"")}</textarea></label>
  <button class="btn primary">Save Reflection</button>
  </form>`;
+}
+// Toggling between Session/Match swaps which link-dropdown, ratings and
+// "what could be better" reason chips are shown. The other block's fields
+// stay in the DOM (so nothing the coach already filled in is lost if they
+// switch back), but its reason checkboxes are explicitly cleared here since
+// both chip grids share name="betterReasons" — otherwise a stale hidden
+// selection could get submitted alongside the visible one. saveReflection()
+// also strips any leftover fields that don't belong to the final chosen type.
+function setReflectionType(type){
+ let input=document.getElementById("reflectionTypeInput");if(input)input.value=type;
+ let sessBtn=document.getElementById("reflTypeSessionBtn"),matchBtn=document.getElementById("reflTypeMatchBtn");
+ if(sessBtn)sessBtn.className="btn "+(type!=="match"?"primary":"secondary");
+ if(matchBtn)matchBtn.className="btn "+(type==="match"?"primary":"secondary");
+ let sessBlock=document.getElementById("reflSessionBlock"),matchBlock=document.getElementById("reflMatchBlock");
+ if(sessBlock)sessBlock.style.display=type==="match"?"none":"";
+ if(matchBlock)matchBlock.style.display=type==="match"?"":"none";
+ let sessReasons=document.getElementById("reflSessionReasons"),matchReasons=document.getElementById("reflMatchReasons");
+ if(sessReasons){sessReasons.style.display=type==="match"?"none":"";if(type==="match")sessReasons.querySelectorAll("input[type=checkbox]").forEach(cb=>cb.checked=false)}
+ if(matchReasons){matchReasons.style.display=type==="match"?"":"none";if(type!=="match")matchReasons.querySelectorAll("input[type=checkbox]").forEach(cb=>cb.checked=false)}
 }
 function onReflectionSessionPick(sel){
  renderReflectionObjectiveRatings(sel.value);
@@ -1679,6 +1732,14 @@ function onReflectionSessionPick(sel){
  if(labelEl&&!labelEl.value)labelEl.value=sessionLabel(s);
  let dateEl=sel.closest("form").querySelector('[name="date"]');
  if(dateEl&&s.date)dateEl.value=s.date;
+}
+function onReflectionMatchPick(sel){
+ if(!sel.value)return;
+ let m=db.matches.find(x=>x.id===sel.value);if(!m)return;
+ let labelEl=document.getElementById("reflectionSessionLabel");
+ if(labelEl&&!labelEl.value)labelEl.value=matchLabel(m);
+ let dateEl=sel.closest("form").querySelector('[name="date"]');
+ if(dateEl&&m.date)dateEl.value=m.date;
 }
 function renderReflectionObjectiveRatings(sessionId){
  let box=document.getElementById("reflectionObjectiveRatings");
@@ -1697,30 +1758,53 @@ function renderReflectionObjectiveRatings(sessionId){
 function newReflection(seed){editingReflectionId=null;modal(reflectionFormHtml(seed||null,"new"));renderReflectionObjectiveRatings(seed&&seed.sessionId?seed.sessionId:"")}
 function newReflectionForSession(sessionId){
  let s=db.sessions.find(x=>x.id===sessionId);if(!s)return;
- newReflection({date:s.date,session:sessionLabel(s),sessionId:s.id});
+ newReflection({date:s.date,session:sessionLabel(s),sessionId:s.id,type:"session"});
 }
+function newReflectionForMatch(matchId){
+ let m=db.matches.find(x=>x.id===matchId);if(!m)return;
+ newReflection({date:m.date,session:matchLabel(m),matchId:m.id,type:"match"});
+}
+// Nudges the coach to reflect on anything past-dated that hasn't been
+// reflected on yet — practice sessions AND matches together, newest first.
 function reflectPendingSessions(){
- let overdue=activeSessions().filter(s=>s.date<today()&&!db.reflections.some(r=>r.sessionId===s.id)).sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a)));
+ let overdueSessions=activeSessions().filter(s=>s.date<today()&&!db.reflections.some(r=>r.sessionId===s.id)).map(s=>({kind:"session",id:s.id,date:s.date,sortKey:sessionDateTimeKey(s),label:sessionLabel(s)}));
+ let overdueMatches=db.matches.filter(m=>m.date<today()&&!db.reflections.some(r=>r.matchId===m.id)).map(m=>({kind:"match",id:m.id,date:m.date,sortKey:m.date||"",label:matchLabel(m)}));
+ let overdue=overdueSessions.concat(overdueMatches).sort((a,b)=>String(b.sortKey).localeCompare(String(a.sortKey)));
  if(!overdue.length)return;
- if(overdue.length===1){newReflectionForSession(overdue[0].id);return}
- modal(`<div class="sheetHead"><h2>Sessions Awaiting Reflection</h2><button class="x" onclick="closeM()">×</button></div>
- <div class="list">${overdue.map(s=>`<div class="item" style="cursor:pointer" onclick="newReflectionForSession('${s.id}')"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}</div></div></div>`).join("")}</div>`);
+ function openItem(item){item.kind==="match"?newReflectionForMatch(item.id):newReflectionForSession(item.id)}
+ if(overdue.length===1){openItem(overdue[0]);return}
+ modal(`<div class="sheetHead"><h2>Sessions &amp; Matches Awaiting Reflection</h2><button class="x" onclick="closeM()">×</button></div>
+ <div class="list">${overdue.map((item,i)=>`<div class="item" style="cursor:pointer" onclick='reflectPendingOpen(${i})'><div><b>${esc(item.label)}</b><div class="muted">${esc(fmtDate(item.date))} · ${item.kind==="match"?"Match":"Session"}</div></div></div>`).join("")}</div>`);
+ window._reflectPendingQueue=overdue;
 }
-function editReflection(id){let x=db.reflections.find(r=>r.id===id);if(!x)return;editingReflectionId=id;modal(reflectionFormHtml(x,"edit"));renderReflectionObjectiveRatings(x.sessionId||"")}
+function reflectPendingOpen(i){let item=(window._reflectPendingQueue||[])[i];if(!item)return;item.kind==="match"?newReflectionForMatch(item.id):newReflectionForSession(item.id)}
+function editReflection(id){let x=db.reflections.find(r=>r.id===id);if(!x)return;editingReflectionId=id;modal(reflectionFormHtml(x,"edit"));renderReflectionObjectiveRatings(x.type==="match"?"":(x.sessionId||""))}
 function saveReflection(e){
  e.preventDefault();
  if(!requireWriteAccess())return;
  let fd=new FormData(e.target);
  let x=Object.fromEntries(fd);
- if(!x.sessionId)delete x.sessionId;
+ x.type=x.type==="match"?"match":"session";
  x.betterReasons=fd.getAll("betterReasons");
  let objectiveRatings={};
- OBJECTIVE_CATEGORIES.forEach((cat,idx)=>{
-  let val=fd.get(`objRating_${idx}`);
-  if(val){objectiveRatings[cat]=val}
-  delete x[`objRating_${idx}`];
- });
+ if(x.type==="session"){
+  OBJECTIVE_CATEGORIES.forEach((cat,idx)=>{
+   let val=fd.get(`objRating_${idx}`);
+   if(val){objectiveRatings[cat]=val}
+  });
+ }
+ OBJECTIVE_CATEGORIES.forEach((cat,idx)=>{delete x[`objRating_${idx}`]});
  if(Object.keys(objectiveRatings).length)x.objectiveRatings=objectiveRatings;
+ // Only the fields belonging to the chosen type are kept — the other
+ // type's link/ratings are dropped even if they were left in the DOM
+ // (e.g. switching type back and forth before saving).
+ if(x.type==="match"){
+  delete x.sessionId;delete x.sessionFlow;delete x.playerEngagement;delete x.objectiveRatings;
+ } else {
+  delete x.matchId;delete x.tacticalDecisions;delete x.playerManagement;
+ }
+ if(!x.sessionId)delete x.sessionId;
+ if(!x.matchId)delete x.matchId;
  if(editingReflectionId){let idx=db.reflections.findIndex(r=>r.id===editingReflectionId);if(idx>-1){x.id=editingReflectionId;db.reflections[idx]=x}}
  else{x.id=uid("refl");db.reflections.push(x)}
  editingReflectionId=null;closeM();save();
@@ -1835,7 +1919,7 @@ function roleNeedsBatting(role){return role!=="Bowler"}
 function roleNeedsBowling(role){return role==="Bowler"||role==="All-rounder"}
 let playerQuery="",playerRoleFilter="",playerTeamFilter="",playerSearchFocused=false,editingPlayerId=null;
 let sessionQuery="",sessionSquadFilter="",sessionSearchFocused=false;
-let reflectionQuery="",reflectionSearchFocused=false;
+let reflectionQuery="",reflectionSearchFocused=false,reflectionTypeFilter="";
 function activePlayers(){return db.players.filter(p=>!p.deletedAt)}
 function activeSessions(){return db.sessions.filter(s=>!s.deletedAt)}
 function playerTeams(){return[...new Set(activePlayers().map(p=>p.team).filter(Boolean))].sort()}
@@ -3029,7 +3113,11 @@ function matches(){
  <h2 class="section">Match History (${list.length})</h2><div class="grid g2">${list.length?list.map(matchCardHtml).join(""):empty("No matches recorded yet.")}</div>`;
  let sEl=document.getElementById("matchSearch");if(sEl&&matchSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
-function matchCardHtml(m){return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div><b>${esc(m.team||"My Team")} vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.date||"")} ${m.venue?"· "+esc(m.venue):""} ${m.format?"· "+esc(m.format):""}</div></div><span class="tag">${esc(matchResultOutcome(m))}</span></div><p>${esc(m.result||"No result recorded")}</p>${(m.battingReview&&m.battingReview.length)||(m.bowlingReview&&m.bowlingReview.length)?`<div class="muted">${(m.battingReview&&m.battingReview.length)?m.battingReview.length+" batting entries":""}${(m.battingReview&&m.battingReview.length)&&(m.bowlingReview&&m.bowlingReview.length)?" · ":""}${(m.bowlingReview&&m.bowlingReview.length)?m.bowlingReview.length+" bowling entries":""}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary" onclick="matchReportView('${m.id}')">Report</button><button class="btn secondary" onclick="editMatch('${m.id}')">Edit</button><button class="btn secondary" onclick="duplicateMatch('${m.id}')">Duplicate</button><button class="btn danger" onclick="delMatch('${m.id}')">Delete</button></div></div>`}
+function matchCardHtml(m){
+ let linkedReflection=db.reflections.find(r=>r.matchId===m.id);
+ let showReflectionStatus=(m.date||"")<=today();
+ return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div><b>${esc(m.team||"My Team")} vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.date||"")} ${m.venue?"· "+esc(m.venue):""} ${m.format?"· "+esc(m.format):""}</div></div><span class="tag">${esc(matchResultOutcome(m))}</span></div><p>${esc(m.result||"No result recorded")}</p>${(m.battingReview&&m.battingReview.length)||(m.bowlingReview&&m.bowlingReview.length)?`<div class="muted">${(m.battingReview&&m.battingReview.length)?m.battingReview.length+" batting entries":""}${(m.battingReview&&m.battingReview.length)&&(m.bowlingReview&&m.bowlingReview.length)?" · ":""}${(m.bowlingReview&&m.bowlingReview.length)?m.bowlingReview.length+" bowling entries":""}</div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForMatch('${m.id}')">Reflection pending</span>`}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary" onclick="matchReportView('${m.id}')">Report</button><button class="btn secondary" onclick="editMatch('${m.id}')">Edit</button><button class="btn secondary" onclick="duplicateMatch('${m.id}')">Duplicate</button><button class="btn danger" onclick="delMatch('${m.id}')">Delete</button></div></div>`;
+}
 
 const DISMISSAL_TYPES=["Not out","Bowled","Caught","Caught and bowled","LBW","Run out","Stumped","Hit wicket","Retired hurt","Other"];
 let battingNotesOpen=new WeakSet(),bowlingNotesOpen=new WeakSet();

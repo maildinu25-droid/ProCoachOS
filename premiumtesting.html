@@ -6,7 +6,6 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#08121e">
 <title>ProCoach OS — Premium Testing</title>
-
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -272,7 +271,7 @@ const PROFILES_KEY="coachbook_profiles",ACTIVE_KEY="coachbook_active_profile";
  shown to the user. What's still NOT verified: the email address itself is
  real/deliverable — only its format is checked.
 */
-const LICENSE_KEY="coachbook_license_testing_premium",TRIAL_DAYS=14;
+const LICENSE_KEY="coachbook_license_premium_testing",TRIAL_DAYS=14;
 const BASIC_TEAM_CAP=1,BASIC_PROFILE_CAP=1;
 const OBJECTIVE_CATEGORIES=["Technical improvement","Tactical understanding","Physical development","Mental skills","Teamwork & communication","Match preparation","Specific skill development"];
 const RATING_LABELS={1:"Struggled",2:"Below Par",3:"Solid",4:"Good",5:"Excellent"};
@@ -284,8 +283,9 @@ function ratingSelectRow(name,label,currentValue){
 }
 const BASIC_CHECKOUT_URL="https://checkout.dodopayments.com/buy/pdt_0NlF4qxzPiVRkaHNhpa5M?quantity=1";
 const PREMIUM_CHECKOUT_URL="https://checkout.dodopayments.com/buy/pdt_0NlF4pFDxitmm3Oci73zh?quantity=1";
-function needsEmailGate(){
- return false; // TESTING BUILD — Premium: gate disabled
+function needsEmailGate(){return false;
+ let raw=null;try{raw=JSON.parse(localStorage.getItem(LICENSE_KEY))}catch(e){}
+ return !raw||typeof raw!=="object";
 }
 function showEmailGate(){
  let overlay=document.createElement("div");
@@ -473,7 +473,7 @@ function daysLeftFromStart(trialStartedAt){
 }
 function getLicenseState(){
  let raw=null;try{raw=JSON.parse(localStorage.getItem(LICENSE_KEY))}catch(e){}
- if(!raw||typeof raw!=="object"){raw={status:"premium",trialStartedAt:today(),licenseKey:"TEST-PREMIUM-KEY",trialEndedNoticeShown:false,email:"testing-premium@procoachos.in"}}
+ if(!raw||typeof raw!=="object"){raw={status:"premium",trialStartedAt:today(),licenseKey:"TESTING",trialEndedNoticeShown:false,email:"testing@procoachos.in"}}
  if(raw.status==="trial"&&daysLeftFromStart(raw.trialStartedAt)<=0){raw.status="expired"}
  try{localStorage.setItem(LICENSE_KEY,JSON.stringify(raw))}catch(e){}
  return raw;
@@ -603,8 +603,7 @@ async function activateLicense(){
 // only a definitive "no longer valid" answer from the server (subscription
 // cancelled, payment failed, device removed) actually locks the app.
 const LICENSE_REVALIDATE_INTERVAL_MS=24*60*60*1000;
-async function revalidateLicenseIfNeeded(){
- return; // TESTING BUILD — skip network revalidation against a fake key
+async function revalidateLicenseIfNeeded(){return;
  let lic=getLicenseState();
  if(lic.status!=="basic"&&lic.status!=="premium")return;
  if(!lic.licenseKey)return;
@@ -623,6 +622,52 @@ async function revalidateLicenseIfNeeded(){
  lic.status="expired";lic.lastRevalidatedAt=now;
  saveLicenseState(lic);
  renderAll();
+}
+const TRIAL_STATUS_API="https://procoachos-dodo.maildinu25.workers.dev/api/trial/status";
+// Mirrors revalidateLicenseIfNeeded()'s once-a-day, fail-open pattern, but for
+// an in-progress TRIAL (which otherwise has no ongoing server check at all —
+// only at signup and on a new-device restore). This is what lets an admin's
+// suspend/grant action actually take effect for a coach who is mid-trial on
+// their own device right now, without them doing anything:
+//  - if the admin suspended this trial email -> lock the app, same as an
+//    expired trial (a network error never does this — only a definitive
+//    "suspended" answer from the server does).
+//  - if the admin (or a real Dodo payment) has granted this email a license
+//    since the trial started -> the app quietly upgrades itself to that
+//    license, no manual key entry needed.
+//  - otherwise -> nothing changes, just records that a check happened today.
+const TRIAL_STATUS_CHECK_INTERVAL_MS=24*60*60*1000;
+async function checkTrialStatusIfNeeded(){
+ let lic=getLicenseState();
+ if(lic.status!=="trial")return;
+ if(!lic.email)return;
+ let now=Date.now();
+ let last=lic.lastTrialStatusCheckedAt||0;
+ if(now-last<TRIAL_STATUS_CHECK_INTERVAL_MS)return;
+ let result=null;
+ try{
+  let response=await fetch(TRIAL_STATUS_API,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({email:lic.email})});
+  try{result=await response.json()}catch(_){}
+  if(!response.ok||!result)return; // couldn't get a definitive answer — try again next time
+ }catch(err){
+  console.error("Trial status check failed:",err&&err.message?err.message:err);
+  return; // network error — fail open, don't touch access
+ }
+ if(result.status==="suspended"){
+  lic.status="expired";lic.lastTrialStatusCheckedAt=now;
+  saveLicenseState(lic);
+  renderAll();
+  return;
+ }
+ if(result.status==="licensed"&&(result.tier==="basic"||result.tier==="premium")&&result.licenseKey){
+  lic.status=result.tier;lic.licenseKey=result.licenseKey;lic.lastRevalidatedAt=now;lic.lastTrialStatusCheckedAt=now;
+  saveLicenseState(lic);
+  renderAll();
+  return;
+ }
+ // still a plain trial, nothing to change — just record that we checked
+ lic.lastTrialStatusCheckedAt=now;
+ saveLicenseState(lic);
 }
 function deactivateLicense(){
  if(!confirm("Remove this license from the app? You'll lose access to add or edit anything until a new plan is activated."))return;
@@ -726,7 +771,7 @@ function initApp(){
   [...new Set(db.players.map(p=>p.team).filter(Boolean))].forEach(name=>{if(!db.teams.some(t=>t.name===name))db.teams.push({id:uid("team"),name,category:"",notes:""})});
   if(needsEmailGate()){showEmailGate()}
   else{
-   nav();renderAll();applyTheme(document.documentElement.classList.contains("light")?"light":"dark");checkPlanTransition();revalidateLicenseIfNeeded();
+   nav();renderAll();applyTheme(document.documentElement.classList.contains("light")?"light":"dark");checkPlanTransition();revalidateLicenseIfNeeded();checkTrialStatusIfNeeded();
    checkTodaysSessionReminder();
    // Restore whichever page was open before this load — iOS can fully
    // reload a standalone Home Screen app when returning from a
@@ -822,7 +867,7 @@ function totalPendingCount(){
  return getPendingItems().length;
 }
 function refreshNotificationBadge(){
- let btn=document.querySelector(".bellBtn:not(.whatsNewBtn)");
+ let btn=document.querySelector(".bellBtn");
  if(!btn)return;
  let count=totalPendingCount();
  btn.innerHTML=`${icon("bell",17)}${count?`<span class="badge">${count}</span>`:""}`;
@@ -964,38 +1009,6 @@ function buildInsights(months,hrsTrend,ratingTrend,assessTrend,sessTrend){
  if(!out.length)out.push({icon:"👋",text:"Log a few sessions and reflections to start seeing insights here."});
  return out.slice(0,5);
 }
-const CHANGELOG=[
- {date:"2026-09-15",items:[
-  "Booking is here — share one link, set your availability, and let parents/players request a 1-on-1 session with zero back-and-forth. A Premium feature.",
-  "Bulk-archive unused assessment metrics in one tap instead of one at a time.",
-  "Assessment Coverage heatmap and Skill Trends (improving/stagnant/declining) added to the Assessment Report.",
-  "Copy Last Session's Plan to start a new session from your most recent one.",
-  "A new Refresh button next to search — useful if the app's on your Home Screen, where there's no other way to pull a fresh update."
- ]},
- {date:"2026-09-13",items:[
-  "Custom assessment metrics — add your own rating metric to any discipline, with an option to archive ones you no longer use.",
-  "Detailed playing style — batting hand, bowling arm, pace/spin, and spin type, right on the player profile.",
-  "Progress-over-time charts on player profiles — overall trend, by discipline, and by specific skill.",
-  "Fitness testing rebuilt — six standard tests plus fully custom-named tests (Bronco, Yo-yo, 40m dash, anything).",
-  "Analysis Tools now has its own place in the nav, linking straight to Pitch Map, Batting Map and Live Session.",
-  "You can now see, and restore, recently deleted players and sessions from Account & Backup.",
-  "A clear, persistent reminder that your data lives on this device only, with one tap to back it up."
- ]}
-];
-function openWhatsNew(){
- localStorage.setItem("coachbook_changelog_seen_at",CHANGELOG[0].date);
- refreshWhatsNewBadge();
- modal(`<div class="sheetHead"><h2>What's New</h2><button class="x" onclick="closeM()">×</button></div>
- ${CHANGELOG.map(entry=>`<div class="card" style="margin-bottom:10px"><b>${esc(fmtDate(entry.date))}</b><ul style="margin:8px 0 0;padding-left:18px">${entry.items.map(i=>`<li style="margin-bottom:4px">${esc(i)}</li>`).join("")}</ul></div>`).join("")}`);
-}
-function hasUnseenChangelog(){
- let seenAt=localStorage.getItem("coachbook_changelog_seen_at");
- return !seenAt||seenAt<CHANGELOG[0].date;
-}
-function refreshWhatsNewBadge(){
- let btn=document.querySelector(".whatsNewBtn");
- if(btn)btn.innerHTML=`${icon("star",16)}${hasUnseenChangelog()?`<span class="badge"></span>`:""}`;
-}
 function forceRefreshApp(){
  // A plain location.reload() isn't reliable here — iOS Safari (especially
  // in standalone Home Screen mode, where there's no pull-to-refresh or URL
@@ -1088,7 +1101,6 @@ function dashboard(){
  <div class="homeHeader">
  <div><div class="homeGreeting">${greetingWord()}, <b>${esc(profile.name||"Coach")}</b> 👋</div><div class="homeSub">${esc(fmtCalDate(today()))}</div></div>
  <div style="display:flex;gap:8px;align-items:center">
- <button class="bellBtn whatsNewBtn" onclick="openWhatsNew()" aria-label="What's new">${icon("star",16)}${hasUnseenChangelog()?`<span class="badge"></span>`:""}</button>
  <button class="bellBtn" onclick="openNotifications()" aria-label="Pending items">${icon("bell",17)}${pendingCount?`<span class="badge">${pendingCount}</span>`:""}</button>
  <button class="searchIconBtn" onclick="openGlobalSearch()" aria-label="Search">${icon("search",16)}</button>
  <button class="bellBtn" onclick="forceRefreshApp()" aria-label="Refresh app">${icon("refresh",17)}</button>
