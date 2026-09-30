@@ -621,8 +621,7 @@ async function activateLicense(){
 // only a definitive "no longer valid" answer from the server (subscription
 // cancelled, payment failed, device removed) actually locks the app.
 const LICENSE_REVALIDATE_INTERVAL_MS=24*60*60*1000;
-async function revalidateLicenseIfNeeded(){
- return; // disabled in testing build
+async function revalidateLicenseIfNeeded(){return;
  let lic=getLicenseState();
  if(lic.status!=="basic"&&lic.status!=="premium")return;
  if(!lic.licenseKey)return;
@@ -1235,7 +1234,7 @@ function sessions(){
   let gameDrills=(s.gameDrillIds||[]).map(id=>db.drills.find(d=>d.id===id)).filter(Boolean);
   let linkedReflection=db.reflections.find(r=>r.sessionId===s.id);
   let showReflectionStatus=s.date<=today();
-  return `<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}${gameDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px"><a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="copySessionSummary('${s.id}')">Copy Summary</button><button class="btn secondary" onclick="printSessionPlan('${s.id}')">Print Plan</button><button class="btn secondary" onclick="editSession('${s.id}')">Edit</button><button class="btn danger" onclick="delSession('${s.id}')">×</button></div></div>`;
+  return `<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}${gameDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px"><a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="shareSessionSummary('${s.id}')">Share via WhatsApp</button><button class="btn secondary" onclick="copySessionSummary('${s.id}')">Copy Text</button><button class="btn secondary" onclick="printSessionPlan('${s.id}')">Print Plan</button><button class="btn secondary" onclick="editSession('${s.id}')">Edit</button><button class="btn danger" onclick="delSession('${s.id}')">×</button></div></div>`;
  }).join("")}</div>`:empty("No sessions match your search.")}</div>`;
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -1259,6 +1258,10 @@ function updateAttendanceForTeam(teamName){
  if(container)container.innerHTML=attendanceOptionsHtml({},teamName,checkedNow.length?checkedNow:null,defaultAllChecked);
  updateFormSectionCount("attendance","marked present");
 }
+function onSessionTeamChange(teamName){
+ updateAttendanceForTeam(teamName);
+ renderNetPlanBuilder();
+}
 function toggleSessionType(val){
  document.getElementById("sessionTypeTeamWrap").style.display=val==="team"?"":"none";
  document.getElementById("sessionTypePlayerWrap").style.display=val==="player"?"":"none";
@@ -1271,6 +1274,7 @@ function toggleSessionType(val){
  } else {
   updateAttendanceForTeam("");
  }
+ renderNetPlanBuilder();
 }
 function sessionFormHtml(s,mode){
  s=s||{};
@@ -1285,7 +1289,7 @@ function sessionFormHtml(s,mode){
  <label>Session title <span class="muted" style="font-weight:400">(optional)</span><input name="title" value="${esc(s.title||"")}" placeholder="Leave blank to show time + squad instead"></label>
  <label class="full">Session type<select name="sessionType" id="sessionTypeSelect" onchange="toggleSessionType(this.value)"><option value="team" ${sType==="team"?"selected":""}>Team / Squad session</option><option value="player" ${sType==="player"?"selected":""}>Individual Player (1-on-1)</option><option value="custom" ${sType==="custom"?"selected":""}>Custom Group</option></select></label>
  ${mode==="new"?`<div class="full"><label><input type="checkbox" id="sessionRepeatCheck" onchange="document.getElementById('sessionRepeatWeeksWrap').style.display=this.checked?'':'none'" style="width:auto;margin-right:6px">Repeat this session weekly</label><div id="sessionRepeatWeeksWrap" style="display:none;margin-top:8px"><label>For how many weeks (including this one)<input type="number" id="sessionRepeatWeeks" min="2" max="26" value="4"></label></div></div>`:""}
- <div class="full" id="sessionTypeTeamWrap" style="${sType==="team"?"":"display:none"}"><label>Team<select name="squadTeam" onchange="updateAttendanceForTeam(this.value)">${db.teams.length?db.teams.map(t=>`<option value="${esc(t.name)}" ${s.squad===t.name?"selected":""}>${esc(t.name)}</option>`).join(""):`<option value="">No teams yet — add one in Teams & Seasons</option>`}</select></label></div>
+ <div class="full" id="sessionTypeTeamWrap" style="${sType==="team"?"":"display:none"}"><label>Team<select name="squadTeam" onchange="onSessionTeamChange(this.value)">${db.teams.length?db.teams.map(t=>`<option value="${esc(t.name)}" ${s.squad===t.name?"selected":""}>${esc(t.name)}</option>`).join(""):`<option value="">No teams yet — add one in Teams & Seasons</option>`}</select></label></div>
  <div class="full" id="sessionTypePlayerWrap" style="${sType==="player"?"":"display:none"}"><label>Player<select name="sessionPlayerId">${activePlayers().length?activePlayers().map(p=>`<option value="${p.id}" ${s.sessionPlayerId===p.id?"selected":""}>${esc(p.name)}</option>`).join(""):`<option value="">No players yet — add one in Players</option>`}</select></label></div>
  <div class="full" id="sessionTypeCustomWrap" style="${sType==="custom"?"":"display:none"}"><label>Group name<input name="squadCustom" value="${esc(squadCustomVal)}" placeholder="e.g. Weekend intensive group"></label></div>
  <label>Duration (minutes)<input type="number" name="duration" value="${esc(s.duration||90)}"></label>
@@ -1331,8 +1335,37 @@ function openSessionForm(existing,mode){
 // Names are picked from the full player roster (not just marked attendance)
 // since session plans are usually built before the coach knows who'll show
 // up — attendance is confirmed later, separately, on the day.
+// Only when the session is a Team/Squad session does a specific team apply —
+// for a 1-on-1 or Custom Group session there's no single team to scope to,
+// so the full active roster is offered, same as Attendance does.
+function currentNetPlanTeamFilter(){
+ let typeSelect=document.getElementById("sessionTypeSelect");
+ if(!typeSelect||typeSelect.value!=="team")return "";
+ let teamSelect=document.querySelector('select[name="squadTeam"]');
+ return teamSelect?teamSelect.value:"";
+}
 function rosterPlayerNames(){
- return activePlayers().map(p=>p.name);
+ let teamFilter=currentNetPlanTeamFilter();
+ let players=teamFilter?activePlayers().filter(p=>p.team===teamFilter):activePlayers();
+ return players.map(p=>p.name);
+}
+// Nets within the same Set run side by side, so a player can only be in one
+// of them at a time — as a batter or a bowler. Names already picked in any
+// other net (or the other role) within this same Set are "taken" and should
+// be greyed out here to prevent double-booking a player in one rotation.
+// Across different Sets there's no clash (different time slots), so this is
+// scoped to si only, never across sets.
+function namesTakenElsewhereInSet(si,ni,field){
+ let set=sessionNetPlanDraft[si];
+ if(!set)return [];
+ let taken=[];
+ set.nets.forEach((net,idx)=>{
+  ["battersNames","bowlersNames"].forEach(f=>{
+   if(idx===ni&&f===field)return;
+   (net[f]||[]).forEach(n=>taken.push(n));
+  });
+ });
+ return taken;
 }
 // Sets run one after another; nets within a set run side by side. So the
 // useful count isn't "nets summed across every set" (that double-counts
@@ -1367,11 +1400,14 @@ function netPlanNameFieldHtml(si,ni,field,label,net){
  let expanded=netPlanExpandedKeys.has(key);
  let names=rosterPlayerNames();
  let atCap=isFinite(cap)&&selected.length>=cap;
+ let takenElsewhere=namesTakenElsewhereInSet(si,ni,field);
  let optionsHtml=names.length?`<div class="netNamePickGrid" id="netPlayerOptions-${key}">${names.map(n=>{
   let isChecked=selected.includes(n);
-  let disabled=(!isChecked&&atCap)?"disabled":"";
-  return `<label class="${disabled?"isDisabled":""}"><input type="checkbox" data-si="${si}" data-ni="${ni}" data-field="${field}" value="${esc(n)}" ${isChecked?"checked":""} ${disabled} onchange="handleNetPlanPlayerToggle(this)"> ${esc(n)}</label>`;
- }).join("")}</div>`:`<div class="muted" style="font-size:var(--fs-2);margin-top:4px">No players in roster yet.</div>`;
+  let isTaken=!isChecked&&takenElsewhere.includes(n);
+  let disabled=(!isChecked&&(atCap||isTaken))?"disabled":"";
+  let title=isTaken?` title="Already assigned in this set"`:"";
+  return `<label class="${disabled?"isDisabled":""}"${title}><input type="checkbox" data-si="${si}" data-ni="${ni}" data-field="${field}" value="${esc(n)}" ${isChecked?"checked":""} ${disabled} onchange="handleNetPlanPlayerToggle(this)"> ${esc(n)}${isTaken?` <span class="muted" style="font-size:var(--fs-1)">(in another net)</span>`:""}</label>`;
+ }).join("")}</div>`:`<div class="muted" style="font-size:var(--fs-2);margin-top:4px">${currentNetPlanTeamFilter()?"No players in this team yet.":"No players in roster yet."}</div>`;
  return `<div style="min-width:0">
   <div class="muted" style="font-size:var(--fs-1);font-weight:600;text-transform:uppercase;letter-spacing:.3px;display:flex;justify-content:space-between;align-items:center;gap:4px;cursor:pointer" onclick="toggleNetPlayerAssign('${key}')">
    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(label)}${capLabel}</span>
@@ -1430,20 +1466,11 @@ function handleNetPlanPlayerToggle(el){
  } else {
   net[field]=net[field].filter(n=>n!==name);
  }
- // Update just the summary block in place — avoids a full re-render that
- // would collapse the checkbox list the coach is mid-way through using.
- let label=document.getElementById(`netPlayerSummary-${si}-${ni}-${field}`);
- if(label)label.innerHTML=netPlanSelectedNamesHtml(net[field]);
- // Once capacity is hit, grey out the remaining unchecked boxes in this same list.
- if(isFinite(cap)){
-  let grid=document.getElementById(`netPlayerOptions-${si}-${ni}-${field}`);
-  if(grid){
-   let atCapNow=net[field].length>=cap;
-   grid.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
-    if(!cb.checked)cb.disabled=atCapNow;
-   });
-  }
- }
+ // A full re-render is needed (not just this list's summary) because picking
+ // a name here can grey it out in every other net/role within this same Set
+ // (see namesTakenElsewhereInSet) — netPlanExpandedKeys is preserved across
+ // renders, so any lists the coach had open stay open.
+ renderNetPlanBuilder();
 }
 function addNetPlanSet(){
  let lastSet=sessionNetPlanDraft[sessionNetPlanDraft.length-1];
@@ -3381,7 +3408,7 @@ function matchReportView(id){
  let battingRows=(m.battingReview||[]).map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.runs||"-")}</td><td>${esc(r.balls||"-")}</td><td>${esc(r.dismissal||"-")}</td><td>${esc(r.notes||"")}</td></tr>`).join("");
  let bowlingRows=(m.bowlingReview||[]).map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.overs||"-")}</td><td>${esc(r.runs||"-")}</td><td>${esc(r.wickets||"-")}</td><td>${esc(r.notes||"")}</td></tr>`).join("");
  let metricRows=obj=>Object.entries(obj||{}).map(([k,v])=>`<div class="item"><div>${esc(k)}</div><b>${esc(v)}/10</b></div>`).join("");
- let body=`${tournament?`<div class="tag" style="margin-bottom:10px">🏆 ${esc(tournament.name)}</div>`:""}<div class="card" style="margin-bottom:12px"><b>Match Summary</b><p style="margin:8px 0 0">${esc(matchNarrative(m))}</p><button class="btn secondary noPrint" style="margin-top:10px" onclick="copyMatchNarrative('${m.id}')">Copy Summary</button></div><div class="grid g3">
+ let body=`${tournament?`<div class="tag" style="margin-bottom:10px">🏆 ${esc(tournament.name)}</div>`:""}<div class="card" style="margin-bottom:12px"><b>Match Summary</b><p style="margin:8px 0 0">${esc(matchNarrative(m))}</p><div class="toolbar noPrint" style="margin-top:10px"><button class="btn secondary" onclick="shareMatchNarrative('${m.id}')">Share via WhatsApp</button><button class="btn secondary" onclick="copyMatchNarrative('${m.id}')">Copy Text</button></div></div><div class="grid g3">
  <div class="card stat"><span>Format</span><b style="font-size:var(--fs-5)">${esc(m.format||"—")}</b></div>
  <div class="card stat"><span>Toss</span><b style="font-size:var(--fs-5)">${esc(m.toss||"—")}${m.tossDecision?" · "+esc(m.tossDecision):""}</b></div>
  <div class="card stat"><span>Result</span><b style="font-size:var(--fs-5)">${esc(m.result||"—")}</b></div>
@@ -4098,6 +4125,26 @@ function copySessionSummary(id){
   prompt("Copy this summary:",text);
  }
 }
+// Opens WhatsApp (app on mobile, WhatsApp Web on desktop) with the message
+// already typed in — the coach still picks who to send it to, but skips
+// the copy/switch-app/paste dance the plain "Copy" buttons still require.
+// A 10-digit number is assumed to be an Indian mobile and given the +91
+// prefix wa.me needs; anything else is left as-is (or omitted entirely,
+// which opens WhatsApp's own contact/group picker instead of one chat).
+function normalizePhoneForWhatsApp(phone){
+ let digits=String(phone||"").replace(/\D/g,"");
+ if(!digits)return "";
+ if(digits.length===10)digits="91"+digits;
+ return digits;
+}
+function shareViaWhatsApp(text,phone){
+ let digits=normalizePhoneForWhatsApp(phone);
+ window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`,"_blank");
+}
+function shareSessionSummary(id){
+ let s=db.sessions.find(x=>x.id===id);if(!s)return;
+ shareViaWhatsApp(sessionSummaryText(s));
+}
 // Returns every searchable piece of text for a reflection, correctly
 // pulling from the new fields (betterReasons/betterDetail/learnings) or
 // falling back to the old ones (better/players/change) for reflections
@@ -4233,13 +4280,18 @@ function copyPaymentReminder(id){
  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>alert("Reminder copied — ready to paste into WhatsApp, SMS or email.")).catch(()=>prompt("Copy this reminder:",text))}
  else{prompt("Copy this reminder:",text)}
 }
+function shareInvoiceReminder(id){
+ let inv=db.invoices.find(i=>i.id===id);if(!inv)return;
+ let p=db.players.find(x=>x.id===inv.playerId);
+ shareViaWhatsApp(paymentReminderText(inv),p?p.parentPhone:"");
+}
 function paymentRemindersCenter(){
  let unpaid=db.invoices.filter(i=>!i.paid).sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
  let total=unpaid.reduce((a,i)=>a+invoiceTotal(i),0);
  modal(`<div class="sheetHead"><h2>Payment Reminders</h2><button class="x" onclick="closeM()">×</button></div>
  <div class="statPillRow"><div class="statPill"><span>Unpaid Invoices</span><b>${unpaid.length}</b></div><div class="statPill"><span>Total Outstanding</span><b>₹${total.toFixed(0)}</b></div></div>
  <h2 class="section">Unpaid</h2>
- <div class="card">${unpaid.length?unpaid.map(i=>{let p=db.players.find(x=>x.id===i.playerId);return `<div class="item"><div><b>${esc(invoiceNoDisplay(i.invNo))} · ${esc(p?p.name:"Unknown player")}</b><div class="muted">${esc(fmtDate(i.date))} · ₹${invoiceTotal(i).toFixed(0)}${i.dueDate?" · Due "+esc(fmtDate(i.dueDate)):""}</div></div><div class="toolbar"><button class="btn secondary" onclick="copyPaymentReminder('${i.id}')">Copy Reminder</button><button class="btn secondary" onclick="viewInvoice('${i.id}')">View</button></div></div>`}).join(""):empty("Nothing outstanding — all invoices are paid.")}</div>`);
+ <div class="card">${unpaid.length?unpaid.map(i=>{let p=db.players.find(x=>x.id===i.playerId);return `<div class="item"><div><b>${esc(invoiceNoDisplay(i.invNo))} · ${esc(p?p.name:"Unknown player")}</b><div class="muted">${esc(fmtDate(i.date))} · ₹${invoiceTotal(i).toFixed(0)}${i.dueDate?" · Due "+esc(fmtDate(i.dueDate)):""}</div></div><div class="toolbar"><button class="btn secondary" onclick="shareInvoiceReminder('${i.id}')">Share via WhatsApp</button><button class="btn secondary" onclick="copyPaymentReminder('${i.id}')">Copy Text</button><button class="btn secondary" onclick="viewInvoice('${i.id}')">View</button></div></div>`}).join(""):empty("Nothing outstanding — all invoices are paid.")}</div>`);
 }
 // Auto-generated, readable paragraph pulled entirely from structured match
 // data already entered — no new capture, just a plain-language summary.
@@ -4260,6 +4312,10 @@ function copyMatchNarrative(id){
  let text=matchNarrative(m);
  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>alert("Match summary copied — ready to paste into a message.")).catch(()=>prompt("Copy this summary:",text))}
  else{prompt("Copy this summary:",text)}
+}
+function shareMatchNarrative(id){
+ let m=db.matches.find(x=>x.id===id);if(!m)return;
+ shareViaWhatsApp(matchNarrative(m));
 }
 // Lightweight keyword-based theme detection over a reflection's free text —
 // surfaces recurring concerns across many reflections without asking the

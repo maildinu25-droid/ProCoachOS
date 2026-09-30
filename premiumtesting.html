@@ -621,8 +621,7 @@ async function activateLicense(){
 // only a definitive "no longer valid" answer from the server (subscription
 // cancelled, payment failed, device removed) actually locks the app.
 const LICENSE_REVALIDATE_INTERVAL_MS=24*60*60*1000;
-async function revalidateLicenseIfNeeded(){
- return; // disabled in testing build
+async function revalidateLicenseIfNeeded(){return;
  let lic=getLicenseState();
  if(lic.status!=="basic"&&lic.status!=="premium")return;
  if(!lic.licenseKey)return;
@@ -1259,6 +1258,10 @@ function updateAttendanceForTeam(teamName){
  if(container)container.innerHTML=attendanceOptionsHtml({},teamName,checkedNow.length?checkedNow:null,defaultAllChecked);
  updateFormSectionCount("attendance","marked present");
 }
+function onSessionTeamChange(teamName){
+ updateAttendanceForTeam(teamName);
+ renderNetPlanBuilder();
+}
 function toggleSessionType(val){
  document.getElementById("sessionTypeTeamWrap").style.display=val==="team"?"":"none";
  document.getElementById("sessionTypePlayerWrap").style.display=val==="player"?"":"none";
@@ -1271,6 +1274,7 @@ function toggleSessionType(val){
  } else {
   updateAttendanceForTeam("");
  }
+ renderNetPlanBuilder();
 }
 function sessionFormHtml(s,mode){
  s=s||{};
@@ -1285,7 +1289,7 @@ function sessionFormHtml(s,mode){
  <label>Session title <span class="muted" style="font-weight:400">(optional)</span><input name="title" value="${esc(s.title||"")}" placeholder="Leave blank to show time + squad instead"></label>
  <label class="full">Session type<select name="sessionType" id="sessionTypeSelect" onchange="toggleSessionType(this.value)"><option value="team" ${sType==="team"?"selected":""}>Team / Squad session</option><option value="player" ${sType==="player"?"selected":""}>Individual Player (1-on-1)</option><option value="custom" ${sType==="custom"?"selected":""}>Custom Group</option></select></label>
  ${mode==="new"?`<div class="full"><label><input type="checkbox" id="sessionRepeatCheck" onchange="document.getElementById('sessionRepeatWeeksWrap').style.display=this.checked?'':'none'" style="width:auto;margin-right:6px">Repeat this session weekly</label><div id="sessionRepeatWeeksWrap" style="display:none;margin-top:8px"><label>For how many weeks (including this one)<input type="number" id="sessionRepeatWeeks" min="2" max="26" value="4"></label></div></div>`:""}
- <div class="full" id="sessionTypeTeamWrap" style="${sType==="team"?"":"display:none"}"><label>Team<select name="squadTeam" onchange="updateAttendanceForTeam(this.value)">${db.teams.length?db.teams.map(t=>`<option value="${esc(t.name)}" ${s.squad===t.name?"selected":""}>${esc(t.name)}</option>`).join(""):`<option value="">No teams yet — add one in Teams & Seasons</option>`}</select></label></div>
+ <div class="full" id="sessionTypeTeamWrap" style="${sType==="team"?"":"display:none"}"><label>Team<select name="squadTeam" onchange="onSessionTeamChange(this.value)">${db.teams.length?db.teams.map(t=>`<option value="${esc(t.name)}" ${s.squad===t.name?"selected":""}>${esc(t.name)}</option>`).join(""):`<option value="">No teams yet — add one in Teams & Seasons</option>`}</select></label></div>
  <div class="full" id="sessionTypePlayerWrap" style="${sType==="player"?"":"display:none"}"><label>Player<select name="sessionPlayerId">${activePlayers().length?activePlayers().map(p=>`<option value="${p.id}" ${s.sessionPlayerId===p.id?"selected":""}>${esc(p.name)}</option>`).join(""):`<option value="">No players yet — add one in Players</option>`}</select></label></div>
  <div class="full" id="sessionTypeCustomWrap" style="${sType==="custom"?"":"display:none"}"><label>Group name<input name="squadCustom" value="${esc(squadCustomVal)}" placeholder="e.g. Weekend intensive group"></label></div>
  <label>Duration (minutes)<input type="number" name="duration" value="${esc(s.duration||90)}"></label>
@@ -1331,8 +1335,37 @@ function openSessionForm(existing,mode){
 // Names are picked from the full player roster (not just marked attendance)
 // since session plans are usually built before the coach knows who'll show
 // up — attendance is confirmed later, separately, on the day.
+// Only when the session is a Team/Squad session does a specific team apply —
+// for a 1-on-1 or Custom Group session there's no single team to scope to,
+// so the full active roster is offered, same as Attendance does.
+function currentNetPlanTeamFilter(){
+ let typeSelect=document.getElementById("sessionTypeSelect");
+ if(!typeSelect||typeSelect.value!=="team")return "";
+ let teamSelect=document.querySelector('select[name="squadTeam"]');
+ return teamSelect?teamSelect.value:"";
+}
 function rosterPlayerNames(){
- return activePlayers().map(p=>p.name);
+ let teamFilter=currentNetPlanTeamFilter();
+ let players=teamFilter?activePlayers().filter(p=>p.team===teamFilter):activePlayers();
+ return players.map(p=>p.name);
+}
+// Nets within the same Set run side by side, so a player can only be in one
+// of them at a time — as a batter or a bowler. Names already picked in any
+// other net (or the other role) within this same Set are "taken" and should
+// be greyed out here to prevent double-booking a player in one rotation.
+// Across different Sets there's no clash (different time slots), so this is
+// scoped to si only, never across sets.
+function namesTakenElsewhereInSet(si,ni,field){
+ let set=sessionNetPlanDraft[si];
+ if(!set)return [];
+ let taken=[];
+ set.nets.forEach((net,idx)=>{
+  ["battersNames","bowlersNames"].forEach(f=>{
+   if(idx===ni&&f===field)return;
+   (net[f]||[]).forEach(n=>taken.push(n));
+  });
+ });
+ return taken;
 }
 // Sets run one after another; nets within a set run side by side. So the
 // useful count isn't "nets summed across every set" (that double-counts
@@ -1367,11 +1400,14 @@ function netPlanNameFieldHtml(si,ni,field,label,net){
  let expanded=netPlanExpandedKeys.has(key);
  let names=rosterPlayerNames();
  let atCap=isFinite(cap)&&selected.length>=cap;
+ let takenElsewhere=namesTakenElsewhereInSet(si,ni,field);
  let optionsHtml=names.length?`<div class="netNamePickGrid" id="netPlayerOptions-${key}">${names.map(n=>{
   let isChecked=selected.includes(n);
-  let disabled=(!isChecked&&atCap)?"disabled":"";
-  return `<label class="${disabled?"isDisabled":""}"><input type="checkbox" data-si="${si}" data-ni="${ni}" data-field="${field}" value="${esc(n)}" ${isChecked?"checked":""} ${disabled} onchange="handleNetPlanPlayerToggle(this)"> ${esc(n)}</label>`;
- }).join("")}</div>`:`<div class="muted" style="font-size:var(--fs-2);margin-top:4px">No players in roster yet.</div>`;
+  let isTaken=!isChecked&&takenElsewhere.includes(n);
+  let disabled=(!isChecked&&(atCap||isTaken))?"disabled":"";
+  let title=isTaken?` title="Already assigned in this set"`:"";
+  return `<label class="${disabled?"isDisabled":""}"${title}><input type="checkbox" data-si="${si}" data-ni="${ni}" data-field="${field}" value="${esc(n)}" ${isChecked?"checked":""} ${disabled} onchange="handleNetPlanPlayerToggle(this)"> ${esc(n)}${isTaken?` <span class="muted" style="font-size:var(--fs-1)">(in another net)</span>`:""}</label>`;
+ }).join("")}</div>`:`<div class="muted" style="font-size:var(--fs-2);margin-top:4px">${currentNetPlanTeamFilter()?"No players in this team yet.":"No players in roster yet."}</div>`;
  return `<div style="min-width:0">
   <div class="muted" style="font-size:var(--fs-1);font-weight:600;text-transform:uppercase;letter-spacing:.3px;display:flex;justify-content:space-between;align-items:center;gap:4px;cursor:pointer" onclick="toggleNetPlayerAssign('${key}')">
    <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(label)}${capLabel}</span>
@@ -1430,20 +1466,11 @@ function handleNetPlanPlayerToggle(el){
  } else {
   net[field]=net[field].filter(n=>n!==name);
  }
- // Update just the summary block in place — avoids a full re-render that
- // would collapse the checkbox list the coach is mid-way through using.
- let label=document.getElementById(`netPlayerSummary-${si}-${ni}-${field}`);
- if(label)label.innerHTML=netPlanSelectedNamesHtml(net[field]);
- // Once capacity is hit, grey out the remaining unchecked boxes in this same list.
- if(isFinite(cap)){
-  let grid=document.getElementById(`netPlayerOptions-${si}-${ni}-${field}`);
-  if(grid){
-   let atCapNow=net[field].length>=cap;
-   grid.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
-    if(!cb.checked)cb.disabled=atCapNow;
-   });
-  }
- }
+ // A full re-render is needed (not just this list's summary) because picking
+ // a name here can grey it out in every other net/role within this same Set
+ // (see namesTakenElsewhereInSet) — netPlanExpandedKeys is preserved across
+ // renders, so any lists the coach had open stay open.
+ renderNetPlanBuilder();
 }
 function addNetPlanSet(){
  let lastSet=sessionNetPlanDraft[sessionNetPlanDraft.length-1];
