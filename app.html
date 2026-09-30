@@ -914,7 +914,16 @@ function applyTheme(t){
  if(meta)meta.setAttribute("content",t==="light"?"#f4f6f5":"#08121e");
 }
 function toggleTheme(){applyTheme(document.documentElement.classList.contains("light")?"dark":"light")}
-function modal(h){sheet.innerHTML=h;modalEl.classList.add("open");enhanceTextareasWithVoice(sheet)}function closeM(){modalEl.classList.remove("open")}const modalEl=document.getElementById("modal"),sheet=document.getElementById("sheet"),side=document.getElementById("side");modalEl.onclick=e=>{if(e.target===modalEl)closeM()}
+function modal(h){sheet.innerHTML=h;modalEl.classList.add("open");enhanceTextareasWithVoice(sheet)}function closeM(){modalEl.classList.remove("open");restorePrintTitle()}const modalEl=document.getElementById("modal"),sheet=document.getElementById("sheet"),side=document.getElementById("side");modalEl.onclick=e=>{if(e.target===modalEl)closeM()}
+// Browsers use document.title as the suggested print header / "Save as
+// PDF" filename. Left alone it's always the app's own title for every
+// single report, invoice or certificate — this lets each printable view
+// set something specific (e.g. "INV-0007 — ProCoach OS") for as long as
+// it's open, restoring the app's real title once that view closes.
+const _origDocTitle=document.title;
+function decodeHtmlEntities(str){let el=document.createElement("textarea");el.innerHTML=str;return el.value}
+function setPrintTitle(t){try{document.title=decodeHtmlEntities(String(t||"")).trim()+" — "+_origDocTitle}catch(e){}}
+function restorePrintTitle(){document.title=_origDocTitle}
 const SpeechRec=window.SpeechRecognition||window.webkitSpeechRecognition;
 let activeVoice=null;
 function enhanceTextareasWithVoice(container){
@@ -4106,7 +4115,7 @@ function reflectionSearchableText(r){
  ];
 }
 function venueOptions(){let venues=[...new Set([...activeSessions().map(s=>s.venue),...db.matches.map(m=>m.venue)].filter(Boolean))];return venues.map(v=>`<option value="${esc(v)}">`).join("")}
-function reportShell(title,sub,body){modal(`<div class="sheetHead noPrint"><h2>${title}</h2><button class="x" onclick="closeM()">×</button></div><div class="report"><h1>${title}</h1><div class="muted">${sub}</div>${body}<div class="reportActions noPrint"><button class="btn primary" onclick="printReport()">Print / Save PDF</button></div></div>`)}
+function reportShell(title,sub,body){setPrintTitle(title);modal(`<div class="sheetHead noPrint"><h2>${title}</h2><button class="x" onclick="closeM()">×</button></div><div class="report"><h1>${title}</h1><div class="muted">${sub}</div>${body}<div class="reportActions noPrint"><button class="btn primary" onclick="printReport()">Print / Save PDF</button></div></div>`)}
 /* ===== Business Tools: Invoices, Payment Reminders, Match Narrative, Reflection Themes, Custom Reports, Certificates ===== */
 function invoiceNoDisplay(n){return "INV-"+String(n||1).padStart(4,"0")}
 function invoiceTotal(inv){return (inv.items||[]).reduce((a,it)=>a+((Number(it.qty)||0)*(Number(it.rate)||0)),0)}
@@ -4427,6 +4436,7 @@ function generateCertificate(){
  <div class="certFooterCol"><div class="certFooterVal">${signedBy?esc(signedBy):""}</div><div class="certFooterLine"></div><div class="certFooterLabel">Coach's Signature</div></div>
  </div>
  </div></div>`;
+ setPrintTitle(`Certificate — ${p.name}`);
  modal(`<div class="sheetHead noPrint"><h2>Certificate</h2><button class="x" onclick="closeM()">×</button></div><div class="report">${body}<div class="reportActions noPrint"><button class="btn primary" onclick="printCertificate()">Print / Save PDF</button></div></div>`);
 }
 // Certificates read better landscape than the portrait layout every other
