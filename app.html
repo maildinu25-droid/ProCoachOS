@@ -1485,17 +1485,28 @@ function handleNetPlanPlayerToggle(el){
  } else {
   net[field]=net[field].filter(n=>n!==name);
  }
- // This list's own summary line, and its own cap-based greying.
+ // This list's own summary line, and its own greying — recomputed from
+ // scratch for every unchecked box (capacity reached AND/OR taken
+ // elsewhere), never just capacity alone: overwriting based on capacity
+ // only would blindly re-enable a name that's greyed out for being taken
+ // in another net/set, the moment anyone else in *this* list is toggled.
  let label=document.getElementById(`netPlayerSummary-${si}-${ni}-${field}`);
  if(label)label.innerHTML=netPlanSelectedNamesHtml(net[field]);
- if(isFinite(cap)){
-  let grid=document.getElementById(`netPlayerOptions-${si}-${ni}-${field}`);
-  if(grid){
-   let atCapNow=net[field].length>=cap;
-   grid.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
-    if(!cb.checked){cb.disabled=atCapNow;let lbl=cb.closest("label");if(lbl)lbl.classList.toggle("isDisabled",atCapNow)}
-   });
-  }
+ let grid=document.getElementById(`netPlayerOptions-${si}-${ni}-${field}`);
+ if(grid){
+  let atCapNow=isFinite(cap)&&net[field].length>=cap;
+  let takenNow=namesTakenElsewhere(si,ni,field);
+  grid.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+   if(cb.checked)return;
+   let isTakenNow=takenNow.includes(cb.value);
+   let dis=atCapNow||isTakenNow;
+   cb.disabled=dis;
+   let lbl=cb.closest("label");
+   if(lbl){
+    lbl.classList.toggle("isDisabled",dis);
+    if(isTakenNow)lbl.title="Already selected elsewhere in today's net plan";else lbl.removeAttribute("title");
+   }
+  });
  }
  // This name's greying in every OTHER net/role picker, wherever it's
  // currently expanded (same Set: any role; other Sets: same role only —
