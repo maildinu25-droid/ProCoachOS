@@ -47,14 +47,14 @@ input[type=range]{accent-color:var(--g);width:100%;height:6px;padding:0;backgrou
 .certCorner.cbl{bottom:12px;left:12px;border-right:0;border-top:0}
 .certCorner.cbr{bottom:12px;right:12px;border-left:0;border-top:0}
 .certSeal{width:64px;height:64px;margin:0 auto 8px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#f8e9b8,#c9a13b 75%);display:flex;align-items:center;justify-content:center;font-size:32px;box-shadow:0 3px 10px rgba(0,0,0,.18);border:2px solid #fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
-.certKicker{font-size:9.5pt;letter-spacing:2.5px;text-transform:uppercase;color:#c9a13b;font-weight:700;margin-bottom:2px}
-.certTitle{font-family:'Playfair Display',Georgia,serif;font-weight:800;font-size:26pt;color:#0e5c3f;letter-spacing:1px;text-transform:uppercase;margin:4px 0 4px}
+.certTitle{font-family:'Playfair Display',Georgia,serif;font-weight:800;font-size:26pt;color:#0e5c3f;letter-spacing:1px;text-transform:uppercase;margin:10px 0 4px}
 .certOrnament{color:#c9a13b;font-size:11pt;margin:0 0 14px;letter-spacing:10px}
 .certSub{font-family:'Playfair Display',Georgia,serif;font-style:italic;font-size:12.5pt;color:#5c6d64;margin:10px 0}
 .certNameWrap{margin:4px 0 2px;display:inline-block;max-width:100%}
 .certName{font-family:'Playfair Display',Georgia,serif;font-weight:800;font-size:25pt;color:#18211e;padding:0 8px;white-space:nowrap}
 .certNameFlourish{width:100%;height:12px;display:block;margin-top:-3px}
-.certAwardBadge{display:inline-block;margin:16px auto 6px;padding:11px 28px;background:linear-gradient(135deg,#0e9968,#10b981);color:#fff;border-radius:999px;font-weight:700;font-size:13.5pt;letter-spacing:.3px;box-shadow:0 4px 14px rgba(16,185,129,.28);-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.certAwardBadge{display:inline-flex;align-items:center;gap:12px;margin:16px auto 6px;padding:11px 30px;background:#fffdf7;border:2px solid #c9a13b;border-radius:10px;color:#0e5c3f;font-family:'Playfair Display',Georgia,serif;font-weight:800;font-size:15pt;letter-spacing:.3px}
+.certAwardBadge .certAwardOrnament{color:#c9a13b;font-size:11pt}
 .certFooterRow{display:flex;justify-content:space-between;gap:40px;margin-top:40px;padding:0 16px}
 .certFooterCol{flex:1;text-align:center}
 .certFooterVal{font-family:'Playfair Display',Georgia,serif;font-size:12pt;min-height:18px;color:#18211e}
@@ -4410,17 +4410,15 @@ function generateCertificate(){
  let date=document.getElementById("certDate").value||today();
  let signedBy=(document.getElementById("certSignedBy").value||"").trim();
  if(signedBy&&signedBy!==db.settings.coachName){db.settings.coachName=signedBy;save()}
- let kicker=db.settings.businessName||"ProCoach OS · Cricket Coaching";
  let body=`<div class="certBox"><div class="certBoxInner">
  <span class="certCorner ctl"></span><span class="certCorner ctr"></span><span class="certCorner cbl"></span><span class="certCorner cbr"></span>
  <div class="certSeal">${certificateEmoji(template)}</div>
- <div class="certKicker">${esc(kicker)}</div>
  <div class="certTitle">Certificate of Achievement</div>
  <div class="certOrnament">✦ ✦ ✦</div>
  <div class="certSub">This certifies that</div>
  <div class="certNameWrap"><div class="certName">${esc(p.name)}</div><svg class="certNameFlourish" viewBox="0 0 300 16" preserveAspectRatio="none"><path d="M2 8 Q75 1 150 8 T298 8" fill="none" stroke="#c9a13b" stroke-width="2"/></svg></div>
  <div class="certSub">has been awarded, in recognition of outstanding commitment and performance</div>
- <div class="certAwardBadge">${esc(achievement)}</div>
+ <div class="certAwardBadge"><span class="certAwardOrnament">✦</span>${esc(achievement)}<span class="certAwardOrnament">✦</span></div>
  <div class="certFooterRow">
  <div class="certFooterCol"><div class="certFooterVal">${esc(fmtDate(date))}</div><div class="certFooterLine"></div><div class="certFooterLabel">Date</div></div>
  <div class="certFooterCol"><div class="certFooterVal">${signedBy?esc(signedBy):""}</div><div class="certFooterLine"></div><div class="certFooterLabel">Coach's Signature</div></div>
