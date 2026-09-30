@@ -1349,23 +1349,33 @@ function rosterPlayerNames(){
  let players=teamFilter?activePlayers().filter(p=>p.team===teamFilter):activePlayers();
  return players.map(p=>p.name);
 }
-// Nets within the same Set run side by side, so a player can only be in one
-// of them at a time — as a batter or a bowler. Names already picked in any
-// other net (or the other role) within this same Set are "taken" and should
-// be greyed out here to prevent double-booking a player in one rotation.
-// Across different Sets there's no clash (different time slots), so this is
-// scoped to si only, never across sets.
-function namesTakenElsewhereInSet(si,ni,field){
- let set=sessionNetPlanDraft[si];
- if(!set)return [];
- let taken=[];
- set.nets.forEach((net,idx)=>{
-  ["battersNames","bowlersNames"].forEach(f=>{
-   if(idx===ni&&f===field)return;
-   (net[f]||[]).forEach(n=>taken.push(n));
+// Two different reasons a name can be "taken" elsewhere in today's plan:
+// 1) Nets within the same Set run side by side, so a player can only be in
+//    one of them at a time — as a batter OR a bowler. Any other net/role
+//    within this same Set blocks the name here.
+// 2) Across different Sets (different time slots) there's no clash of time,
+//    but picking the same player to BAT in set after set crowds out the
+//    rest of the squad — so an existing batting slot elsewhere in the
+//    session also blocks batting here, to keep batting reps spread around.
+//    Bowling is the opposite: it's normal (and often necessary, with a
+//    small pool of bowlers) for the same bowler to bowl across several
+//    Sets/nets in one session, so bowling is never blocked across Sets —
+//    only within the same Set, same as any other role clash.
+function namesTakenElsewhere(si,ni,field){
+ let taken=new Set();
+ sessionNetPlanDraft.forEach((set,setIdx)=>{
+  set.nets.forEach((net,netIdx)=>{
+   if(setIdx===si){
+    ["battersNames","bowlersNames"].forEach(f=>{
+     if(netIdx===ni&&f===field)return;
+     (net[f]||[]).forEach(n=>taken.add(n));
+    });
+   } else if(field==="battersNames"){
+    (net.battersNames||[]).forEach(n=>taken.add(n));
+   }
   });
  });
- return taken;
+ return [...taken];
 }
 // Sets run one after another; nets within a set run side by side. So the
 // useful count isn't "nets summed across every set" (that double-counts
@@ -1400,12 +1410,12 @@ function netPlanNameFieldHtml(si,ni,field,label,net){
  let expanded=netPlanExpandedKeys.has(key);
  let names=rosterPlayerNames();
  let atCap=isFinite(cap)&&selected.length>=cap;
- let takenElsewhere=namesTakenElsewhereInSet(si,ni,field);
+ let takenElsewhere=namesTakenElsewhere(si,ni,field);
  let optionsHtml=names.length?`<div class="netNamePickGrid" id="netPlayerOptions-${key}">${names.map(n=>{
   let isChecked=selected.includes(n);
   let isTaken=!isChecked&&takenElsewhere.includes(n);
   let disabled=(!isChecked&&(atCap||isTaken))?"disabled":"";
-  let title=isTaken?` title="Already assigned in this set"`:"";
+  let title=isTaken?` title="Already selected elsewhere in today's net plan"`:"";
   return `<label class="${disabled?"isDisabled":""}"${title}><input type="checkbox" data-si="${si}" data-ni="${ni}" data-field="${field}" value="${esc(n)}" ${isChecked?"checked":""} ${disabled} onchange="handleNetPlanPlayerToggle(this)"> ${esc(n)}</label>`;
  }).join("")}</div>`:`<div class="muted" style="font-size:var(--fs-2);margin-top:4px">${currentNetPlanTeamFilter()?"No players in this team yet.":"No players in roster yet."}</div>`;
  return `<div style="min-width:0">
@@ -1454,6 +1464,11 @@ function toggleNetPlayerAssign(key){
  if(netPlanExpandedKeys.has(key))netPlanExpandedKeys.delete(key);else netPlanExpandedKeys.add(key);
  renderNetPlanBuilder();
 }
+// Deliberately never calls renderNetPlanBuilder() — rebuilding the whole
+// builder's innerHTML would recreate every scrollable name-picker grid from
+// scratch and reset its scroll position to the top, which is exactly the
+// annoyance we're avoiding. Instead this patches just the checkboxes/labels
+// that need to change, in place, across every picker currently open.
 function handleNetPlanPlayerToggle(el){
  let si=+el.dataset.si,ni=+el.dataset.ni,field=el.dataset.field,name=el.value,checked=el.checked;
  let net=sessionNetPlanDraft[si]&&sessionNetPlanDraft[si].nets[ni];
@@ -1466,11 +1481,48 @@ function handleNetPlanPlayerToggle(el){
  } else {
   net[field]=net[field].filter(n=>n!==name);
  }
- // A full re-render is needed (not just this list's summary) because picking
- // a name here can grey it out in every other net/role within this same Set
- // (see namesTakenElsewhereInSet) — netPlanExpandedKeys is preserved across
- // renders, so any lists the coach had open stay open.
- renderNetPlanBuilder();
+ // This list's own summary line, and its own cap-based greying.
+ let label=document.getElementById(`netPlayerSummary-${si}-${ni}-${field}`);
+ if(label)label.innerHTML=netPlanSelectedNamesHtml(net[field]);
+ if(isFinite(cap)){
+  let grid=document.getElementById(`netPlayerOptions-${si}-${ni}-${field}`);
+  if(grid){
+   let atCapNow=net[field].length>=cap;
+   grid.querySelectorAll('input[type="checkbox"]').forEach(cb=>{
+    if(!cb.checked){cb.disabled=atCapNow;let lbl=cb.closest("label");if(lbl)lbl.classList.toggle("isDisabled",atCapNow)}
+   });
+  }
+ }
+ // This name's greying in every OTHER net/role picker, wherever it's
+ // currently expanded (same Set: any role; other Sets: same role only —
+ // see namesTakenElsewhere). Skipped entirely for pickers not on screen,
+ // since they'll compute the correct state fresh whenever they're opened.
+ sessionNetPlanDraft.forEach((set,setIdx)=>{
+  set.nets.forEach((net2,netIdx)=>{
+   if(setIdx===si&&netIdx===ni)return; // this exact net already handled above
+   ["battersNames","bowlersNames"].forEach(f2=>{
+    // Same-set: any role clashes (parallel nets). Other sets: only batting
+    // clashes with batting elsewhere — bowlers are expected to repeat
+    // across Sets, so bowling is never cross-set-blocked.
+    let clashes=setIdx===si?true:(field==="battersNames"&&f2==="battersNames");
+    if(!clashes)return;
+    let grid2=document.getElementById(`netPlayerOptions-${setIdx}-${netIdx}-${f2}`);
+    if(!grid2)return; // not currently expanded — nothing to patch
+    let cb2=[...grid2.querySelectorAll('input[type="checkbox"]')].find(b=>b.value===name);
+    if(!cb2||cb2.checked)return;
+    let lbl2=cb2.closest("label");
+    if(checked){
+     cb2.disabled=true;
+     if(lbl2){lbl2.classList.add("isDisabled");lbl2.title="Already selected elsewhere in today's net plan"}
+    } else {
+     let cap2=parseNetCap(f2==="battersNames"?net2.batters:net2.bowlers);
+     let atCap2=isFinite(cap2)&&(net2[f2]||[]).length>=cap2;
+     cb2.disabled=atCap2;
+     if(lbl2){lbl2.classList.toggle("isDisabled",atCap2);if(!atCap2)lbl2.removeAttribute("title")}
+    }
+   });
+  });
+ });
 }
 function addNetPlanSet(){
  let lastSet=sessionNetPlanDraft[sessionNetPlanDraft.length-1];
