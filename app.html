@@ -4269,7 +4269,16 @@ function recurringThemesCardHtml(){
 }
 function customReportBuilder(){
  modal(`<div class="sheetHead"><h2>Custom Report Builder</h2><button class="x" onclick="closeM()">×</button></div>
- <div class="muted" style="margin-bottom:12px">Choose which sections to include, then optionally narrow by date.</div>
+ <label>Scope<select id="reportScopeType" onchange="updateScopeValueField()">
+  <option value="all">All Players</option>
+  <option value="team">Specific Team</option>
+  <option value="player">Specific Player</option>
+  <option value="group">Specific Group</option>
+  <option value="season">Specific Season</option>
+  <option value="tournament">Specific Tournament</option>
+ </select></label>
+ <div id="reportScopeValueWrap"></div>
+ <div class="muted" style="margin:12px 0">Choose which sections to include, then optionally narrow by date. Picking a season or tournament fills the range automatically.</div>
  <div class="chipGrid2">
  <label><input type="checkbox" id="crbSessions" checked> Sessions</label>
  <label><input type="checkbox" id="crbMatches" checked> Matches</label>
@@ -4284,39 +4293,77 @@ function customReportBuilder(){
  </div>
  <label style="margin-top:10px">Report title<input id="crbTitle" value="Custom Report"></label>
  <button class="btn primary" style="margin-top:15px" onclick="buildCustomReport()">Generate Report</button>`);
+ updateScopeValueField();
+}
+// Sessions/matches don't carry a playerId list the way assessments do, so
+// team/season scoping matches them by team name (session.squad / match.team)
+// directly when possible, and falls back to "attended/played by someone in
+// the scoped roster" for scopes (player/group/tournament) that don't map to
+// a single team name — same fallback buildTeamReport already relies on.
+function sessionsInScope(scope,from,to){
+ if(scope.type==="team")return activeSessions().filter(s=>s.squad===scope.value&&inRange(s.date,from,to));
+ if(scope.type==="season"){
+  let season=db.seasons.find(x=>x.id===scope.value);
+  return season&&season.team?activeSessions().filter(s=>s.squad===season.team&&inRange(s.date,from,to)):[];
+ }
+ if(scope.type==="all")return activeSessions().filter(s=>inRange(s.date,from,to));
+ let names=new Set(playersInScope(scope).map(p=>p.name));
+ return activeSessions().filter(s=>inRange(s.date,from,to)&&(s.attendees||[]).some(n=>names.has(n)));
+}
+function matchesInScope(scope,roster,from,to){
+ if(scope.type==="team")return db.matches.filter(m=>m.team===scope.value&&inRange(m.date,from,to));
+ if(scope.type==="season"){
+  let season=db.seasons.find(x=>x.id===scope.value);
+  return season&&season.team?db.matches.filter(m=>m.team===season.team&&inRange(m.date,from,to)):[];
+ }
+ if(scope.type==="all")return db.matches.filter(m=>inRange(m.date,from,to));
+ let seen=new Set(),out=[];
+ roster.forEach(p=>{playerMatches(p).forEach(m=>{if(inRange(m.date,from,to)&&!seen.has(m.id)){seen.add(m.id);out.push(m)}})});
+ return out.sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
 }
 function buildCustomReport(){
+ let scope=scopeValues();
  let{from,to}=reportRangeValues();
+ let roster=playersInScope(scope);
  let title=(document.getElementById("crbTitle").value||"Custom Report").trim()||"Custom Report";
  let sections=[];
  if(document.getElementById("crbSessions").checked){
-  let list=activeSessions().filter(s=>inRange(s.date,from,to));
-  sections.push(`<h2>Sessions (${list.length})</h2>${list.length?list.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div></div></div>`).join(""):empty("No sessions in range.")}`);
+  let list=sessionsInScope(scope,from,to);
+  sections.push(`<h2>Sessions (${list.length})</h2>${list.length?list.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div></div></div>`).join(""):empty("No sessions in this scope/range.")}`);
  }
  if(document.getElementById("crbMatches").checked){
-  let list=db.matches.filter(m=>inRange(m.date,from,to));
-  sections.push(`<h2>Matches (${list.length})</h2>${list.length?list.map(m=>`<div class="item"><div><b>${esc(m.team||"Team")} vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(fmtDate(m.date))} · ${esc(m.result||"")}</div></div></div>`).join(""):empty("No matches in range.")}`);
+  let list=matchesInScope(scope,roster,from,to);
+  sections.push(`<h2>Matches (${list.length})</h2>${list.length?list.map(m=>`<div class="item"><div><b>${esc(m.team||"Team")} vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(fmtDate(m.date))} · ${esc(m.result||"")}</div></div></div>`).join(""):empty("No matches in this scope/range.")}`);
  }
  if(document.getElementById("crbAssessments").checked){
-  let list=db.assessments.filter(a=>inRange(a.date,from,to));
-  sections.push(`<h2>Assessments (${list.length})</h2>${list.length?list.map(a=>`<div class="item"><div><b>${esc(a.player||"Unknown")}</b><div class="muted">${esc(fmtDate(a.date))} · Avg ${esc(assessmentAvg(a))}/10</div></div></div>`).join(""):empty("No assessments in range.")}`);
+  let names=new Set(roster.map(p=>p.name));
+  let list=db.assessments.filter(a=>inRange(a.date,from,to)&&(scope.type==="all"||names.has(a.player)));
+  sections.push(`<h2>Assessments (${list.length})</h2>${list.length?list.map(a=>`<div class="item"><div><b>${esc(a.player||"Unknown")}</b><div class="muted">${esc(fmtDate(a.date))} · Avg ${esc(assessmentAvg(a))}/10</div></div></div>`).join(""):empty("No assessments in this scope/range.")}`);
  }
  if(document.getElementById("crbAttendance").checked){
-  let roster=activePlayers();
-  let list=activeSessions().filter(s=>inRange(s.date,from,to));
+  let list=sessionsInScope(scope,from,to);
   let rows=roster.map(p=>{let att=list.filter(s=>(s.attendees||[]).includes(p.name));let rate=list.length?Math.round(att.length/list.length*100):0;return{p,rate,count:att.length}}).sort((a,b)=>a.rate-b.rate);
-  sections.push(`<h2>Attendance</h2>${rows.length?rows.map(r=>`<div class="item"><div><b>${esc(r.p.name)}</b></div><span class="tag">${r.count}/${list.length} · ${r.rate}%</span></div>`).join(""):empty("No sessions in range.")}`);
+  sections.push(`<h2>Attendance</h2>${rows.length?rows.map(r=>`<div class="item"><div><b>${esc(r.p.name)}</b></div><span class="tag">${r.count}/${list.length} · ${r.rate}%</span></div>`).join(""):empty("No players/sessions in this scope.")}`);
  }
  if(document.getElementById("crbReflections").checked){
-  let list=db.reflections.filter(r=>inRange(r.date,from,to));
-  sections.push(`<h2>Reflections (${list.length})</h2>${list.length?list.map(r=>`<div class="item"><div><b>${esc(r.session||"Reflection")}</b><div class="muted">${esc(fmtDate(r.date))} · Rating ${esc(r.rating)}/5</div><small>${esc(r.well||"")}</small></div></div>`).join(""):empty("No reflections in range.")}`);
+  let teamFilter=scope.type==="team"?scope.value:(scope.type==="season"?(db.seasons.find(x=>x.id===scope.value)||{}).team||null:null);
+  let list=db.reflections.filter(r=>{
+   if(!inRange(r.date,from,to))return false;
+   if(!teamFilter)return true;
+   let s=r.sessionId?db.sessions.find(x=>x.id===r.sessionId):null;
+   let m=r.matchId?db.matches.find(x=>x.id===r.matchId):null;
+   if(s)return s.squad===teamFilter;
+   if(m)return m.team===teamFilter;
+   return false;
+  });
+  sections.push(`<h2>Reflections (${list.length})</h2>${list.length?list.map(r=>`<div class="item"><div><b>${esc(r.session||"Reflection")}</b><div class="muted">${esc(fmtDate(r.date))} · Rating ${esc(r.rating)}/5</div><small>${esc(r.well||"")}</small></div></div>`).join(""):empty(teamFilter?"No reflections linked to this team's sessions/matches in range.":"No reflections in range.")}`);
  }
  if(document.getElementById("crbPlayers").checked){
-  let list=db.players.slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
-  sections.push(`<h2>Player Roster (${list.length})</h2>${list.length?list.map(p=>`<div class="item"><div><b>${esc(p.name)}</b><div class="muted">${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}</div></div></div>`).join(""):empty("No players yet.")}`);
+  let list=roster.slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
+  sections.push(`<h2>Player Roster (${list.length})</h2>${list.length?list.map(p=>`<div class="item"><div><b>${esc(p.name)}</b><div class="muted">${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}</div></div></div>`).join(""):empty("No players in this scope.")}`);
  }
  if(!sections.length){alert("Pick at least one section to include.");return}
- reportShell(esc(title),rangeLabel(from,to),sections.join(""));
+ reportShell(esc(title),`${esc(scopeLabel(scope))} · ${rangeLabel(from,to)}`,sections.join(""));
 }
 const CERTIFICATE_TEMPLATES=["Player of the Month","Most Improved Player","Best Attendance","Outstanding Batting Performance","Outstanding Bowling Performance","Outstanding Fielding","Team Spirit Award","Completion of Season","Custom"];
 function certificateGenerator(){
