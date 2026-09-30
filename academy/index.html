@@ -6,7 +6,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ProCoach OS — Academy</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Sora:wght@600;700;800&family=Playfair+Display:ital,wght@0,700;0,800;1,600&display=swap" rel="stylesheet">
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
 <style>
@@ -139,6 +139,31 @@
   .checkbox-list { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 12px; }
   .checkbox-list label { display: flex; align-items: center; gap: 6px; font-size: 13px; background: var(--surface); border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 6px 10px; }
   .checkbox-list label.dim { opacity: 0.55; }
+  /* Certificate Generator — a self-contained, print-ready award design (its own
+     gold/serif look, independent of the app's dark theme) ported from the
+     individual app. Rendered inside a sheet for preview, then copied into
+     #print-area for the actual print (see printCertificate()). */
+  .certBox { padding: 7px; margin-top: 10px; background: linear-gradient(135deg,#c9a13b,#f0deac,#c9a13b); border-radius: 20px; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .certBoxInner { position: relative; background: #fffdf7; border: 2px solid #0e9968; border-radius: 15px; padding: 46px 40px 34px; text-align: center; overflow: hidden; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .certCorner { position: absolute; width: 28px; height: 28px; border: 3px solid #c9a13b; }
+  .certCorner.ctl { top: 12px; left: 12px; border-right: 0; border-bottom: 0; }
+  .certCorner.ctr { top: 12px; right: 12px; border-left: 0; border-bottom: 0; }
+  .certCorner.cbl { bottom: 12px; left: 12px; border-right: 0; border-top: 0; }
+  .certCorner.cbr { bottom: 12px; right: 12px; border-left: 0; border-top: 0; }
+  .certSeal { width: 64px; height: 64px; margin: 0 auto 8px; border-radius: 50%; background: radial-gradient(circle at 35% 30%,#f8e9b8,#c9a13b 75%); display: flex; align-items: center; justify-content: center; font-size: 32px; box-shadow: 0 3px 10px rgba(0,0,0,.18); border: 2px solid #fff; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+  .certTitle { font-family: 'Playfair Display', Georgia, serif; font-weight: 800; font-size: 26pt; color: #0e5c3f; letter-spacing: 1px; text-transform: uppercase; margin: 10px 0 4px; }
+  .certOrnament { color: #c9a13b; font-size: 11pt; margin: 0 0 14px; letter-spacing: 10px; }
+  .certSub { font-family: 'Playfair Display', Georgia, serif; font-style: italic; font-size: 12.5pt; color: #5c6d64; margin: 10px 0; }
+  .certNameWrap { margin: 4px 0 2px; display: inline-block; max-width: 100%; }
+  .certName { font-family: 'Playfair Display', Georgia, serif; font-weight: 800; font-size: 25pt; color: #18211e; padding: 0 8px; white-space: nowrap; }
+  .certNameFlourish { width: 100%; height: 10px; display: block; }
+  .certAwardBadge { display: inline-flex; align-items: center; gap: 12px; margin: 16px auto 6px; padding: 11px 30px; background: #fffdf7; border: 2px solid #c9a13b; border-radius: 10px; color: #0e5c3f; font-family: 'Playfair Display', Georgia, serif; font-weight: 800; font-size: 15pt; letter-spacing: .3px; }
+  .certAwardBadge .certAwardOrnament { color: #c9a13b; font-size: 11pt; }
+  .certFooterRow { display: flex; justify-content: space-between; gap: 40px; margin-top: 40px; padding: 0 16px; }
+  .certFooterCol { flex: 1; text-align: center; }
+  .certFooterVal { font-family: 'Playfair Display', Georgia, serif; font-size: 12pt; min-height: 18px; color: #18211e; }
+  .certFooterLine { border-top: 1px solid #8a95ab; margin-top: 7px; }
+  .certFooterLabel { font-size: 9pt; color: #707a76; margin-top: 5px; letter-spacing: .4px; text-transform: uppercase; }
   .collapsible-multiselect { margin: 6px 0 12px; }
   .collapsible-header { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; background: var(--surface); border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 10px 12px; font-size: 13.5px; font-weight: 650; color: var(--text); font-family: inherit; text-align: left; cursor: pointer; }
   .collapsible-count { color: var(--text-dim); font-weight: 400; font-size: 12.5px; margin-left: auto; margin-right: 6px; }
@@ -895,11 +920,14 @@
             <option value="parent">Parent</option>
           </select>
         </div>
+        <div class="form-row" id="invite-player-row" style="display:none; margin-top:10px;">
+          <select id="invite-player"><option value="">No player selected</option></select>
+        </div>
         <button class="btn small" id="invite-btn">Invite</button>
       </div>
       <div id="members-list"></div>
       <div class="note">
-        Inviting an email that already has an account activates them immediately. Otherwise the invite sits pending until they sign up — no manual "accept" step needed, it reconciles automatically. Actually notifying the invited email still needs a small server-side function (not built here — same pattern as the individual app's welcome-email worker).
+        Inviting an email that already has an account activates them immediately. Otherwise the invite sits pending until they sign up — no manual "accept" step needed, it reconciles automatically. For the Player or Parent role, picking a player links them (or their guardian) to that player's record automatically, even if the invite is still pending. The invited email gets a sign-in link automatically — no need to walk them through it in person.
       </div>
     </div>
 
@@ -1002,6 +1030,9 @@
             <option value="facility-usage">Facility usage &amp; rotation</option>
             <option value="fees-report">Fees &amp; outstanding balances</option>
           </optgroup>
+          <optgroup label="Custom">
+            <option value="custom-report">Custom report (pick sections)</option>
+          </optgroup>
         </select>
 
         <div class="formgrid" id="report-daterange-row" style="margin-top:10px;">
@@ -1051,6 +1082,10 @@
 
       <div class="sectionHeading" id="saved-reports-count">Saved Reports</div>
       <div id="saved-reports-list"></div>
+
+      <div class="sectionHeading" style="margin-top:24px;">Certificates</div>
+      <p style="color:var(--text-dim); font-size:13px; margin-top:-8px;">Generate a printable award certificate for a player.</p>
+      <button class="btn ghost" id="open-certificate-btn">🏅 Generate Certificate</button>
     </div>
 
 
@@ -1169,7 +1204,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-27-22:10';
+const APP_BUILD_VERSION = '2026-09-30-14:05';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -6836,6 +6871,7 @@ const REPORT_CONTROLS = {
   'tournament-report': { tournament: true }, 'season-analytics': { season: true },
   'session-report': { daterange: true, team: true }, 'monthly-coaching': { month: true, team: true, coach: true },
   'coach-development': { daterange: true }, 'equipment-facilities': {}, 'facility-usage': { daterange: true }, 'fees-report': {},
+  'custom-report': {}, // its scope/sections/date-range are chosen in its own sheet (see openCustomReportBuilder), not these shared filter rows
 };
 function updateReportControlVisibility() {
   const cfg = REPORT_CONTROLS[document.getElementById('report-type').value] || {};
@@ -6891,6 +6927,11 @@ async function loadReportsPanel() {
   loadSavedReports();
 }
 document.getElementById('run-report-btn').addEventListener('click', async () => {
+  // Custom report has no fixed template to "run" — Generate here just opens
+  // its own scope/sections sheet; buildCustomReport() (its sheet's own
+  // Generate button) is what actually fills #report-output and reveals
+  // Save Report, once the coach has made their picks.
+  if (document.getElementById('report-type').value === 'custom-report') { openCustomReportBuilder(); return; }
   const runners = {
     'full-overview': runFullOverviewReport, 'team-comparison': runTeamComparisonReport, 'branch-summary': runBranchSummaryReport,
     'trends-analytics': runTrendsAnalyticsReport,
@@ -6908,7 +6949,10 @@ document.getElementById('run-report-btn').addEventListener('click', async () => 
 });
 document.getElementById('save-report-btn').addEventListener('click', async () => {
   const typeSelect = document.getElementById('report-type');
-  const title = `${typeSelect.selectedOptions[0].textContent} — ${new Date().toLocaleDateString()}`;
+  // Custom report's own title field (set when it was generated) makes a
+  // better saved-report label than its fixed dropdown text.
+  const label = typeSelect.value === 'custom-report' ? crbLastTitle : typeSelect.selectedOptions[0].textContent;
+  const title = `${label} — ${new Date().toLocaleDateString()}`;
   const row = {
     org_id: currentOrgId, title, report_type: typeSelect.value,
     rendered_html: document.getElementById('report-output').innerHTML,
@@ -7558,7 +7602,8 @@ document.getElementById('export-report-btn').addEventListener('click', async () 
       showToast('Generate a report first.', 'error'); return;
     }
   }
-  const reportLabel = document.getElementById('report-type').selectedOptions[0].textContent;
+  const typeSelect = document.getElementById('report-type');
+  const reportLabel = typeSelect.value === 'custom-report' ? crbLastTitle : typeSelect.selectedOptions[0].textContent;
   await printWithBranding(reportLabel, outputEl.innerHTML);
 });
 
@@ -7633,6 +7678,339 @@ async function runAnalysisSummaryReport() {
   }
   outputEl.innerHTML = html;
 }
+
+// ============================================================
+// CUSTOM REPORT BUILDER — pick exactly which sections appear instead of a
+// fixed template (ported from the individual app's Custom Report Builder).
+// Lives as an extra option in the existing report-type select; its own
+// scope/sections/date-range are chosen in a sheet rather than the shared
+// filter rows above, then it renders into the same #report-output used by
+// every other report so Save/Export Print (branded) keep working unchanged.
+// ============================================================
+let crbState = { seasons: [], tournaments: [] };
+let crbLastTitle = 'Custom Report';
+
+async function openCustomReportBuilder() {
+  if (!cache.teams.length) await loadTeams();
+  if (!cache.players.length) await loadPlayers();
+  const [{ data: seasons, error: seasonsErr }, { data: tournaments, error: tournamentsErr }] = await Promise.all([
+    supabase.from('seasons').select('id, name, team_id, start_date, end_date').eq('org_id', currentOrgId).order('name'),
+    supabase.from('tournaments').select('id, name, squad_player_ids').eq('org_id', currentOrgId).order('name'),
+  ]);
+  if (seasonsErr) reportError(seasonsErr, 'Custom Report Builder (seasons)');
+  if (tournamentsErr) reportError(tournamentsErr, 'Custom Report Builder (tournaments)');
+  crbState.seasons = seasons || [];
+  crbState.tournaments = tournaments || [];
+  openSheet(sheetHead('Custom Report Builder') + `
+    <label class="field-label" style="margin-top:0;">Scope</label>
+    <select id="crb-scope-type">
+      <option value="all">All Players</option>
+      <option value="team">Specific Team</option>
+      <option value="player">Specific Player</option>
+      <option value="group">Specific Group</option>
+      <option value="season">Specific Season</option>
+      <option value="tournament">Specific Tournament</option>
+    </select>
+    <div id="crb-scope-value-wrap" style="margin-top:8px;"></div>
+    <div class="note" style="margin:12px 0;">Choose which sections to include, then optionally narrow by date. Picking a season fills the date range automatically.</div>
+    <label class="field-label" style="margin-top:0;">Sections to include</label>
+    <div class="checkbox-list">
+      <label><input type="checkbox" id="crb-sessions" style="width:auto; margin:0;" checked> Sessions</label>
+      <label><input type="checkbox" id="crb-matches" style="width:auto; margin:0;" checked> Matches</label>
+      <label><input type="checkbox" id="crb-assessments" style="width:auto; margin:0;" checked> Assessments</label>
+      <label><input type="checkbox" id="crb-attendance" style="width:auto; margin:0;"> Attendance</label>
+      <label><input type="checkbox" id="crb-reflections" style="width:auto; margin:0;"> Reflections</label>
+      <label><input type="checkbox" id="crb-players" style="width:auto; margin:0;"> Player Roster</label>
+    </div>
+    <div class="formgrid">
+      <label>From <span style="color:var(--text-dim); font-weight:400;">(optional)</span><input type="date" id="crb-from"></label>
+      <label>To <span style="color:var(--text-dim); font-weight:400;">(optional)</span><input type="date" id="crb-to"></label>
+    </div>
+    <label class="field-label">Report title</label>
+    <input type="text" id="crb-title" value="Custom Report">
+    <button class="btn primary" id="crb-generate-btn" style="margin-top:14px; width:auto;">Generate Report</button>`);
+  updateCrbScopeValueField();
+  document.getElementById('crb-scope-type').addEventListener('change', updateCrbScopeValueField);
+  document.getElementById('crb-generate-btn').addEventListener('click', buildCustomReport);
+}
+function updateCrbScopeValueField() {
+  const type = document.getElementById('crb-scope-type').value;
+  const wrap = document.getElementById('crb-scope-value-wrap');
+  if (type === 'team') {
+    wrap.innerHTML = cache.teams.length ? `<label>Team<select id="crb-scope-value">${cache.teams.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select></label>` : '<div class="note">No teams yet.</div>';
+  } else if (type === 'player') {
+    const sorted = cache.players.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+    wrap.innerHTML = sorted.length ? `<label>Player<select id="crb-scope-value">${sorted.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select></label>` : '<div class="note">No players yet.</div>';
+  } else if (type === 'group') {
+    const groups = [...new Set(cache.players.map(p => p.group).filter(Boolean))];
+    wrap.innerHTML = groups.length ? `<label>Group<select id="crb-scope-value">${groups.map(g => `<option value="${esc(g)}">${esc(g)}</option>`).join('')}</select></label>` : '<div class="note">No group set on any player yet.</div>';
+  } else if (type === 'season') {
+    wrap.innerHTML = crbState.seasons.length ? `<label>Season<select id="crb-scope-value">${crbState.seasons.map(s => `<option value="${esc(s.id)}">${esc(s.name)}</option>`).join('')}</select></label>` : '<div class="note">No seasons yet.</div>';
+    const sel = document.getElementById('crb-scope-value');
+    if (sel) { sel.addEventListener('change', crbOnScopeValuePick); crbOnScopeValuePick(); }
+  } else if (type === 'tournament') {
+    wrap.innerHTML = crbState.tournaments.length ? `<label>Tournament<select id="crb-scope-value">${crbState.tournaments.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select></label>` : '<div class="note">No tournaments yet.</div>';
+  } else {
+    wrap.innerHTML = '';
+  }
+}
+function crbOnScopeValuePick() {
+  const type = document.getElementById('crb-scope-type').value;
+  const valueEl = document.getElementById('crb-scope-value');
+  if (!valueEl || type !== 'season') return;
+  const season = crbState.seasons.find(s => s.id === valueEl.value);
+  if (!season) return;
+  const fromEl = document.getElementById('crb-from'), toEl = document.getElementById('crb-to');
+  if (fromEl && season.start_date) fromEl.value = season.start_date;
+  if (toEl && season.end_date) toEl.value = season.end_date;
+}
+function crbScopeValues() {
+  const type = document.getElementById('crb-scope-type').value;
+  const valueEl = document.getElementById('crb-scope-value');
+  return { type, value: type !== 'all' && valueEl ? valueEl.value : null };
+}
+function crbPlayersInScope(scope) {
+  if (scope.type === 'team') return cache.players.filter(p => p.team_id === scope.value);
+  if (scope.type === 'player') return cache.players.filter(p => p.id === scope.value);
+  if (scope.type === 'group') return cache.players.filter(p => p.group === scope.value);
+  if (scope.type === 'season') {
+    const season = crbState.seasons.find(s => s.id === scope.value);
+    return season && season.team_id ? cache.players.filter(p => p.team_id === season.team_id) : [];
+  }
+  if (scope.type === 'tournament') {
+    const tournament = crbState.tournaments.find(t => t.id === scope.value);
+    return tournament && tournament.squad_player_ids ? cache.players.filter(p => tournament.squad_player_ids.includes(p.id)) : [];
+  }
+  return cache.players.slice();
+}
+function crbScopeLabel(scope) {
+  if (scope.type === 'team') return `Team: ${nameById(cache.teams, scope.value)}`;
+  if (scope.type === 'player') return `Player: ${nameById(cache.players, scope.value)}`;
+  if (scope.type === 'group') return `Group: ${scope.value}`;
+  if (scope.type === 'season') { const s = crbState.seasons.find(x => x.id === scope.value); return `Season: ${s ? s.name : '—'}`; }
+  if (scope.type === 'tournament') { const t = crbState.tournaments.find(x => x.id === scope.value); return `Tournament: ${t ? t.name : '—'}`; }
+  return 'All Players';
+}
+function crbRangeLabel(from, to) {
+  if (!from && !to) return 'All-time';
+  if (from && to) return `${from} → ${to}`;
+  if (from) return `From ${from}`;
+  return `Up to ${to}`;
+}
+// Sessions/matches carry a real team_id (unlike the individual app's
+// team-name matching), so team/season scoping filters directly on that;
+// player/group/tournament scopes fall back to "attended/played by someone
+// in the scoped roster", matched by name against attendees[]/playing_xi[].
+async function crbSessionsInScope(scope, roster, from, to) {
+  let query = supabase.from('sessions').select('id, date, title, team_id, duration, attendees').eq('org_id', currentOrgId);
+  query = applyDateRange(query, from, to);
+  if (scope.type === 'team') query = query.eq('team_id', scope.value);
+  else if (scope.type === 'season') {
+    const season = crbState.seasons.find(s => s.id === scope.value);
+    if (!season || !season.team_id) return [];
+    query = query.eq('team_id', season.team_id);
+  }
+  const { data, error } = await query.order('date', { ascending: false });
+  if (error) { reportError(error, 'Custom Report (sessions)'); return []; }
+  let list = data || [];
+  if (scope.type === 'player' || scope.type === 'group' || scope.type === 'tournament') {
+    const names = new Set(roster.map(p => p.name));
+    list = list.filter(s => (s.attendees || []).some(n => names.has(n)));
+  }
+  return list;
+}
+function crbMatchIncludesPlayer(m, name) {
+  if ((m.playing_xi || []).includes(name)) return true;
+  if ((m.batting_review || []).some(r => r && r.name === name)) return true;
+  if ((m.bowling_review || []).some(r => r && r.name === name)) return true;
+  return false;
+}
+async function crbMatchesInScope(scope, roster, from, to) {
+  let query = supabase.from('matches').select('id, date, opponent, result, team_id, playing_xi, batting_review, bowling_review').eq('org_id', currentOrgId);
+  query = applyDateRange(query, from, to);
+  if (scope.type === 'team') query = query.eq('team_id', scope.value);
+  else if (scope.type === 'season') {
+    const season = crbState.seasons.find(s => s.id === scope.value);
+    if (!season || !season.team_id) return [];
+    query = query.eq('team_id', season.team_id);
+  }
+  const { data, error } = await query.order('date', { ascending: false });
+  if (error) { reportError(error, 'Custom Report (matches)'); return []; }
+  let list = data || [];
+  if (scope.type === 'player' || scope.type === 'group' || scope.type === 'tournament') {
+    const names = new Set(roster.map(p => p.name));
+    list = list.filter(m => [...names].some(n => crbMatchIncludesPlayer(m, n)));
+  }
+  return list;
+}
+async function crbAssessmentsInScope(scope, roster, from, to) {
+  let query = supabase.from('assessments').select('id, date, player_id, ratings').eq('org_id', currentOrgId);
+  query = applyDateRange(query, from, to);
+  if (scope.type !== 'all') {
+    const ids = roster.map(p => p.id);
+    if (!ids.length) return [];
+    query = query.in('player_id', ids);
+  }
+  const { data, error } = await query.order('date', { ascending: false });
+  if (error) { reportError(error, 'Custom Report (assessments)'); return []; }
+  return data || [];
+}
+// Reflections have no player link in this schema (only an optional linked
+// session), so team/season scoping narrows via that session's team; other
+// scopes fall back to showing every reflection in range, same limitation
+// the individual app has for those scopes.
+async function crbReflectionsInScope(scope, from, to) {
+  let query = supabase.from('reflections').select('id, date, session_id, rating, well').eq('org_id', currentOrgId);
+  query = applyDateRange(query, from, to);
+  const { data, error } = await query.order('date', { ascending: false });
+  if (error) { reportError(error, 'Custom Report (reflections)'); return []; }
+  let list = data || [];
+  const teamId = scope.type === 'team' ? scope.value : (scope.type === 'season' ? (crbState.seasons.find(s => s.id === scope.value) || {}).team_id : null);
+  if (teamId) {
+    const { data: teamSessions } = await supabase.from('sessions').select('id').eq('org_id', currentOrgId).eq('team_id', teamId);
+    const sessionIds = new Set((teamSessions || []).map(s => s.id));
+    list = list.filter(r => r.session_id && sessionIds.has(r.session_id));
+  }
+  return list;
+}
+function crbPlayerRosterHtml(roster) {
+  const list = roster.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+  return `<h3>Player Roster (${list.length})</h3>${list.length ? list.map(p => `<div class="list-item"><span>${esc(p.name)}</span><span class="role-tag">${esc(p.role || 'Player')}${p.team_id ? ' · ' + esc(nameById(cache.teams, p.team_id)) : ''}</span></div>`).join('') : '<div class="empty-state">No players in this scope.</div>'}`;
+}
+async function buildCustomReport() {
+  const scope = crbScopeValues();
+  const from = document.getElementById('crb-from').value || '';
+  const to = document.getElementById('crb-to').value || '';
+  const title = (document.getElementById('crb-title').value || 'Custom Report').trim() || 'Custom Report';
+  const wantSessions = document.getElementById('crb-sessions').checked;
+  const wantMatches = document.getElementById('crb-matches').checked;
+  const wantAssessments = document.getElementById('crb-assessments').checked;
+  const wantAttendance = document.getElementById('crb-attendance').checked;
+  const wantReflections = document.getElementById('crb-reflections').checked;
+  const wantPlayers = document.getElementById('crb-players').checked;
+  if (!wantSessions && !wantMatches && !wantAssessments && !wantAttendance && !wantReflections && !wantPlayers) {
+    showToast('Pick at least one section to include.', 'error'); return;
+  }
+  const generateBtn = document.getElementById('crb-generate-btn');
+  generateBtn.disabled = true; generateBtn.textContent = 'Generating...';
+
+  const roster = crbPlayersInScope(scope);
+  const sections = [];
+  // Sessions and Attendance both need the same session list — fetched once
+  // and reused, rather than querying twice.
+  let sessionsList = null;
+  if (wantSessions || wantAttendance) sessionsList = await crbSessionsInScope(scope, roster, from, to);
+
+  if (wantSessions) {
+    const list = sessionsList;
+    sections.push(`<h3>Sessions (${list.length})</h3>${list.length ? list.map(s => `<div class="list-item"><span>${esc(s.title || nameById(cache.teams, s.team_id))}</span><span class="role-tag">${esc(s.date)}${s.duration ? ' · ' + s.duration + ' min' : ''}</span></div>`).join('') : '<div class="empty-state">No sessions in this scope/range.</div>'}`);
+  }
+  if (wantMatches) {
+    const list = await crbMatchesInScope(scope, roster, from, to);
+    sections.push(`<h3>Matches (${list.length})</h3>${list.length ? list.map(m => `<div class="list-item"><span>${esc(nameById(cache.teams, m.team_id))} vs ${esc(m.opponent || 'Opposition')}</span><span class="role-tag">${esc(m.date)} · ${esc(m.result || '')}</span></div>`).join('') : '<div class="empty-state">No matches in this scope/range.</div>'}`);
+  }
+  if (wantAssessments) {
+    const list = await crbAssessmentsInScope(scope, roster, from, to);
+    sections.push(`<h3>Assessments (${list.length})</h3>${list.length ? list.map(a => {
+      const vals = a.ratings && typeof a.ratings === 'object' ? Object.values(a.ratings).filter(v => typeof v === 'number') : [];
+      const avg = vals.length ? (vals.reduce((x, y) => x + y, 0) / vals.length).toFixed(1) : null;
+      return `<div class="list-item"><span>${esc(nameById(cache.players, a.player_id))}</span><span class="role-tag">${esc(a.date)}${avg ? ' · avg ' + avg + '/10' : ''}</span></div>`;
+    }).join('') : '<div class="empty-state">No assessments in this scope/range.</div>'}`);
+  }
+  if (wantAttendance) {
+    const list = sessionsList;
+    const rows = roster.map(p => {
+      const att = list.filter(s => (s.attendees || []).includes(p.name));
+      const rate = list.length ? Math.round(att.length / list.length * 100) : 0;
+      return { p, rate, count: att.length };
+    }).sort((a, b) => a.rate - b.rate);
+    sections.push(`<h3>Attendance</h3>${rows.length ? rows.map(r => `<div class="list-item"><span>${esc(r.p.name)}</span><span class="role-tag">${r.count}/${list.length} · ${r.rate}%</span></div>`).join('') : '<div class="empty-state">No players/sessions in this scope.</div>'}`);
+  }
+  if (wantReflections) {
+    const list = await crbReflectionsInScope(scope, from, to);
+    sections.push(`<h3>Reflections (${list.length})</h3>${list.length ? list.map(r => `<div class="list-item"><span>${r.rating ? 'Rating ' + esc(String(r.rating)) + '/10' : 'Reflection'}</span><span class="role-tag">${esc(r.date)}</span></div>`).join('') : '<div class="empty-state">No reflections in this scope/range.</div>'}`);
+  }
+  if (wantPlayers) sections.push(crbPlayerRosterHtml(roster));
+
+  generateBtn.disabled = false; generateBtn.textContent = 'Generate Report';
+  crbLastTitle = title;
+  closeSheet();
+  const outputEl = document.getElementById('report-output');
+  outputEl.innerHTML = `<h3 style="margin:0 0 4px;">${esc(title)}</h3><div class="note" style="margin-bottom:12px;">${esc(crbScopeLabel(scope))} · ${esc(crbRangeLabel(from, to))}</div>` + sections.join('');
+  document.getElementById('save-report-btn').style.display = planAllows('advanced_reports') ? '' : 'none';
+  outputEl.scrollIntoView({ behavior: 'smooth' });
+  showToast('Report generated.', 'ok');
+}
+
+// ============================================================
+// CERTIFICATE GENERATOR — a print-ready award certificate for a player,
+// ported from the individual app. Reuses the app's #print-area (see
+// printWithBranding) but skips its org-logo header wrapper, since the
+// certificate's gold/serif design is already fully self-contained.
+// ============================================================
+const CERTIFICATE_TEMPLATES = ['Player of the Month', 'Most Improved Player', 'Best Attendance', 'Outstanding Batting Performance', 'Outstanding Bowling Performance', 'Outstanding Fielding', 'Team Spirit Award', 'Completion of Season', 'Custom'];
+const CERTIFICATE_EMOJI = { 'Player of the Month': '🏆', 'Most Improved Player': '📈', 'Best Attendance': '🗓️', 'Outstanding Batting Performance': '🏏', 'Outstanding Bowling Performance': '🎯', 'Outstanding Fielding': '🧤', 'Team Spirit Award': '🤝', 'Completion of Season': '🎖️' };
+function certificateEmoji(template) { return CERTIFICATE_EMOJI[template] || '🏅'; }
+async function openCertificateGenerator() {
+  if (!cache.players.length) await loadPlayers();
+  if (!cache.players.length) { showToast('Add a player first.', 'error'); return; }
+  const sorted = cache.players.slice().sort((a, b) => String(a.name || '').localeCompare(String(b.name || '')));
+  const nameByUser = await profilesByIds([session.user.id]);
+  openSheet(sheetHead('Certificate Generator') + `
+    <div class="formgrid">
+      <label class="full">Player<select id="cert-player">${sorted.map(p => `<option value="${esc(p.id)}">${esc(p.name)}</option>`).join('')}</select></label>
+      <label class="full">Award / Achievement<select id="cert-template">${CERTIFICATE_TEMPLATES.map(t => `<option>${esc(t)}</option>`).join('')}</select></label>
+      <label class="full" id="cert-custom-wrap" style="display:none;">Custom text<input type="text" id="cert-custom-text" placeholder="e.g. Fastest Bowler of the Season"></label>
+      <label>Date<input type="date" id="cert-date" value="${new Date().toISOString().slice(0, 10)}"></label>
+      <label>Signed by <span style="color:var(--text-dim); font-weight:400;">(optional)</span><input type="text" id="cert-signed-by" value="${esc(nameByUser[session.user.id] || '')}"></label>
+    </div>
+    <button class="btn primary" id="cert-generate-btn" style="margin-top:14px; width:auto;">Generate Certificate</button>`);
+  document.getElementById('cert-template').addEventListener('change', onCertTemplateChange);
+  document.getElementById('cert-generate-btn').addEventListener('click', generateCertificate);
+}
+function onCertTemplateChange() {
+  const wrap = document.getElementById('cert-custom-wrap');
+  if (wrap) wrap.style.display = document.getElementById('cert-template').value === 'Custom' ? '' : 'none';
+}
+function generateCertificate() {
+  const player = cache.players.find(p => p.id === document.getElementById('cert-player').value);
+  if (!player) return;
+  const template = document.getElementById('cert-template').value;
+  const achievement = template === 'Custom' ? (document.getElementById('cert-custom-text').value || 'Achievement').trim() : template;
+  const date = document.getElementById('cert-date').value || new Date().toISOString().slice(0, 10);
+  const signedBy = (document.getElementById('cert-signed-by').value || '').trim();
+  const body = `<div class="certBox" id="cert-render-box"><div class="certBoxInner">
+    <span class="certCorner ctl"></span><span class="certCorner ctr"></span><span class="certCorner cbl"></span><span class="certCorner cbr"></span>
+    <div class="certSeal">${certificateEmoji(template)}</div>
+    <div class="certTitle">Certificate of Achievement</div>
+    <div class="certOrnament">✦ ✦ ✦</div>
+    <div class="certSub">This certifies that</div>
+    <div class="certNameWrap"><div class="certName">${esc(player.name)}</div><svg class="certNameFlourish" viewBox="0 0 300 16" preserveAspectRatio="none"><path d="M2 8 Q75 1 150 8 T298 8" fill="none" stroke="#c9a13b" stroke-width="2"/></svg></div>
+    <div class="certSub">has been awarded, in recognition of outstanding commitment and performance</div>
+    <div class="certAwardBadge"><span class="certAwardOrnament">✦</span>${esc(achievement)}<span class="certAwardOrnament">✦</span></div>
+    <div class="certFooterRow">
+      <div class="certFooterCol"><div class="certFooterVal">${esc(date)}</div><div class="certFooterLine"></div><div class="certFooterLabel">Date</div></div>
+      <div class="certFooterCol"><div class="certFooterVal">${signedBy ? esc(signedBy) : ''}</div><div class="certFooterLine"></div><div class="certFooterLabel">Coach's Signature</div></div>
+    </div>
+  </div></div>`;
+  closeSheet();
+  openSheet(sheetHead('Certificate') + `<div style="background:#fff; border-radius:12px; padding:6px;">${body}</div><button class="btn primary" id="print-certificate-btn" style="margin-top:14px; width:auto;">Print / Save PDF</button>`);
+  document.getElementById('print-certificate-btn').addEventListener('click', printCertificate);
+}
+// Certificates read better landscape than the app's default print layout,
+// so a scoped @page override is injected only for this print and removed
+// again on the shared afterprint listener below.
+function printCertificate() {
+  const box = document.getElementById('cert-render-box');
+  if (!box) return;
+  document.getElementById('print-area').innerHTML = box.outerHTML;
+  let style = document.getElementById('cert-print-style');
+  if (!style) { style = document.createElement('style'); style.id = 'cert-print-style'; document.head.appendChild(style); }
+  style.textContent = '@page { size: landscape; margin: 10mm; }';
+  window.print();
+}
+window.addEventListener('afterprint', () => { const s = document.getElementById('cert-print-style'); if (s) s.remove(); });
+document.getElementById('open-certificate-btn').addEventListener('click', openCertificateGenerator);
 
 // ============================================================
 // DEVELOPMENT PLANS
@@ -9005,8 +9383,19 @@ document.getElementById('import-org-data-btn').addEventListener('click', async (
 // ============================================================
 // MEMBERS (+ team assignments for assistant_coach)
 // ============================================================
+function updateInvitePlayerRowVisibility() {
+  const role = document.getElementById('invite-role').value;
+  const row = document.getElementById('invite-player-row');
+  row.style.display = (role === 'player' || role === 'parent') ? 'block' : 'none';
+  if (row.style.display === 'none') document.getElementById('invite-player').value = '';
+}
+document.getElementById('invite-role').addEventListener('change', updateInvitePlayerRowVisibility);
+
 async function loadMembers() {
   if (!cache.teams.length) await loadTeams();
+  if (!cache.players.length) await loadPlayers();
+  fillSelect(document.getElementById('invite-player'), [...cache.players].sort((a, b) => a.name.localeCompare(b.name)), 'No player selected');
+  updateInvitePlayerRowVisibility();
   const listEl = document.getElementById('members-list');
   listEl.innerHTML = '<div class="empty-state">Loading...</div>';
 
@@ -9087,6 +9476,9 @@ async function loadMembers() {
 document.getElementById('invite-btn').addEventListener('click', async () => {
   const email = document.getElementById('invite-email').value.trim();
   const role = document.getElementById('invite-role').value;
+  const playerId = document.getElementById('invite-player-row').style.display !== 'none'
+    ? (document.getElementById('invite-player').value || null)
+    : null;
   if (!email) return;
   if (role === 'admin' || role === 'head_coach' || role === 'assistant_coach') {
     const { count, error: countErr } = await supabase.from('memberships').select('id', { count: 'exact', head: true })
@@ -9094,9 +9486,16 @@ document.getElementById('invite-btn').addEventListener('click', async () => {
     if (countErr) reportError(countErr, 'Invite (coach count)');
     else if (planLimitReached('max_coaches', count ?? 0)) { showToast(upgradeMessage('max_coaches'), 'error'); return; }
   }
-  const { error } = await supabase.rpc('invite_member', { p_org_id: currentOrgId, p_email: email, p_role: role });
-  if (error) { showToast(error.message, 'error'); return; }
+  const inviteBtn = document.getElementById('invite-btn');
+  inviteBtn.disabled = true;
+  const { data, error } = await invokeEdgeFunction('send-invite-email', { org_id: currentOrgId, email, role, player_id: playerId });
+  inviteBtn.disabled = false;
+  if (error) { showToast(error, 'error'); return; }
+  if (data?.emailStatus === 'sent') showToast('Invited — a sign-in email was sent.', 'ok');
+  else if (data?.emailStatus === 'skipped') showToast('Invited. (Email sending isn\'t configured yet — share the sign-in link with them yourself.)', 'ok');
+  else showToast('Invited, but the email failed to send. They can still sign in with their email at the login screen.', 'ok');
   document.getElementById('invite-email').value = '';
+  document.getElementById('invite-player').value = '';
   loadMembers();
 });
 
