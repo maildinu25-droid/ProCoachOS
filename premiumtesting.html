@@ -1235,7 +1235,7 @@ function sessions(){
   let gameDrills=(s.gameDrillIds||[]).map(id=>db.drills.find(d=>d.id===id)).filter(Boolean);
   let linkedReflection=db.reflections.find(r=>r.sessionId===s.id);
   let showReflectionStatus=s.date<=today();
-  return `<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}${gameDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px"><a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="copySessionSummary('${s.id}')">Copy Summary</button><button class="btn secondary" onclick="printSessionPlan('${s.id}')">Print Plan</button><button class="btn secondary" onclick="editSession('${s.id}')">Edit</button><button class="btn danger" onclick="delSession('${s.id}')">×</button></div></div>`;
+  return `<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}${gameDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px"><a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="shareSessionSummary('${s.id}')">Share via WhatsApp</button><button class="btn secondary" onclick="copySessionSummary('${s.id}')">Copy Text</button><button class="btn secondary" onclick="printSessionPlan('${s.id}')">Print Plan</button><button class="btn secondary" onclick="editSession('${s.id}')">Edit</button><button class="btn danger" onclick="delSession('${s.id}')">×</button></div></div>`;
  }).join("")}</div>`:empty("No sessions match your search.")}</div>`;
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -3381,7 +3381,7 @@ function matchReportView(id){
  let battingRows=(m.battingReview||[]).map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.runs||"-")}</td><td>${esc(r.balls||"-")}</td><td>${esc(r.dismissal||"-")}</td><td>${esc(r.notes||"")}</td></tr>`).join("");
  let bowlingRows=(m.bowlingReview||[]).map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.overs||"-")}</td><td>${esc(r.runs||"-")}</td><td>${esc(r.wickets||"-")}</td><td>${esc(r.notes||"")}</td></tr>`).join("");
  let metricRows=obj=>Object.entries(obj||{}).map(([k,v])=>`<div class="item"><div>${esc(k)}</div><b>${esc(v)}/10</b></div>`).join("");
- let body=`${tournament?`<div class="tag" style="margin-bottom:10px">🏆 ${esc(tournament.name)}</div>`:""}<div class="card" style="margin-bottom:12px"><b>Match Summary</b><p style="margin:8px 0 0">${esc(matchNarrative(m))}</p><button class="btn secondary noPrint" style="margin-top:10px" onclick="copyMatchNarrative('${m.id}')">Copy Summary</button></div><div class="grid g3">
+ let body=`${tournament?`<div class="tag" style="margin-bottom:10px">🏆 ${esc(tournament.name)}</div>`:""}<div class="card" style="margin-bottom:12px"><b>Match Summary</b><p style="margin:8px 0 0">${esc(matchNarrative(m))}</p><div class="toolbar noPrint" style="margin-top:10px"><button class="btn secondary" onclick="shareMatchNarrative('${m.id}')">Share via WhatsApp</button><button class="btn secondary" onclick="copyMatchNarrative('${m.id}')">Copy Text</button></div></div><div class="grid g3">
  <div class="card stat"><span>Format</span><b style="font-size:var(--fs-5)">${esc(m.format||"—")}</b></div>
  <div class="card stat"><span>Toss</span><b style="font-size:var(--fs-5)">${esc(m.toss||"—")}${m.tossDecision?" · "+esc(m.tossDecision):""}</b></div>
  <div class="card stat"><span>Result</span><b style="font-size:var(--fs-5)">${esc(m.result||"—")}</b></div>
@@ -4098,6 +4098,26 @@ function copySessionSummary(id){
   prompt("Copy this summary:",text);
  }
 }
+// Opens WhatsApp (app on mobile, WhatsApp Web on desktop) with the message
+// already typed in — the coach still picks who to send it to, but skips
+// the copy/switch-app/paste dance the plain "Copy" buttons still require.
+// A 10-digit number is assumed to be an Indian mobile and given the +91
+// prefix wa.me needs; anything else is left as-is (or omitted entirely,
+// which opens WhatsApp's own contact/group picker instead of one chat).
+function normalizePhoneForWhatsApp(phone){
+ let digits=String(phone||"").replace(/\D/g,"");
+ if(!digits)return "";
+ if(digits.length===10)digits="91"+digits;
+ return digits;
+}
+function shareViaWhatsApp(text,phone){
+ let digits=normalizePhoneForWhatsApp(phone);
+ window.open(`https://wa.me/${digits}?text=${encodeURIComponent(text)}`,"_blank");
+}
+function shareSessionSummary(id){
+ let s=db.sessions.find(x=>x.id===id);if(!s)return;
+ shareViaWhatsApp(sessionSummaryText(s));
+}
 // Returns every searchable piece of text for a reflection, correctly
 // pulling from the new fields (betterReasons/betterDetail/learnings) or
 // falling back to the old ones (better/players/change) for reflections
@@ -4233,13 +4253,18 @@ function copyPaymentReminder(id){
  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>alert("Reminder copied — ready to paste into WhatsApp, SMS or email.")).catch(()=>prompt("Copy this reminder:",text))}
  else{prompt("Copy this reminder:",text)}
 }
+function shareInvoiceReminder(id){
+ let inv=db.invoices.find(i=>i.id===id);if(!inv)return;
+ let p=db.players.find(x=>x.id===inv.playerId);
+ shareViaWhatsApp(paymentReminderText(inv),p?p.parentPhone:"");
+}
 function paymentRemindersCenter(){
  let unpaid=db.invoices.filter(i=>!i.paid).sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
  let total=unpaid.reduce((a,i)=>a+invoiceTotal(i),0);
  modal(`<div class="sheetHead"><h2>Payment Reminders</h2><button class="x" onclick="closeM()">×</button></div>
  <div class="statPillRow"><div class="statPill"><span>Unpaid Invoices</span><b>${unpaid.length}</b></div><div class="statPill"><span>Total Outstanding</span><b>₹${total.toFixed(0)}</b></div></div>
  <h2 class="section">Unpaid</h2>
- <div class="card">${unpaid.length?unpaid.map(i=>{let p=db.players.find(x=>x.id===i.playerId);return `<div class="item"><div><b>${esc(invoiceNoDisplay(i.invNo))} · ${esc(p?p.name:"Unknown player")}</b><div class="muted">${esc(fmtDate(i.date))} · ₹${invoiceTotal(i).toFixed(0)}${i.dueDate?" · Due "+esc(fmtDate(i.dueDate)):""}</div></div><div class="toolbar"><button class="btn secondary" onclick="copyPaymentReminder('${i.id}')">Copy Reminder</button><button class="btn secondary" onclick="viewInvoice('${i.id}')">View</button></div></div>`}).join(""):empty("Nothing outstanding — all invoices are paid.")}</div>`);
+ <div class="card">${unpaid.length?unpaid.map(i=>{let p=db.players.find(x=>x.id===i.playerId);return `<div class="item"><div><b>${esc(invoiceNoDisplay(i.invNo))} · ${esc(p?p.name:"Unknown player")}</b><div class="muted">${esc(fmtDate(i.date))} · ₹${invoiceTotal(i).toFixed(0)}${i.dueDate?" · Due "+esc(fmtDate(i.dueDate)):""}</div></div><div class="toolbar"><button class="btn secondary" onclick="shareInvoiceReminder('${i.id}')">Share via WhatsApp</button><button class="btn secondary" onclick="copyPaymentReminder('${i.id}')">Copy Text</button><button class="btn secondary" onclick="viewInvoice('${i.id}')">View</button></div></div>`}).join(""):empty("Nothing outstanding — all invoices are paid.")}</div>`);
 }
 // Auto-generated, readable paragraph pulled entirely from structured match
 // data already entered — no new capture, just a plain-language summary.
@@ -4260,6 +4285,10 @@ function copyMatchNarrative(id){
  let text=matchNarrative(m);
  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text).then(()=>alert("Match summary copied — ready to paste into a message.")).catch(()=>prompt("Copy this summary:",text))}
  else{prompt("Copy this summary:",text)}
+}
+function shareMatchNarrative(id){
+ let m=db.matches.find(x=>x.id===id);if(!m)return;
+ shareViaWhatsApp(matchNarrative(m));
 }
 // Lightweight keyword-based theme detection over a reflection's free text —
 // surfaces recurring concerns across many reflections without asking the
