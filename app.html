@@ -796,6 +796,16 @@ function initApp(){
   Object.keys(skillSets).forEach(k=>{db.customSkills[k]=Array.isArray(db.customSkills[k])?db.customSkills[k]:[]});
   db.archivedSkills=(db.archivedSkills&&typeof db.archivedSkills==="object")?db.archivedSkills:{};
   Object.keys(skillSets).forEach(k=>{db.archivedSkills[k]=Array.isArray(db.archivedSkills[k])?db.archivedSkills[k]:[]});
+  db.customFormatSkills=(db.customFormatSkills&&typeof db.customFormatSkills==="object")?db.customFormatSkills:{};
+  db.archivedFormatSkills=(db.archivedFormatSkills&&typeof db.archivedFormatSkills==="object")?db.archivedFormatSkills:{};
+  Object.keys(FORMAT_SKILLS).forEach(d=>{
+   db.customFormatSkills[d]=(db.customFormatSkills[d]&&typeof db.customFormatSkills[d]==="object")?db.customFormatSkills[d]:{};
+   db.archivedFormatSkills[d]=(db.archivedFormatSkills[d]&&typeof db.archivedFormatSkills[d]==="object")?db.archivedFormatSkills[d]:{};
+   Object.keys(FORMAT_SKILLS[d]).forEach(f=>{
+    db.customFormatSkills[d][f]=Array.isArray(db.customFormatSkills[d][f])?db.customFormatSkills[d][f]:[];
+    db.archivedFormatSkills[d][f]=Array.isArray(db.archivedFormatSkills[d][f])?db.archivedFormatSkills[d][f]:[];
+   });
+  });
   db.settings=(db.settings&&typeof db.settings==="object")?db.settings:{};
   db.teams=Array.isArray(db.teams)?db.teams:[];
   db.tournaments=Array.isArray(db.tournaments)?db.tournaments:[];
@@ -2515,6 +2525,64 @@ function toggleArchivedSkillsPanel(d){
  let panel=document.getElementById(`archivedSkillsPanel_${d}`);
  if(panel)panel.style.display=panel.style.display==="none"?"":"none";
 }
+// Format-specific metrics (Batting/Bowling, under a chosen Format Focus) get
+// the same custom-metric + archive mechanics as the core skills above, kept
+// in their own namespaced stores so they never collide with core skill
+// indices or with another format's metric list for the same discipline.
+function allFormatSkillsFor(d,f){return((FORMAT_SKILLS[d]&&FORMAT_SKILLS[d][f])||[]).concat((db.customFormatSkills&&db.customFormatSkills[d]&&db.customFormatSkills[d][f])||[])}
+function isFormatSkillArchived(d,f,skillName){return((db.archivedFormatSkills&&db.archivedFormatSkills[d]&&db.archivedFormatSkills[d][f])||[]).includes(skillName)}
+function formatSkillEverUsed(d,f,skillIdx){
+ return db.assessments.some(a=>a.formatRatings&&a.formatRatings[d]&&Array.isArray(a.formatRatings[d][f])&&Number(a.formatRatings[d][f][skillIdx])>0);
+}
+function unusedUnarchivedFormatSkills(d,f){
+ let skills=allFormatSkillsFor(d,f);
+ return skills.map((s,i)=>({name:s,idx:i})).filter(x=>!isFormatSkillArchived(d,f,x.name)&&!formatSkillEverUsed(d,f,x.idx));
+}
+function bulkArchiveUnusedFormat(d,f){
+ if(!requireWriteAccess())return;
+ let unused=unusedUnarchivedFormatSkills(d,f);
+ if(!unused.length)return;
+ if(!confirm(`Archive ${unused.length} metric${unused.length===1?"":"s"} in ${d} (${f}) that ${unused.length===1?"has":"have"} never been rated? You can unarchive any of them later.`))return;
+ db.archivedFormatSkills=db.archivedFormatSkills||{};
+ db.archivedFormatSkills[d]=db.archivedFormatSkills[d]||{};
+ db.archivedFormatSkills[d][f]=db.archivedFormatSkills[d][f]||[];
+ unused.forEach(x=>{if(!db.archivedFormatSkills[d][f].includes(x.name))db.archivedFormatSkills[d][f].push(x.name)});
+ save();
+ renderAssessmentSkills();
+}
+function archiveFormatSkill(d,f,skillName){
+ if(!requireWriteAccess())return;
+ db.archivedFormatSkills=db.archivedFormatSkills||{};
+ db.archivedFormatSkills[d]=db.archivedFormatSkills[d]||{};
+ db.archivedFormatSkills[d][f]=db.archivedFormatSkills[d][f]||[];
+ if(!db.archivedFormatSkills[d][f].includes(skillName))db.archivedFormatSkills[d][f].push(skillName);
+ save();
+ renderAssessmentSkills();
+}
+function unarchiveFormatSkill(d,f,skillName){
+ if(!requireWriteAccess())return;
+ if(db.archivedFormatSkills&&db.archivedFormatSkills[d]&&db.archivedFormatSkills[d][f])db.archivedFormatSkills[d][f]=db.archivedFormatSkills[d][f].filter(s=>s!==skillName);
+ save();
+ renderAssessmentSkills();
+}
+function toggleArchivedFormatSkillsPanel(d,f){
+ let panel=document.getElementById(`archivedFormatSkillsPanel_${d}_${f}`);
+ if(panel)panel.style.display=panel.style.display==="none"?"":"none";
+}
+function addCustomFormatSkill(d,f){
+ if(!requireWriteAccess())return;
+ let input=document.getElementById(`newFormatSkill_${d}_${f}`);
+ let name=(input.value||"").trim();
+ if(!name)return;
+ let existingNames=allFormatSkillsFor(d,f).map(s=>s.toLowerCase());
+ if(existingNames.includes(name.toLowerCase())){alert(`"${name}" already exists for ${d} (${f}).`);return}
+ db.customFormatSkills=db.customFormatSkills||{};
+ db.customFormatSkills[d]=db.customFormatSkills[d]||{};
+ db.customFormatSkills[d][f]=db.customFormatSkills[d][f]||[];
+ db.customFormatSkills[d][f].push(name);
+ save();
+ renderAssessmentSkills();
+}
 // Bowling used to have "Length Control" and "Consistency" as two separate skills
 // (10 total); they're now merged into one "Control & Consistency" skill (9 total).
 // Old assessments still have 10 stored values — this preserves them exactly as
@@ -2730,13 +2798,24 @@ function renderAssessmentSkills(){
   // prior assessment's SAME format, since a different format's values
   // don't correspond to this one's list.
   let formatBlocksHtml=activeFormats.map(f=>{
-   let formatSkills=FORMAT_SKILLS[d][f];
+   let formatSkills=allFormatSkillsFor(d,f);
+   let archivedFormatList=(db.archivedFormatSkills&&db.archivedFormatSkills[d]&&db.archivedFormatSkills[d][f])||[];
    let oldFormatVals=(existing&&existing.formatRatings&&existing.formatRatings[d]&&existing.formatRatings[d][f])?existing.formatRatings[d][f]:null;
-   return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><div class="muted" style="font-weight:700;text-transform:uppercase;font-size:var(--fs-1);letter-spacing:.3px;margin-bottom:6px">${esc(f)} specifics</div>${formatSkills.map((s,i)=>{
+   let rowsHtml=formatSkills.map((s,i)=>{
     let val=oldFormatVals&&oldFormatVals[i]!==undefined?oldFormatVals[i]:5;
-    let wasAssessed=!!(oldFormatVals&&oldFormatVals[i]);
-    return sliderRow(s,`${d}_fmt_${f}_${i}`,val,wasAssessed);
-   }).join("")}</div>`;
+    // Same default as the core skills above: a metric is available for
+    // marking right away. It only turns off (needing "Assessed today" to
+    // be re-ticked) when this exact format was carried forward from a
+    // prior assessment and that specific metric wasn't rated there.
+    let wasAssessed=oldFormatVals?!!oldFormatVals[i]:true;
+    let archived=isFormatSkillArchived(d,f,s);
+    if(archived&&!oldFormatVals)wasAssessed=false;
+    let rowHtml=sliderRow(s,`${d}_fmt_${f}_${i}`,val,wasAssessed);
+    if(archived)return `<div style="display:none">${rowHtml}</div>`;
+    return `<div style="position:relative">${rowHtml}<button type="button" class="btn secondary" style="position:absolute;top:0;right:0;padding:3px 8px;font-size:var(--fs-1)" title="Archive this metric — hides it from future assessments without affecting past data" onclick="archiveFormatSkill('${d}','${f}','${esc(s).replace(/'/g,"\\'")}')">Archive</button></div>`;
+   }).join("");
+   let formatCustomAddHtml=`<div class="formgrid" style="margin-top:8px"><input type="text" id="newFormatSkill_${d}_${f}" placeholder="Add a custom ${f} metric for ${d}..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomFormatSkill('${d}','${f}')}"><button type="button" class="btn primary" onclick="addCustomFormatSkill('${d}','${f}')">+ Add metric</button></div>${(()=>{let unused=unusedUnarchivedFormatSkills(d,f);return unused.length?`<button type="button" class="btn secondary" style="margin-top:6px" onclick="bulkArchiveUnusedFormat('${d}','${f}')">Archive ${unused.length} never-used metric${unused.length===1?"":"s"}</button>`:""})()}${archivedFormatList.length?`<div style="margin-top:8px"><a href="#" onclick="event.preventDefault();toggleArchivedFormatSkillsPanel('${d}','${f}')" class="muted">Archived metrics (${archivedFormatList.length})</a><div id="archivedFormatSkillsPanel_${d}_${f}" style="display:none;margin-top:6px">${archivedFormatList.map(s=>`<div class="item"><span class="muted">${esc(s)}</span><button type="button" class="btn secondary" onclick="unarchiveFormatSkill('${d}','${f}','${esc(s).replace(/'/g,"\\'")}')">Unarchive</button></div>`).join("")}</div></div>`:""}`;
+   return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><div class="muted" style="font-weight:700;text-transform:uppercase;font-size:var(--fs-1);letter-spacing:.3px;margin-bottom:6px">${esc(f)} specifics</div>${rowsHtml}${formatCustomAddHtml}</div>`;
   }).join("");
   let customAddHtml=`<div class="formgrid" style="margin-top:8px"><input type="text" id="newSkill_${d}" placeholder="Add a custom metric for ${d}..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomSkill('${d}')}"><button type="button" class="btn primary" onclick="addCustomSkill('${d}')">+ Add metric</button></div>${(()=>{let unused=unusedUnarchivedSkills(d);return unused.length?`<button type="button" class="btn secondary" style="margin-top:6px" onclick="bulkArchiveUnused('${d}')">Archive ${unused.length} never-used metric${unused.length===1?"":"s"}</button>`:""})()}${archivedList.length?`<div style="margin-top:8px"><a href="#" onclick="event.preventDefault();toggleArchivedSkillsPanel('${d}')" class="muted">Archived metrics (${archivedList.length})</a><div id="archivedSkillsPanel_${d}" style="display:none;margin-top:6px">${archivedList.map(s=>`<div class="item"><span class="muted">${esc(s)}</span><button type="button" class="btn secondary" onclick="unarchiveSkill('${d}','${esc(s).replace(/'/g,"\\'")}')">Unarchive</button></div>`).join("")}</div></div>`:""}`;
   let bodyHtml=(showGeneral?coreRowsHtml:"")+formatBlocksHtml+(showGeneral?customAddHtml:"")+(!showGeneral&&!activeFormats.length?`<div class="muted">Pick a Format Focus above (General, T20, ODI or Test) to rate ${esc(d)}.</div>`:"");
@@ -2772,7 +2851,7 @@ function saveAssessment(e){
    let activeFormats=formats.filter(f=>f!=="General"&&FORMAT_SKILLS[d][f]&&FORMAT_SKILLS[d][f].length);
    if(activeFormats.length){
     a.formatRatings[d]={};
-    activeFormats.forEach(f=>{a.formatRatings[d][f]=FORMAT_SKILLS[d][f].map((_,i)=>Number(fd.get(`${d}_fmt_${f}_${i}`)||0))});
+    activeFormats.forEach(f=>{a.formatRatings[d][f]=allFormatSkillsFor(d,f).map((_,i)=>Number(fd.get(`${d}_fmt_${f}_${i}`)||0))});
    }
   }
  });
@@ -2795,10 +2874,10 @@ function assessmentFormatEntries(a,d){
  if(!fr)return [];
  if(Array.isArray(fr)){
   let legacyFormat=(Array.isArray(a.formats)&&a.formats.find(f=>f!=="General"))||a.format;
-  if(legacyFormat&&FORMAT_SKILLS[d]&&FORMAT_SKILLS[d][legacyFormat])return [{format:legacyFormat,vals:fr,labels:FORMAT_SKILLS[d][legacyFormat]}];
+  if(legacyFormat&&FORMAT_SKILLS[d]&&FORMAT_SKILLS[d][legacyFormat])return [{format:legacyFormat,vals:fr,labels:allFormatSkillsFor(d,legacyFormat)}];
   return [];
  }
- if(typeof fr==="object")return Object.keys(fr).filter(f=>FORMAT_SKILLS[d]&&FORMAT_SKILLS[d][f]).map(f=>({format:f,vals:fr[f],labels:FORMAT_SKILLS[d][f]}));
+ if(typeof fr==="object")return Object.keys(fr).filter(f=>FORMAT_SKILLS[d]&&FORMAT_SKILLS[d][f]).map(f=>({format:f,vals:fr[f],labels:allFormatSkillsFor(d,f)}));
  return [];
 }
 function assessmentFormatTagsHtml(a){return (Array.isArray(a.formats)?a.formats:[]).filter(f=>f!=="General").map(f=>`<span class="tag">${esc(f)}</span>`).join("")}
