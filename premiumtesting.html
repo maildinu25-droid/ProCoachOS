@@ -773,7 +773,21 @@ function initApp(){
   db.players.forEach(p=>{if(!p.id)p.id=uid("plyr")});
   db.sessions.forEach(s=>{if(!s.id)s.id=uid("sess")});
   db.reflections.forEach(r=>{if(!r.id)r.id=uid("refl")});
-  db.assessments.forEach(a=>{if(!a.id)a.id=uid("assess");if(!a.format)a.format="General";if(!a.formatRatings||typeof a.formatRatings!=="object")a.formatRatings={}});
+  db.assessments.forEach(a=>{
+   if(!a.id)a.id=uid("assess");
+   if(!Array.isArray(a.formats))a.formats=[a.format||"General"];
+   if(!a.formatRatings||typeof a.formatRatings!=="object")a.formatRatings={};
+   // Migrate the old pre-multi-select shape (a.formatRatings[d] as a flat
+   // array tied to the single a.format string) into the new {format:arr} shape.
+   Object.keys(a.formatRatings).forEach(d=>{
+    if(Array.isArray(a.formatRatings[d])){
+     let legacyFormat=a.formats.find(f=>f!=="General");
+     let arr=a.formatRatings[d];
+     a.formatRatings[d]=(legacyFormat&&arr.some(x=>x))?{[legacyFormat]:arr}:{};
+    }
+   });
+   delete a.format;
+  });
   db.customSkills=(db.customSkills&&typeof db.customSkills==="object")?db.customSkills:{};
   Object.keys(skillSets).forEach(k=>{db.customSkills[k]=Array.isArray(db.customSkills[k])?db.customSkills[k]:[]});
   db.archivedSkills=(db.archivedSkills&&typeof db.archivedSkills==="object")?db.archivedSkills:{};
@@ -2363,7 +2377,7 @@ function playerViewBody(p,forPrint){
  ${p.areas?`<h2 class="section">Development areas</h2><div class="card">${esc(p.areas)}</div>`:""}
  ${p.notes?`<h2 class="section">Coach notes</h2><div class="card">${esc(p.notes)}</div>`:""}
  ${latest?`<h2 class="section">Latest assessment</h2><div class="card"><b>Overall ${assessmentAvg(latest)}/10</b><br>${assessmentDisciplines(latest).map(d=>`<span class="tag">${d} ${disciplineAvg(latest,d)}/10</span>`).join("")}</div>${assessmentDetailHTML(latest)}`:""}
- <h2 class="section">Assessment history (${assessments.length})</h2>${assessments.length?`<div class="card">${assessments.map(a=>`<div class="item"><div><b>${esc(fmtDate(a.date))}</b>${(a.format&&a.format!=="General")?` <span class="tag">${esc(a.format)}</span>`:""}<div class="muted">Overall ${assessmentAvg(a)}/10</div>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div></div>`).join("")}</div>`:empty("No assessments yet.")}
+ <h2 class="section">Assessment history (${assessments.length})</h2>${assessments.length?`<div class="card">${assessments.map(a=>`<div class="item"><div><b>${esc(fmtDate(a.date))}</b>${assessmentFormatTagsHtml(a)}<div class="muted">Overall ${assessmentAvg(a)}/10</div>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div></div>`).join("")}</div>`:empty("No assessments yet.")}
  <h2 class="section">Session attendance (${sessions.length})</h2>${sessions.length?`<div class="card">${sessions.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}</div></div></div>`).join("")}</div>`:empty("No recorded attendance yet.")}
  ${matchPatternsHtml(p)}
  <h2 class="section">Match history (${matches.length})</h2>${matches.length?`<div class="card">${matches.map(m=>{let bat=(m.battingReview||[]).find(r=>r.name===p.name);let bowl=(m.bowlingReview||[]).find(r=>r.name===p.name);return `<div class="item"><div><b>vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(fmtDate(m.date))}${bat?" · "+esc(bat.runs||0)+"("+esc(bat.balls||0)+")":""}${bowl?" · "+esc(bowl.wickets||0)+"/"+esc(bowl.runs||0):""}</div></div><button class="btn secondary" onclick="closeM();matchReportView('${m.id}')">Report</button></div>`}).join("")}</div>`:empty("No match entries yet.")}`;
@@ -2573,7 +2587,7 @@ function saveBulkAssessment(){
  closeM();
  assessments();
 }
-function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" onclick="newAssessment()">+ New Assessment</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess Squad</button></div><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(a.date)} · Overall ${assessmentAvg(a)}/10</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}${(a.format&&a.format!=="General")?`<span class="tag">${esc(a.format)}</span>`:""}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editAssessment('${a.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delAssessment('${a.id}')">${icon("trash",17)}</button></div></div>`).join(""):empty("No assessments yet.")}</div>`}
+function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" onclick="newAssessment()">+ New Assessment</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess Squad</button></div><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(a.date)} · Overall ${assessmentAvg(a)}/10</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}${assessmentFormatTagsHtml(a)}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editAssessment('${a.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delAssessment('${a.id}')">${icon("trash",17)}</button></div></div>`).join(""):empty("No assessments yet.")}</div>`}
 function assessmentFormHtml(a,mode){
  a=a||{};
  return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Assessment":"Player Assessment"}</h2><button class="x" onclick="closeM()">×</button></div>
@@ -2585,7 +2599,9 @@ function assessmentFormHtml(a,mode){
  <label style="margin-bottom:6px">Choose Skill Areas</label>
  <div class="muted">Select as many as required.</div>
  <div class="skillPick">${Object.keys(skillSets).map(k=>`<label><input type="checkbox" name="disciplines" value="${k}" ${(a.disciplines||[]).includes(k)?"checked":""} onchange="renderAssessmentSkills()"> ${k}</label>`).join("")}</div>
- <label>Format <span class="muted" style="font-weight:400">(optional — adds a few extra Batting/Bowling metrics for that format)</span><select name="format" onchange="renderAssessmentSkills()">${ASSESSMENT_FORMATS.map(f=>`<option value="${f}" ${(a.format||"General")===f?"selected":""}>${f==="General"?"General (no format focus)":f}</option>`).join("")}</select></label>
+ <label style="margin-bottom:6px">Format Focus <span class="muted" style="font-weight:400">(Batting/Bowling — pick one or more; General is the core skill set)</span></label>
+ <div class="muted">Select as many as required.</div>
+ <div class="skillPick">${ASSESSMENT_FORMATS.map(f=>`<label><input type="checkbox" name="formats" value="${f}" ${(Array.isArray(a.formats)&&a.formats.length?a.formats:["General"]).includes(f)?"checked":""} onchange="renderAssessmentSkills()"> ${f}</label>`).join("")}</div>
  <div id="assessmentSkills">${empty("Select at least one skill area.")}</div>
  <label>Key development priority<textarea name="priority">${esc(a.priority||"")}</textarea></label>
  <label>Coach comments<textarea name="comments">${esc(a.comments||"")}</textarea></label>
@@ -2664,25 +2680,22 @@ function renderAssessmentSkills(){
  let existing=editingAssessmentId
   ?db.assessments.find(x=>x.id===editingAssessmentId)
   :(selectedPlayerName?db.assessments.filter(x=>x.player===selectedPlayerName).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))[0]:null);
- let format=document.querySelector('select[name="format"]')?.value||"General";
+ // Format Focus is a user-controlled multi-select (General + any of
+ // T20/ODI/Test can be checked together, or General alone, or a single
+ // format alone with no General/core block at all) — nothing is forced on.
+ let formats=[...document.querySelectorAll('input[name="formats"]:checked')].map(x=>x.value);
  box.innerHTML=sel.map(d=>{
   let oldVals=(existing&&existing.ratings&&existing.ratings[d])?existing.ratings[d]:null;
   let isLegacyBowling=d==="Bowling"&&oldVals&&oldVals.length===10;
   let skills=allSkillsFor(d);
   let archivedList=(db.archivedSkills&&db.archivedSkills[d])||[];
-  // Format-specific metrics (Batting/Bowling only) render as their own
-  // block below the core skills, in a separate field namespace
-  // (${d}_fmt_${i}) so they never shift the core skills' indices — only
-  // carried forward when the prior assessment used this SAME format,
-  // since a different format's values don't correspond to this one's list.
-  let formatSkills=(FORMAT_SKILLS[d]&&FORMAT_SKILLS[d][format])||[];
-  let oldFormatVals=(existing&&existing.format===format&&existing.formatRatings&&existing.formatRatings[d])?existing.formatRatings[d]:null;
-  let formatBlockHtml=formatSkills.length?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><div class="muted" style="font-weight:700;text-transform:uppercase;font-size:var(--fs-1);letter-spacing:.3px;margin-bottom:6px">${esc(format)} specifics</div>${formatSkills.map((s,i)=>{
-   let val=oldFormatVals&&oldFormatVals[i]!==undefined?oldFormatVals[i]:5;
-   let wasAssessed=!!(oldFormatVals&&oldFormatVals[i]);
-   return sliderRow(s,`${d}_fmt_${i}`,val,wasAssessed);
-  }).join("")}</div>`:"";
-  return `<label style="margin-bottom:6px">${d} · Rate 1–10</label><div class="card">${skills.map((s,i)=>{
+  // Fielding/Wicketkeeping have no format-specific breakdown, so they
+  // always show the core ("General") skill list regardless of the Format
+  // Focus checkboxes above. Batting/Bowling respect the user's choice.
+  let hasFormatConcept=!!FORMAT_SKILLS[d];
+  let showGeneral=!hasFormatConcept||formats.includes("General");
+  let activeFormats=hasFormatConcept?formats.filter(f=>f!=="General"&&FORMAT_SKILLS[d][f]&&FORMAT_SKILLS[d][f].length):[];
+  let coreRowsHtml=skills.map((s,i)=>{
    let val=5,wasAssessed=true;
    if(oldVals){
     if(isLegacyBowling){
@@ -2705,7 +2718,25 @@ function renderAssessmentSkills(){
    let rowHtml=sliderRow(s,`${d}_${i}`,val,wasAssessed);
    if(archived)return `<div style="display:none">${rowHtml}</div>`;
    return `<div style="position:relative">${rowHtml}<button type="button" class="btn secondary" style="position:absolute;top:0;right:0;padding:3px 8px;font-size:var(--fs-1)" title="Archive this metric — hides it from future assessments without affecting past data" onclick="archiveSkill('${d}','${esc(s).replace(/'/g,"\\'")}')">Archive</button></div>`;
-  }).join("")}${formatBlockHtml}<div class="formgrid" style="margin-top:8px"><input type="text" id="newSkill_${d}" placeholder="Add a custom metric for ${d}..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomSkill('${d}')}"><button type="button" class="btn primary" onclick="addCustomSkill('${d}')">+ Add metric</button></div>${(()=>{let unused=unusedUnarchivedSkills(d);return unused.length?`<button type="button" class="btn secondary" style="margin-top:6px" onclick="bulkArchiveUnused('${d}')">Archive ${unused.length} never-used metric${unused.length===1?"":"s"}</button>`:""})()}${archivedList.length?`<div style="margin-top:8px"><a href="#" onclick="event.preventDefault();toggleArchivedSkillsPanel('${d}')" class="muted">Archived metrics (${archivedList.length})</a><div id="archivedSkillsPanel_${d}" style="display:none;margin-top:6px">${archivedList.map(s=>`<div class="item"><span class="muted">${esc(s)}</span><button type="button" class="btn secondary" onclick="unarchiveSkill('${d}','${esc(s).replace(/'/g,"\\'")}')">Unarchive</button></div>`).join("")}</div></div>`:""}<label>${d} development notes<textarea name="${d}_notes">${esc((existing&&existing.disciplineNotes&&existing.disciplineNotes[d])||"")}</textarea></label></div>`;
+  }).join("");
+  // Format-specific metrics (Batting/Bowling only) render as their own
+  // block per selected format below the core skills, in a per-format field
+  // namespace (${d}_fmt_${format}_${i}) so multiple formats can be rated
+  // side by side without colliding, and carried forward only from the
+  // prior assessment's SAME format, since a different format's values
+  // don't correspond to this one's list.
+  let formatBlocksHtml=activeFormats.map(f=>{
+   let formatSkills=FORMAT_SKILLS[d][f];
+   let oldFormatVals=(existing&&existing.formatRatings&&existing.formatRatings[d]&&existing.formatRatings[d][f])?existing.formatRatings[d][f]:null;
+   return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><div class="muted" style="font-weight:700;text-transform:uppercase;font-size:var(--fs-1);letter-spacing:.3px;margin-bottom:6px">${esc(f)} specifics</div>${formatSkills.map((s,i)=>{
+    let val=oldFormatVals&&oldFormatVals[i]!==undefined?oldFormatVals[i]:5;
+    let wasAssessed=!!(oldFormatVals&&oldFormatVals[i]);
+    return sliderRow(s,`${d}_fmt_${f}_${i}`,val,wasAssessed);
+   }).join("")}</div>`;
+  }).join("");
+  let customAddHtml=`<div class="formgrid" style="margin-top:8px"><input type="text" id="newSkill_${d}" placeholder="Add a custom metric for ${d}..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomSkill('${d}')}"><button type="button" class="btn primary" onclick="addCustomSkill('${d}')">+ Add metric</button></div>${(()=>{let unused=unusedUnarchivedSkills(d);return unused.length?`<button type="button" class="btn secondary" style="margin-top:6px" onclick="bulkArchiveUnused('${d}')">Archive ${unused.length} never-used metric${unused.length===1?"":"s"}</button>`:""})()}${archivedList.length?`<div style="margin-top:8px"><a href="#" onclick="event.preventDefault();toggleArchivedSkillsPanel('${d}')" class="muted">Archived metrics (${archivedList.length})</a><div id="archivedSkillsPanel_${d}" style="display:none;margin-top:6px">${archivedList.map(s=>`<div class="item"><span class="muted">${esc(s)}</span><button type="button" class="btn secondary" onclick="unarchiveSkill('${d}','${esc(s).replace(/'/g,"\\'")}')">Unarchive</button></div>`).join("")}</div></div>`:""}`;
+  let bodyHtml=(showGeneral?coreRowsHtml:"")+formatBlocksHtml+(showGeneral?customAddHtml:"")+(!showGeneral&&!activeFormats.length?`<div class="muted">Pick a Format Focus above (General, T20, ODI or Test) to rate ${esc(d)}.</div>`:"");
+  return `<label style="margin-bottom:6px">${d}${showGeneral?" · Rate 1–10":""}</label><div class="card">${bodyHtml}<label>${d} development notes<textarea name="${d}_notes">${esc((existing&&existing.disciplineNotes&&existing.disciplineNotes[d])||"")}</textarea></label></div>`;
  }).join("")||empty("Select at least one skill area.");
  enhanceTextareasWithVoice(box);
 }
@@ -2725,14 +2756,21 @@ function saveAssessment(e){
  if(!requireWriteAccess())return;
  let fd=new FormData(e.target),sel=fd.getAll("disciplines");
  if(!sel.length){alert("Select at least one skill area.");return}
- let format=fd.get("format")||"General";
- let a={player:fd.get("player"),date:fd.get("date"),disciplines:sel,priority:fd.get("priority"),comments:fd.get("comments"),ratings:{},disciplineNotes:{},format,formatRatings:{}};
+ let formats=fd.getAll("formats");
+ let a={player:fd.get("player"),date:fd.get("date"),disciplines:sel,priority:fd.get("priority"),comments:fd.get("comments"),ratings:{},disciplineNotes:{},formats,formatRatings:{}};
  a.mediaLinks=(fd.get("mediaLinks")||"").split("\n").map(s=>s.trim()).filter(Boolean);
  sel.forEach(d=>{
-  a.ratings[d]=allSkillsFor(d).map((_,i)=>Number(fd.get(`${d}_${i}`)||0));
+  let hasFormatConcept=!!FORMAT_SKILLS[d];
+  let showGeneral=!hasFormatConcept||formats.includes("General");
+  a.ratings[d]=showGeneral?allSkillsFor(d).map((_,i)=>Number(fd.get(`${d}_${i}`)||0)):[];
   a.disciplineNotes[d]=fd.get(`${d}_notes`)||"";
-  let formatSkills=(FORMAT_SKILLS[d]&&FORMAT_SKILLS[d][format])||[];
-  if(formatSkills.length)a.formatRatings[d]=formatSkills.map((_,i)=>Number(fd.get(`${d}_fmt_${i}`)||0));
+  if(hasFormatConcept){
+   let activeFormats=formats.filter(f=>f!=="General"&&FORMAT_SKILLS[d][f]&&FORMAT_SKILLS[d][f].length);
+   if(activeFormats.length){
+    a.formatRatings[d]={};
+    activeFormats.forEach(f=>{a.formatRatings[d][f]=FORMAT_SKILLS[d][f].map((_,i)=>Number(fd.get(`${d}_fmt_${f}_${i}`)||0))});
+   }
+  }
  });
  if(editingAssessmentId){
   let idx=db.assessments.findIndex(x=>x.id===editingAssessmentId);
@@ -2744,8 +2782,24 @@ function saveAssessment(e){
  editingAssessmentId=null;closeM();save();
 }
 function delAssessment(id){if(confirm("Delete this assessment?")){db.assessments=db.assessments.filter(x=>x.id!==id);save()}}
-function assessmentDisciplines(a){return Array.isArray(a.disciplines)&&a.disciplines.length?a.disciplines:["Fielding"]}function disciplineAvg(a,d){let n=[];if(a.ratings&&Array.isArray(a.ratings[d]))n=a.ratings[d].map(Number).filter(x=>x>0);else if(d==="Fielding")n=legacySkills.map((_,i)=>Number(a["s"+i]||0)).filter(x=>x>0);if(a.formatRatings&&Array.isArray(a.formatRatings[d]))n=n.concat(a.formatRatings[d].map(Number).filter(x=>x>0));return n.length?(n.reduce((x,y)=>x+y,0)/n.length).toFixed(1):"—"}function assessmentAvg(a){let n=assessmentDisciplines(a).map(d=>Number(disciplineAvg(a,d))).filter(Number.isFinite);return n.length?(n.reduce((x,y)=>x+y,0)/n.length).toFixed(1):"—"}
-function assessmentDetailHTML(a){return assessmentDisciplines(a).map(d=>{let vals=a.ratings?.[d]||[],labels=(d==="Bowling"&&vals.length===10)?legacyBowlingSkills:allSkillsFor(d);if(!vals.length&&d==="Fielding")vals=legacySkills.map((_,i)=>Number(a["s"+i]||0));let fmtVals=(a.formatRatings&&a.formatRatings[d])||[];let fmtLabels=(FORMAT_SKILLS[d]&&a.format&&FORMAT_SKILLS[d][a.format])||[];let fmtHtml=fmtVals.length?`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><b>${esc(a.format)} specifics</b>${fmtLabels.map((s,i)=>fmtVals[i]?`<div style="margin-top:4px"><b>${esc(s)}</b> — ${esc(fmtVals[i])}/10</div>`:"").join("")}</div>`:"";return `<h2 class="section">${d} · ${disciplineAvg(a,d)}/10${(a.format&&a.format!=="General")?` <span class="tag">${esc(a.format)}</span>`:""}</h2><div class="card">${labels.map((s,i)=>vals[i]?`<div><b>${esc(s)}</b> — ${esc(vals[i])}/10</div>`:"").join("")}${fmtHtml}${a.disciplineNotes?.[d]?`<p><b>Development notes</b><br>${esc(a.disciplineNotes[d])}</p>`:""}</div>`}).join("")+assessmentMediaLinksHtml(a)}
+function assessmentDisciplines(a){return Array.isArray(a.disciplines)&&a.disciplines.length?a.disciplines:["Fielding"]}
+function assessmentFormatEntries(a,d){
+ // Normalizes a.formatRatings[d] into [{format,vals,labels}], tolerating the
+ // old pre-multi-select shape (a flat array for a single a.format string)
+ // from assessments saved before Format Focus became a multi-select.
+ let fr=a.formatRatings&&a.formatRatings[d];
+ if(!fr)return [];
+ if(Array.isArray(fr)){
+  let legacyFormat=(Array.isArray(a.formats)&&a.formats.find(f=>f!=="General"))||a.format;
+  if(legacyFormat&&FORMAT_SKILLS[d]&&FORMAT_SKILLS[d][legacyFormat])return [{format:legacyFormat,vals:fr,labels:FORMAT_SKILLS[d][legacyFormat]}];
+  return [];
+ }
+ if(typeof fr==="object")return Object.keys(fr).filter(f=>FORMAT_SKILLS[d]&&FORMAT_SKILLS[d][f]).map(f=>({format:f,vals:fr[f],labels:FORMAT_SKILLS[d][f]}));
+ return [];
+}
+function assessmentFormatTagsHtml(a){return (Array.isArray(a.formats)?a.formats:[]).filter(f=>f!=="General").map(f=>`<span class="tag">${esc(f)}</span>`).join("")}
+function disciplineAvg(a,d){let n=[];if(a.ratings&&Array.isArray(a.ratings[d]))n=a.ratings[d].map(Number).filter(x=>x>0);else if(d==="Fielding")n=legacySkills.map((_,i)=>Number(a["s"+i]||0)).filter(x=>x>0);assessmentFormatEntries(a,d).forEach(({vals})=>{n=n.concat(vals.map(Number).filter(x=>x>0))});return n.length?(n.reduce((x,y)=>x+y,0)/n.length).toFixed(1):"—"}function assessmentAvg(a){let n=assessmentDisciplines(a).map(d=>Number(disciplineAvg(a,d))).filter(Number.isFinite);return n.length?(n.reduce((x,y)=>x+y,0)/n.length).toFixed(1):"—"}
+function assessmentDetailHTML(a){return assessmentDisciplines(a).map(d=>{let vals=a.ratings?.[d]||[],labels=(d==="Bowling"&&vals.length===10)?legacyBowlingSkills:allSkillsFor(d);if(!vals.length&&d==="Fielding")vals=legacySkills.map((_,i)=>Number(a["s"+i]||0));let formatEntries=assessmentFormatEntries(a,d).filter(({vals:fv})=>fv.some(x=>x));let fmtHtml=formatEntries.map(({format,vals:fv,labels:fl})=>`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><b>${esc(format)} specifics</b>${fl.map((s,i)=>fv[i]?`<div style="margin-top:4px"><b>${esc(s)}</b> — ${esc(fv[i])}/10</div>`:"").join("")}</div>`).join("");let formatTags=formatEntries.map(({format})=>` <span class="tag">${esc(format)}</span>`).join("");return `<h2 class="section">${d} · ${disciplineAvg(a,d)}/10${formatTags}</h2><div class="card">${labels.map((s,i)=>vals[i]?`<div><b>${esc(s)}</b> — ${esc(vals[i])}/10</div>`:"").join("")}${fmtHtml}${a.disciplineNotes?.[d]?`<p><b>Development notes</b><br>${esc(a.disciplineNotes[d])}</p>`:""}</div>`}).join("")+assessmentMediaLinksHtml(a)}
 function assessmentMediaLinksHtml(a){
  if(!a.mediaLinks||!a.mediaLinks.length)return "";
  return `<div class="card" style="margin-top:10px"><b>Video / Photo Links</b><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px">${a.mediaLinks.map((link,i)=>{
@@ -3896,7 +3950,7 @@ function buildAssessmentReport(){
  `${assessmentCoverageHeatmapHtml(roster)}
  ${skillTrendsHtml(roster,assessments)}
  <h2>Player Summary</h2>${byPlayer.length?byPlayer.map(({p,count,latest})=>`<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span><p>${count} assessment${count!==1?"s":""} logged${latest?" · Latest: "+assessmentAvg(latest)+"/10 on "+esc(fmtDate(latest.date)):""}</p></div>`).join(""):empty("No players in this scope.")}
- <h2>Full Assessment Log</h2>${assessments.length?assessments.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).map(a=>`<div class="card"><b>${esc(a.player)} · ${esc(fmtDate(a.date))}</b>${(a.format&&a.format!=="General")?` <span class="tag">${esc(a.format)}</span>`:""}<div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d} ${disciplineAvg(a,d)}/10</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div>`).join(""):empty("No assessments recorded in this scope.")}`);
+ <h2>Full Assessment Log</h2>${assessments.length?assessments.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).map(a=>`<div class="card"><b>${esc(a.player)} · ${esc(fmtDate(a.date))}</b>${assessmentFormatTagsHtml(a)}<div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d} ${disciplineAvg(a,d)}/10</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div>`).join(""):empty("No assessments recorded in this scope.")}`);
 }
 function attendanceReport(){scopeAndRangeModal("Attendance Report","buildAttendanceReport")}
 function buildAttendanceReport(){
