@@ -27,7 +27,7 @@ button,input,textarea,select{font:inherit}.top{position:sticky;top:0;z-index:20;
 .layout{display:grid;grid-template-columns:235px 1fr;min-height:calc(100vh - 68px);min-height:calc(100dvh - 68px)}aside{background:var(--surface);border-right:1px solid var(--line);padding:16px 12px;position:sticky;top:68px;height:calc(100vh - 68px);height:calc(100dvh - 68px);overflow-y:auto}.nav{display:grid;gap:3px}.nav button{border:0;background:transparent;text-align:left;padding:12px;border-radius:10px;color:var(--muted);display:flex;align-items:center;gap:12px;font-size:var(--fs-5);font-weight:600;transition:.15s;border-left:3px solid transparent}.nav button:hover{background:var(--surface2);color:var(--ink)}.nav button.active{background:var(--mint);color:var(--g);font-weight:800;border-left:3px solid var(--g)}.navIcon{width:21px;height:21px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center}
 .navGroupLabel{font-size:var(--fs-2);text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:700;padding:16px 12px 6px;opacity:.65}
 main{padding:28px;max-width:1200px;width:100%;margin:auto;scroll-behavior:smooth}.page{display:none}.page.active{display:block;animation:fadein .18s ease}@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}.hero{margin-bottom:24px}.hero h1{margin:0 0 6px;font-size:var(--fs-8);font-weight:800;letter-spacing:-.3px}.backBtn{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:var(--fs-3);font-weight:600;cursor:pointer;margin-bottom:16px;display:inline-flex;align-items:center;gap:6px;transition:.15s}.backBtn:hover{background:var(--surface2);color:var(--ink);border-color:var(--lineHover)}.muted{color:var(--muted)}.grid{display:grid;gap:16px}.g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}.card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:var(--shadow)}.glass{background:var(--glassBg);border:1px solid var(--glassBorder);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}.stat{transition:.15s}.stat span{font-size:var(--fs-2);text-transform:uppercase;color:var(--muted);letter-spacing:.7px;font-weight:600}.stat b{display:block;font-size:var(--fs-8);color:var(--g);margin-top:8px;font-family:'Sora',sans-serif}.section{margin:28px 0 14px;font-size:var(--fs-6);font-weight:700;letter-spacing:-.2px}.btn{border:0;border-radius:10px;padding:11px 15px;font-weight:750;cursor:pointer;transition:.15s}.btn:hover{filter:brightness(1.1)}.btn:active{transform:scale(.97)}.primary{background:linear-gradient(135deg,var(--g),var(--g2));color:#fff;box-shadow:0 6px 18px rgba(16,185,129,.32)}.secondary{background:var(--mint);color:var(--g)}.danger{background:var(--redTint);color:var(--red)}.toolbar{display:flex;gap:8px;flex-wrap:wrap}
-.iconBtn{flex:0 0 auto!important;width:38px;height:38px;padding:0!important;display:inline-flex;align-items:center;justify-content:center}.toolbar .btn{flex:1;text-align:center;white-space:nowrap}.list{display:grid;gap:10px}.item{border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;justify-content:space-between;gap:10px;align-items:flex-start;transition:.15s;background:var(--surface)}.item:hover{border-color:var(--lineHover);background:var(--surface2)}.tag{display:inline-block;background:var(--mint);color:var(--g);padding:5px 9px;border-radius:999px;font-size:var(--fs-2);font-weight:600;margin:2px}.quick,.reportCard{cursor:pointer;transition:.15s}.quick:hover,.reportCard:hover{transform:translateY(-3px);box-shadow:0 16px 34px rgba(0,0,0,.5)}.quick b,.reportCard b{color:var(--g);font-size:var(--fs-6);font-family:'Sora',sans-serif}.reportCard p{color:var(--muted);margin-bottom:0}.empty{text-align:center;padding:32px;color:var(--muted);border:1px dashed var(--line);border-radius:14px}
+.iconBtn{flex:0 0 auto!important;width:38px;height:38px;padding:0!important;display:inline-flex;align-items:center;justify-content:center}.toolbar .btn{flex:1;text-align:center;white-space:nowrap}.list{display:grid;gap:10px}.item{border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;justify-content:space-between;gap:10px;align-items:flex-start;transition:.15s;background:var(--surface)}.item .toolbar{flex:0 0 auto;flex-wrap:nowrap}.item>:not(.toolbar){flex:1 1 auto;min-width:0}.item:hover{border-color:var(--lineHover);background:var(--surface2)}.tag{display:inline-block;background:var(--mint);color:var(--g);padding:5px 9px;border-radius:999px;font-size:var(--fs-2);font-weight:600;margin:2px}.quick,.reportCard{cursor:pointer;transition:.15s}.quick:hover,.reportCard:hover{transform:translateY(-3px);box-shadow:0 16px 34px rgba(0,0,0,.5)}.quick b,.reportCard b{color:var(--g);font-size:var(--fs-6);font-family:'Sora',sans-serif}.reportCard p{color:var(--muted);margin-bottom:0}.empty{text-align:center;padding:32px;color:var(--muted);border:1px dashed var(--line);border-radius:14px}
 input,textarea,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface2);color:var(--ink)}textarea{min-height:95px;resize:vertical}label{display:grid;gap:6px;font-size:var(--fs-4);font-weight:650;color:var(--label)}.formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.full{grid-column:1/-1}
 .sliderRow{margin-bottom:16px}
 .sliderLabel{display:flex;justify-content:space-between;align-items:center;font-size:var(--fs-4);color:var(--ink);margin-bottom:6px;font-weight:600}
@@ -1436,6 +1436,12 @@ function netPlanSelectedNamesHtml(names){
  if(!names.length)return `<div class="muted" style="font-size:var(--fs-3)">+ Add names</div>`;
  return names.map(n=>`<div style="font-size:var(--fs-3);line-height:1.4;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(n)}</div>`).join("");
 }
+// How many Sets (not nets) a player is already down to bowl in, anywhere in
+// this session's net plan — shown as a small badge next to their name in the
+// bowler picker so the coach can spot workload before adding another Set.
+function bowlerSetCountInPlan(name){
+ return sessionNetPlanDraft.filter(set=>set.nets.some(net=>(net.bowlersNames||[]).includes(name))).length;
+}
 function netPlanNameFieldHtml(si,ni,field,label,net){
  let key=`${si}-${ni}-${field}`;
  let selected=net[field]||[];
@@ -1450,7 +1456,9 @@ function netPlanNameFieldHtml(si,ni,field,label,net){
   let isTaken=!isChecked&&takenElsewhere.includes(n);
   let disabled=(!isChecked&&(atCap||isTaken))?"disabled":"";
   let title=isTaken?` title="Already selected elsewhere in today's net plan"`:"";
-  return `<label class="${disabled?"isDisabled":""}"${title}><input type="checkbox" data-si="${si}" data-ni="${ni}" data-field="${field}" value="${esc(n)}" ${isChecked?"checked":""} ${disabled} onchange="handleNetPlanPlayerToggle(this)"> ${esc(n)}</label>`;
+  let bowlCount=field==="bowlersNames"?bowlerSetCountInPlan(n):0;
+  let bowlBadge=bowlCount>0?`<span class="bowlCountBadge tag" style="padding:1px 6px;font-size:10px;margin-left:4px;vertical-align:middle" title="${bowlCount} set${bowlCount===1?"":"s"} already bowled in this plan">${bowlCount}</span>`:"";
+  return `<label class="${disabled?"isDisabled":""}"${title}><input type="checkbox" data-si="${si}" data-ni="${ni}" data-field="${field}" value="${esc(n)}" ${isChecked?"checked":""} ${disabled} onchange="handleNetPlanPlayerToggle(this)"> ${esc(n)}${bowlBadge}</label>`;
  }).join("")}</div>`:`<div class="muted" style="font-size:var(--fs-2);margin-top:4px">${currentNetPlanTeamFilter()?"No players in this team yet.":"No players in roster yet."}</div>`;
  return `<div style="min-width:0">
   <div class="muted" style="font-size:var(--fs-3);font-weight:600;text-transform:uppercase;letter-spacing:.3px;display:flex;justify-content:space-between;align-items:center;gap:4px;cursor:pointer" onclick="toggleNetPlayerAssign('${key}')">
@@ -1564,6 +1572,37 @@ function handleNetPlanPlayerToggle(el){
      let atCap2=isFinite(cap2)&&(net2[f2]||[]).length>=cap2;
      cb2.disabled=atCap2;
      if(lbl2){lbl2.classList.toggle("isDisabled",atCap2);if(!atCap2)lbl2.removeAttribute("title")}
+    }
+   });
+  });
+ });
+ if(field==="bowlersNames")refreshBowlerCountBadges();
+}
+// Updates the "sets bowled so far" badge on every bowler picker currently
+// expanded on screen, without rebuilding any of them (which would reset
+// their scroll position). Only bowling toggles call this — batting never
+// changes a bowl count.
+function refreshBowlerCountBadges(){
+ sessionNetPlanDraft.forEach((set,si2)=>{
+  set.nets.forEach((net2,ni2)=>{
+   let grid=document.getElementById(`netPlayerOptions-${si2}-${ni2}-bowlersNames`);
+   if(!grid)return;
+   grid.querySelectorAll("label").forEach(lbl=>{
+    let cb=lbl.querySelector('input[type="checkbox"]');
+    if(!cb)return;
+    let count=bowlerSetCountInPlan(cb.value);
+    let badge=lbl.querySelector(".bowlCountBadge");
+    if(count>0){
+     if(!badge){
+      badge=document.createElement("span");
+      badge.className="bowlCountBadge tag";
+      badge.style.cssText="padding:1px 6px;font-size:10px;margin-left:4px;vertical-align:middle";
+      lbl.appendChild(badge);
+     }
+     badge.textContent=count;
+     badge.title=`${count} set${count===1?"":"s"} already bowled in this plan`;
+    } else if(badge){
+     badge.remove();
     }
    });
   });
