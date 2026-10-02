@@ -3091,6 +3091,7 @@ function fieldToolIconSvg(id){
  }
  if(id==="shapeFull")return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/></svg>`;
  if(id==="shapeHalf")return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="7" width="17" height="10" rx="1.5"/></svg>`;
+ if(id==="shapeSquare")return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="1.5"/></svg>`;
  return "";
 }
 // opts.xComp counter-scales a marker's x-extent so it still looks round/upright
@@ -3198,19 +3199,21 @@ function fieldArrowSvg(a,opts){
  return line+badge;
 }
 // Each diagram step keeps a fully separate marker/arrow list per ground shape
-// (step.full.items and step.half.items) so switching the Full/Half Ground
-// toggle never mixes or loses a drawing — what's drawn on one shape's
-// canvas stays there when you switch to the other and switch back.
+// (step.full.items, step.half.items, step.square.items) so switching between
+// Full/Half/Square Ground never mixes or loses a drawing — what's drawn on
+// one shape's canvas stays there when you switch to another and switch back.
 function normalizeFieldStep(st){
  st=st||{};
- if(st.full||st.half){
-  return {label:st.label||"",activeShape:st.activeShape==="half"?"half":"full",full:{items:(st.full&&st.full.items)||[]},half:{items:(st.half&&st.half.items)||[]}};
+ if(st.full||st.half||st.square){
+  let activeShape=(st.activeShape==="half"||st.activeShape==="square")?st.activeShape:"full";
+  return {label:st.label||"",activeShape:activeShape,full:{items:(st.full&&st.full.items)||[]},half:{items:(st.half&&st.half.items)||[]},square:{items:(st.square&&st.square.items)||[]}};
  }
+ // Oldest saved shape (pre-dates even Half Ground) — never had a square drawing.
  let shape=st.shape==="half"?"half":"full";
  let items=st.items||[];
- return {label:st.label||"",activeShape:shape,full:{items:shape==="half"?[]:items},half:{items:shape==="half"?items:[]}};
+ return {label:st.label||"",activeShape:shape,full:{items:shape==="half"?[]:items},half:{items:shape==="half"?items:[]},square:{items:[]}};
 }
-function curFieldShape(step){return step.activeShape==="half"?"half":"full"}
+function curFieldShape(step){return (step.activeShape==="half"||step.activeShape==="square")?step.activeShape:"full"}
 function curFieldItems(step){
  let shape=curFieldShape(step);
  if(!step[shape])step[shape]={items:[]};
@@ -3220,7 +3223,7 @@ function curFieldItems(step){
 function fieldDiagramSvg(view,opts){
  opts=opts||{};
  let interactive=!!opts.interactive;
- let shape=view.shape==="half"?"half":"full";
+ let shape=(view.shape==="half"||view.shape==="square")?view.shape:"full";
  let vb=shape==="half"?{w:100,h:60}:{w:100,h:100};
  // opts.aspect (Full Ground fullscreen-in-landscape only) lets the wrapper be
  // drawn wider than tall so the ground uses the extra landscape width — the
@@ -3231,8 +3234,13 @@ function fieldDiagramSvg(view,opts){
  let dispAspect=opts.aspect||(vb.w/vb.h);
  let naturalAspect=vb.w/vb.h;
  let xComp=dispAspect!==naturalAspect?naturalAspect/dispAspect:1;
+ // Square Ground is deliberately bare — just a big green square, no pitch or
+ // boundary markings — for fielding drills that don't need the real ground's
+ // shape (e.g. a grid of catching stations) and want the most usable space.
  let bg=shape==="half"
   ?`<rect x="0" y="0" width="100" height="60" fill="#1c4726"/><rect x="38" y="50" width="24" height="8" fill="rgba(244,241,232,0.12)" stroke="rgba(244,241,232,0.5)" stroke-width="0.4"/>`
+  :shape==="square"
+  ?`<rect x="0" y="0" width="100" height="100" fill="#1c4726"/>`
   :`<circle cx="50" cy="50" r="48" fill="#1c4726" stroke="#f4f1e8" stroke-width="1"/><circle cx="50" cy="50" r="30" fill="none" stroke="rgba(238,242,246,0.4)" stroke-width="0.5" stroke-dasharray="2 2"/><rect x="46" y="40" width="8" height="20" fill="rgba(244,241,232,0.12)" stroke="rgba(244,241,232,0.5)" stroke-width="0.4"/>`;
  let defs=`<defs><marker id="fdArrowBall" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="3" markerHeight="3" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#c0392b"/></marker><marker id="fdArrowPlayer" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="2.6" markerHeight="2.6" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#3b82f6"/></marker></defs>`;
  let items=view.items||[];
@@ -3429,7 +3437,7 @@ function fieldEditorHtml(fullscreen){
   let addStepBtn=fieldDraft.steps.length<3?`<button type="button" class="btn secondary" title="Add Diagram Step" onclick="addFieldStep()">${icon("plus",16)}</button>`:"";
   let duplicateStepBtn=fieldDraft.steps.length<3?`<button type="button" class="btn secondary" title="Duplicate Step" onclick="duplicateFieldStep()">${icon("copy",16)}</button>`:"";
   let removeStepBtn=fieldDraft.steps.length>1?`<button type="button" class="btn danger" title="Remove This Step" onclick="removeFieldStep(${fieldDraft.activeStep})">${icon("trash",16)}</button>`:"";
-  let shapeBtns=`<button type="button" class="btn ${shape!=="half"?"primary":"secondary"}" title="Full Ground" onclick="updateFieldStepShape('full')">${fieldToolIconSvg("shapeFull")}</button><button type="button" class="btn ${shape==="half"?"primary":"secondary"}" title="Half Ground" onclick="updateFieldStepShape('half')">${fieldToolIconSvg("shapeHalf")}</button>`;
+  let shapeBtns=`<button type="button" class="btn ${shape==="full"?"primary":"secondary"}" title="Full Ground" onclick="updateFieldStepShape('full')">${fieldToolIconSvg("shapeFull")}</button><button type="button" class="btn ${shape==="half"?"primary":"secondary"}" title="Half Ground" onclick="updateFieldStepShape('half')">${fieldToolIconSvg("shapeHalf")}</button><button type="button" class="btn ${shape==="square"?"primary":"secondary"}" title="Square Ground" onclick="updateFieldStepShape('square')">${fieldToolIconSvg("shapeSquare")}</button>`;
   let toolBtns=FIELD_TOOLS.map(t=>`<button type="button" class="btn ${fieldDraft.tool===t.id?"primary":"secondary"}" title="${esc(t.label)}" onclick="setFieldTool('${t.id}')">${fieldToolIconSvg(t.id)}</button>`).join("");
   // Shown only while an arrow is mid-draw (at least one point placed) — Finish
   // commits it (needs 2+ points), Cancel discards the in-progress path.
@@ -3457,12 +3465,13 @@ function fieldEditorHtml(fullscreen){
   <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${tabsHtml}${fieldDraft.steps.length<3?`<button type="button" class="btn secondary" style="padding:6px 10px;font-size:var(--fs-2)" onclick="addFieldStep()">+ Step</button>`:""}${fieldDraft.steps.length<3?`<button type="button" class="btn secondary" style="padding:6px 10px;font-size:var(--fs-2)" onclick="duplicateFieldStep()">Duplicate Step</button>`:""}${fieldDraft.steps.length>1?`<button type="button" class="btn danger" style="padding:6px 10px;font-size:var(--fs-2)" onclick="removeFieldStep(${fieldDraft.activeStep})">Remove Step</button>`:""}</div>
   <input type="text" placeholder="Step label (optional) — e.g. Setup" value="${esc(step.label||"")}" style="margin-bottom:8px;font-size:var(--fs-3)" onchange="updateFieldStepLabel(this.value)">
   <div style="display:flex;gap:6px;margin-bottom:8px">
-   <button type="button" class="btn ${shape!=="half"?"primary":"secondary"}" style="padding:6px 12px;font-size:var(--fs-2)" onclick="updateFieldStepShape('full')">Full Ground</button>
+   <button type="button" class="btn ${shape==="full"?"primary":"secondary"}" style="padding:6px 12px;font-size:var(--fs-2)" onclick="updateFieldStepShape('full')">Full Ground</button>
    <button type="button" class="btn ${shape==="half"?"primary":"secondary"}" style="padding:6px 12px;font-size:var(--fs-2)" onclick="updateFieldStepShape('half')">Half Ground</button>
+   <button type="button" class="btn ${shape==="square"?"primary":"secondary"}" style="padding:6px 12px;font-size:var(--fs-2)" onclick="updateFieldStepShape('square')">Square Ground</button>
   </div>
   <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">${toolsHtml}</div>
   ${fieldDraft.pendingArrowPoints.length?`<div style="display:flex;gap:6px;margin-bottom:8px">${fieldDraft.pendingArrowPoints.length>=2?`<button type="button" class="btn primary" style="padding:6px 12px;font-size:var(--fs-2)" onclick="finishFieldArrow()">✓ Finish Arrow</button>`:""}<button type="button" class="btn danger" style="padding:6px 12px;font-size:var(--fs-2)" onclick="cancelFieldArrow()">Cancel Arrow</button></div>`:""}
-  <div class="muted" style="font-size:var(--fs-1);margin-bottom:6px">Tap the ground to place a marker, or drag an existing one to reposition it. For an arrow, tap a start point, then tap again for each bend, then Finish Arrow (or tap Cancel Arrow to discard it). Tap an existing marker or arrow to remove it. Full Ground and Half Ground each keep their own separate drawing for this step.</div>`;
+  <div class="muted" style="font-size:var(--fs-1);margin-bottom:6px">Tap the ground to place a marker, or drag an existing one to reposition it. For an arrow, tap a start point, then tap again for each bend, then Finish Arrow (or tap Cancel Arrow to discard it). Tap an existing marker or arrow to remove it. Full, Half and Square Ground each keep their own separate drawing for this step.</div>`;
  let bottomBar=`<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
    <button type="button" class="btn secondary" style="padding:6px 10px;font-size:var(--fs-2)" onclick="undoFieldLast()">Undo</button>
    <button type="button" class="btn danger" style="padding:6px 10px;font-size:var(--fs-2)" onclick="clearFieldStep()">Clear Step</button>
@@ -3472,7 +3481,8 @@ function fieldEditorHtml(fullscreen){
 }
 // Full Ground stays a true circle (aspect 1) in every orientation — an oval
 // stretch was tried to use extra landscape width but looked off, so it was
-// reverted. Half Ground is already wide (100:60) and needs no change either way.
+// reverted. Square Ground is square either way for the same reason. Half
+// Ground is already wide (100:60) and needs no change either way.
 function isLandscapeNow(){return !!(window.matchMedia&&window.matchMedia("(orientation: landscape)").matches)}
 function fieldFsAspect(shape){return shape==="half"?(100/60):1}
 function sizeFullscreenCanvas(){
@@ -3551,11 +3561,11 @@ function switchFieldStep(i){
 }
 function addFieldStep(){
  if(fieldDraft.steps.length>=3)return;
- fieldDraft.steps.push({label:"",activeShape:"full",full:{items:[]},half:{items:[]}});
+ fieldDraft.steps.push({label:"",activeShape:"full",full:{items:[]},half:{items:[]},square:{items:[]}});
  fieldDraft.activeStep=fieldDraft.steps.length-1;fieldDraft.tool=null;fieldDraft.pendingArrowPoints=[];fieldDraft.pendingArrowStyle=null;
  renderFieldEditor();
 }
-// Clones the active step's markers/arrows (both Full and Half Ground drawings,
+// Clones the active step's markers/arrows (every ground shape's drawing,
 // whichever is being viewed or not) into a new step right after it, so a
 // multi-phase drill that's mostly a repeat of the last setup doesn't mean
 // re-placing every marker by hand — just adjust what's changed.
@@ -3566,6 +3576,7 @@ function duplicateFieldStep(){
  let copy=JSON.parse(JSON.stringify(cur));
  copy.full.items=(copy.full.items||[]).map(it=>({...it,id:uid("fditem")}));
  copy.half.items=(copy.half.items||[]).map(it=>({...it,id:uid("fditem")}));
+ copy.square.items=(copy.square.items||[]).map(it=>({...it,id:uid("fditem")}));
  fieldDraft.steps.splice(fieldDraft.activeStep+1,0,copy);
  fieldDraft.activeStep=fieldDraft.activeStep+1;
  fieldDraft.tool=null;fieldDraft.pendingArrowPoints=[];fieldDraft.pendingArrowStyle=null;
@@ -3584,9 +3595,9 @@ function updateFieldStepLabel(value){
 function updateFieldStepShape(shape){
  let step=fieldDraft.steps[fieldDraft.activeStep];
  if(!step)return;
- // Just switches which of the step's two independent drawings (full/half)
+ // Just switches which of the step's independent drawings (full/half/square)
  // is being viewed and edited — never moves or copies items between them.
- step.activeShape=shape==="half"?"half":"full";
+ step.activeShape=(shape==="half"||shape==="square")?shape:"full";
  fieldDraft.tool=null;fieldDraft.pendingArrowPoints=[];fieldDraft.pendingArrowStyle=null;
  renderFieldEditor();
 }
@@ -3610,7 +3621,7 @@ function undoFieldLast(){
 function clearFieldStep(){
  let step=fieldDraft.steps[fieldDraft.activeStep];
  if(!step)return;
- let shapeLabel=curFieldShape(step)==="half"?"Half Ground":"Full Ground";
+ let shapeLabel=curFieldShape(step)==="half"?"Half Ground":curFieldShape(step)==="square"?"Square Ground":"Full Ground";
  if(!confirm(`Clear everything on this step's ${shapeLabel} diagram?`))return;
  step[curFieldShape(step)].items=[];
  renderFieldEditor();
