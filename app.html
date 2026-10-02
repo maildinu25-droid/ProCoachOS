@@ -2661,26 +2661,61 @@ function addCustomFormatSkill(d,f){
 // Old assessments still have 10 stored values — this preserves them exactly as
 // originally entered rather than silently corrupting/relabeling them.
 const legacyBowlingSkills=["Run-up / Approach","Action & Alignment","Accuracy","Length Control","Consistency","Pace / Revolutions","Swing / Seam / Spin","Variations","Tactical Awareness","Execution Under Pressure"];
-let bulkAssessmentDraft={discipline:null,ratings:{}};
+let bulkAssessmentDraft={team:"",discipline:null,format:"General",ratings:{}};
 function openBulkAssessment(){
  if(!activePlayers().length){alert("Add a player first.");return}
- bulkAssessmentDraft={discipline:null,ratings:{}};
+ bulkAssessmentDraft={team:"",discipline:null,format:"General",ratings:{}};
  modal(`<div class="sheetHead"><h2>Bulk Assess Squad</h2><button class="x" onclick="closeM()">×</button></div>
- <p class="muted">Pick one skill area to rate across the whole squad in one pass. Each player's last rating for this area is pre-filled — adjust rather than start from scratch.</p>
- <div class="skillPick">${Object.keys(skillSets).map(d=>`<label><input type="radio" name="bulkDiscipline" value="${d}" onchange="selectBulkDiscipline('${d}')"> ${d}</label>`).join("")}</div>
+ <p class="muted">Optionally narrow to one team, then pick a skill area (and format focus, if relevant) to rate in one pass. Each player's last rating for this area is pre-filled — adjust rather than start from scratch.</p>
+ <label>Team<select onchange="selectBulkTeam(this.value)"><option value="">All Players</option>${db.teams.map(t=>`<option value="${esc(t.name)}">${esc(t.name)}</option>`).join("")}</select></label>
+ <div class="skillPick" style="margin-top:12px">${Object.keys(skillSets).map(d=>`<label><input type="radio" name="bulkDiscipline" value="${d}" onchange="selectBulkDiscipline('${d}')"> ${d}</label>`).join("")}</div>
+ <div id="bulkFormatPick"></div>
  <div id="bulkAssessmentBody"></div>`);
 }
-function bulkCarryForwardFor(playerName,discipline){
- let prior=db.assessments.filter(a=>a.player===playerName&&a.ratings&&a.ratings[discipline]).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))[0];
+function bulkPlayers(){return activePlayers().filter(p=>!bulkAssessmentDraft.team||p.team===bulkAssessmentDraft.team)}
+function bulkSkillsList(){
+ let d=bulkAssessmentDraft.discipline,f=bulkAssessmentDraft.format;
+ if(!d)return [];
+ if(f&&f!=="General"&&FORMAT_SKILLS[d]&&FORMAT_SKILLS[d][f])return allFormatSkillsFor(d,f).filter(s=>!isFormatSkillArchived(d,f,s));
+ return allSkillsFor(d).filter(s=>!isSkillArchived(d,s));
+}
+function bulkCarryForwardFor(playerName,discipline,format){
+ if(format&&format!=="General"&&FORMAT_SKILLS[discipline]&&FORMAT_SKILLS[discipline][format]){
+  let prior=db.assessments.filter(a=>a.player===playerName&&a.formatRatings&&a.formatRatings[discipline]&&a.formatRatings[discipline][format]).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))[0];
+  return prior?prior.formatRatings[discipline][format]:null;
+ }
+ let prior=db.assessments.filter(a=>a.player===playerName&&a.ratings&&a.ratings[discipline]&&a.ratings[discipline].length).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))[0];
  return prior?prior.ratings[discipline]:null;
+}
+function selectBulkTeam(team){
+ bulkAssessmentDraft.team=team;
+ if(bulkAssessmentDraft.discipline)computeBulkRatings();
 }
 function selectBulkDiscipline(discipline){
  bulkAssessmentDraft.discipline=discipline;
- let skills=allSkillsFor(discipline).filter(s=>!isSkillArchived(discipline,s));
- let players=activePlayers();
+ bulkAssessmentDraft.format="General";
+ renderBulkFormatPick();
+ computeBulkRatings();
+}
+function renderBulkFormatPick(){
+ let box=document.getElementById("bulkFormatPick");
+ if(!box)return;
+ let d=bulkAssessmentDraft.discipline;
+ if(!d||!FORMAT_SKILLS[d]){box.innerHTML="";return}
+ let formats=["General",...Object.keys(FORMAT_SKILLS[d])];
+ box.innerHTML=`<label style="margin-top:12px;display:block">Format Focus</label><div class="skillPick">${formats.map(f=>`<label><input type="radio" name="bulkFormat" value="${f}" ${bulkAssessmentDraft.format===f?"checked":""} onchange="selectBulkFormat('${f}')"> ${f}</label>`).join("")}</div>`;
+}
+function selectBulkFormat(format){
+ bulkAssessmentDraft.format=format;
+ computeBulkRatings();
+}
+function computeBulkRatings(){
+ let discipline=bulkAssessmentDraft.discipline,format=bulkAssessmentDraft.format;
+ let skills=bulkSkillsList();
+ let players=bulkPlayers();
  bulkAssessmentDraft.ratings={};
  players.forEach(p=>{
-  let oldVals=bulkCarryForwardFor(p.name,discipline);
+  let oldVals=bulkCarryForwardFor(p.name,discipline,format);
   bulkAssessmentDraft.ratings[p.name]=skills.map((s,i)=>oldVals&&oldVals[i]!==undefined?Number(oldVals[i]):5);
  });
  renderBulkAssessmentGrid();
@@ -2700,9 +2735,9 @@ function renderBulkAssessmentGrid(){
  // grid only moves when the coach actually scrolls it.
  let existingWrap=box.querySelector(".matchEntryWrap");
  let scrollLeft=existingWrap?existingWrap.scrollLeft:0;
- let discipline=bulkAssessmentDraft.discipline;
- let skills=allSkillsFor(discipline).filter(s=>!isSkillArchived(discipline,s));
- let players=activePlayers();
+ let skills=bulkSkillsList();
+ let players=bulkPlayers();
+ if(!players.length){box.innerHTML=`<div class="muted" style="margin-top:12px">No players ${bulkAssessmentDraft.team?`in ${esc(bulkAssessmentDraft.team)}`:""}.</div>`;return}
  box.innerHTML=`<div class="matchEntryWrap" style="margin-top:12px"><table class="matchEntryTable"><thead><tr><th style="min-width:110px">Player</th>${skills.map(s=>`<th style="min-width:78px;text-align:center">${esc(s)}</th>`).join("")}</tr></thead><tbody>
  ${players.map((p,pi)=>`<tr><td><b>${esc(p.name)}</b></td>${skills.map((s,si)=>{
   let safeName=p.name.replace(/'/g,"\\'");
@@ -2717,16 +2752,26 @@ function saveBulkAssessment(){
  if(!requireWriteAccess())return;
  let discipline=bulkAssessmentDraft.discipline;
  if(!discipline)return;
- let skills=allSkillsFor(discipline).filter(s=>!isSkillArchived(discipline,s));
+ let format=bulkAssessmentDraft.format;
+ let isFormat=!!(format&&format!=="General"&&FORMAT_SKILLS[discipline]&&FORMAT_SKILLS[discipline][format]);
+ let skills=bulkSkillsList();
+ let players=bulkPlayers();
  let d=today();
- activePlayers().forEach(p=>{
+ players.forEach(p=>{
   let vals=bulkAssessmentDraft.ratings[p.name];
   if(!vals)return;
   let clamped=skills.map((s,i)=>Math.max(1,Math.min(10,Number(vals[i])||5)));
-  db.assessments.push({
-   id:uid("assess"),player:p.name,date:d,disciplines:[discipline],
-   ratings:{[discipline]:clamped},disciplineNotes:{},priority:"",comments:"",mediaLinks:[]
-  });
+  let rec={id:uid("assess"),player:p.name,date:d,disciplines:[discipline],disciplineNotes:{},priority:"",comments:"",mediaLinks:[]};
+  if(isFormat){
+   rec.ratings={[discipline]:[]};
+   rec.formats=[format];
+   rec.formatRatings={[discipline]:{[format]:clamped}};
+  } else {
+   rec.ratings={[discipline]:clamped};
+   rec.formats=["General"];
+   rec.formatRatings={};
+  }
+  db.assessments.push(rec);
  });
  save();
  closeM();
