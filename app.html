@@ -2472,7 +2472,7 @@ function playerViewBody(p,forPrint){
 function playerView(id){let p=db.players.find(x=>x.id===id);if(!p)return;modal(`<div class="sheetHead"><h2>${esc(p.name)}</h2><button class="x" onclick="closeM()">×</button></div>${playerViewBody(p)}<button class="btn secondary" style="margin-top:14px" onclick="playerProfileReport('${p.id}')">Print Profile</button>
  <button class="btn secondary" style="margin-top:8px" onclick="parentSummaryReport('${p.id}')">Parent / Player Summary</button>
  <button class="btn secondary" style="margin-top:8px" onclick="compareVideos('${p.id}')">Compare Videos (Before / After)</button>
- ${p.sessionRate?`<button class="btn secondary" style="margin-top:8px" onclick="closeM();newInvoice('${p.id}')">Create Invoice</button>`:""}`)}
+ ${p.sessionRate?`<button class="btn secondary" style="margin-top:8px" onclick="closeM();invoiceReturnTo=null;newInvoice('${p.id}')">Create Invoice</button>`:""}`)}
 function compareVideos(playerId){
  let p=db.players.find(x=>x.id===playerId);if(!p)return;
  let allLinks=[];
@@ -3170,8 +3170,9 @@ function fieldDiagramSvg(view,opts){
  // stretch into a wide oval (a realistic look for a ground, and what actually
  // makes it bigger); fieldMarkerSvg/fieldArrowSvg counter-scale (xComp) so
  // individual markers and labels still look round/upright on top of it.
- let dispAspect=opts.aspect||1;
- let xComp=dispAspect!==1?1/dispAspect:1;
+ let dispAspect=opts.aspect||(vb.w/vb.h);
+ let naturalAspect=vb.w/vb.h;
+ let xComp=dispAspect!==naturalAspect?naturalAspect/dispAspect:1;
  let bg=shape==="half"
   ?`<rect x="0" y="0" width="100" height="60" fill="#1c4726"/><rect x="38" y="50" width="24" height="8" fill="rgba(244,241,232,0.12)" stroke="rgba(244,241,232,0.5)" stroke-width="0.4"/>`
   :`<circle cx="50" cy="50" r="48" fill="#1c4726" stroke="#f4f1e8" stroke-width="1"/><circle cx="50" cy="50" r="30" fill="none" stroke="rgba(238,242,246,0.4)" stroke-width="0.5" stroke-dasharray="2 2"/><rect x="46" y="40" width="8" height="20" fill="rgba(244,241,232,0.12)" stroke="rgba(244,241,232,0.5)" stroke-width="0.4"/>`;
@@ -4531,19 +4532,28 @@ function reflectionWentWellText(r){return[(r.wentWellThemes||[]).join(", "),r.we
 function reflectionTakeawayText(r){return[(r.takeawayThemes||[]).join(", "),r.learnings!==undefined?r.learnings:[r.players,r.change].filter(Boolean).join(" ")].filter(Boolean).join(" — ")}
 function reflectionNextFocusText(r){return[(r.nextFocusThemes||[]).join(", "),r.next].filter(Boolean).join(" — ")}
 function venueOptions(){let venues=[...new Set([...activeSessions().map(s=>s.venue),...db.matches.map(m=>m.venue)].filter(Boolean))];return venues.map(v=>`<option value="${esc(v)}">`).join("")}
-function reportShell(title,sub,body){setPrintTitle(title);modal(`<div class="sheetHead noPrint"><h2>${title}</h2><button class="x" onclick="closeM()">×</button></div><div class="report"><h1>${title}</h1><div class="muted">${sub}</div>${body}<div class="reportActions noPrint"><button class="btn primary" onclick="printReport()">Print / Save PDF</button></div></div>`)}
+function reportShell(title,sub,body,onClose){setPrintTitle(title);modal(`<div class="sheetHead noPrint"><h2>${title}</h2><button class="x" onclick="${onClose||"closeM()"}">×</button></div><div class="report"><h1>${title}</h1><div class="muted">${sub}</div>${body}<div class="reportActions noPrint"><button class="btn primary" onclick="printReport()">Print / Save PDF</button></div></div>`)}
 /* ===== Business Tools: Invoices, Payment Reminders, Match Narrative, Reflection Themes, Custom Reports, Certificates ===== */
 function invoiceNoDisplay(n){return "INV-"+String(n||1).padStart(4,"0")}
 function invoiceTotal(inv){return (inv.items||[]).reduce((a,it)=>a+((Number(it.qty)||0)*(Number(it.rate)||0)),0)}
 let invoiceDraft=[],editingInvoiceId=null;
+// Invoices are browsed from a list (Invoice Center, or Payment Reminders),
+// then drilled into for viewing/editing — all inside the same modal, which
+// has no concept of "back" on its own. invoiceReturnTo remembers which list
+// (if any) to reopen when the coach closes out of a view/edit/delete, so
+// closing doesn't dump them straight past the list to whatever page was
+// underneath. Left null when an invoice is opened from somewhere that isn't
+// a list (e.g. "Create Invoice" from a player's profile).
+let invoiceReturnTo=null;
+function closeInvoiceView(){let fn=invoiceReturnTo;invoiceReturnTo=null;if(fn){fn()}else{closeM()}}
 function invoiceCenter(){
  let list=db.invoices.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
  let outstanding=list.filter(i=>!i.paid).reduce((a,i)=>a+invoiceTotal(i),0);
  modal(`<div class="sheetHead"><h2>Invoices</h2><button class="x" onclick="closeM()">×</button></div>
- <button class="btn primary" onclick="newInvoice()">+ New Invoice</button>
+ <button class="btn primary" onclick="invoiceReturnTo=invoiceCenter;newInvoice()">+ New Invoice</button>
  <div class="statPillRow" style="margin-top:12px"><div class="statPill"><span>Total Invoices</span><b>${list.length}</b></div><div class="statPill"><span>Outstanding</span><b>₹${outstanding.toFixed(0)}</b></div></div>
  <h2 class="section">All invoices</h2>
- <div class="card">${list.length?list.map(i=>{let p=db.players.find(x=>x.id===i.playerId);return `<div class="item"><div><b>${esc(invoiceNoDisplay(i.invNo))} · ${esc(p?p.name:"Unknown player")}</b><div class="muted">${esc(fmtDate(i.date))} · ₹${invoiceTotal(i).toFixed(0)}</div></div><div class="toolbar"><span class="tag" style="${i.paid?"":"background:var(--redTint);color:var(--red)"}">${i.paid?"Paid":"Unpaid"}</span><button class="btn secondary iconBtn" title="View" onclick="viewInvoice('${i.id}')">${icon("eye",17)}</button></div></div>`}).join(""):empty("No invoices yet.")}</div>`);
+ <div class="card">${list.length?list.map(i=>{let p=db.players.find(x=>x.id===i.playerId);return `<div class="item"><div><b>${esc(invoiceNoDisplay(i.invNo))} · ${esc(p?p.name:"Unknown player")}</b><div class="muted">${esc(fmtDate(i.date))} · ₹${invoiceTotal(i).toFixed(0)}</div></div><div class="toolbar"><span class="tag" style="${i.paid?"":"background:var(--redTint);color:var(--red)"}">${i.paid?"Paid":"Unpaid"}</span><button class="btn secondary iconBtn" title="View" onclick="invoiceReturnTo=invoiceCenter;viewInvoice('${i.id}')">${icon("eye",17)}</button></div></div>`}).join(""):empty("No invoices yet.")}</div>`);
 }
 function invoiceRowHtml(row,i){
  return `<tr><td><input value="${esc(row.desc||"")}" placeholder="e.g. Coaching sessions - September" oninput="invoiceDraft[${i}].desc=this.value"></td>
@@ -4559,7 +4569,7 @@ function updateInvoiceTotal(){let el=document.getElementById("invoiceTotalDispla
 function invoiceFormHtml(inv,mode){
  inv=inv||{};
  let sorted=db.players.slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
- return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Invoice":"New Invoice"}</h2><button class="x" onclick="closeM()">×</button></div>
+ return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Invoice":"New Invoice"}</h2><button class="x" onclick="closeInvoiceView()">×</button></div>
  <form onsubmit="saveInvoice(event)">
  <div class="formgrid">
  <label class="full">Player<select name="playerId" id="invoicePlayerSelect" onchange="onInvoicePlayerPick(this.value)">${sorted.map(p=>`<option value="${p.id}" ${inv.playerId===p.id?"selected":""}>${esc(p.name)}</option>`).join("")}</select></label>
@@ -4611,7 +4621,7 @@ function saveInvoice(e){
   inv.paid=false;
   db.invoices.push(inv);
  }
- editingInvoiceId=null;closeM();save();
+ editingInvoiceId=null;closeInvoiceView();save();
 }
 function toggleInvoicePaid(id){
  if(!requireWriteAccess())return;
@@ -4619,7 +4629,7 @@ function toggleInvoicePaid(id){
  inv.paid=!inv.paid;inv.paidDate=inv.paid?today():"";
  save();viewInvoice(id);
 }
-function deleteInvoice(id){if(!requireWriteAccess())return;if(confirm("Delete this invoice? This cannot be undone.")){db.invoices=db.invoices.filter(x=>x.id!==id);closeM();save()}}
+function deleteInvoice(id){if(!requireWriteAccess())return;if(confirm("Delete this invoice? This cannot be undone.")){db.invoices=db.invoices.filter(x=>x.id!==id);closeInvoiceView();save()}}
 function viewInvoice(id){
  let inv=db.invoices.find(x=>x.id===id);if(!inv)return;
  let p=db.players.find(x=>x.id===inv.playerId);
@@ -4636,7 +4646,7 @@ function viewInvoice(id){
  <button class="btn secondary iconBtn" title="Edit" onclick="editInvoice('${inv.id}')">${icon("edit",17)}</button>
  <button class="btn danger iconBtn" title="Delete" onclick="deleteInvoice('${inv.id}')">${icon("trash",17)}</button>
  </div>`;
- reportShell(invoiceNoDisplay(inv.invNo),`${inv.paid?"Paid":"Unpaid"}${inv.paidDate?" · "+fmtDate(inv.paidDate):""}`,body);
+ reportShell(invoiceNoDisplay(inv.invNo),`${inv.paid?"Paid":"Unpaid"}${inv.paidDate?" · "+fmtDate(inv.paidDate):""}`,body,"closeInvoiceView()");
 }
 function paymentReminderText(inv){
  let p=db.players.find(x=>x.id===inv.playerId);
@@ -4663,7 +4673,7 @@ function paymentRemindersCenter(){
  modal(`<div class="sheetHead"><h2>Payment Reminders</h2><button class="x" onclick="closeM()">×</button></div>
  <div class="statPillRow"><div class="statPill"><span>Unpaid Invoices</span><b>${unpaid.length}</b></div><div class="statPill"><span>Total Outstanding</span><b>₹${total.toFixed(0)}</b></div></div>
  <h2 class="section">Unpaid</h2>
- <div class="card">${unpaid.length?unpaid.map(i=>{let p=db.players.find(x=>x.id===i.playerId);return `<div class="item"><div><b>${esc(invoiceNoDisplay(i.invNo))} · ${esc(p?p.name:"Unknown player")}</b><div class="muted">${esc(fmtDate(i.date))} · ₹${invoiceTotal(i).toFixed(0)}${i.dueDate?" · Due "+esc(fmtDate(i.dueDate)):""}</div></div><div class="toolbar"><button class="btn secondary iconBtn" title="Share via WhatsApp" onclick="shareInvoiceReminder('${i.id}')">${icon("share",17)}</button><button class="btn secondary iconBtn" title="Copy Text" onclick="copyPaymentReminder('${i.id}')">${icon("copy",17)}</button><button class="btn secondary iconBtn" title="View" onclick="viewInvoice('${i.id}')">${icon("eye",17)}</button></div></div>`}).join(""):empty("Nothing outstanding — all invoices are paid.")}</div>`);
+ <div class="card">${unpaid.length?unpaid.map(i=>{let p=db.players.find(x=>x.id===i.playerId);return `<div class="item"><div><b>${esc(invoiceNoDisplay(i.invNo))} · ${esc(p?p.name:"Unknown player")}</b><div class="muted">${esc(fmtDate(i.date))} · ₹${invoiceTotal(i).toFixed(0)}${i.dueDate?" · Due "+esc(fmtDate(i.dueDate)):""}</div></div><div class="toolbar"><button class="btn secondary iconBtn" title="Share via WhatsApp" onclick="shareInvoiceReminder('${i.id}')">${icon("share",17)}</button><button class="btn secondary iconBtn" title="Copy Text" onclick="copyPaymentReminder('${i.id}')">${icon("copy",17)}</button><button class="btn secondary iconBtn" title="View" onclick="invoiceReturnTo=paymentRemindersCenter;viewInvoice('${i.id}')">${icon("eye",17)}</button></div></div>`}).join(""):empty("Nothing outstanding — all invoices are paid.")}</div>`);
 }
 // Auto-generated, readable paragraph pulled entirely from structured match
 // data already entered — no new capture, just a plain-language summary.
