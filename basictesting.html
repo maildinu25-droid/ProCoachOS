@@ -1896,21 +1896,25 @@ function reflectionFormHtml(x,mode){
  </div>
  ${ratingSelectRow("rating","Overall rating",x.rating)}
  ${ratingSelectRow("communication","Communication",x.communication)}
- <div class="full"><label style="margin-bottom:6px">What went well?</label>
- <div class="chipGrid2" id="reflWentWellSession" style="${type==="match"?"display:none":""}">${COACH_WENT_WELL_SESSION.map(r=>`<label><input type="checkbox" name="wentWellThemes" value="${esc(r)}" ${(x.wentWellThemes||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
- <div class="chipGrid2" id="reflWentWellMatch" style="${type==="match"?"":"display:none"}">${COACH_WENT_WELL_MATCH.map(r=>`<label><input type="checkbox" name="wentWellThemes" value="${esc(r)}" ${(x.wentWellThemes||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
- <input type="text" name="well" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.well||"")}"></div>
- <div class="full"><label style="margin-bottom:6px">What could be better?</label>
- <div class="chipGrid2" id="reflSessionReasons" style="${type==="match"?"display:none":""}">${BETTER_REASONS.map(r=>`<label><input type="checkbox" name="betterReasons" value="${esc(r)}" ${(x.betterReasons||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
- <div class="chipGrid2" id="reflMatchReasons" style="${type==="match"?"":"display:none"}">${MATCH_BETTER_REASONS.map(r=>`<label><input type="checkbox" name="betterReasons" value="${esc(r)}" ${(x.betterReasons||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
- <input type="text" name="betterDetail" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.betterDetail!==undefined?x.betterDetail:(x.better||""))}"></div>
- <div class="full"><label style="margin-bottom:6px">Key takeaway</label>
- <div class="chipGrid2" id="reflTakeawaySession" style="${type==="match"?"display:none":""}">${COACH_TAKEAWAY_SESSION.map(r=>`<label><input type="checkbox" name="takeawayThemes" value="${esc(r)}" ${(x.takeawayThemes||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
- <div class="chipGrid2" id="reflTakeawayMatch" style="${type==="match"?"":"display:none"}">${COACH_TAKEAWAY_MATCH.map(r=>`<label><input type="checkbox" name="takeawayThemes" value="${esc(r)}" ${(x.takeawayThemes||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
- <input type="text" name="learnings" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.learnings!==undefined?x.learnings:[x.players,x.change].filter(Boolean).join(" "))}"></div>
- <div class="full"><label style="margin-bottom:6px">Next focus</label>
- <div class="chipGrid2">${COACH_NEXT_FOCUS.map(r=>`<label><input type="checkbox" name="nextFocusThemes" value="${esc(r)}" ${(x.nextFocusThemes||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
- <input type="text" name="next" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.next||"")}"></div>
+ <div class="full">${formSectionHead("wentWell","What went well?",false)}
+ <div id="formSec-wentWell" style="display:none;margin-top:10px">
+ <div class="chipGrid2" id="reflWentWellSession" style="${type==="match"?"display:none":""}">${COACH_WENT_WELL_SESSION.map(r=>`<label><input type="checkbox" name="wentWellThemes" value="${esc(r)}" ${(x.wentWellThemes||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('wentWell','selected')"> ${esc(r)}</label>`).join("")}</div>
+ <div class="chipGrid2" id="reflWentWellMatch" style="${type==="match"?"":"display:none"}">${COACH_WENT_WELL_MATCH.map(r=>`<label><input type="checkbox" name="wentWellThemes" value="${esc(r)}" ${(x.wentWellThemes||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('wentWell','selected')"> ${esc(r)}</label>`).join("")}</div>
+ <input type="text" name="well" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.well||"")}"></div></div>
+ <div class="full">${formSectionHead("betterReasons","What could be better?",false)}
+ <div id="formSec-betterReasons" style="display:none;margin-top:10px">
+ <div class="chipGrid2" id="reflSessionReasons" style="${type==="match"?"display:none":""}">${BETTER_REASONS.map(r=>`<label><input type="checkbox" name="betterReasons" value="${esc(r)}" ${(x.betterReasons||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('betterReasons','selected')"> ${esc(r)}</label>`).join("")}</div>
+ <div class="chipGrid2" id="reflMatchReasons" style="${type==="match"?"":"display:none"}">${MATCH_BETTER_REASONS.map(r=>`<label><input type="checkbox" name="betterReasons" value="${esc(r)}" ${(x.betterReasons||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('betterReasons','selected')"> ${esc(r)}</label>`).join("")}</div>
+ <input type="text" name="betterDetail" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.betterDetail!==undefined?x.betterDetail:(x.better||""))}"></div></div>
+ <div class="full">${formSectionHead("takeaway","Key takeaway",false)}
+ <div id="formSec-takeaway" style="display:none;margin-top:10px">
+ <div class="chipGrid2" id="reflTakeawaySession" style="${type==="match"?"display:none":""}">${COACH_TAKEAWAY_SESSION.map(r=>`<label><input type="checkbox" name="takeawayThemes" value="${esc(r)}" ${(x.takeawayThemes||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('takeaway','selected')"> ${esc(r)}</label>`).join("")}</div>
+ <div class="chipGrid2" id="reflTakeawayMatch" style="${type==="match"?"":"display:none"}">${COACH_TAKEAWAY_MATCH.map(r=>`<label><input type="checkbox" name="takeawayThemes" value="${esc(r)}" ${(x.takeawayThemes||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('takeaway','selected')"> ${esc(r)}</label>`).join("")}</div>
+ <input type="text" name="learnings" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.learnings!==undefined?x.learnings:[x.players,x.change].filter(Boolean).join(" "))}"></div></div>
+ <div class="full">${formSectionHead("nextFocus","Next focus",false)}
+ <div id="formSec-nextFocus" style="display:none;margin-top:10px">
+ <div class="chipGrid2">${COACH_NEXT_FOCUS.map(r=>`<label><input type="checkbox" name="nextFocusThemes" value="${esc(r)}" ${(x.nextFocusThemes||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('nextFocus','selected')"> ${esc(r)}</label>`).join("")}</div>
+ <input type="text" name="next" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.next||"")}"></div></div>
  <button class="btn primary">Save Reflection</button>
  </form>`;
 }
@@ -1938,6 +1942,7 @@ function setReflectionType(type){
  let takeSess=document.getElementById("reflTakeawaySession"),takeMatch=document.getElementById("reflTakeawayMatch");
  if(takeSess){takeSess.style.display=type==="match"?"none":"";if(type==="match")takeSess.querySelectorAll("input[type=checkbox]").forEach(cb=>cb.checked=false)}
  if(takeMatch){takeMatch.style.display=type==="match"?"":"none";if(type!=="match")takeMatch.querySelectorAll("input[type=checkbox]").forEach(cb=>cb.checked=false)}
+ initReflectionSectionCounts();
 }
 function onReflectionSessionPick(sel){
  renderReflectionObjectiveRatings(sel.value);
@@ -1970,7 +1975,7 @@ function renderReflectionObjectiveRatings(sessionId){
   return ratingSelectRow(`objRating_${idx}`,t,existing[t]);
  }).join("")}`;
 }
-function newReflection(seed){editingReflectionId=null;modal(reflectionFormHtml(seed||null,"new"));renderReflectionObjectiveRatings(seed&&seed.sessionId?seed.sessionId:"")}
+function newReflection(seed){editingReflectionId=null;modal(reflectionFormHtml(seed||null,"new"));renderReflectionObjectiveRatings(seed&&seed.sessionId?seed.sessionId:"");initReflectionSectionCounts()}
 function newReflectionForSession(sessionId){
  let s=db.sessions.find(x=>x.id===sessionId);if(!s)return;
  newReflection({date:s.date,session:sessionLabel(s),sessionId:s.id,type:"session"});
@@ -1993,7 +1998,8 @@ function reflectPendingSessions(){
  window._reflectPendingQueue=overdue;
 }
 function reflectPendingOpen(i){let item=(window._reflectPendingQueue||[])[i];if(!item)return;item.kind==="match"?newReflectionForMatch(item.id):newReflectionForSession(item.id)}
-function editReflection(id){let x=db.reflections.find(r=>r.id===id);if(!x)return;editingReflectionId=id;modal(reflectionFormHtml(x,"edit"));renderReflectionObjectiveRatings(x.type==="match"?"":(x.sessionId||""))}
+function editReflection(id){let x=db.reflections.find(r=>r.id===id);if(!x)return;editingReflectionId=id;modal(reflectionFormHtml(x,"edit"));renderReflectionObjectiveRatings(x.type==="match"?"":(x.sessionId||""));initReflectionSectionCounts()}
+function initReflectionSectionCounts(){["wentWell","betterReasons","takeaway","nextFocus"].forEach(id=>updateFormSectionCount(id,"selected"))}
 function saveReflection(e){
  e.preventDefault();
  if(!requireWriteAccess())return;
