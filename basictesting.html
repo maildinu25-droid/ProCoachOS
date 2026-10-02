@@ -297,8 +297,16 @@ const LICENSE_KEY="coachbook_license_testing_basic",TRIAL_DAYS=14;
 const BASIC_TEAM_CAP=1,BASIC_PROFILE_CAP=1;
 const OBJECTIVE_CATEGORIES=["Technical improvement","Tactical understanding","Physical development","Mental skills","Teamwork & communication","Match preparation","Specific skill development"];
 const RATING_LABELS={1:"Struggled",2:"Below Par",3:"Solid",4:"Good",5:"Excellent"};
-const BETTER_REASONS=["Time management","Group size","Weather / facility","Player attention","My own preparation"];
-const MATCH_BETTER_REASONS=["Team selection","Tactical calls","Player execution","Toss / conditions","Opposition strength","My own preparation"];
+// Coach Self Reflection is about the coach's own performance, not the
+// players' — every chip list below is framed around what the coach did,
+// not what the team/players did, so "What went well" etc. stay coach-centric.
+const COACH_WENT_WELL_SESSION=["Communication Clarity","Session Planning & Structure","Time Management","Adapting on the Fly","Individual Attention Given","Energy & Enthusiasm","Patience & Tone","Feedback Quality","Group/Behavior Management","Technical Knowledge Applied"];
+const COACH_WENT_WELL_MATCH=["Tactical Decision-making","In-game Communication","Composure Under Pressure","Player Man-management","Adaptability to Match Situations","Pre-match Preparation","Clarity of Instructions","Reading the Game"];
+const BETTER_REASONS=["Session Planning","Time Management","Group Management","Communication Clarity","Individual Attention","Adaptability","Instructions/Demonstrations","Energy/Pacing Control"];
+const MATCH_BETTER_REASONS=["Tactical Calls","Team Selection","In-game Communication","Composure","Player Management/Rotation","Preparation","Adaptability to Match Situations"];
+const COACH_TAKEAWAY_SESSION=["Adjust Session Structure","Use Smaller Groups","Give More 1:1 Attention","Revisit Drill/Technique Teaching Approach","Communicate Expectations More Clearly","Manage Time Better","Rotate Players More Effectively","Simplify Instructions","Build in More Game-based Practice"];
+const COACH_TAKEAWAY_MATCH=["Reconsider Team Selection Approach","Adjust Tactical Approach","Manage Match Situations Better","Communicate More Calmly Under Pressure","Do Closer Opposition Analysis","Trust Preparation More"];
+const COACH_NEXT_FOCUS=["Communication","Session Planning","Game-day Tactics","Player Management","Time Management","Feedback Delivery","Preparation","Adaptability","Technical Knowledge","Composure"];
 function matchLabel(m){return `${m.team||"My Team"} vs ${m.opp||"Opposition"}`}
 function ratingSelectRow(name,label,currentValue){
  return `<label>${esc(label)}<select name="${name}">${[5,4,3,2,1].map(n=>`<option value="${n}" ${String(currentValue)===String(n)?"selected":""}>${n} — ${RATING_LABELS[n]}</option>`).join("")}</select></label>`;
@@ -1857,7 +1865,7 @@ function reflections(){
  <label>Type<select onchange="reflectionTypeFilter=this.value;reflections()"><option value="">All</option><option value="session" ${reflectionTypeFilter==="session"?"selected":""}>Practice Session</option><option value="match" ${reflectionTypeFilter==="match"?"selected":""}>Match</option></select></label>
  </div></div>
  <h2 class="section">Reflection history (${list.length})</h2>
- <div class="card">${list.length?list.map(x=>`<div class="item"><div><b>${esc(x.date)} · ${esc(x.session||"Reflection")}</b> <span class="tag">${x.type==="match"?"Match":"Session"}</span><div class="muted">Rating ${esc(x.rating)}/5</div><small>${esc(x.well)}</small></div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editReflection('${x.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delReflection('${x.id}')">${icon("trash",17)}</button></div></div>`).join(""):empty("No reflections match your search.")}</div>
+ <div class="card">${list.length?list.map(x=>`<div class="item"><div><b>${esc(x.date)} · ${esc(x.session||"Reflection")}</b> <span class="tag">${x.type==="match"?"Match":"Session"}</span><div class="muted">Rating ${esc(x.rating)}/5</div><small>${esc(reflectionWentWellText(x))}</small></div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editReflection('${x.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delReflection('${x.id}')">${icon("trash",17)}</button></div></div>`).join(""):empty("No reflections match your search.")}</div>
  ${recurringThemesCardHtml()}`;
  let sEl=document.getElementById("reflectionSearch");if(sEl&&reflectionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -1888,13 +1896,21 @@ function reflectionFormHtml(x,mode){
  </div>
  ${ratingSelectRow("rating","Overall rating",x.rating)}
  ${ratingSelectRow("communication","Communication",x.communication)}
- <label class="full">What went well?<textarea name="well">${esc(x.well||"")}</textarea></label>
+ <div class="full"><label style="margin-bottom:6px">What went well?</label>
+ <div class="chipGrid2" id="reflWentWellSession" style="${type==="match"?"display:none":""}">${COACH_WENT_WELL_SESSION.map(r=>`<label><input type="checkbox" name="wentWellThemes" value="${esc(r)}" ${(x.wentWellThemes||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
+ <div class="chipGrid2" id="reflWentWellMatch" style="${type==="match"?"":"display:none"}">${COACH_WENT_WELL_MATCH.map(r=>`<label><input type="checkbox" name="wentWellThemes" value="${esc(r)}" ${(x.wentWellThemes||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
+ <input type="text" name="well" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.well||"")}"></div>
  <div class="full"><label style="margin-bottom:6px">What could be better?</label>
  <div class="chipGrid2" id="reflSessionReasons" style="${type==="match"?"display:none":""}">${BETTER_REASONS.map(r=>`<label><input type="checkbox" name="betterReasons" value="${esc(r)}" ${(x.betterReasons||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
  <div class="chipGrid2" id="reflMatchReasons" style="${type==="match"?"":"display:none"}">${MATCH_BETTER_REASONS.map(r=>`<label><input type="checkbox" name="betterReasons" value="${esc(r)}" ${(x.betterReasons||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
- <textarea name="betterDetail" placeholder="Anything else? (optional)" style="margin-top:8px">${esc(x.betterDetail!==undefined?x.betterDetail:(x.better||""))}</textarea></div>
- <label class="full">What did I learn, and what will I change next time?<textarea name="learnings">${esc(x.learnings!==undefined?x.learnings:[x.players,x.change].filter(Boolean).join("\n\n"))}</textarea></label>
- <label class="full">Next focus<textarea name="next">${esc(x.next||"")}</textarea></label>
+ <input type="text" name="betterDetail" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.betterDetail!==undefined?x.betterDetail:(x.better||""))}"></div>
+ <div class="full"><label style="margin-bottom:6px">Key takeaway</label>
+ <div class="chipGrid2" id="reflTakeawaySession" style="${type==="match"?"display:none":""}">${COACH_TAKEAWAY_SESSION.map(r=>`<label><input type="checkbox" name="takeawayThemes" value="${esc(r)}" ${(x.takeawayThemes||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
+ <div class="chipGrid2" id="reflTakeawayMatch" style="${type==="match"?"":"display:none"}">${COACH_TAKEAWAY_MATCH.map(r=>`<label><input type="checkbox" name="takeawayThemes" value="${esc(r)}" ${(x.takeawayThemes||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
+ <input type="text" name="learnings" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.learnings!==undefined?x.learnings:[x.players,x.change].filter(Boolean).join(" "))}"></div>
+ <div class="full"><label style="margin-bottom:6px">Next focus</label>
+ <div class="chipGrid2">${COACH_NEXT_FOCUS.map(r=>`<label><input type="checkbox" name="nextFocusThemes" value="${esc(r)}" ${(x.nextFocusThemes||[]).includes(r)?"checked":""}> ${esc(r)}</label>`).join("")}</div>
+ <input type="text" name="next" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.next||"")}"></div>
  <button class="btn primary">Save Reflection</button>
  </form>`;
 }
@@ -1916,6 +1932,12 @@ function setReflectionType(type){
  let sessReasons=document.getElementById("reflSessionReasons"),matchReasons=document.getElementById("reflMatchReasons");
  if(sessReasons){sessReasons.style.display=type==="match"?"none":"";if(type==="match")sessReasons.querySelectorAll("input[type=checkbox]").forEach(cb=>cb.checked=false)}
  if(matchReasons){matchReasons.style.display=type==="match"?"":"none";if(type!=="match")matchReasons.querySelectorAll("input[type=checkbox]").forEach(cb=>cb.checked=false)}
+ let wwSess=document.getElementById("reflWentWellSession"),wwMatch=document.getElementById("reflWentWellMatch");
+ if(wwSess){wwSess.style.display=type==="match"?"none":"";if(type==="match")wwSess.querySelectorAll("input[type=checkbox]").forEach(cb=>cb.checked=false)}
+ if(wwMatch){wwMatch.style.display=type==="match"?"":"none";if(type!=="match")wwMatch.querySelectorAll("input[type=checkbox]").forEach(cb=>cb.checked=false)}
+ let takeSess=document.getElementById("reflTakeawaySession"),takeMatch=document.getElementById("reflTakeawayMatch");
+ if(takeSess){takeSess.style.display=type==="match"?"none":"";if(type==="match")takeSess.querySelectorAll("input[type=checkbox]").forEach(cb=>cb.checked=false)}
+ if(takeMatch){takeMatch.style.display=type==="match"?"":"none";if(type!=="match")takeMatch.querySelectorAll("input[type=checkbox]").forEach(cb=>cb.checked=false)}
 }
 function onReflectionSessionPick(sel){
  renderReflectionObjectiveRatings(sel.value);
@@ -1979,6 +2001,9 @@ function saveReflection(e){
  let x=Object.fromEntries(fd);
  x.type=x.type==="match"?"match":"session";
  x.betterReasons=fd.getAll("betterReasons");
+ x.wentWellThemes=fd.getAll("wentWellThemes");
+ x.takeawayThemes=fd.getAll("takeawayThemes");
+ x.nextFocusThemes=fd.getAll("nextFocusThemes");
  let objectiveRatings={};
  if(x.type==="session"){
   OBJECTIVE_CATEGORIES.forEach((cat,idx)=>{
@@ -4441,9 +4466,15 @@ function reflectionSearchableText(r){
   r.session,r.well,r.next,
   (r.betterReasons&&r.betterReasons.length)?r.betterReasons.join(" "):"",
   r.betterDetail!==undefined?r.betterDetail:r.better,
-  r.learnings!==undefined?r.learnings:[r.players,r.change].filter(Boolean).join(" ")
+  r.learnings!==undefined?r.learnings:[r.players,r.change].filter(Boolean).join(" "),
+  (r.wentWellThemes&&r.wentWellThemes.length)?r.wentWellThemes.join(" "):"",
+  (r.takeawayThemes&&r.takeawayThemes.length)?r.takeawayThemes.join(" "):"",
+  (r.nextFocusThemes&&r.nextFocusThemes.length)?r.nextFocusThemes.join(" "):""
  ];
 }
+function reflectionWentWellText(r){return[(r.wentWellThemes||[]).join(", "),r.well].filter(Boolean).join(" — ")}
+function reflectionTakeawayText(r){return[(r.takeawayThemes||[]).join(", "),r.learnings!==undefined?r.learnings:[r.players,r.change].filter(Boolean).join(" ")].filter(Boolean).join(" — ")}
+function reflectionNextFocusText(r){return[(r.nextFocusThemes||[]).join(", "),r.next].filter(Boolean).join(" — ")}
 function venueOptions(){let venues=[...new Set([...activeSessions().map(s=>s.venue),...db.matches.map(m=>m.venue)].filter(Boolean))];return venues.map(v=>`<option value="${esc(v)}">`).join("")}
 function reportShell(title,sub,body){setPrintTitle(title);modal(`<div class="sheetHead noPrint"><h2>${title}</h2><button class="x" onclick="closeM()">×</button></div><div class="report"><h1>${title}</h1><div class="muted">${sub}</div>${body}<div class="reportActions noPrint"><button class="btn primary" onclick="printReport()">Print / Save PDF</button></div></div>`)}
 /* ===== Business Tools: Invoices, Payment Reminders, Match Narrative, Reflection Themes, Custom Reports, Certificates ===== */
@@ -4724,7 +4755,7 @@ function buildCustomReport(){
    if(m)return m.team===teamFilter;
    return false;
   });
-  sections.push(`<h2>Reflections (${list.length})</h2>${list.length?list.map(r=>`<div class="item"><div><b>${esc(r.session||"Reflection")}</b><div class="muted">${esc(fmtDate(r.date))} · Rating ${esc(r.rating)}/5</div><small>${esc(r.well||"")}</small></div></div>`).join(""):empty(teamFilter?"No reflections linked to this team's sessions/matches in range.":"No reflections in range.")}`);
+  sections.push(`<h2>Reflections (${list.length})</h2>${list.length?list.map(r=>`<div class="item"><div><b>${esc(r.session||"Reflection")}</b><div class="muted">${esc(fmtDate(r.date))} · Rating ${esc(r.rating)}/5</div><small>${esc(reflectionWentWellText(r))}</small></div></div>`).join(""):empty(teamFilter?"No reflections linked to this team's sessions/matches in range.":"No reflections in range.")}`);
  }
  if(document.getElementById("crbPlayers").checked){
   let list=roster.slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
@@ -4969,11 +5000,12 @@ function buildCoachReport(){
   let reasonsPart=(r.betterReasons&&r.betterReasons.length)?r.betterReasons.join(", "):"";
   let detailPart=r.betterDetail!==undefined?r.betterDetail:(r.betterReasons===undefined?(r.better||""):"");
   let betterText=[reasonsPart,detailPart].filter(Boolean).join(" — ")||"—";
-  let learningsRaw=r.learnings!==undefined?r.learnings:[r.players,r.change].filter(Boolean).join(" ");
-  let learningsText=learningsRaw||"—";
+  let learningsText=reflectionTakeawayText(r)||"—";
+  let wentWellText=reflectionWentWellText(r)||"—";
+  let nextFocusText=reflectionNextFocusText(r)||"—";
   let extraRatings=[r.sessionFlow?`Session Flow ${esc(r.sessionFlow)}/5`:"",r.playerEngagement?`Player Engagement ${esc(r.playerEngagement)}/5`:""].filter(Boolean).join(" · ");
   let objectiveRatingsHtml=(r.objectiveRatings&&Object.keys(r.objectiveRatings).length)?`<p><b>Achieved Objectives:</b> ${Object.entries(r.objectiveRatings).map(([cat,val])=>`${esc(cat)} ${esc(val)}/5`).join(", ")}</p>`:"";
-  return `<div class="card"><b>${esc(fmtDate(r.date))} · ${esc(r.session||"Coaching Reflection")}</b><p><b>Rating:</b> ${esc(r.rating)}/5 · Communication ${esc(r.communication||"—")}/5${extraRatings?" · "+extraRatings:""}</p><p><b>What went well:</b> ${esc(r.well||"—")}</p><p><b>What could improve:</b> ${esc(betterText)}</p><p><b>Learning & change next time:</b> ${esc(learningsText)}</p>${objectiveRatingsHtml}<p><b>Next focus:</b> ${esc(r.next||"—")}</p></div>`;
+  return `<div class="card"><b>${esc(fmtDate(r.date))} · ${esc(r.session||"Coaching Reflection")}</b><p><b>Rating:</b> ${esc(r.rating)}/5 · Communication ${esc(r.communication||"—")}/5${extraRatings?" · "+extraRatings:""}</p><p><b>What went well:</b> ${esc(wentWellText)}</p><p><b>What could improve:</b> ${esc(betterText)}</p><p><b>Key takeaway:</b> ${esc(learningsText)}</p>${objectiveRatingsHtml}<p><b>Next focus:</b> ${esc(nextFocusText)}</p></div>`;
  }).join(""):empty("No reflections documented.")}`);
 }
 function backup(){let a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:"application/json"}));a.download="ProCoach-OS-Backup-"+today()+".json";a.click()}function restore(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{db=JSON.parse(r.result);save();alert("Backup restored.")}catch(e){alert("Invalid backup file.")}};r.readAsText(f)}
@@ -5007,16 +5039,16 @@ function exportExcel(){
   Reflections:db.reflections.map(r=>{
     let reasonsPart=(r.betterReasons&&r.betterReasons.length)?r.betterReasons.join(', '):'';
     let detailPart=r.betterDetail!==undefined?r.betterDetail:(r.betterReasons===undefined?(r.better||''):'');
-    let learningsText=r.learnings!==undefined?r.learnings:[r.players,r.change].filter(Boolean).join(' ');
+    let learningsText=reflectionTakeawayText(r);
     let objectiveRatingsText=(r.objectiveRatings&&Object.keys(r.objectiveRatings).length)?Object.entries(r.objectiveRatings).map(([cat,val])=>`${cat}:${val}`).join('; '):'';
     return{
       date:r.date,session:r.session||'',
       rating:r.rating||'',communication:r.communication||'',sessionFlow:r.sessionFlow||'',playerEngagement:r.playerEngagement||'',
-      whatWentWell:r.well||'',
+      whatWentWell:reflectionWentWellText(r),
       whatCouldImprove:[reasonsPart,detailPart].filter(Boolean).join(' — '),
       learningAndChange:learningsText,
       achievedObjectives:objectiveRatingsText,
-      nextFocus:r.next||''
+      nextFocus:reflectionNextFocusText(r)
     };
   }),
   Matches:db.matches.map(m=>({
@@ -5879,7 +5911,7 @@ function globalSearchHtml(){return `<div class="sheetHead"><h2>Search ProCoach O
 <div id="globalSearchResults" style="margin-top:16px">${globalSearchResultsHtml()}</div>`}
 function renderGlobalSearchResults(){let el=document.getElementById("globalSearchResults");if(el)el.innerHTML=globalSearchResultsHtml()}
 function sessionResultHtml(s){return `<div class="item" style="cursor:pointer" onclick="closeM();go('sessions')"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date)||"")}</div></div></div>`}
-function reflectionResultHtml(r){return `<div class="item" style="cursor:pointer" onclick="closeM();go('reflections')"><div><b>${esc(r.date||"")} · ${esc(r.session||"Reflection")}</b><div class="muted">${esc((r.well||"").slice(0,70))}</div></div></div>`}
+function reflectionResultHtml(r){return `<div class="item" style="cursor:pointer" onclick="closeM();go('reflections')"><div><b>${esc(r.date||"")} · ${esc(r.session||"Reflection")}</b><div class="muted">${esc(reflectionWentWellText(r).slice(0,70))}</div></div></div>`}
 function playerResultHtml(p){return `<div class="item" style="cursor:pointer" onclick="closeM();playerView('${p.id}')"><div><b>${esc(p.name)}</b><div class="muted">${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}</div></div></div>`}
 function drillResultHtml(d){return `<div class="item" style="cursor:pointer" onclick="closeM();editDrill('${d.id}')"><div><b>${esc(d.name)}</b><div class="muted">${esc(d.cat||"General")}</div></div></div>`}
 function drillIntoAssessment(name){let p=db.players.find(x=>x.name===name);closeM();if(p)playerView(p.id);else go('assessments')}
