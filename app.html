@@ -2694,21 +2694,24 @@ function stepBulkAssessmentRating(playerName,skillIndex,delta){
 function renderBulkAssessmentGrid(){
  let box=document.getElementById("bulkAssessmentBody");
  if(!box)return;
+ // Re-rendering replaces the table's markup entirely, which would
+ // otherwise silently reset horizontal scroll back to the first column
+ // every time a rating is stepped — capture and restore it here so the
+ // grid only moves when the coach actually scrolls it.
+ let existingWrap=box.querySelector(".matchEntryWrap");
+ let scrollLeft=existingWrap?existingWrap.scrollLeft:0;
  let discipline=bulkAssessmentDraft.discipline;
  let skills=allSkillsFor(discipline).filter(s=>!isSkillArchived(discipline,s));
  let players=activePlayers();
- // One metric per card, stacked vertically, with every player listed
- // underneath it — this keeps the full metric name on screen (no
- // truncated/narrow table columns) and needs only vertical scrolling,
- // never horizontal, no matter how long a metric's name is.
- box.innerHTML=`<div style="margin-top:12px">${skills.map((s,si)=>`<div class="card" style="margin-bottom:10px">
- <label style="margin-bottom:8px;display:block">${esc(s)}</label>
- <div class="list">${players.map(p=>{
+ box.innerHTML=`<div class="matchEntryWrap" style="margin-top:12px"><table class="matchEntryTable"><thead><tr><th style="min-width:110px">Player</th>${skills.map(s=>`<th style="min-width:78px;text-align:center">${esc(s)}</th>`).join("")}</tr></thead><tbody>
+ ${players.map((p,pi)=>`<tr><td><b>${esc(p.name)}</b></td>${skills.map((s,si)=>{
   let safeName=p.name.replace(/'/g,"\\'");
-  return `<div class="item" style="align-items:center;padding:8px 10px"><div style="min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(p.name)}</div>${numberStepperHtml(bulkAssessmentDraft.ratings[p.name][si],`stepBulkAssessmentRating('${safeName}',${si},-1)`,`stepBulkAssessmentRating('${safeName}',${si},1)`,18)}</div>`;
- }).join("")}</div>
- </div>`).join("")}</div>
- <button class="btn primary full" style="margin-top:4px" onclick="saveBulkAssessment()">Save ${players.length} Assessments</button>`;
+  return `<td>${numberStepperHtml(bulkAssessmentDraft.ratings[p.name][si],`stepBulkAssessmentRating('${safeName}',${si},-1)`,`stepBulkAssessmentRating('${safeName}',${si},1)`,16)}</td>`;
+ }).join("")}</tr>`).join("")}
+ </tbody></table></div>
+ <button class="btn primary full" style="margin-top:14px" onclick="saveBulkAssessment()">Save ${players.length} Assessments</button>`;
+ let newWrap=box.querySelector(".matchEntryWrap");
+ if(newWrap)newWrap.scrollLeft=scrollLeft;
 }
 function saveBulkAssessment(){
  if(!requireWriteAccess())return;
