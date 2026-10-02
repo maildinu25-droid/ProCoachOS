@@ -3044,11 +3044,19 @@ let drillQuery="",drillCatFilter="",drillSearchFocused=false,drillDraftDiagram=n
 // Each step stores one flat `items` array (markers and arrows mixed, in the
 // order they were added) so "Undo" is just popping the last item, and
 // render order (arrows under markers) is a simple filter at draw time.
-let fieldDraft={steps:[],activeStep:0,tool:null,pendingArrowStart:null};
+// pendingArrowPoints/pendingArrowStyle hold an arrow mid-draw: the first tap
+// starts it, every tap after adds a bend point, and Finish Arrow commits it —
+// this is what lets an arrow have more than a straight start/end (a fielder's
+// curved run-and-throw path, say). dragState tracks an in-progress marker drag
+// (see handleFieldPointerDown/Move/Up) so a drag can be told apart from a tap.
+let fieldDraft={steps:[],activeStep:0,tool:null,pendingArrowPoints:[],pendingArrowStyle:null,dragState:null};
 const FIELD_TOOLS=[
  {id:"coach",label:"Coach"},
  {id:"player",label:"Player"},
+ {id:"wk",label:"Keeper"},
  {id:"cone",label:"Cone"},
+ {id:"gate",label:"Cone Gate"},
+ {id:"target",label:"Target"},
  {id:"ball",label:"Ball"},
  {id:"stumps",label:"Stumps"},
  {id:"arrowBall",label:"Ball →"},
@@ -3060,7 +3068,10 @@ const FIELD_TOOLS=[
 function fieldToolIconSvg(id){
  if(id==="coach")return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#f2994a" stroke="#3d2410" stroke-width="1.3"/><text x="12" y="16" text-anchor="middle" font-size="10" font-weight="800" fill="#2b1200" font-family="Poppins,sans-serif">C</text></svg>`;
  if(id==="player")return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#f4f1e8" stroke="#0a1420" stroke-width="1.3"/><text x="12" y="15.5" text-anchor="middle" font-size="9" font-weight="700" fill="#0a1420" font-family="Poppins,sans-serif">P</text></svg>`;
+ if(id==="wk")return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#2f5233" stroke="#0e1f11" stroke-width="1.3"/><text x="12" y="15.3" text-anchor="middle" font-size="7.5" font-weight="800" fill="#f4f1e8" font-family="Poppins,sans-serif">WK</text></svg>`;
  if(id==="cone")return `<svg width="20" height="20" viewBox="0 0 24 24"><polygon points="12,4 4,20 20,20" fill="#f97316" stroke="#5c2c06" stroke-width="1.2"/></svg>`;
+ if(id==="gate")return `<svg width="20" height="20" viewBox="0 0 24 24"><polygon points="6,8 2,20 10,20" fill="#f97316" stroke="#5c2c06" stroke-width="1.1"/><polygon points="18,8 14,20 22,20" fill="#f97316" stroke="#5c2c06" stroke-width="1.1"/></svg>`;
+ if(id==="target")return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#2ecc71" stroke-width="1.6" stroke-dasharray="3 2"/><circle cx="12" cy="12" r="2" fill="#2ecc71"/></svg>`;
  if(id==="ball")return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5" fill="#c0392b" stroke="#3d0f0a" stroke-width="1.2"/></svg>`;
  if(id==="stumps"){
   let sw=1.6,sh=13,gap=4.2,x1=12-gap,x2=12,x3=12+gap,topY=12-6.5;
@@ -3105,6 +3116,27 @@ function fieldMarkerSvg(m,opts){
   let numHtml=m.label?textWrap(m.x,`<text x="${m.x}" y="${m.y+2.75}" text-anchor="middle" font-size="1.5" font-weight="700" fill="#f4f1e8" font-family="Poppins,sans-serif">${esc(m.label)}</text>`):"";
   return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><polygon points="${m.x},${m.y-1.9} ${m.x-1.65*xComp},${m.y+1.5} ${m.x+1.65*xComp},${m.y+1.5}" fill="#f97316" stroke="#5c2c06" stroke-width="0.35"/>${numHtml}</g>`;
  }
+ if(m.type==="wk"){
+  let r=2.5*k,fs=1.3*k;
+  return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><ellipse cx="${m.x}" cy="${m.y}" rx="${r*xComp}" ry="${r}" fill="#2f5233" stroke="#0e1f11" stroke-width="0.45"/>${textWrap(m.x,`<text x="${m.x}" y="${m.y+0.5*k}" text-anchor="middle" font-size="${fs}" font-weight="800" fill="#f4f1e8" font-family="Poppins,sans-serif">${esc(m.label||"WK")}</text>`)}</g>`;
+ }
+ if(m.type==="gate"){
+  // Two small cones a fixed gap apart, centered on the tapped point — the
+  // "run/throw through here" gate a lot of fielding drills use. One placeable
+  // unit (drag moves both cones together) rather than two separate markers.
+  let gap=4*xComp,leftX=m.x-gap,rightX=m.x+gap;
+  let numHtml=m.label?textWrap(m.x,`<text x="${m.x}" y="${m.y+2.75}" text-anchor="middle" font-size="1.4" font-weight="700" fill="#f4f1e8" font-family="Poppins,sans-serif">${esc(m.label)}</text>`):"";
+  return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer">
+   <polygon points="${leftX},${m.y-1.5} ${leftX-1.3*xComp},${m.y+1.2} ${leftX+1.3*xComp},${m.y+1.2}" fill="#f97316" stroke="#5c2c06" stroke-width="0.3"/>
+   <polygon points="${rightX},${m.y-1.5} ${rightX-1.3*xComp},${m.y+1.2} ${rightX+1.3*xComp},${m.y+1.2}" fill="#f97316" stroke="#5c2c06" stroke-width="0.3"/>
+   <line x1="${leftX}" y1="${m.y+1.2}" x2="${rightX}" y2="${m.y+1.2}" stroke="#f97316" stroke-width="0.25" stroke-dasharray="0.6 0.5"/>
+   ${numHtml}
+  </g>`;
+ }
+ if(m.type==="target"){
+  let r=2.6*k;
+  return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><ellipse cx="${m.x}" cy="${m.y}" rx="${r*xComp}" ry="${r}" fill="rgba(46,204,113,0.18)" stroke="#2ecc71" stroke-width="0.5" stroke-dasharray="1 0.7"/><ellipse cx="${m.x}" cy="${m.y}" rx="${0.6*xComp}" ry="0.6" fill="#2ecc71"/>${m.label?textWrap(m.x,`<text x="${m.x}" y="${m.y-r-0.8}" text-anchor="middle" font-size="1.5" font-weight="700" fill="#2ecc71" font-family="Poppins,sans-serif">${esc(m.label)}</text>`):""}</g>`;
+ }
  if(m.type==="ball")return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><ellipse cx="${m.x}" cy="${m.y}" rx="${1.4*xComp}" ry="1.4" fill="#c0392b" stroke="#3d0f0a" stroke-width="0.35"/></g>`;
  if(m.type==="stumps"){
   let sw=0.45*xComp,sh=3.2,gap=1.1*xComp,x1=m.x-gap,x2=m.x,x3=m.x+gap,topY=m.y-1.7;
@@ -3118,6 +3150,34 @@ function fieldMarkerSvg(m,opts){
  }
  return "";
 }
+// An arrow can be a straight 2-point hop (the original shape) or a multi-point
+// path with bends added via Finish Arrow's "tap to add a point" flow. Older
+// saved arrows only ever have x1/y1/x2/y2 — arrowPointsOf reads either shape
+// so nothing already saved needs migrating.
+function arrowPointsOf(a){
+ if(a.points&&a.points.length)return a.points;
+ return [{x:a.x1,y:a.y1},{x:a.x2,y:a.y2}];
+}
+// Where to put a ball-path's numbered badge: the midpoint along the whole
+// path's length (not just the midpoint of the first/last point), so a bendy
+// path still gets its number roughly centered on the line the eye follows.
+function pathMidpoint(pts){
+ if(pts.length<2)return pts[0]||{x:0,y:0};
+ let segLens=[],total=0;
+ for(let i=0;i<pts.length-1;i++){
+  let len=Math.hypot(pts[i+1].x-pts[i].x,pts[i+1].y-pts[i].y);
+  segLens.push(len);total+=len;
+ }
+ let half=total/2,acc=0;
+ for(let i=0;i<segLens.length;i++){
+  if(acc+segLens[i]>=half){
+   let t=segLens[i]?(half-acc)/segLens[i]:0;
+   return {x:pts[i].x+(pts[i+1].x-pts[i].x)*t,y:pts[i].y+(pts[i+1].y-pts[i].y)*t};
+  }
+  acc+=segLens[i];
+ }
+ return pts[pts.length-1];
+}
 function fieldArrowSvg(a,opts){
  opts=opts||{};
  let xComp=opts.xComp||1;
@@ -3125,10 +3185,12 @@ function fieldArrowSvg(a,opts){
  let color=isBall?"#c0392b":"#3b82f6";
  let dashAttr=isBall?"":' stroke-dasharray="1.4 1"';
  let markerId=isBall?"fdArrowBall":"fdArrowPlayer";
- let line=`<line class="fdArrow" data-id="${a.id}" x1="${a.x1}" y1="${a.y1}" x2="${a.x2}" y2="${a.y2}" stroke="${color}" stroke-width="0.65" ${dashAttr} marker-end="url(#${markerId})" style="cursor:pointer"/>`;
+ let pts=arrowPointsOf(a);
+ let pointsStr=pts.map(p=>`${p.x},${p.y}`).join(" ");
+ let line=`<polyline class="fdArrow" data-id="${a.id}" points="${pointsStr}" fill="none" stroke="${color}" stroke-width="0.65" ${dashAttr} marker-end="url(#${markerId})" style="cursor:pointer"/>`;
  let badge="";
  if(isBall&&a.label){
-  let mx=(a.x1+a.x2)/2,my=(a.y1+a.y2)/2;
+  let mid=pathMidpoint(pts),mx=mid.x,my=mid.y;
   let textEl=`<text x="${mx}" y="${my+0.5}" text-anchor="middle" font-size="1.6" font-weight="700" fill="#f4f1e8" font-family="Poppins,sans-serif">${esc(a.label)}</text>`;
   let textWrapped=xComp!==1?`<g transform="translate(${mx} 0) scale(${xComp} 1) translate(${-mx} 0)">${textEl}</g>`:textEl;
   badge=`<g class="fdArrow" data-id="${a.id}" style="cursor:pointer"><ellipse cx="${mx}" cy="${my}" rx="${1.5*xComp}" ry="1.5" fill="#0a1420" stroke="${color}" stroke-width="0.3"/>${textWrapped}</g>`;
@@ -3177,10 +3239,15 @@ function fieldDiagramSvg(view,opts){
  let markerOpts={xComp:xComp,compact:!!opts.compactMarkers};
  let arrowsHtml=items.filter(it=>it.kind==="arrow").map(it=>fieldArrowSvg(it,markerOpts)).join("");
  let markersHtml=items.filter(it=>it.kind==="marker").map(it=>fieldMarkerSvg(it,markerOpts)).join("");
+ // Mid-draw arrow preview: a dashed ring at every point placed so far, joined
+ // by a dashed line, so a bend is visible before Finish Arrow commits it.
  let pendingHtml="";
- if(interactive&&fieldDraft.pendingArrowStart){
-  let p=fieldDraft.pendingArrowStart;
-  pendingHtml=`<ellipse cx="${p.x}" cy="${p.y}" rx="${1.6*xComp}" ry="1.6" fill="none" stroke="#f4f1e8" stroke-width="0.4" stroke-dasharray="0.9 0.7"/>`;
+ if(interactive&&fieldDraft.pendingArrowPoints&&fieldDraft.pendingArrowPoints.length){
+  let pts=fieldDraft.pendingArrowPoints;
+  let pendColor=fieldDraft.pendingArrowStyle==="ball"?"#c0392b":"#3b82f6";
+  let polyHtml=pts.length>1?`<polyline points="${pts.map(p=>`${p.x},${p.y}`).join(" ")}" fill="none" stroke="${pendColor}" stroke-width="0.5" stroke-dasharray="1.2 0.8" opacity="0.85"/>`:"";
+  let dotsHtml=pts.map(p=>`<ellipse cx="${p.x}" cy="${p.y}" rx="${1.6*xComp}" ry="1.6" fill="none" stroke="#f4f1e8" stroke-width="0.4" stroke-dasharray="0.9 0.7"/>`).join("");
+  pendingHtml=polyHtml+dotsHtml;
  }
  // fill mode (used in the fullscreen editor): the svg exactly fills its wrapper,
  // whose exact pixel size is computed by sizeFullscreenCanvas() — this is what
@@ -3188,7 +3255,10 @@ function fieldDiagramSvg(view,opts){
  // "none" is a no-op whenever dispAspect matches the viewBox's own ratio (every
  // case except Full Ground fullscreen-in-landscape), so nothing else is affected.
  let sizeStyle=opts.fill?"width:100%;height:100%;display:block;border-radius:10px":"width:100%;height:auto;display:block;border-radius:10px";
- let clickAttr=interactive?` onclick="handleFieldCanvasClick(event,this)" style="cursor:crosshair;${sizeStyle}"`:` style="${sizeStyle}"`;
+ // touch-action:none stops a touch-drag on the ground from also trying to
+ // scroll the page — needed for marker dragging (handleFieldPointerDown/Move/Up)
+ // to track the finger cleanly instead of fighting a scroll gesture.
+ let clickAttr=interactive?` onclick="handleFieldCanvasClick(event,this)" onpointerdown="handleFieldPointerDown(event,this)" onpointermove="handleFieldPointerMove(event,this)" onpointerup="handleFieldPointerUp(event,this)" onpointercancel="handleFieldPointerUp(event,this)" style="cursor:crosshair;touch-action:none;${sizeStyle}"`:` style="${sizeStyle}"`;
  return `<svg viewBox="0 0 ${vb.w} ${vb.h}" preserveAspectRatio="none"${clickAttr}>${defs}${bg}${arrowsHtml}${markersHtml}${pendingHtml}</svg>`;
 }
 function fieldCanvasCoords(evt,svgEl){
@@ -3199,6 +3269,11 @@ function fieldCanvasCoords(evt,svgEl){
  return {x:Math.max(0,Math.min(vb.width,px*vb.width)),y:Math.max(0,Math.min(vb.height,py*vb.height))};
 }
 function handleFieldCanvasClick(evt,svgEl){
+ // A click immediately following a marker drag (see handleFieldPointerUp) is
+ // the browser's own synthesized click for that same gesture — without this
+ // guard it would fall straight into the "tap a marker to delete it" branch
+ // below and erase the marker that was just repositioned.
+ if(fieldDraft.suppressNextClick){fieldDraft.suppressNextClick=false;return}
  let step=fieldDraft.steps[fieldDraft.activeStep];
  if(!step)return;
  let items=curFieldItems(step);
@@ -3223,26 +3298,20 @@ function handleFieldCanvasClick(evt,svgEl){
  if(!fieldDraft.tool)return; // no tool selected — tapping empty ground does nothing
  let pos=fieldCanvasCoords(evt,svgEl);
  if(fieldDraft.tool==="arrowBall"||fieldDraft.tool==="arrowPlayer"){
-  if(!fieldDraft.pendingArrowStart){
-   fieldDraft.pendingArrowStart=pos;
-  } else {
-   let isBall=fieldDraft.tool==="arrowBall";
-   // Ball-path arrows are numbered in tap order (1st ball, 2nd ball...) so the
-   // sequence of a drill is readable at a glance; player-path arrows aren't.
-   let label="";
-   if(isBall){
-    let ballArrowCount=items.filter(it=>it.kind==="arrow"&&it.style==="ball").length;
-    label=String(ballArrowCount+1);
-   }
-   items.push({id:uid("fditem"),kind:"arrow",style:isBall?"ball":"player",x1:fieldDraft.pendingArrowStart.x,y1:fieldDraft.pendingArrowStart.y,x2:pos.x,y2:pos.y,label});
-   fieldDraft.pendingArrowStart=null;
+  // Each tap on empty ground adds a point to the arrow being drawn — a
+  // straight arrow is just two points; Finish Arrow (finishFieldArrow)
+  // commits it, so a path can have as many bends as needed first.
+  if(!fieldDraft.pendingArrowPoints.length){
+   fieldDraft.pendingArrowStyle=fieldDraft.tool==="arrowBall"?"ball":"player";
   }
+  fieldDraft.pendingArrowPoints.push(pos);
   renderFieldEditor();
   return;
  }
- // Player, Coach and Cone markers are numbered in the order they're tapped
- // (P1/P2..., C1/C2..., 1/2...) so a drill's structure reads clearly; Ball
- // and Stumps markers are unlabeled since they're usually single/fixed points.
+ // Player, Coach, Keeper, Cone, Cone Gate and Target markers are numbered in
+ // the order they're tapped (P1/P2..., C1/C2..., WK/WK2..., 1/2..., G1/G2...,
+ // T1/T2...) so a drill's structure reads clearly; Ball and Stumps markers
+ // are unlabeled since they're usually single/fixed points.
  let label="";
  if(fieldDraft.tool==="player"){
   let playerCount=items.filter(it=>it.kind==="marker"&&it.type==="player").length;
@@ -3250,11 +3319,97 @@ function handleFieldCanvasClick(evt,svgEl){
  } else if(fieldDraft.tool==="coach"){
   let coachCount=items.filter(it=>it.kind==="marker"&&it.type==="coach").length;
   label="C"+(coachCount+1);
+ } else if(fieldDraft.tool==="wk"){
+  let wkCount=items.filter(it=>it.kind==="marker"&&it.type==="wk").length;
+  label=wkCount?"WK"+(wkCount+1):"WK";
  } else if(fieldDraft.tool==="cone"){
   let coneCount=items.filter(it=>it.kind==="marker"&&it.type==="cone").length;
   label=String(coneCount+1);
+ } else if(fieldDraft.tool==="gate"){
+  let gateCount=items.filter(it=>it.kind==="marker"&&it.type==="gate").length;
+  label=gateCount?"G"+(gateCount+1):"";
+ } else if(fieldDraft.tool==="target"){
+  let targetCount=items.filter(it=>it.kind==="marker"&&it.type==="target").length;
+  label=targetCount?"T"+(targetCount+1):"";
  }
  items.push({id:uid("fditem"),kind:"marker",type:fieldDraft.tool,x:pos.x,y:pos.y,label});
+ renderFieldEditor();
+}
+// Dragging a marker: pointerdown on a marker starts tracking; pointermove
+// (once past a small threshold, so a plain tap isn't mistaken for a drag)
+// nudges it live via a transform (cheap — avoids rebuilding the whole SVG
+// mid-drag, which would also drop the pointer capture); pointerup commits the
+// new x/y to the data and re-renders properly. A drag never deletes — only a
+// tap that didn't move does (handled by the suppressNextClick guard above).
+function handleFieldPointerDown(evt,svgEl){
+ let markerEl=evt.target.closest&&evt.target.closest(".fdMarker");
+ if(!markerEl)return;
+ let step=fieldDraft.steps[fieldDraft.activeStep];
+ if(!step)return;
+ let items=curFieldItems(step);
+ let id=markerEl.getAttribute("data-id");
+ let item=items.find(it=>it.id===id&&it.kind==="marker");
+ if(!item)return;
+ let pos=fieldCanvasCoords(evt,svgEl);
+ fieldDraft.dragState={id:id,startX:item.x,startY:item.y,startPointer:pos,moved:false,dx:0,dy:0};
+ if(svgEl.setPointerCapture)try{svgEl.setPointerCapture(evt.pointerId)}catch(e){}
+}
+function handleFieldPointerMove(evt,svgEl){
+ let d=fieldDraft.dragState;
+ if(!d)return;
+ let pos=fieldCanvasCoords(evt,svgEl);
+ let dx=pos.x-d.startPointer.x,dy=pos.y-d.startPointer.y;
+ if(!d.moved&&Math.hypot(dx,dy)<0.8)return; // below threshold — still a potential tap, not a drag yet
+ d.moved=true;d.dx=dx;d.dy=dy;
+ let g=svgEl.querySelector(`.fdMarker[data-id="${d.id}"]`);
+ if(g)g.setAttribute("transform",`translate(${dx} ${dy})`);
+}
+function handleFieldPointerUp(evt,svgEl){
+ let d=fieldDraft.dragState;
+ fieldDraft.dragState=null;
+ if(!d)return;
+ if(svgEl.hasPointerCapture&&svgEl.hasPointerCapture(evt.pointerId))try{svgEl.releasePointerCapture(evt.pointerId)}catch(e){}
+ if(!d.moved)return; // a plain tap — let the normal click handler (delete) run
+ let step=fieldDraft.steps[fieldDraft.activeStep];
+ if(step){
+  let items=curFieldItems(step);
+  let item=items.find(it=>it.id===d.id);
+  if(item){
+   let vb=svgEl.viewBox.baseVal;
+   item.x=Math.max(0,Math.min(vb.width,d.startX+d.dx));
+   item.y=Math.max(0,Math.min(vb.height,d.startY+d.dy));
+  }
+ }
+ fieldDraft.suppressNextClick=true;
+ // Self-clearing safety net: a drag's own pointerup is normally followed
+ // almost immediately by the browser's own synthesized click on the same
+ // gesture, which is what actually consumes this flag (see
+ // handleFieldCanvasClick). If that click never arrives for any reason, this
+ // stops the flag from permanently swallowing the next unrelated tap.
+ setTimeout(()=>{fieldDraft.suppressNextClick=false},400);
+ renderFieldEditor();
+}
+function finishFieldArrow(){
+ if(fieldDraft.pendingArrowPoints.length<2)return;
+ let step=fieldDraft.steps[fieldDraft.activeStep];
+ if(!step)return;
+ let items=curFieldItems(step);
+ let isBall=fieldDraft.pendingArrowStyle==="ball";
+ // Ball-path arrows are numbered in finish order (1st ball, 2nd ball...) so
+ // the sequence of a drill is readable at a glance; player-path arrows aren't.
+ let label="";
+ if(isBall){
+  let ballArrowCount=items.filter(it=>it.kind==="arrow"&&it.style==="ball").length;
+  label=String(ballArrowCount+1);
+ }
+ items.push({id:uid("fditem"),kind:"arrow",style:isBall?"ball":"player",points:fieldDraft.pendingArrowPoints.map(p=>({x:p.x,y:p.y})),label});
+ fieldDraft.pendingArrowPoints=[];
+ fieldDraft.pendingArrowStyle=null;
+ renderFieldEditor();
+}
+function cancelFieldArrow(){
+ fieldDraft.pendingArrowPoints=[];
+ fieldDraft.pendingArrowStyle=null;
  renderFieldEditor();
 }
 function fieldEditorHtml(fullscreen){
@@ -3272,13 +3427,18 @@ function fieldEditorHtml(fullscreen){
   // with a `title` tooltip on hover for reference.
   let stepPills=fieldDraft.steps.length>1?fieldDraft.steps.map((st,i)=>`<button type="button" class="btn fdFsStepPill ${i===fieldDraft.activeStep?"primary":"secondary"}" title="${esc(st.label||("Step "+(i+1)))}" onclick="switchFieldStep(${i})">${i+1}</button>`).join(""):"";
   let addStepBtn=fieldDraft.steps.length<3?`<button type="button" class="btn secondary" title="Add Diagram Step" onclick="addFieldStep()">${icon("plus",16)}</button>`:"";
+  let duplicateStepBtn=fieldDraft.steps.length<3?`<button type="button" class="btn secondary" title="Duplicate Step" onclick="duplicateFieldStep()">${icon("copy",16)}</button>`:"";
   let removeStepBtn=fieldDraft.steps.length>1?`<button type="button" class="btn danger" title="Remove This Step" onclick="removeFieldStep(${fieldDraft.activeStep})">${icon("trash",16)}</button>`:"";
   let shapeBtns=`<button type="button" class="btn ${shape!=="half"?"primary":"secondary"}" title="Full Ground" onclick="updateFieldStepShape('full')">${fieldToolIconSvg("shapeFull")}</button><button type="button" class="btn ${shape==="half"?"primary":"secondary"}" title="Half Ground" onclick="updateFieldStepShape('half')">${fieldToolIconSvg("shapeHalf")}</button>`;
   let toolBtns=FIELD_TOOLS.map(t=>`<button type="button" class="btn ${fieldDraft.tool===t.id?"primary":"secondary"}" title="${esc(t.label)}" onclick="setFieldTool('${t.id}')">${fieldToolIconSvg(t.id)}</button>`).join("");
+  // Shown only while an arrow is mid-draw (at least one point placed) — Finish
+  // commits it (needs 2+ points), Cancel discards the in-progress path.
+  let finishArrowBtn=fieldDraft.pendingArrowPoints.length>=2?`<button type="button" class="btn primary" title="Finish Arrow" onclick="finishFieldArrow()">${icon("check",16)}</button>`:"";
+  let cancelArrowBtn=fieldDraft.pendingArrowPoints.length?`<button type="button" class="btn danger" title="Cancel Arrow" onclick="cancelFieldArrow()" style="font-size:14px;font-weight:700">✕</button>`:"";
   let exitBtn=`<button type="button" class="btn secondary" title="Exit Fullscreen" onclick="closeFieldFullscreen()" style="font-size:16px;font-weight:700">✕</button>`;
   let undoBtn=`<button type="button" class="btn secondary" title="Undo" onclick="undoFieldLast()">${icon("undo",16)}</button>`;
   let clearBtn=`<button type="button" class="btn danger" title="Clear Drawing" onclick="clearFieldStep()">${icon("trash",16)}</button>`;
-  let toolbar=`<div class="fdFsToolbar">${exitBtn}${stepPills}${addStepBtn}${removeStepBtn}${shapeBtns}${toolBtns}${undoBtn}${clearBtn}</div>`;
+  let toolbar=`<div class="fdFsToolbar">${exitBtn}${stepPills}${addStepBtn}${duplicateStepBtn}${removeStepBtn}${shapeBtns}${toolBtns}${finishArrowBtn}${cancelArrowBtn}${undoBtn}${clearBtn}</div>`;
   // The wrapper's exact pixel width/height is computed and set by
   // sizeFullscreenCanvas() right after this markup is inserted — CSS
   // aspect-ratio inside a flex layout turns out to distort under flex-shrink
@@ -3294,14 +3454,15 @@ function fieldEditorHtml(fullscreen){
  let tabsHtml=fieldDraft.steps.map((st,i)=>`<button type="button" class="btn ${i===fieldDraft.activeStep?"primary":"secondary"}" style="padding:6px 10px;font-size:var(--fs-2)" onclick="switchFieldStep(${i})">${esc(st.label||("Step "+(i+1)))}</button>`).join("");
  let toolsHtml=FIELD_TOOLS.map(t=>`<button type="button" class="btn ${fieldDraft.tool===t.id?"primary":"secondary"}" style="padding:6px 9px;font-size:var(--fs-1);white-space:nowrap" onclick="setFieldTool('${t.id}')">${t.label}</button>`).join("");
  let controlsHtml=`
-  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${tabsHtml}${fieldDraft.steps.length<3?`<button type="button" class="btn secondary" style="padding:6px 10px;font-size:var(--fs-2)" onclick="addFieldStep()">+ Step</button>`:""}${fieldDraft.steps.length>1?`<button type="button" class="btn danger" style="padding:6px 10px;font-size:var(--fs-2)" onclick="removeFieldStep(${fieldDraft.activeStep})">Remove Step</button>`:""}</div>
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px">${tabsHtml}${fieldDraft.steps.length<3?`<button type="button" class="btn secondary" style="padding:6px 10px;font-size:var(--fs-2)" onclick="addFieldStep()">+ Step</button>`:""}${fieldDraft.steps.length<3?`<button type="button" class="btn secondary" style="padding:6px 10px;font-size:var(--fs-2)" onclick="duplicateFieldStep()">Duplicate Step</button>`:""}${fieldDraft.steps.length>1?`<button type="button" class="btn danger" style="padding:6px 10px;font-size:var(--fs-2)" onclick="removeFieldStep(${fieldDraft.activeStep})">Remove Step</button>`:""}</div>
   <input type="text" placeholder="Step label (optional) — e.g. Setup" value="${esc(step.label||"")}" style="margin-bottom:8px;font-size:var(--fs-3)" onchange="updateFieldStepLabel(this.value)">
   <div style="display:flex;gap:6px;margin-bottom:8px">
    <button type="button" class="btn ${shape!=="half"?"primary":"secondary"}" style="padding:6px 12px;font-size:var(--fs-2)" onclick="updateFieldStepShape('full')">Full Ground</button>
    <button type="button" class="btn ${shape==="half"?"primary":"secondary"}" style="padding:6px 12px;font-size:var(--fs-2)" onclick="updateFieldStepShape('half')">Half Ground</button>
   </div>
   <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">${toolsHtml}</div>
-  <div class="muted" style="font-size:var(--fs-1);margin-bottom:6px">Tap the ground to place a marker, or to draw an arrow (tap start, then end). Tap an existing marker or arrow to remove it. Full Ground and Half Ground each keep their own separate drawing for this step.</div>`;
+  ${fieldDraft.pendingArrowPoints.length?`<div style="display:flex;gap:6px;margin-bottom:8px">${fieldDraft.pendingArrowPoints.length>=2?`<button type="button" class="btn primary" style="padding:6px 12px;font-size:var(--fs-2)" onclick="finishFieldArrow()">✓ Finish Arrow</button>`:""}<button type="button" class="btn danger" style="padding:6px 12px;font-size:var(--fs-2)" onclick="cancelFieldArrow()">Cancel Arrow</button></div>`:""}
+  <div class="muted" style="font-size:var(--fs-1);margin-bottom:6px">Tap the ground to place a marker, or drag an existing one to reposition it. For an arrow, tap a start point, then tap again for each bend, then Finish Arrow (or tap Cancel Arrow to discard it). Tap an existing marker or arrow to remove it. Full Ground and Half Ground each keep their own separate drawing for this step.</div>`;
  let bottomBar=`<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
    <button type="button" class="btn secondary" style="padding:6px 10px;font-size:var(--fs-2)" onclick="undoFieldLast()">Undo</button>
    <button type="button" class="btn danger" style="padding:6px 10px;font-size:var(--fs-2)" onclick="clearFieldStep()">Clear Step</button>
@@ -3381,23 +3542,39 @@ function maybeShowLandscapeHint(){
 }
 function setFieldTool(t){
  fieldDraft.tool=fieldDraft.tool===t?null:t;
- fieldDraft.pendingArrowStart=null;
+ fieldDraft.pendingArrowPoints=[];fieldDraft.pendingArrowStyle=null;
  renderFieldEditor();
 }
 function switchFieldStep(i){
- fieldDraft.activeStep=i;fieldDraft.tool=null;fieldDraft.pendingArrowStart=null;
+ fieldDraft.activeStep=i;fieldDraft.tool=null;fieldDraft.pendingArrowPoints=[];fieldDraft.pendingArrowStyle=null;
  renderFieldEditor();
 }
 function addFieldStep(){
  if(fieldDraft.steps.length>=3)return;
  fieldDraft.steps.push({label:"",activeShape:"full",full:{items:[]},half:{items:[]}});
- fieldDraft.activeStep=fieldDraft.steps.length-1;fieldDraft.tool=null;fieldDraft.pendingArrowStart=null;
+ fieldDraft.activeStep=fieldDraft.steps.length-1;fieldDraft.tool=null;fieldDraft.pendingArrowPoints=[];fieldDraft.pendingArrowStyle=null;
+ renderFieldEditor();
+}
+// Clones the active step's markers/arrows (both Full and Half Ground drawings,
+// whichever is being viewed or not) into a new step right after it, so a
+// multi-phase drill that's mostly a repeat of the last setup doesn't mean
+// re-placing every marker by hand — just adjust what's changed.
+function duplicateFieldStep(){
+ if(fieldDraft.steps.length>=3)return;
+ let cur=fieldDraft.steps[fieldDraft.activeStep];
+ if(!cur)return;
+ let copy=JSON.parse(JSON.stringify(cur));
+ copy.full.items=(copy.full.items||[]).map(it=>({...it,id:uid("fditem")}));
+ copy.half.items=(copy.half.items||[]).map(it=>({...it,id:uid("fditem")}));
+ fieldDraft.steps.splice(fieldDraft.activeStep+1,0,copy);
+ fieldDraft.activeStep=fieldDraft.activeStep+1;
+ fieldDraft.tool=null;fieldDraft.pendingArrowPoints=[];fieldDraft.pendingArrowStyle=null;
  renderFieldEditor();
 }
 function removeFieldStep(i){
  fieldDraft.steps.splice(i,1);
  fieldDraft.activeStep=Math.max(0,Math.min(fieldDraft.activeStep,fieldDraft.steps.length-1));
- fieldDraft.tool=null;fieldDraft.pendingArrowStart=null;
+ fieldDraft.tool=null;fieldDraft.pendingArrowPoints=[];fieldDraft.pendingArrowStyle=null;
  renderFieldEditor();
 }
 function updateFieldStepLabel(value){
@@ -3410,10 +3587,19 @@ function updateFieldStepShape(shape){
  // Just switches which of the step's two independent drawings (full/half)
  // is being viewed and edited — never moves or copies items between them.
  step.activeShape=shape==="half"?"half":"full";
- fieldDraft.tool=null;fieldDraft.pendingArrowStart=null;
+ fieldDraft.tool=null;fieldDraft.pendingArrowPoints=[];fieldDraft.pendingArrowStyle=null;
  renderFieldEditor();
 }
 function undoFieldLast(){
+ // Mid-draw (an arrow with at least one point placed but not yet finished)
+ // Undo removes just the last point, so a bend can be corrected without
+ // restarting the whole arrow.
+ if(fieldDraft.pendingArrowPoints.length){
+  fieldDraft.pendingArrowPoints.pop();
+  if(!fieldDraft.pendingArrowPoints.length)fieldDraft.pendingArrowStyle=null;
+  renderFieldEditor();
+  return;
+ }
  let step=fieldDraft.steps[fieldDraft.activeStep];
  if(!step)return;
  let items=curFieldItems(step);
@@ -3465,7 +3651,7 @@ function drillFormHtml(d,mode){d=d||{};return `<div class="sheetHead"><h2>${mode
 function openDrillForm(existing,mode){
  drillDraftDiagram=existing&&existing.diagram?existing.diagram:null;
  editingDrillId=mode==="edit"?existing.id:null;
- fieldDraft={steps:existing&&existing.fieldSteps?JSON.parse(JSON.stringify(existing.fieldSteps)).map(normalizeFieldStep):[],activeStep:0,tool:null,pendingArrowStart:null};
+ fieldDraft={steps:existing&&existing.fieldSteps?JSON.parse(JSON.stringify(existing.fieldSteps)).map(normalizeFieldStep):[],activeStep:0,tool:null,pendingArrowPoints:[],pendingArrowStyle:null,dragState:null};
  modal(drillFormHtml(existing,mode));
  renderDrillDiagramPreview();
  renderFieldEditor();
@@ -3480,7 +3666,7 @@ function saveDrill(e){
  d.fieldSteps=JSON.parse(JSON.stringify(fieldDraft.steps));
  if(editingDrillId){let idx=db.drills.findIndex(x=>x.id===editingDrillId);if(idx>-1){d.id=editingDrillId;db.drills[idx]=d}}
  else{d.id=uid("drill");db.drills.push(d)}
- editingDrillId=null;drillDraftDiagram=null;fieldDraft={steps:[],activeStep:0,tool:null,pendingArrowStart:null};closeM();save();
+ editingDrillId=null;drillDraftDiagram=null;fieldDraft={steps:[],activeStep:0,tool:null,pendingArrowPoints:[],pendingArrowStyle:null,dragState:null};closeM();save();
 }
 function delDrill(id){if(confirm("Delete this drill?")){db.drills=db.drills.filter(x=>x.id!==id);save()}}
 function fieldStepsPreviewHtml(fieldSteps,size){
