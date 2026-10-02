@@ -1904,21 +1904,21 @@ function reflectionFormHtml(x,mode){
  <div id="formSec-wentWell" style="display:none;margin-top:10px">
  <div class="chipGrid2" id="reflWentWellSession" style="${type==="match"?"display:none":""}">${COACH_WENT_WELL_SESSION.map(r=>`<label><input type="checkbox" name="wentWellThemes" value="${esc(r)}" ${(x.wentWellThemes||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('wentWell','selected')"> ${esc(r)}</label>`).join("")}</div>
  <div class="chipGrid2" id="reflWentWellMatch" style="${type==="match"?"":"display:none"}">${COACH_WENT_WELL_MATCH.map(r=>`<label><input type="checkbox" name="wentWellThemes" value="${esc(r)}" ${(x.wentWellThemes||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('wentWell','selected')"> ${esc(r)}</label>`).join("")}</div>
- <input type="text" name="well" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.well||"")}"></div></div>
+ <textarea name="well" placeholder="Anything else? (optional)" style="margin-top:8px">${esc(x.well||"")}</textarea></div></div>
  <div class="full">${formSectionHead("betterReasons","What could be better?",false)}
  <div id="formSec-betterReasons" style="display:none;margin-top:10px">
  <div class="chipGrid2" id="reflSessionReasons" style="${type==="match"?"display:none":""}">${BETTER_REASONS.map(r=>`<label><input type="checkbox" name="betterReasons" value="${esc(r)}" ${(x.betterReasons||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('betterReasons','selected')"> ${esc(r)}</label>`).join("")}</div>
  <div class="chipGrid2" id="reflMatchReasons" style="${type==="match"?"":"display:none"}">${MATCH_BETTER_REASONS.map(r=>`<label><input type="checkbox" name="betterReasons" value="${esc(r)}" ${(x.betterReasons||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('betterReasons','selected')"> ${esc(r)}</label>`).join("")}</div>
- <input type="text" name="betterDetail" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.betterDetail!==undefined?x.betterDetail:(x.better||""))}"></div></div>
+ <textarea name="betterDetail" placeholder="Anything else? (optional)" style="margin-top:8px">${esc(x.betterDetail!==undefined?x.betterDetail:(x.better||""))}</textarea></div></div>
  <div class="full">${formSectionHead("takeaway","Key takeaway",false)}
  <div id="formSec-takeaway" style="display:none;margin-top:10px">
  <div class="chipGrid2" id="reflTakeawaySession" style="${type==="match"?"display:none":""}">${COACH_TAKEAWAY_SESSION.map(r=>`<label><input type="checkbox" name="takeawayThemes" value="${esc(r)}" ${(x.takeawayThemes||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('takeaway','selected')"> ${esc(r)}</label>`).join("")}</div>
  <div class="chipGrid2" id="reflTakeawayMatch" style="${type==="match"?"":"display:none"}">${COACH_TAKEAWAY_MATCH.map(r=>`<label><input type="checkbox" name="takeawayThemes" value="${esc(r)}" ${(x.takeawayThemes||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('takeaway','selected')"> ${esc(r)}</label>`).join("")}</div>
- <input type="text" name="learnings" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.learnings!==undefined?x.learnings:[x.players,x.change].filter(Boolean).join(" "))}"></div></div>
+ <textarea name="learnings" placeholder="Anything else? (optional)" style="margin-top:8px">${esc(x.learnings!==undefined?x.learnings:[x.players,x.change].filter(Boolean).join(" "))}</textarea></div></div>
  <div class="full">${formSectionHead("nextFocus","Next focus",false)}
  <div id="formSec-nextFocus" style="display:none;margin-top:10px">
  <div class="chipGrid2">${COACH_NEXT_FOCUS.map(r=>`<label><input type="checkbox" name="nextFocusThemes" value="${esc(r)}" ${(x.nextFocusThemes||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('nextFocus','selected')"> ${esc(r)}</label>`).join("")}</div>
- <input type="text" name="next" placeholder="Anything else? (optional)" style="margin-top:8px" value="${esc(x.next||"")}"></div></div>
+ <textarea name="next" placeholder="Anything else? (optional)" style="margin-top:8px">${esc(x.next||"")}</textarea></div></div>
  <button class="btn primary">Save Reflection</button>
  </form>`;
 }
