@@ -195,6 +195,15 @@ p{orphans:3;widows:3}
 .calLegend .calDot{margin-left:10px}
 .calLegend .calDot:first-child{margin-left:0}
 @media(max-width:520px){.calCell{min-height:46px;padding:4px}.calDayNum{font-size:var(--fs-2)}}
+/* Mobile Safari (and some Android browsers) auto-zoom the whole page when a
+   focused input/textarea/select has a font-size under 16px. A handful of
+   compact fields — the Bulk Assess / Match Entry table, and the Net Plan's
+   Set focus / Net focus / Step label boxes — intentionally use a smaller
+   font to fit tight layouts, which crosses that threshold. This restores
+   16px for every text-entry control on narrower screens only (desktop never
+   auto-zooms, so its original compact sizing is untouched); !important is
+   needed because those fields set their smaller size inline.*/
+@media(max-width:850px){input,textarea,select{font-size:16px!important}}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
