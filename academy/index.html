@@ -139,6 +139,15 @@
   .checkbox-list { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 12px; }
   .checkbox-list label { display: flex; align-items: center; gap: 6px; font-size: 13px; background: var(--surface); border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 6px 10px; }
   .checkbox-list label.dim { opacity: 0.55; }
+  /* Theme chips (reflections): a collapsed-by-default dropdown — click the
+     head to reveal the checkbox grid, mirroring the individual coach app's
+     collapsible form sections. */
+  .theme-section-head { display: flex; justify-content: space-between; align-items: center; background: var(--surface); border: 1px solid var(--surface-border); border-radius: var(--radius-sm); padding: 8px 12px; cursor: pointer; font-size: 13px; font-weight: 600; margin: 6px 0; }
+  .theme-section-head:hover { border-color: var(--green); }
+  .theme-section-chev { transition: transform .15s; flex-shrink: 0; }
+  .theme-section-head.open .theme-section-chev { transform: rotate(90deg); }
+  .theme-section-body { display: none; }
+  .theme-section-body.open { display: block; }
   /* Certificate Generator — a self-contained, print-ready award design (its own
      gold/serif look, independent of the app's dark theme) ported from the
      individual app. Rendered inside a sheet for preview, then copied into
@@ -608,7 +617,7 @@
           <input type="text" id="drill-equipment" placeholder="Equipment (optional)">
         </div>
         <input type="text" id="drill-diagram" placeholder="Diagram / video URL (optional)">
-        <label class="fd-section-label">Field Diagram <span class="muted" style="font-weight:400;">(optional — build one by tapping the ground below)</span></label>
+        <label class="fd-section-label">Field Diagram <span class="muted" style="font-weight:400; font-size:12px;">(optional — build one by tapping the ground below)</span></label>
         <div id="fieldEditorBody"></div>
         <textarea id="drill-points" placeholder="Coaching points (optional)"></textarea>
         <button class="advanced-toggle" data-toggle="drills-advanced">+ Progressions &amp; regressions</button>
@@ -831,7 +840,7 @@
         <select id="facility-branch" style="display:none;"><option value="">All branches</option></select>
         <textarea id="facility-availability" placeholder="Availability notes (optional)"></textarea>
         <textarea id="facility-maintenance" placeholder="Maintenance notes (optional)"></textarea>
-        <label class="field-label">Operating hours <span class="muted" style="font-weight:400;">(needed for player/parent facility booking — leave blank for no fixed hours)</span></label>
+        <label class="field-label">Operating hours <span class="muted" style="font-weight:400; font-size:12px;">(needed for player/parent facility booking — leave blank for no fixed hours)</span></label>
         <div class="form-row">
           <input type="time" id="facility-open-time">
           <input type="time" id="facility-close-time">
@@ -1044,7 +1053,7 @@
           <input type="month" id="report-month" style="max-width:200px;">
         </div>
         <div id="report-branch-row" style="display:none; margin-top:10px;">
-          <label class="field-label">Branch <span class="muted" style="font-weight:400;">(narrows the team list below; for reports without a required single team, also rolls up across the whole branch)</span></label>
+          <label class="field-label">Branch <span class="muted" style="font-weight:400; font-size:12px;">(narrows the team list below; for reports without a required single team, also rolls up across the whole branch)</span></label>
           <select id="report-branch-filter"><option value="">All branches</option></select>
         </div>
         <div id="report-team-row" style="display:none; margin-top:10px;">
@@ -1204,7 +1213,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-10-03-20:28';
+const APP_BUILD_VERSION = '2026-10-03-21:35';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -1975,55 +1984,6 @@ function listRow(mainHtml, tagText, onEdit, onDelete, onDuplicate) {
 
 function confirmDelete(label) { return confirm(`Delete ${label}? This can't be undone.`); }
 
-// ---------- Coach text presets: reusable "insert saved text instead of typing" picker ----------
-// Attached per-field via a field_key (e.g. "session_objectives"). Private presets are
-// visible only to their creator; shared ones are visible to every coach in the org —
-// enforced by RLS, not just hidden client-side.
-let presetsCache = null; // { field_key: [{id, label, content, visibility, created_by}, ...] }
-async function loadPresetsCache() {
-  const { data, error } = await supabase.from('text_presets').select('id, field_key, label, content, visibility, created_by').eq('org_id', currentOrgId);
-  if (error) { reportError(error, 'Presets'); presetsCache = {}; return; }
-  presetsCache = {};
-  for (const p of (data || [])) (presetsCache[p.field_key] ||= []).push(p);
-}
-function presetOptionsHtml(fieldKey) {
-  const list = (presetsCache && presetsCache[fieldKey]) || [];
-  return '<option value="">— Insert saved preset —</option>' + list.map(p => `<option value="${esc(p.id)}">${esc(p.label)}${p.visibility === 'shared' ? ' (shared)' : ''}</option>`).join('');
-}
-function presetRowHtml(fieldKey, textareaId) {
-  return `<div class="preset-row full" data-field-key="${esc(fieldKey)}" data-target="${esc(textareaId)}" style="display:flex; gap:8px; align-items:center; margin:4px 0;">
-    <select class="preset-select" style="flex:1; min-width:0; font-size:12px;">${presetOptionsHtml(fieldKey)}</select>
-    <button type="button" class="link-btn save-preset-btn" style="white-space:nowrap;">+ Save preset</button>
-  </div>`;
-}
-function attachPresetHandlers(container) {
-  container.querySelectorAll('.preset-row').forEach(row => {
-    const fieldKey = row.dataset.fieldKey;
-    const textarea = document.getElementById(row.dataset.target);
-    const select = row.querySelector('.preset-select');
-    select.addEventListener('change', () => {
-      if (!select.value || !textarea) return;
-      const preset = (presetsCache[fieldKey] || []).find(p => p.id === select.value);
-      if (preset) textarea.value = preset.content;
-      select.value = '';
-    });
-    row.querySelector('.save-preset-btn').addEventListener('click', async () => {
-      if (!textarea || !textarea.value.trim()) { showToast('Nothing to save — write something first.', 'error'); return; }
-      const label = prompt('Name this preset (e.g. "U14 pre-season warmup"):');
-      if (!label || !label.trim()) return;
-      const shared = confirm('Share this with every coach at the academy?\n\nOK = shared with everyone\nCancel = private, just for you');
-      const { error } = await supabase.from('text_presets').insert({
-        org_id: currentOrgId, created_by: session.user.id, field_key: fieldKey,
-        label: label.trim(), content: textarea.value, visibility: shared ? 'shared' : 'private',
-      });
-      if (error) { showToast(error.message, 'error'); return; }
-      showToast('Preset saved.', 'ok');
-      await loadPresetsCache();
-      select.innerHTML = presetOptionsHtml(fieldKey);
-    });
-  });
-}
-
 // ---------- Checkbox-based multi-select: replaces native <select multiple>, which ----------
 // ---------- needs an undiscoverable Ctrl/Cmd-click on desktop but allows plain    ----------
 // ---------- multi-tap on mobile — this behaves identically on both.              ----------
@@ -2090,7 +2050,7 @@ function updateAttendanceCollapsibleCount(headerBtn, body) {
   countEl.textContent = `(${n} marked present)`;
 }
 
-// ---------- Session templates: whole-form reuse, distinct from per-field text presets ----------
+// ---------- Session templates: whole-form reuse ----------
 let sessionTemplatesCache = [];
 async function loadSessionTemplatesCache() {
   const { data, error } = await supabase.from('session_templates').select('*').eq('org_id', currentOrgId).order('name');
@@ -2784,7 +2744,7 @@ function announcementFormHtml() {
     <div class="formgrid">
       <label class="full">Audience<select id="sheet-announce-team"><option value="">Whole academy</option>${cache.teams.map(t => `<option value="${t.id}">${esc(t.name)} only</option>`).join('')}</select></label>
       <label class="full">Title<input id="sheet-announce-title" placeholder="e.g. U14 training moved to 6 PM"></label>
-      <label class="full">Details <span class="muted" style="font-weight:400;">(optional)</span><textarea id="sheet-announce-body"></textarea></label>
+      <label class="full">Details <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span><textarea id="sheet-announce-body"></textarea></label>
     </div>
     <button class="btn primary" id="sheet-save-announce-btn" style="margin-top:14px; width:auto;">Post</button>`;
 }
@@ -3422,7 +3382,7 @@ function teamFormHtml(t) {
     <div class="formgrid">
       <label class="full">Team name<input id="sheet-team-name" value="${esc(t?.name || '')}"></label>
       <label>Category<input id="sheet-team-category" value="${esc(t?.category || '')}" placeholder="e.g. U14"></label>
-      ${cache.branches.length ? `<label>Branch <span class="muted" style="font-weight:400;">(optional)</span><select id="sheet-team-branch"><option value="">No branch</option>${cache.branches.map(b => `<option value="${b.id}" ${t?.branch_id === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>` : ''}
+      ${cache.branches.length ? `<label>Branch <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span><select id="sheet-team-branch"><option value="">No branch</option>${cache.branches.map(b => `<option value="${b.id}" ${t?.branch_id === b.id ? 'selected' : ''}>${esc(b.name)}</option>`).join('')}</select></label>` : ''}
       ${t ? `<label>Captain<select id="sheet-team-captain">${playerOpts(t?.captain_id)}</select></label>
       <label>Vice-captain<select id="sheet-team-vice-captain">${playerOpts(t?.vice_captain_id)}</select></label>` : `<div class="note full">Save the team first, then edit it to set a captain and vice-captain from its players.</div>`}
       <label class="full">Notes<textarea id="sheet-team-notes">${esc(t?.notes || '')}</textarea></label>
@@ -3823,9 +3783,9 @@ async function loadPlayerLinkingSection(p) {
   const names = await profilesByIds(members.map(m => m.user_id));
   const guardianIds = new Set((guardiansRes.data || []).map(g => g.user_id));
 
-  let html = '<label class="field-label" style="margin-top:14px;">Linked player account <span class="muted" style="font-weight:400;">(lets this player sign in and see their own schedule &amp; development)</span></label>';
+  let html = '<label class="field-label" style="margin-top:14px;">Linked player account <span class="muted" style="font-weight:400; font-size:12px;">(lets this player sign in and see their own schedule &amp; development)</span></label>';
   html += `<select id="sheet-player-linked-user"><option value="">None</option>${playerCandidates.map(m => `<option value="${m.user_id}" ${p.linked_user_id === m.user_id ? 'selected' : ''}>${esc(names[m.user_id] || m.invited_email || m.user_id)}</option>`).join('')}</select>`;
-  html += '<label class="field-label">Guardians <span class="muted" style="font-weight:400;">(can see this player\'s schedule &amp; development, not private coach notes)</span></label>';
+  html += '<label class="field-label">Guardians <span class="muted" style="font-weight:400; font-size:12px;">(can see this player\'s schedule &amp; development, not private coach notes)</span></label>';
   html += '<div id="sheet-player-guardians-list">' + ((guardiansRes.data || []).length ? guardiansRes.data.map(g => `<span class="tagPill">${esc(names[g.user_id] || g.user_id)} <a data-remove-guardian="${g.id}" style="cursor:pointer;">×</a></span>`).join('') : '<span class="muted" style="font-size:12.5px;">None yet.</span>') + '</div>';
   const availableParents = parentCandidates.filter(m => !guardianIds.has(m.user_id));
   if (availableParents.length) {
@@ -3927,7 +3887,7 @@ Vihaan Nair"></textarea>
       </label>
     </div>
     <div class="sectionHeading">— OR —</div>
-    <label class="field-label">Upload a CSV or Excel file <span class="muted" style="font-weight:400;">(needs a "Name" column — Role, Age, Date of birth are picked up automatically if present)</span></label>
+    <label class="field-label">Upload a CSV or Excel file <span class="muted" style="font-weight:400; font-size:12px;">(needs a "Name" column — Role, Age, Date of birth are picked up automatically if present)</span></label>
     <input type="file" id="bulk-players-file" accept=".csv,.xlsx,.xls" style="width:auto;">
     <div class="status-msg" id="bulk-players-file-status"></div>
     <div id="bulk-players-preview"></div>
@@ -5096,13 +5056,13 @@ function netCardHtml(setIdx, netIdx, net, teamPlayers) {
   return `<div class="net-card" data-set="${setIdx}" data-net="${netIdx}" style="margin-top:14px; padding-top:14px; border-top:1px solid var(--surface-border);">
     <div style="display:flex; gap:8px; align-items:flex-end;">
       <label style="flex:1; min-width:0;">Net ${netIdx + 1} — Batters<input type="number" min="0" class="net-batters-count" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.battersCount)}"></label>
-      <label style="flex:1; min-width:0;">Bowlers <span class="muted" style="font-weight:400;">(e.g. 4-5)</span><input type="number" min="0" class="net-bowlers-count" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.bowlersCount)}"></label>
+      <label style="flex:1; min-width:0;">Bowlers <span class="muted" style="font-weight:400; font-size:12px;">(e.g. 4-5)</span><input type="number" min="0" class="net-bowlers-count" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.bowlersCount)}"></label>
       <label style="flex:1; min-width:0;">Duration (mins)<input type="number" min="0" class="net-duration" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.durationMins)}"></label>
       <button type="button" class="net-remove-btn" data-set="${setIdx}" data-net="${netIdx}" style="background:none; border:none; color:var(--danger); cursor:pointer; font-size:16px; padding:0 4px; flex-shrink:0; align-self:center;">✕</button>
     </div>
     ${netPlayerCapPickerHtml(setIdx, netIdx, 'batter', 'Batters', net.battersCount, teamPlayers, net.batterIds)}
     ${netPlayerCapPickerHtml(setIdx, netIdx, 'bowler', 'Bowlers', net.bowlersCount, teamPlayers, net.bowlerIds)}
-    <label class="full" style="margin-top:12px;">Net focus <span class="muted" style="font-weight:400;">(optional)</span><input class="net-focus" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.focus || '')}"></label>
+    <label class="full" style="margin-top:12px;">Net focus <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span><input class="net-focus" data-set="${setIdx}" data-net="${netIdx}" value="${esc(net.focus || '')}"></label>
   </div>`;
 }
 function netSetCardHtml(setIdx, set, teamPlayers) {
@@ -5111,7 +5071,7 @@ function netSetCardHtml(setIdx, set, teamPlayers) {
       <strong>Set ${setIdx + 1}</strong>
       <button type="button" class="btn ghost set-remove-btn" data-set="${setIdx}" style="width:auto; padding:2px 10px; font-size:12px; color:var(--danger);">Remove Set</button>
     </div>
-    <label class="full" style="margin-top:6px;">Set focus <span class="muted" style="font-weight:400;">(optional)</span><input class="net-set-focus" data-set="${setIdx}" value="${esc(set.focus || '')}"></label>
+    <label class="full" style="margin-top:6px;">Set focus <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span><input class="net-set-focus" data-set="${setIdx}" value="${esc(set.focus || '')}"></label>
     <div class="net-cards-list">${set.nets.map((net, netIdx) => netCardHtml(setIdx, netIdx, net, teamPlayers)).join('')}</div>
     <div style="border-top:1px solid var(--surface-border); margin-top:14px; padding-top:10px;">
       <button type="button" class="btn ghost add-net-btn" data-set="${setIdx}" style="width:auto; padding:4px 10px; font-size:12px;">+ Add Net</button>
@@ -5279,13 +5239,13 @@ function sessionFormHtml(s) {
     <div class="formgrid">
       <label>Date<input type="date" id="sheet-session-date" value="${esc(s?.date || new Date().toISOString().slice(0, 10))}"></label>
       <label>Time<input type="time" id="sheet-session-time" value="${esc((s?.time || '').slice(0, 5))}"></label>
-      <label class="full">Session title <span class="muted" style="font-weight:400;">(optional)</span><input id="sheet-session-title" value="${esc(s?.title || '')}" placeholder="Leave blank to show date + team instead"></label>
+      <label class="full">Session title <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span><input id="sheet-session-title" value="${esc(s?.title || '')}" placeholder="Leave blank to show date + team instead"></label>
       <label>Session type<select id="sheet-session-type"><option value="team" ${(!s || s.session_type === 'team') ? 'selected' : ''}>Team / Squad session</option><option value="player" ${s?.session_type === 'player' ? 'selected' : ''}>Individual Player (1-on-1)</option><option value="custom" ${s?.session_type === 'custom' ? 'selected' : ''}>Custom Group</option></select></label>
       <label>Team<select id="sheet-session-team">${cache.teams.map(t => `<option value="${t.id}" ${s?.team_id === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
       <label>Duration (minutes)<input type="number" id="sheet-session-duration" value="${s?.duration ?? 90}"></label>
       <label>Primary focus<select id="sheet-session-focus">${SESSION_FOCUS_OPTIONS.map(f => `<option ${s?.focus === f ? 'selected' : ''}>${f}</option>`).join('')}</select></label>
-      <label class="full">Venue <span class="muted" style="font-weight:400;">(free text — for an opponent's ground, etc.)</span><input id="sheet-session-venue" value="${esc(s?.venue || '')}"></label>
-      <label class="full">Facility used <span class="muted" style="font-weight:400;">(optional — links this session to a tracked net/ground for usage reporting)</span><select id="sheet-session-facility"><option value="">— Not a tracked facility —</option>${cache.facilities.map(f => `<option value="${f.id}" ${s?.facility_id === f.id ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select></label>
+      <label class="full">Venue <span class="muted" style="font-weight:400; font-size:12px;">(free text — for an opponent's ground, etc.)</span><input id="sheet-session-venue" value="${esc(s?.venue || '')}"></label>
+      <label class="full">Facility used <span class="muted" style="font-weight:400; font-size:12px;">(optional — links this session to a tracked net/ground for usage reporting)</span><select id="sheet-session-facility"><option value="">— Not a tracked facility —</option>${cache.facilities.map(f => `<option value="${f.id}" ${s?.facility_id === f.id ? 'selected' : ''}>${esc(f.name)}</option>`).join('')}</select></label>
     </div>
     <div class="collapsible-multiselect" id="sheet-session-attendance-wrap">
       <button type="button" class="collapsible-header" data-collapse-target="sheet-session-attendance-body">Attendance <span class="collapsible-count">(${attendedCount(s?.attendance)} marked present)</span> <span class="collapsible-chevron">▾</span></button>
@@ -5295,17 +5255,17 @@ function sessionFormHtml(s) {
       </div>
     </div>
     ${checkboxMultiSelectHtml('sheet-session-objcategory', OBJECTIVE_CATEGORIES.map(c => ({ id: c, label: c })), s?.objective_category, 'Objective Categories')}
-    <label class="full" style="display:block;">Objectives</label>${presetRowHtml('session_objectives', 'sheet-session-objectives')}<textarea id="sheet-session-objectives">${esc(s?.objectives || '')}</textarea>
-    <label class="full" style="display:block;">Warm-up / Preparation</label>${presetRowHtml('session_warmup', 'sheet-session-warmup')}<textarea id="sheet-session-warmup">${esc(s?.warmup || '')}</textarea>
-    <label class="full" style="display:block;">Main Skill Block</label>${presetRowHtml('session_main', 'sheet-session-main')}<textarea id="sheet-session-main">${esc(s?.main || '')}</textarea>
+    <label class="full" style="display:block;">Objectives</label><textarea id="sheet-session-objectives">${esc(s?.objectives || '')}</textarea>
+    <label class="full" style="display:block;">Warm-up / Preparation</label><textarea id="sheet-session-warmup">${esc(s?.warmup || '')}</textarea>
+    <label class="full" style="display:block;">Main Skill Block</label><textarea id="sheet-session-main">${esc(s?.main || '')}</textarea>
     ${drillLinkerWrapHtml('main')}
     ${netPlanWrapHtml(teamPlayers)}
-    <label class="full" style="display:block; margin-top:10px;">Competitive / Game Block</label>${presetRowHtml('session_game', 'sheet-session-game')}<textarea id="sheet-session-game">${esc(s?.game || '')}</textarea>
+    <label class="full" style="display:block; margin-top:10px;">Competitive / Game Block</label><textarea id="sheet-session-game">${esc(s?.game || '')}</textarea>
     ${drillLinkerWrapHtml('game')}
     ${checkboxMultiSelectHtml('sheet-session-equipment', cache.equipment.map(eq => ({ id: eq.id, label: eq.name })), s?.equipment_ids, 'Equipment used (optional)')}
-    <label class="full" style="display:block; margin-top:10px;">Coaching Cues</label>${presetRowHtml('session_cues', 'sheet-session-cues')}<textarea id="sheet-session-cues">${esc(s?.cues || '')}</textarea>
-    <label class="full" style="display:block;">Success Criteria</label>${presetRowHtml('session_success', 'sheet-session-success')}<textarea id="sheet-session-success">${esc(s?.success || '')}</textarea>
-    <label class="full" style="display:block; margin-top:10px;">Attachment <span class="muted" style="font-weight:400;">(optional)</span></label>
+    <label class="full" style="display:block; margin-top:10px;">Coaching Cues</label><textarea id="sheet-session-cues">${esc(s?.cues || '')}</textarea>
+    <label class="full" style="display:block;">Success Criteria</label><textarea id="sheet-session-success">${esc(s?.success || '')}</textarea>
+    <label class="full" style="display:block; margin-top:10px;">Attachment <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span></label>
     <p class="muted" style="font-size:12.5px; margin:2px 0 8px;">Upload a Word, Excel, PDF or image version of this session plan (under 2MB) — only if you have one.</p>
     <input type="file" id="sheet-session-attachment-file" accept=".doc,.docx,.xls,.xlsx,.pdf,image/*">
     <div id="sheet-session-attachment-status" class="status-msg"></div>
@@ -5325,10 +5285,8 @@ async function openSessionForm(s) {
   if (!cache.drills.length) { const { data } = await supabase.from('drills').select('*').eq('org_id', currentOrgId).order('name'); cache.drills = data || []; }
   if (!cache.equipment.length) { const { data } = await supabase.from('equipment').select('*').eq('org_id', currentOrgId).order('name'); cache.equipment = data || []; }
   if (!cache.facilities.length) { const { data } = await supabase.from('facilities').select('*').eq('org_id', currentOrgId).order('name'); cache.facilities = data || []; }
-  await loadPresetsCache();
   await loadSessionTemplatesCache();
   openSheet(sessionFormHtml(s));
-  attachPresetHandlers(document);
   document.querySelectorAll('#sheet-session-objcategory .collapsible-header, #sheet-session-equipment .collapsible-header').forEach(wireCollapsibleSection);
   wireAttendanceCollapsible(document.querySelector('#sheet-session-attendance-wrap .collapsible-header'));
   wireNetPlanCollapse(document.querySelector('#sheet-session-netplan-wrap .collapsible-header'));
@@ -5727,7 +5685,7 @@ function matchFormHtml(m) {
       <label>Opposition<input id="sheet-match-opponent" value="${esc(m?.opponent || '')}"></label>
       <label>Venue<input id="sheet-match-venue" value="${esc(m?.venue || '')}"></label>
       <label>Format<input id="sheet-match-format" value="${esc(m?.format || '')}" placeholder="e.g. T20"></label>
-      <label>Tournament <span class="muted" style="font-weight:400;">(optional)</span><select id="sheet-match-tournament"><option value="">None</option>${cache.tournaments.map(t => `<option value="${t.id}" ${m?.tournament_id === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
+      <label>Tournament <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span><select id="sheet-match-tournament"><option value="">None</option>${cache.tournaments.map(t => `<option value="${t.id}" ${m?.tournament_id === t.id ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}</select></label>
       <label class="full">Result<input id="sheet-match-result" value="${esc(m?.result || '')}" placeholder="e.g. Won by 24 runs"></label>
     </div>
 
@@ -5741,9 +5699,9 @@ function matchFormHtml(m) {
     ${sectionHeadHtml('teamreview', 'Team Review', false)}
     <div class="formgrid sectionCollapseBody" id="matchSec-teamreview" style="display:none;">
       <label>Overall team rating /10<input type="number" id="sheet-match-team-rating" min="1" max="10" value="${m?.team_rating ?? ''}"></label>
-      <label>Team batting rating /10 <span class="muted" style="font-weight:400;">${avgRatingHint(m?.batting_ratings)}</span><input type="number" id="sheet-match-team-batting-rating" min="1" max="10" value="${m?.team_batting_rating ?? ''}"></label>
-      <label>Team bowling rating /10 <span class="muted" style="font-weight:400;">${avgRatingHint(m?.bowling_ratings)}</span><input type="number" id="sheet-match-team-bowling-rating" min="1" max="10" value="${m?.team_bowling_rating ?? ''}"></label>
-      <label>Team fielding rating /10 <span class="muted" style="font-weight:400;">${avgRatingHint(m?.fielding_ratings)}</span><input type="number" id="sheet-match-team-fielding-rating" min="1" max="10" value="${m?.team_fielding_rating ?? ''}"></label>
+      <label>Team batting rating /10 <span class="muted" style="font-weight:400; font-size:12px;">${avgRatingHint(m?.batting_ratings)}</span><input type="number" id="sheet-match-team-batting-rating" min="1" max="10" value="${m?.team_batting_rating ?? ''}"></label>
+      <label>Team bowling rating /10 <span class="muted" style="font-weight:400; font-size:12px;">${avgRatingHint(m?.bowling_ratings)}</span><input type="number" id="sheet-match-team-bowling-rating" min="1" max="10" value="${m?.team_bowling_rating ?? ''}"></label>
+      <label>Team fielding rating /10 <span class="muted" style="font-weight:400; font-size:12px;">${avgRatingHint(m?.fielding_ratings)}</span><input type="number" id="sheet-match-team-fielding-rating" min="1" max="10" value="${m?.team_fielding_rating ?? ''}"></label>
       <label class="full">Team performance notes<textarea id="sheet-match-team-notes">${esc(m?.team_notes || '')}</textarea></label>
     </div>
 
@@ -5887,7 +5845,11 @@ const ASSESSMENT_FORMATS = ['T20', 'ODI', 'Test'];
 
 function assessmentAvg(a) {
   const flatten = (obj) => Object.values(obj || {}).flatMap(v => (v && typeof v === 'object') ? flatten(v) : [v]);
-  const vals = flatten(a.ratings).map(Number).filter(Number.isFinite);
+  // A bulk format-only pass (e.g. a Bowling/T20 pass) stores nothing under
+  // `ratings` at all — fall back to `format_ratings` so its average still
+  // shows, rather than always reading as "—".
+  let vals = flatten(a.ratings).map(Number).filter(Number.isFinite);
+  if (!vals.length) vals = flatten(a.format_ratings).map(Number).filter(Number.isFinite);
   return vals.length ? (vals.reduce((x, y) => x + y, 0) / vals.length).toFixed(1) : '—';
 }
 function getAssessmentTemplateById(id) {
@@ -5982,7 +5944,7 @@ function formatFocusPickerHtml(skillArea, checkedFormats) {
   if (!FORMAT_SKILLS[skillArea]) return '';
   const checked = new Set(checkedFormats || []);
   return `<div class="format-focus-picker" style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--surface-border);">
-    <label class="field-label" style="margin-bottom:4px; font-size:12.5px;">Format Focus <span class="muted" style="font-weight:400;">(optional — extra metrics for a specific format)</span></label>
+    <label class="field-label" style="margin-bottom:4px; font-size:12.5px;">Format Focus <span class="muted" style="font-weight:400; font-size:12px;">(optional — extra metrics for a specific format)</span></label>
     <div class="checkbox-list">${ASSESSMENT_FORMATS.map(f => `<label><input type="checkbox" class="format-focus-check" value="${esc(f)}" style="width:auto; margin:0;" ${checked.has(f) ? 'checked' : ''}> ${esc(f)}</label>`).join('')}</div>
   </div>`;
 }
@@ -6065,9 +6027,9 @@ function assessmentFormHtml(a) {
     <div id="sheet-assessment-criteria-box" style="margin-top:10px;"></div>
     <div id="sheet-assessment-ratings-box"></div>
     <div class="formgrid" style="margin-top:10px;">
-      <label class="full">Priority area <span class="muted" style="font-weight:400;">(optional)</span><input id="sheet-assessment-priority" value="${esc(a?.priority || '')}"></label>
+      <label class="full">Priority area <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span><input id="sheet-assessment-priority" value="${esc(a?.priority || '')}"></label>
       <label class="full">Comments<textarea id="sheet-assessment-comments">${esc(a?.comments || '')}</textarea></label>
-      <label class="full">Video/photo links <span class="muted" style="font-weight:400;">(one per line, optional)</span><textarea id="sheet-assessment-links">${esc((a?.media_links || []).join('\n'))}</textarea></label>
+      <label class="full">Video/photo links <span class="muted" style="font-weight:400; font-size:12px;">(one per line, optional)</span><textarea id="sheet-assessment-links">${esc((a?.media_links || []).join('\n'))}</textarea></label>
     </div>
     <button class="btn primary" id="sheet-save-assessment-btn" style="margin-top:14px; width:auto;">${a ? 'Save changes' : 'Save Assessment'}</button>`;
 }
@@ -6181,76 +6143,75 @@ function lastFormatRatingForPlayerSkill(playerId, skillArea, format) {
     .sort((a, b) => (a.date < b.date ? 1 : -1));
   return rows[0]?.format_ratings[skillArea][format] || {};
 }
-// Which formats the Bulk Assess Format Focus picker currently has checked —
-// reset whenever the chosen skill area changes (Batting/Bowling only; see
-// FORMAT_SKILLS). Applies the same checked formats across every player in
-// the squad pass, unlike the single-assessment form's per-card picker.
-let bulkCheckedFormats = new Set();
-function bulkStepperHtml(metric, value, format) {
-  return `<div class="bulk-stepper" data-metric="${esc(metric)}"${format ? ` data-format="${esc(format)}"` : ''}>
+// Which single variant ("General" or one named format) the Bulk Assess pass
+// is currently rating — a coach picks exactly one, same as the individual
+// coach app: choosing T20 doesn't add T20 metrics alongside the core ones,
+// it REPLACES the table with T20's metric set for the whole squad. General
+// is reset to whenever the skill area changes. Only Batting/Bowling ever
+// offer anything beyond General (see FORMAT_SKILLS) — Fielding and
+// Wicketkeeping always rate their one core metric set.
+let bulkFormat = 'General';
+function bulkStepperHtml(metric, value) {
+  return `<div class="bulk-stepper" data-metric="${esc(metric)}">
     <button type="button" class="bulk-stepper-minus" aria-label="Decrease">−</button>
     <span class="bulk-stepper-value">${esc(value)}</span>
     <button type="button" class="bulk-stepper-plus" aria-label="Increase">+</button>
   </div>`;
 }
-function bulkAssessTableHtml(skillArea, teamPlayers, checkedFormats) {
+function bulkAssessTableHtml(skillArea, teamPlayers, format) {
   const cat = DEFAULT_ASSESSMENT_TEMPLATE.categories.find(c => c.category === skillArea);
   if (!cat) return '<div class="empty-state">Unknown skill area.</div>';
   if (!teamPlayers.length) return '<div class="empty-state">No players on this team yet.</div>';
-  const formats = checkedFormats || [];
-  const formatMetrics = formats.map(f => ({ format: f, metrics: (FORMAT_SKILLS[skillArea] && FORMAT_SKILLS[skillArea][f]) || [] }));
-  const formatHeaderCells = formatMetrics.map(({ format, metrics }) => metrics.map(m => `<th data-format="${esc(format)}">${esc(format)} · ${esc(m)}</th>`).join('')).join('');
+  const isFormat = format && format !== 'General' && FORMAT_SKILLS[skillArea] && FORMAT_SKILLS[skillArea][format];
+  const metrics = isFormat ? FORMAT_SKILLS[skillArea][format] : cat.criteria;
   const rows = teamPlayers.map(p => {
-    const last = lastRatingForPlayerSkill(p.id, skillArea);
-    const cells = cat.criteria.map(metric => `<td>${bulkStepperHtml(metric, Number(last[metric] ?? 5))}</td>`).join('');
-    const formatCells = formatMetrics.map(({ format, metrics }) => {
-      const lastF = lastFormatRatingForPlayerSkill(p.id, skillArea, format);
-      return metrics.map(metric => `<td data-format="${esc(format)}">${bulkStepperHtml(metric, Number(lastF[metric] ?? 5), format)}</td>`).join('');
-    }).join('');
-    return `<tr data-player="${esc(p.id)}"><td class="player-name-cell">${esc(p.name)}</td>${cells}${formatCells}</tr>`;
+    const last = isFormat ? lastFormatRatingForPlayerSkill(p.id, skillArea, format) : lastRatingForPlayerSkill(p.id, skillArea);
+    const cells = metrics.map(metric => `<td>${bulkStepperHtml(metric, Number(last[metric] ?? 5))}</td>`).join('');
+    return `<tr data-player="${esc(p.id)}"><td class="player-name-cell">${esc(p.name)}</td>${cells}</tr>`;
   }).join('');
   return `<div class="bulk-assess-table-wrap"><table class="bulk-assess-table">
-    <thead><tr><th class="player-name-th">Player</th>${cat.criteria.map(m => `<th>${esc(m)}</th>`).join('')}${formatHeaderCells}</tr></thead>
+    <thead><tr><th class="player-name-th">Player</th>${metrics.map(m => `<th>${esc(m)}</th>`).join('')}</tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
 }
 function bulkAssessFormHtml() {
   const categories = DEFAULT_ASSESSMENT_TEMPLATE.categories;
   return sheetHead('Bulk Assess Squad') + `
-    <p style="color:var(--text-dim); font-size:14px; margin-top:0;">Pick one skill area to rate across the whole squad in one pass. Each player's last rating for this area is pre-filled — adjust rather than start from scratch.</p>
+    <p style="color:var(--text-dim); font-size:13px; margin-top:0;">Pick one skill area to rate across the whole squad in one pass. Each player's last rating for this area is pre-filled — adjust rather than start from scratch.</p>
     <label class="full">Team<select id="bulk-assess-team">${cache.teams.map(t => `<option value="${esc(t.id)}">${esc(t.name)}</option>`).join('')}</select></label>
     <div class="skill-radio-grid" id="bulk-assess-skill-grid">
       ${categories.map((c, i) => `<label class="skill-radio-btn"><input type="radio" name="bulk-assess-skill" value="${esc(c.category)}" ${i === 0 ? 'checked' : ''}><span>${esc(c.category)}</span></label>`).join('')}
     </div>
-    <div id="bulk-format-focus-box"></div>
+    <div id="bulk-format-pick-box"></div>
     <div id="bulk-assess-table-box"></div>
     <button class="btn primary" id="bulk-assess-save-btn" style="margin-top:16px; width:auto;">Save All Ratings</button>`;
 }
-function renderBulkFormatFocusBox() {
+// Only rendered for Batting/Bowling (whichever skill area has entries in
+// FORMAT_SKILLS) — General is an explicit, equally-weighted choice here
+// alongside T20/ODI/Test, not an always-on default with optional add-ons.
+function renderBulkFormatPickBox() {
   const skillArea = document.querySelector('input[name="bulk-assess-skill"]:checked').value;
-  const box = document.getElementById('bulk-format-focus-box');
+  const box = document.getElementById('bulk-format-pick-box');
   if (!FORMAT_SKILLS[skillArea]) { box.innerHTML = ''; return; }
+  const options = ['General', ...ASSESSMENT_FORMATS];
   box.innerHTML = `<div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--surface-border);">
-    <label class="field-label" style="margin-bottom:4px; font-size:12.5px;">Format Focus <span class="muted" style="font-weight:400;">(optional — extra metrics for a specific format, applied across the whole squad)</span></label>
-    <div class="checkbox-list">${ASSESSMENT_FORMATS.map(f => `<label><input type="checkbox" class="bulk-format-focus-check" value="${esc(f)}" style="width:auto; margin:0;" ${bulkCheckedFormats.has(f) ? 'checked' : ''}> ${esc(f)}</label>`).join('')}</div>
+    <label class="field-label" style="margin-bottom:4px; font-size:12.5px;">What to assess today</label>
+    <div class="skill-radio-grid">${options.map(f => `<label class="skill-radio-btn"><input type="radio" name="bulk-assess-format" value="${esc(f)}" ${bulkFormat === f ? 'checked' : ''}><span>${esc(f)}</span></label>`).join('')}</div>
   </div>`;
-  box.querySelectorAll('.bulk-format-focus-check').forEach(chk => {
-    chk.onchange = () => {
-      if (chk.checked) bulkCheckedFormats.add(chk.value); else bulkCheckedFormats.delete(chk.value);
-      renderBulkAssessTable();
-    };
+  box.querySelectorAll('input[name="bulk-assess-format"]').forEach(radio => {
+    radio.onchange = () => { bulkFormat = radio.value; renderBulkAssessTable(); };
   });
 }
 function onBulkSkillAreaChange() {
-  bulkCheckedFormats = new Set();
-  renderBulkFormatFocusBox();
+  bulkFormat = 'General';
+  renderBulkFormatPickBox();
   renderBulkAssessTable();
 }
 function renderBulkAssessTable() {
   const skillArea = document.querySelector('input[name="bulk-assess-skill"]:checked').value;
   const teamId = document.getElementById('bulk-assess-team').value;
   const teamPlayers = cache.players.filter(p => p.team_id === teamId);
-  document.getElementById('bulk-assess-table-box').innerHTML = bulkAssessTableHtml(skillArea, teamPlayers, Array.from(bulkCheckedFormats));
+  document.getElementById('bulk-assess-table-box').innerHTML = bulkAssessTableHtml(skillArea, teamPlayers, bulkFormat);
   wireBulkAssessSteppers();
 }
 function wireBulkAssessSteppers() {
@@ -6265,34 +6226,32 @@ function wireBulkAssessSteppers() {
 function openBulkAssessForm() {
   if (!cache.teams.length) { showToast('Add a team before running a bulk assessment.', 'error'); return; }
   openSheet(bulkAssessFormHtml());
-  bulkCheckedFormats = new Set();
-  renderBulkFormatFocusBox();
+  bulkFormat = 'General';
+  renderBulkFormatPickBox();
   renderBulkAssessTable();
   document.getElementById('bulk-assess-team').addEventListener('change', renderBulkAssessTable);
   document.getElementById('bulk-assess-skill-grid').addEventListener('change', onBulkSkillAreaChange);
   document.getElementById('bulk-assess-save-btn').addEventListener('click', async () => {
     const skillArea = document.querySelector('input[name="bulk-assess-skill"]:checked').value;
+    const isFormat = bulkFormat !== 'General' && FORMAT_SKILLS[skillArea] && FORMAT_SKILLS[skillArea][bulkFormat];
     const today = new Date().toISOString().slice(0, 10);
     const rowsByPlayer = [];
     document.querySelectorAll('#bulk-assess-table-box tbody tr').forEach(tr => {
       const playerId = tr.dataset.player;
-      const skillRatings = {};
-      const formatRatings = {};
+      const ratingsForPlayer = {};
       tr.querySelectorAll('.bulk-stepper').forEach(stepper => {
-        const metric = stepper.dataset.metric;
-        const format = stepper.dataset.format;
-        const value = Number(stepper.querySelector('.bulk-stepper-value').textContent);
-        if (format) {
-          formatRatings[format] = formatRatings[format] || {};
-          formatRatings[format][metric] = value;
-        } else {
-          skillRatings[metric] = value;
-        }
+        ratingsForPlayer[stepper.dataset.metric] = Number(stepper.querySelector('.bulk-stepper-value').textContent);
       });
       rowsByPlayer.push({
         org_id: currentOrgId, player_id: playerId, assessed_by: session.user.id, date: today,
-        disciplines: [skillArea], ratings: { [skillArea]: skillRatings },
-        format_ratings: Object.keys(formatRatings).length ? { [skillArea]: formatRatings } : null,
+        disciplines: [skillArea],
+        // A format pass (T20/ODI/Test) replaces the core General rating for
+        // this pass entirely — it's recorded under format_ratings only, with
+        // ratings left empty, exactly like a General pass records under
+        // ratings with format_ratings left empty. The two are never mixed
+        // in the same bulk row.
+        ratings: isFormat ? null : { [skillArea]: ratingsForPlayer },
+        format_ratings: isFormat ? { [skillArea]: { [bulkFormat]: ratingsForPlayer } } : null,
       });
     });
     if (!rowsByPlayer.length) { showToast('No players to assess for this team.', 'error'); return; }
@@ -6302,8 +6261,9 @@ function openBulkAssessForm() {
     if (error) { showToast(error.message, 'error'); btn.disabled = false; btn.textContent = 'Save All Ratings'; return; }
     closeSheet();
     loadAssessments();
-    showToast(`Logged ${skillArea} ratings for ${rowsByPlayer.length} player${rowsByPlayer.length === 1 ? '' : 's'}.`, 'ok');
-    for (const row of rowsByPlayer) notifyPlayerCircle(row.player_id, 'New assessment logged', `${skillArea} ratings updated`);
+    const label = isFormat ? `${skillArea} (${bulkFormat})` : skillArea;
+    showToast(`Logged ${label} ratings for ${rowsByPlayer.length} player${rowsByPlayer.length === 1 ? '' : 's'}.`, 'ok');
+    for (const row of rowsByPlayer) notifyPlayerCircle(row.player_id, 'New assessment logged', `${label} ratings updated`);
   });
 }
 document.getElementById('bulk-assess-btn').addEventListener('click', () => openBulkAssessForm());
@@ -6342,7 +6302,7 @@ function templateEditFormHtml(t) {
   return sheetHead(t ? 'Edit Template' : 'New Template') + `
     <div class="formgrid">
       <label class="full">Template name<input id="sheet-template-name" value="${esc(t?.name || '')}"></label>
-      <label class="full">Skill areas &amp; metrics <span class="muted" style="font-weight:400;">(one per line: Skill Area: metric1, metric2, metric3)</span><textarea id="sheet-template-categories" style="min-height:140px;">${esc(t ? categoriesToText(t.categories) : categoriesToText(DEFAULT_ASSESSMENT_TEMPLATE.categories))}</textarea></label>
+      <label class="full">Skill areas &amp; metrics <span class="muted" style="font-weight:400; font-size:12px;">(one per line: Skill Area: metric1, metric2, metric3)</span><textarea id="sheet-template-categories" style="min-height:140px;">${esc(t ? categoriesToText(t.categories) : categoriesToText(DEFAULT_ASSESSMENT_TEMPLATE.categories))}</textarea></label>
     </div>
     <button class="btn primary" id="sheet-save-template-btn" style="margin-top:14px; width:auto;">${t ? 'Save changes' : 'Create Template'}</button>`;
 }
@@ -6691,7 +6651,7 @@ function analysisFormHtml(a) {
       <label>Player<select id="sheet-analysis-player">${cache.players.map(p => `<option value="${p.id}" ${a?.player_id === p.id ? 'selected' : ''}>${esc(p.name)}</option>`).join('')}</select></label>
       <label>Type<select id="sheet-analysis-type">${ANALYSIS_TYPES.map(t => `<option ${a?.analysis_type === t ? 'selected' : ''}>${t}</option>`).join('')}</select></label>
       <label>Date<input type="date" id="sheet-analysis-date" value="${esc(a?.date || new Date().toISOString().slice(0, 10))}"></label>
-      <label class="full">Link to the analysis file/export <span class="muted" style="font-weight:400;">(optional)</span><input id="sheet-analysis-link" value="${esc(a?.external_link || '')}" placeholder="https://..."></label>
+      <label class="full">Link to the analysis file/export <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span><input id="sheet-analysis-link" value="${esc(a?.external_link || '')}" placeholder="https://..."></label>
       <label class="full">Summary<textarea id="sheet-analysis-summary">${esc(a?.summary || '')}</textarea></label>
     </div>
     <button class="btn primary" id="sheet-save-analysis-btn" style="margin-top:14px; width:auto;">${a ? 'Save changes' : 'Save Record'}</button>`;
@@ -6752,18 +6712,36 @@ function themesForReflectionSection(section, type) {
   if (section === 'change') return isMatch ? COACH_CHANGE_MATCH_THEMES : COACH_CHANGE_THEMES;
   return COACH_NEXT_FOCUS_THEMES;
 }
+// Rendered as a collapsed-by-default dropdown (head + body), matching the
+// individual coach app's collapsible "What went well?" / "What could be
+// better?" etc. sections — not a plain always-visible checkbox grid. The
+// head shows a live "(n selected)" count and stays collapsed even when
+// editing a reflection that already has themes checked, exactly like the
+// source app (its formSectionHead is always called with openByDefault=false
+// for these sections).
 function themeChipsHtml(section, themes, checkedValues) {
   const checked = new Set(checkedValues || []);
   return `<div class="theme-chip-box" data-section="${esc(section)}" style="margin:6px 0;">
-    <div class="muted theme-chip-count" style="font-size:12px; margin-bottom:4px;">${checked.size} selected</div>
-    <div class="checkbox-list">${themes.map(t => `<label><input type="checkbox" class="theme-chip-check" data-section="${esc(section)}" value="${esc(t)}" style="width:auto; margin:0;" ${checked.has(t) ? 'checked' : ''}> ${esc(t)}</label>`).join('')}</div>
+    <div class="theme-section-head" data-action="toggleThemeSection">
+      <span>Pick themes <span class="muted theme-chip-count" style="font-weight:400;">(${checked.size} selected)</span></span>
+      <span class="theme-section-chev">▸</span>
+    </div>
+    <div class="theme-section-body">
+      <div class="checkbox-list">${themes.map(t => `<label><input type="checkbox" class="theme-chip-check" data-section="${esc(section)}" value="${esc(t)}" style="width:auto; margin:0;" ${checked.has(t) ? 'checked' : ''}> ${esc(t)}</label>`).join('')}</div>
+    </div>
   </div>`;
 }
 function wireThemeChipEvents(root) {
   root.querySelectorAll('.theme-chip-box').forEach(box => {
+    const head = box.querySelector('.theme-section-head');
+    const body = box.querySelector('.theme-section-body');
     const update = () => {
       const n = box.querySelectorAll('.theme-chip-check:checked').length;
-      box.querySelector('.theme-chip-count').textContent = `${n} selected`;
+      box.querySelector('.theme-chip-count').textContent = `(${n} selected)`;
+    };
+    head.onclick = () => {
+      const open = body.classList.toggle('open');
+      head.classList.toggle('open', open);
     };
     box.querySelectorAll('.theme-chip-check').forEach(chk => { chk.onchange = update; });
   });
@@ -6827,28 +6805,26 @@ function reflectionFormHtml(r) {
       </div></div>
       <label>Date<input type="date" id="sheet-reflection-date" value="${esc(r?.date || new Date().toISOString().slice(0, 10))}"></label>
       <div class="full formgrid" id="reflection-session-block" style="padding:0; margin:0; ${type === 'match' ? 'display:none;' : ''}">
-        <label class="full">Link to a specific session <span class="muted" style="font-weight:400;">(optional)</span><select id="sheet-reflection-session"><option value="">— No specific session —</option>${recentSessions.map(s => `<option value="${s.id}" ${r?.session_id === s.id ? 'selected' : ''}>${esc(s.date)} · ${esc(s.title || nameById(cache.teams, s.team_id))}</option>`).join('')}</select></label>
+        <label class="full">Link to a specific session <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span><select id="sheet-reflection-session"><option value="">— No specific session —</option>${recentSessions.map(s => `<option value="${s.id}" ${r?.session_id === s.id ? 'selected' : ''}>${esc(s.date)} · ${esc(s.title || nameById(cache.teams, s.team_id))}</option>`).join('')}</select></label>
       </div>
       <div class="full formgrid" id="reflection-match-block" style="padding:0; margin:0; ${type === 'match' ? '' : 'display:none;'}">
-        <label class="full">Link to a specific match <span class="muted" style="font-weight:400;">(optional)</span><select id="sheet-reflection-match"><option value="">— No specific match —</option>${recentMatches.map(m => `<option value="${m.id}" ${r?.match_id === m.id ? 'selected' : ''}>${esc(m.date)} · vs ${esc(m.opponent || '—')}</option>`).join('')}</select></label>
+        <label class="full">Link to a specific match <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span><select id="sheet-reflection-match"><option value="">— No specific match —</option>${recentMatches.map(m => `<option value="${m.id}" ${r?.match_id === m.id ? 'selected' : ''}>${esc(m.date)} · vs ${esc(m.opponent || '—')}</option>`).join('')}</select></label>
         <label>Tactical decisions (1-10)<input type="number" min="1" max="10" id="sheet-reflection-tactical" value="${r?.tactical_decisions ?? ''}"></label>
         <label>Player management / rotation (1-10)<input type="number" min="1" max="10" id="sheet-reflection-player-mgmt" value="${r?.player_management ?? ''}"></label>
       </div>
       <label>Overall rating (1-10)<input type="number" min="1" max="10" id="sheet-reflection-rating" value="${r?.rating ?? ''}"></label>
       <label>Communication (1-10)<input type="number" min="1" max="10" id="sheet-reflection-communication" value="${r?.communication ?? ''}"></label>
-      <label class="full" style="display:block;">What went well?</label><div id="reflection-well-themes-box">${themeChipsHtml('well', themesForReflectionSection('well', type), r?.well_themes)}</div>${presetRowHtml('reflection_well', 'sheet-reflection-well')}<textarea class="full" id="sheet-reflection-well">${esc(r?.well || '')}</textarea>
-      <label class="full" style="display:block;">What could be better?</label><div id="reflection-better-themes-box">${themeChipsHtml('better', themesForReflectionSection('better', type), r?.better_themes)}</div>${presetRowHtml('reflection_better', 'sheet-reflection-better')}<textarea class="full" id="sheet-reflection-better">${esc(r?.better || '')}</textarea>
-      <label class="full" style="display:block;">Player notes</label>${presetRowHtml('reflection_players', 'sheet-reflection-players')}<textarea class="full" id="sheet-reflection-players">${esc(r?.players || '')}</textarea>
-      <label class="full" style="display:block;">What will I change next time?</label><div id="reflection-change-themes-box">${themeChipsHtml('change', themesForReflectionSection('change', type), r?.change_themes)}</div>${presetRowHtml('reflection_change', 'sheet-reflection-change')}<textarea class="full" id="sheet-reflection-change">${esc(r?.change || '')}</textarea>
-      <label class="full" style="display:block;">Next focus</label>${themeChipsHtml('next', COACH_NEXT_FOCUS_THEMES, r?.next_themes)}${presetRowHtml('reflection_next', 'sheet-reflection-next')}<textarea class="full" id="sheet-reflection-next">${esc(r?.next || '')}</textarea>
+      <label class="full" style="display:block;">What went well?</label><div id="reflection-well-themes-box">${themeChipsHtml('well', themesForReflectionSection('well', type), r?.well_themes)}</div><textarea class="full" id="sheet-reflection-well">${esc(r?.well || '')}</textarea>
+      <label class="full" style="display:block;">What could be better?</label><div id="reflection-better-themes-box">${themeChipsHtml('better', themesForReflectionSection('better', type), r?.better_themes)}</div><textarea class="full" id="sheet-reflection-better">${esc(r?.better || '')}</textarea>
+      <label class="full" style="display:block;">Player notes</label><textarea class="full" id="sheet-reflection-players">${esc(r?.players || '')}</textarea>
+      <label class="full" style="display:block;">What will I change next time?</label><div id="reflection-change-themes-box">${themeChipsHtml('change', themesForReflectionSection('change', type), r?.change_themes)}</div><textarea class="full" id="sheet-reflection-change">${esc(r?.change || '')}</textarea>
+      <label class="full" style="display:block;">Next focus</label>${themeChipsHtml('next', COACH_NEXT_FOCUS_THEMES, r?.next_themes)}<textarea class="full" id="sheet-reflection-next">${esc(r?.next || '')}</textarea>
     </div>
     <button class="btn primary" id="sheet-save-reflection-btn" style="margin-top:14px; width:auto;">${r ? 'Save changes' : 'Save Reflection'}</button>`;
 }
 async function openReflectionForm(r) {
   editing.reflections = r ? r.id : null;
-  await loadPresetsCache();
   openSheet(reflectionFormHtml(r));
-  attachPresetHandlers(document);
   wireThemeChipEvents(document);
   // Tracks which half of the form (Session vs Match) is currently showing —
   // a closure var rather than reading a hidden input, since it also decides
@@ -7173,7 +7149,7 @@ async function renderMyDashboardFor(player) {
   html += '<div class="sectionHeading">Active development goals</div>';
   html += (devRes.data || []).length ? devRes.data.map(dp => `<div class="list-item"><span>${esc(dp.goal)}</span><span class="role-tag">Due ${esc(dp.deadline || '—')}</span></div>`).join('') : '<div class="empty-state">No active goals.</div>';
 
-  html += `<div class="sectionHeading">Sessions attended ${pastSessions.length ? `<span class="muted" style="font-weight:400;">(${attendedCount}/${pastSessions.length} recent · ${attendanceRate}%)</span>` : ''}</div>`;
+  html += `<div class="sectionHeading">Sessions attended ${pastSessions.length ? `<span class="muted" style="font-weight:400; font-size:12px;">(${attendedCount}/${pastSessions.length} recent · ${attendanceRate}%)</span>` : ''}</div>`;
   if (!pastSessions.length) html += '<div class="empty-state">No past sessions logged yet.</div>';
   else html += pastSessions.map(s => {
     const status = s.attendance && s.attendance[player.id] ? s.attendance[player.id] : 'not recorded';
@@ -7209,7 +7185,7 @@ async function openFacilityBookingForm(player, onDone) {
     <div class="formgrid">
       <label>Start time<input type="time" id="booking-start"></label>
       <label>End time<input type="time" id="booking-end"></label>
-      <label class="full">Purpose <span class="muted" style="font-weight:400;">(optional)</span><textarea id="booking-purpose" placeholder="e.g. Personal net practice"></textarea></label>
+      <label class="full">Purpose <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span><textarea id="booking-purpose" placeholder="e.g. Personal net practice"></textarea></label>
     </div>
     <div class="status-msg" id="booking-status"></div>
     <button class="btn primary" id="booking-submit-btn" style="margin-top:10px; width:auto;">Request booking</button>`);
@@ -7337,7 +7313,7 @@ async function openCoachBookingForm(player, onDone) {
     <div class="formgrid">
       <label>Start time<input type="time" id="coach-booking-start"></label>
       <label>End time<input type="time" id="coach-booking-end"></label>
-      <label class="full">Purpose <span class="muted" style="font-weight:400;">(optional)</span><textarea id="coach-booking-purpose" placeholder="e.g. Batting technique work"></textarea></label>
+      <label class="full">Purpose <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span><textarea id="coach-booking-purpose" placeholder="e.g. Batting technique work"></textarea></label>
     </div>
     <div class="status-msg" id="coach-booking-status"></div>
     <button class="btn primary" id="coach-booking-submit-btn" style="margin-top:10px; width:auto;">Request booking</button>`);
@@ -9053,7 +9029,7 @@ async function openApproveCoachBookingSheet(booking, nameByUser) {
   openSheet(sheetHead('Approve Coach Booking') + `
     <p class="muted" style="margin-top:0;">Coach ${esc(nameByUser[booking.coach_user_id] || '')} · ${esc(booking.start_time.slice(0, 5))}–${esc(booking.end_time.slice(0, 5))} on ${esc(booking.date)}${booking.players?.name ? ' · For ' + esc(booking.players.name) : ''}</p>
     ${booking.player_id ? `<div class="formgrid">
-      <label>Invoice amount (₹) <span class="muted" style="font-weight:400;">(optional — leave blank to approve with no charge)</span><input type="number" id="coach-booking-invoice-amount" min="0" step="1"></label>
+      <label>Invoice amount (₹) <span class="muted" style="font-weight:400; font-size:12px;">(optional — leave blank to approve with no charge)</span><input type="number" id="coach-booking-invoice-amount" min="0" step="1"></label>
     </div>` : `<div class="muted">No linked player on this request, so no invoice can be generated — it'll be approved with no charge.</div>`}
     <button class="btn primary" id="coach-booking-approve-btn" style="margin-top:10px; width:auto;">Approve</button>`);
   document.getElementById('coach-booking-approve-btn').addEventListener('click', async () => {
@@ -9269,7 +9245,7 @@ function openRecordPaymentSheet(invoice) {
       <label>Amount received (₹)<input type="number" id="payment-amount" value="${(invoice.amount_cents / 100).toFixed(0)}"></label>
       <label>Date<input type="date" id="payment-date" value="${new Date().toISOString().slice(0, 10)}"></label>
       <label>Method<select id="payment-method"><option value="cash">Cash</option><option value="bank_transfer">Bank Transfer</option><option value="upi">UPI</option><option value="cheque">Cheque</option><option value="other">Other</option></select></label>
-      <label class="full">Notes <span class="muted" style="font-weight:400;">(optional)</span><textarea id="payment-notes"></textarea></label>
+      <label class="full">Notes <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span><textarea id="payment-notes"></textarea></label>
     </div>
     <div class="panelToolbar">
       <button class="btn primary" id="save-payment-btn" style="width:auto;">Save Payment</button>
@@ -9308,8 +9284,8 @@ async function openGenerateInvoiceSheet() {
       <label>Apply to<select id="invoice-target"><option value="team">Whole team</option><option value="player">One player</option></select></label>
       <label id="invoice-team-wrap">Team<select id="invoice-team">${cache.teams.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
       <label id="invoice-player-wrap" style="display:none;">Player<select id="invoice-player">${cache.players.map(p => `<option value="${p.id}">${esc(p.name)}</option>`).join('')}</select></label>
-      <label>Period <span class="muted" style="font-weight:400;">(optional — e.g. a specific month)</span><input type="month" id="invoice-period"></label>
-      <label>Due date <span class="muted" style="font-weight:400;">(optional)</span><input type="date" id="invoice-due-date"></label>
+      <label>Period <span class="muted" style="font-weight:400; font-size:12px;">(optional — e.g. a specific month)</span><input type="month" id="invoice-period"></label>
+      <label>Due date <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span><input type="date" id="invoice-due-date"></label>
     </div>
     <button class="btn primary" id="save-invoice-btn" style="margin-top:14px; width:auto;">Generate</button>`);
   document.getElementById('invoice-target').addEventListener('change', (e) => {
@@ -9356,8 +9332,8 @@ async function openFeeStructuresSheet() {
       <label class="full">Name<input id="new-structure-name" placeholder="e.g. Monthly Tuition"></label>
       <label>Amount (₹)<input type="number" id="new-structure-amount"></label>
       <label>Frequency<select id="new-structure-frequency"><option value="monthly">Monthly</option><option value="quarterly">Quarterly</option><option value="annual">Annual</option><option value="one_time">One-time</option></select></label>
-      <label class="full">Applies to <span class="muted" style="font-weight:400;">(optional — leave blank for whole academy)</span><select id="new-structure-team"><option value="">Whole academy</option>${cache.teams.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
-      ${cache.branches.length ? `<label class="full">Branch <span class="muted" style="font-weight:400;">(optional — e.g. a location-specific rate)</span><select id="new-structure-branch"><option value="">All branches</option>${cache.branches.map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></label>` : ''}
+      <label class="full">Applies to <span class="muted" style="font-weight:400; font-size:12px;">(optional — leave blank for whole academy)</span><select id="new-structure-team"><option value="">Whole academy</option>${cache.teams.map(t => `<option value="${t.id}">${esc(t.name)}</option>`).join('')}</select></label>
+      ${cache.branches.length ? `<label class="full">Branch <span class="muted" style="font-weight:400; font-size:12px;">(optional — e.g. a location-specific rate)</span><select id="new-structure-branch"><option value="">All branches</option>${cache.branches.map(b => `<option value="${b.id}">${esc(b.name)}</option>`).join('')}</select></label>` : ''}
     </div>
     <button class="btn primary" id="add-structure-btn" style="margin-top:10px; width:auto;">Add</button>`);
   document.getElementById('fee-structures-list').querySelectorAll('[data-delete-structure]').forEach(btn => {
@@ -9631,7 +9607,7 @@ function enterpriseLeadFormHtml() {
       <label class="full">Academy name<input id="lead-academy-name"></label>
       <label>Approx. players<input type="number" id="lead-players"></label>
       <label>Approx. teams<input type="number" id="lead-teams"></label>
-      <label class="full">Anything else we should know? <span class="muted" style="font-weight:400;">(optional)</span><textarea id="lead-message"></textarea></label>
+      <label class="full">Anything else we should know? <span class="muted" style="font-weight:400; font-size:12px;">(optional)</span><textarea id="lead-message"></textarea></label>
     </div>
     <button class="btn primary" id="submit-lead-btn" style="margin-top:14px; width:auto;">Submit</button>`;
 }
@@ -9865,7 +9841,7 @@ function openGrantEnterpriseForm(org, sub) {
       <label>Max players<input type="number" id="grant-players" value="${sub?.custom_max_players ?? ''}"></label>
       <label>Max coaches<input type="number" id="grant-coaches" value="${sub?.custom_max_coaches ?? ''}"></label>
       <label>Agreed price (₹/month)<input type="number" id="grant-price" value="${sub?.custom_price_cents != null ? sub.custom_price_cents / 100 : ''}"></label>
-      <label class="full">Notes <span class="muted" style="font-weight:400;">(terms agreed, contract ref, etc.)</span><textarea id="grant-notes">${esc(sub?.custom_notes || '')}</textarea></label>
+      <label class="full">Notes <span class="muted" style="font-weight:400; font-size:12px;">(terms agreed, contract ref, etc.)</span><textarea id="grant-notes">${esc(sub?.custom_notes || '')}</textarea></label>
     </div>
     <button class="btn primary" id="save-grant-btn" style="margin-top:14px; width:auto;">Save</button>`);
   document.getElementById('save-grant-btn').addEventListener('click', async () => {
