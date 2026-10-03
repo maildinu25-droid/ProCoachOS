@@ -1899,8 +1899,6 @@ function reflectionFormHtml(x,mode){
  <label>Session / Match label<input name="session" id="reflectionSessionLabel" value="${esc(x.session||"")}"></label>
  <div id="reflSessionBlock" class="full formgrid" style="padding:0;margin:0;${type==="match"?"display:none":""}">
   <label class="full">Link to a specific session <span class="muted" style="font-weight:400">(optional)</span><select name="sessionId" id="reflectionSessionSelect" onchange="onReflectionSessionPick(this)"><option value="">— No specific session —</option>${recentSessions.map(s=>`<option value="${s.id}" ${x.sessionId===s.id?"selected":""}>${esc(fmtDate(s.date))} · ${esc(sessionLabel(s))}</option>`).join("")}</select></label>
-  ${ratingSelectRow("sessionFlow","Session flow / pacing",x.sessionFlow)}
-  ${ratingSelectRow("playerEngagement","Player engagement",x.playerEngagement)}
   <div class="full" id="reflectionObjectiveRatings" style="display:none"></div>
  </div>
  <div id="reflMatchBlock" class="full formgrid" style="padding:0;margin:0;${type==="match"?"":"display:none"}">
@@ -1909,7 +1907,6 @@ function reflectionFormHtml(x,mode){
   ${ratingSelectRow("playerManagement","Player management / rotation calls",x.playerManagement)}
  </div>
  ${ratingSelectRow("rating","Overall rating",x.rating)}
- ${ratingSelectRow("communication","Communication",x.communication)}
  <div class="full">${formSectionHead("wentWell","What went well?",false)}
  <div id="formSec-wentWell" style="display:none;margin-top:10px">
  <div class="chipGrid2" id="reflWentWellSession" style="${type==="match"?"display:none":""}">${COACH_WENT_WELL_SESSION.map(r=>`<label><input type="checkbox" name="wentWellThemes" value="${esc(r)}" ${(x.wentWellThemes||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('wentWell','selected')"> ${esc(r)}</label>`).join("")}</div>
@@ -2037,7 +2034,7 @@ function saveReflection(e){
  // type's link/ratings are dropped even if they were left in the DOM
  // (e.g. switching type back and forth before saving).
  if(x.type==="match"){
-  delete x.sessionId;delete x.sessionFlow;delete x.playerEngagement;delete x.objectiveRatings;
+  delete x.sessionId;delete x.objectiveRatings;
  } else {
   delete x.matchId;delete x.tacticalDecisions;delete x.playerManagement;
  }
@@ -5514,9 +5511,8 @@ function buildCoachReport(){
   let learningsText=reflectionTakeawayText(r)||"—";
   let wentWellText=reflectionWentWellText(r)||"—";
   let nextFocusText=reflectionNextFocusText(r)||"—";
-  let extraRatings=[r.sessionFlow?`Session Flow ${esc(r.sessionFlow)}/5`:"",r.playerEngagement?`Player Engagement ${esc(r.playerEngagement)}/5`:""].filter(Boolean).join(" · ");
   let objectiveRatingsHtml=(r.objectiveRatings&&Object.keys(r.objectiveRatings).length)?`<p><b>Achieved Objectives:</b> ${Object.entries(r.objectiveRatings).map(([cat,val])=>`${esc(cat)} ${esc(val)}/5`).join(", ")}</p>`:"";
-  return `<div class="card"><b>${esc(fmtDate(r.date))} · ${esc(r.session||"Coaching Reflection")}</b><p><b>Rating:</b> ${esc(r.rating)}/5 · Communication ${esc(r.communication||"—")}/5${extraRatings?" · "+extraRatings:""}</p><p><b>What went well:</b> ${esc(wentWellText)}</p><p><b>What could improve:</b> ${esc(betterText)}</p><p><b>Key takeaway:</b> ${esc(learningsText)}</p>${objectiveRatingsHtml}<p><b>Next focus:</b> ${esc(nextFocusText)}</p></div>`;
+  return `<div class="card"><b>${esc(fmtDate(r.date))} · ${esc(r.session||"Coaching Reflection")}</b><p><b>Rating:</b> ${esc(r.rating)}/5</p><p><b>What went well:</b> ${esc(wentWellText)}</p><p><b>What could improve:</b> ${esc(betterText)}</p><p><b>Key takeaway:</b> ${esc(learningsText)}</p>${objectiveRatingsHtml}<p><b>Next focus:</b> ${esc(nextFocusText)}</p></div>`;
  }).join(""):empty("No reflections documented.")}`);
 }
 function backup(){let a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:"application/json"}));a.download="ProCoach-OS-Backup-"+today()+".json";a.click()}function restore(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{db=JSON.parse(r.result);save();alert("Backup restored.")}catch(e){alert("Invalid backup file.")}};r.readAsText(f)}
@@ -5554,7 +5550,7 @@ function exportExcel(){
     let objectiveRatingsText=(r.objectiveRatings&&Object.keys(r.objectiveRatings).length)?Object.entries(r.objectiveRatings).map(([cat,val])=>`${cat}:${val}`).join('; '):'';
     return{
       date:r.date,session:r.session||'',
-      rating:r.rating||'',communication:r.communication||'',sessionFlow:r.sessionFlow||'',playerEngagement:r.playerEngagement||'',
+      rating:r.rating||'',
       whatWentWell:reflectionWentWellText(r),
       whatCouldImprove:[reasonsPart,detailPart].filter(Boolean).join(' — '),
       learningAndChange:learningsText,
