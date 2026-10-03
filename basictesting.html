@@ -5038,7 +5038,7 @@ function renderUninvoicedSessionsBox(){
  box.innerHTML=`<div class="card" style="margin:10px 0">
   <b>Uninvoiced sessions for ${esc(player.name)}</b>
   <p class="muted" style="font-size:var(--fs-1);margin:4px 0 8px">Sessions already on a previous invoice aren't listed here, so you can't bill the same session twice.</p>
-  <div>${list.map(s=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 0"><input type="checkbox" id="uis_${s.id}" value="${s.id}"><span>${esc(fmtDate(s.date))} — ${esc(sessionLabel(s))}</span></label>`).join("")}</div>
+  <div>${list.map(s=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 0"><input type="checkbox" id="uis_${s.id}" value="${s.id}" style="width:auto;flex-shrink:0;padding:0;margin:0"><span style="white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0">${esc(fmtDate(s.date))} — ${esc(sessionLabel(s))}</span></label>`).join("")}</div>
   <button type="button" class="btn secondary" style="margin-top:8px" onclick="addUninvoicedSessionsToInvoice('${player.id}')">+ Add Selected to Invoice</button>
  </div>`;
 }
