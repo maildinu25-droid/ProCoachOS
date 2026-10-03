@@ -881,7 +881,8 @@ function icon(name,size){
  copy:'<rect x="9" y="9" width="11" height="11" rx="1.8"/><path d="M15 9V6a1.8 1.8 0 0 0-1.8-1.8H6A1.8 1.8 0 0 0 4.2 6v7.2A1.8 1.8 0 0 0 6 15h3"/>',
  print:'<path d="M7 8.5V4a1 1 0 0 1 1-1h8a1 1 0 0 1 1 1v4.5"/><rect x="4.5" y="8.5" width="15" height="8" rx="1.5"/><path d="M7 15.5h10V20a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1z"/>',
  share:'<circle cx="18" cy="5.5" r="2.3"/><circle cx="6" cy="12" r="2.3"/><circle cx="18" cy="18.5" r="2.3"/><line x1="8.1" y1="10.8" x2="15.9" y2="6.7"/><line x1="8.1" y1="13.2" x2="15.9" y2="17.3"/>',
- eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>'
+ eye:'<path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="3"/>',
+ download:'<path d="M12 3.5v12"/><polyline points="7 10.5 12 15.5 17 10.5"/><path d="M4.5 18.5v1.5a1 1 0 0 0 1 1h13a1 1 0 0 0 1-1v-1.5"/>'
  };
  return `<svg width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px">${paths[name]||""}</svg>`;
 }
@@ -3058,7 +3059,7 @@ let drillQuery="",drillCatFilter="",drillSearchFocused=false,drillDraftDiagram=n
 // this is what lets an arrow have more than a straight start/end (a fielder's
 // curved run-and-throw path, say). dragState tracks an in-progress marker drag
 // (see handleFieldPointerDown/Move/Up) so a drag can be told apart from a tap.
-let fieldDraft={steps:[],activeStep:0,tool:null,pendingArrowPoints:[],pendingArrowStyle:null,dragState:null};
+let fieldDraft={steps:[],activeStep:0,tool:null,pendingArrowPoints:[],pendingArrowStyle:null,dragState:null,fsZoom:1};
 const FIELD_TOOLS=[
  {id:"coach",label:"Coach"},
  {id:"player",label:"Player"},
@@ -3197,15 +3198,17 @@ function fieldArrowSvg(a,opts){
  let markerId=isBall?"fdArrowBall":"fdArrowPlayer";
  let pts=arrowPointsOf(a);
  let pointsStr=pts.map(p=>`${p.x},${p.y}`).join(" ");
- let line=`<polyline class="fdArrow" data-id="${a.id}" points="${pointsStr}" fill="none" stroke="${color}" stroke-width="0.65" ${dashAttr} marker-end="url(#${markerId})" style="cursor:pointer"/>`;
+ let line=`<polyline points="${pointsStr}" fill="none" stroke="${color}" stroke-width="0.65" ${dashAttr} marker-end="url(#${markerId})"/>`;
  let badge="";
  if(isBall&&a.label){
   let mid=pathMidpoint(pts),mx=mid.x,my=mid.y;
   let textEl=`<text x="${mx}" y="${my+0.5}" text-anchor="middle" font-size="1.6" font-weight="700" fill="#f4f1e8" font-family="Poppins,sans-serif">${esc(a.label)}</text>`;
   let textWrapped=xComp!==1?`<g transform="translate(${mx} 0) scale(${xComp} 1) translate(${-mx} 0)">${textEl}</g>`:textEl;
-  badge=`<g class="fdArrow" data-id="${a.id}" style="cursor:pointer"><ellipse cx="${mx}" cy="${my}" rx="${1.5*xComp}" ry="1.5" fill="#0a1420" stroke="${color}" stroke-width="0.3"/>${textWrapped}</g>`;
+  badge=`<ellipse cx="${mx}" cy="${my}" rx="${1.5*xComp}" ry="1.5" fill="#0a1420" stroke="${color}" stroke-width="0.3"/>${textWrapped}`;
  }
- return line+badge;
+ // Whole arrow (line + badge) is one <g class="fdArrow"> so a drag transform
+ // moves both together and tap-to-delete hit-tests a single element.
+ return `<g class="fdArrow" data-id="${a.id}" style="cursor:pointer">${line}${badge}</g>`;
 }
 // Each diagram step keeps a fully separate marker/arrow list per ground shape
 // (step.full.items, step.half.items, step.square.items) so switching between
@@ -3271,6 +3274,15 @@ function fieldDiagramSvg(view,opts){
  // lets the ground grow to the actual maximum the screen allows. preserveAspectRatio
  // "none" is a no-op whenever dispAspect matches the viewBox's own ratio (every
  // case except Full Ground fullscreen-in-landscape), so nothing else is affected.
+ // opts.exportPx: used only by exportFieldDiagram() to serialize a standalone
+ // image. A percentage-based style width/height (the normal in-page sizing)
+ // has no containing block once the SVG is decoded on its own as an Image(),
+ // so this swaps in real pixel width/height attributes and an explicit xmlns
+ // instead, which is what a standalone SVG document needs to rasterize cleanly.
+ if(opts.exportPx){
+  let px=opts.exportPx;
+  return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vb.w} ${vb.h}" width="${px.w}" height="${px.h}" preserveAspectRatio="xMidYMid meet">${defs}${bg}${arrowsHtml}${markersHtml}</svg>`;
+ }
  let sizeStyle=opts.fill?"width:100%;height:100%;display:block;border-radius:10px":"width:100%;height:auto;display:block;border-radius:10px";
  // touch-action:none stops a touch-drag on the ground from also trying to
  // scroll the page — needed for marker dragging (handleFieldPointerDown/Move/Up)
@@ -3300,7 +3312,7 @@ function handleFieldCanvasClick(evt,svgEl){
  if(markerEl){
   let id=markerEl.getAttribute("data-id");
   let idx=items.findIndex(it=>it.id===id);
-  if(idx>-1)items.splice(idx,1);
+  if(idx>-1){pushFieldHistory();items.splice(idx,1)}
   renderFieldEditor();
   return;
  }
@@ -3308,7 +3320,7 @@ function handleFieldCanvasClick(evt,svgEl){
  if(arrowEl){
   let id=arrowEl.getAttribute("data-id");
   let idx=items.findIndex(it=>it.id===id);
-  if(idx>-1)items.splice(idx,1);
+  if(idx>-1){pushFieldHistory();items.splice(idx,1)}
   renderFieldEditor();
   return;
  }
@@ -3349,27 +3361,43 @@ function handleFieldCanvasClick(evt,svgEl){
   let targetCount=items.filter(it=>it.kind==="marker"&&it.type==="target").length;
   label=targetCount?"T"+(targetCount+1):"";
  }
+ pushFieldHistory();
  items.push({id:uid("fditem"),kind:"marker",type:fieldDraft.tool,x:pos.x,y:pos.y,label});
  renderFieldEditor();
 }
-// Dragging a marker: pointerdown on a marker starts tracking; pointermove
+// Dragging a marker or arrow: pointerdown on one starts tracking; pointermove
 // (once past a small threshold, so a plain tap isn't mistaken for a drag)
 // nudges it live via a transform (cheap — avoids rebuilding the whole SVG
 // mid-drag, which would also drop the pointer capture); pointerup commits the
-// new x/y to the data and re-renders properly. A drag never deletes — only a
-// tap that didn't move does (handled by the suppressNextClick guard above).
+// new position to the data and re-renders properly. A drag never deletes —
+// only a tap that didn't move does (handled by the suppressNextClick guard).
 function handleFieldPointerDown(evt,svgEl){
- let markerEl=evt.target.closest&&evt.target.closest(".fdMarker");
- if(!markerEl)return;
  let step=fieldDraft.steps[fieldDraft.activeStep];
  if(!step)return;
  let items=curFieldItems(step);
- let id=markerEl.getAttribute("data-id");
- let item=items.find(it=>it.id===id&&it.kind==="marker");
- if(!item)return;
  let pos=fieldCanvasCoords(evt,svgEl);
- fieldDraft.dragState={id:id,startX:item.x,startY:item.y,startPointer:pos,moved:false,dx:0,dy:0};
- if(svgEl.setPointerCapture)try{svgEl.setPointerCapture(evt.pointerId)}catch(e){}
+ let markerEl=evt.target.closest&&evt.target.closest(".fdMarker");
+ if(markerEl){
+  let id=markerEl.getAttribute("data-id");
+  let item=items.find(it=>it.id===id&&it.kind==="marker");
+  if(!item)return;
+  fieldDraft.dragState={type:"marker",id:id,startX:item.x,startY:item.y,startPointer:pos,pointerId:evt.pointerId,moved:false,dx:0,dy:0};
+  return;
+ }
+ let arrowEl=evt.target.closest&&evt.target.closest(".fdArrow");
+ if(arrowEl){
+  let id=arrowEl.getAttribute("data-id");
+  let item=items.find(it=>it.id===id&&it.kind==="arrow");
+  if(!item)return;
+  fieldDraft.dragState={type:"arrow",id:id,startPoints:arrowPointsOf(item).map(p=>({x:p.x,y:p.y})),startPointer:pos,pointerId:evt.pointerId,moved:false,dx:0,dy:0};
+  return;
+ }
+ // Pointer capture is deliberately NOT taken here. Capturing on every
+ // pointerdown — even a plain tap that never moves — makes the browser
+ // retarget the resulting click event to the svg element instead of the
+ // marker/arrow, so evt.target.closest() in handleFieldCanvasClick fails
+ // and tap-to-delete silently stops working. Capture is taken only once a
+ // real drag is confirmed, in handleFieldPointerMove below.
 }
 function handleFieldPointerMove(evt,svgEl){
  let d=fieldDraft.dragState;
@@ -3377,8 +3405,10 @@ function handleFieldPointerMove(evt,svgEl){
  let pos=fieldCanvasCoords(evt,svgEl);
  let dx=pos.x-d.startPointer.x,dy=pos.y-d.startPointer.y;
  if(!d.moved&&Math.hypot(dx,dy)<0.8)return; // below threshold — still a potential tap, not a drag yet
+ if(!d.moved&&svgEl.setPointerCapture)try{svgEl.setPointerCapture(d.pointerId)}catch(e){}
  d.moved=true;d.dx=dx;d.dy=dy;
- let g=svgEl.querySelector(`.fdMarker[data-id="${d.id}"]`);
+ let sel=d.type==="arrow"?`.fdArrow[data-id="${d.id}"]`:`.fdMarker[data-id="${d.id}"]`;
+ let g=svgEl.querySelector(sel);
  if(g)g.setAttribute("transform",`translate(${dx} ${dy})`);
 }
 function handleFieldPointerUp(evt,svgEl){
@@ -3392,9 +3422,22 @@ function handleFieldPointerUp(evt,svgEl){
   let items=curFieldItems(step);
   let item=items.find(it=>it.id===d.id);
   if(item){
+   pushFieldHistory();
    let vb=svgEl.viewBox.baseVal;
-   item.x=Math.max(0,Math.min(vb.width,d.startX+d.dx));
-   item.y=Math.max(0,Math.min(vb.height,d.startY+d.dy));
+   if(d.type==="arrow"){
+    // Clamp dx/dy as a whole (not per-point) so the arrow's shape isn't
+    // warped if one endpoint would otherwise clip against the edge.
+    let xs=d.startPoints.map(p=>p.x),ys=d.startPoints.map(p=>p.y);
+    let minX=Math.min(...xs),maxX=Math.max(...xs),minY=Math.min(...ys),maxY=Math.max(...ys);
+    let cdx=Math.max(-minX,Math.min(vb.width-maxX,d.dx));
+    let cdy=Math.max(-minY,Math.min(vb.height-maxY,d.dy));
+    let newPts=d.startPoints.map(p=>({x:p.x+cdx,y:p.y+cdy}));
+    if(item.points)item.points=newPts;
+    else{item.x1=newPts[0].x;item.y1=newPts[0].y;item.x2=newPts[1].x;item.y2=newPts[1].y;}
+   }else{
+    item.x=Math.max(0,Math.min(vb.width,d.startX+d.dx));
+    item.y=Math.max(0,Math.min(vb.height,d.startY+d.dy));
+   }
   }
  }
  fieldDraft.suppressNextClick=true;
@@ -3419,6 +3462,7 @@ function finishFieldArrow(){
   let ballArrowCount=items.filter(it=>it.kind==="arrow"&&it.style==="ball").length;
   label=String(ballArrowCount+1);
  }
+ pushFieldHistory();
  items.push({id:uid("fditem"),kind:"arrow",style:isBall?"ball":"player",points:fieldDraft.pendingArrowPoints.map(p=>({x:p.x,y:p.y})),label});
  fieldDraft.pendingArrowPoints=[];
  fieldDraft.pendingArrowStyle=null;
@@ -3454,8 +3498,22 @@ function fieldEditorHtml(fullscreen){
   let cancelArrowBtn=fieldDraft.pendingArrowPoints.length?`<button type="button" class="btn danger" title="Cancel Arrow" onclick="cancelFieldArrow()" style="font-size:14px;font-weight:700">✕</button>`:"";
   let exitBtn=`<button type="button" class="btn secondary" title="Exit Fullscreen" onclick="closeFieldFullscreen()" style="font-size:16px;font-weight:700">✕</button>`;
   let undoBtn=`<button type="button" class="btn secondary" title="Undo" onclick="undoFieldLast()">${icon("undo",16)}</button>`;
+  let redoKey=fieldHistoryKey();
+  let canRedo=!!(fieldDraft.history&&fieldDraft.history[redoKey]&&fieldDraft.history[redoKey].redo.length);
+  let redoBtn=`<button type="button" class="btn secondary" title="Redo" ${canRedo?"":"disabled"} onclick="redoFieldLast()" style="transform:scaleX(-1)">${icon("undo",16)}</button>`;
+  let exportBtn=`<button type="button" class="btn secondary" title="Export Diagram as Image" onclick="exportFieldDiagram()">${icon("download",16)}</button>`;
   let clearBtn=`<button type="button" class="btn danger" title="Clear Drawing" onclick="clearFieldStep()">${icon("trash",16)}</button>`;
-  let toolbar=`<div class="fdFsToolbar">${exitBtn}${stepPills}${addStepBtn}${duplicateStepBtn}${removeStepBtn}${shapeBtns}${toolBtns}${finishArrowBtn}${cancelArrowBtn}${undoBtn}${clearBtn}</div>`;
+  // Zoom (for precise placement on a small screen) + pan, fullscreen only.
+  // Panning scrolls #fieldFsCanvasArea natively (see sizeFullscreenCanvas,
+  // which makes the ground bigger than the viewport once zoomed) — the arrow
+  // buttons just nudge that scroll position, since a touch-drag on the SVG
+  // itself is already claimed by marker/arrow placement and dragging.
+  let zoomPct=Math.round((fieldDraft.fsZoom||1)*100);
+  let zoomOutBtn=`<button type="button" class="btn secondary" title="Zoom Out" ${fieldDraft.fsZoom<=FIELD_ZOOM_STEPS[0]?"disabled":""} onclick="zoomFieldBy(-1)" style="font-size:18px;font-weight:700">−</button>`;
+  let zoomLabel=`<div class="btn secondary" style="width:44px;font-size:11px;pointer-events:none">${zoomPct}%</div>`;
+  let zoomInBtn=`<button type="button" class="btn secondary" title="Zoom In" ${fieldDraft.fsZoom>=FIELD_ZOOM_STEPS[FIELD_ZOOM_STEPS.length-1]?"disabled":""} onclick="zoomFieldBy(1)" style="font-size:18px;font-weight:700">+</button>`;
+  let panBtns=(fieldDraft.fsZoom||1)>1?`<button type="button" class="btn secondary" title="Pan Up" onclick="panFieldFs(0,-1)" style="font-size:14px">▲</button><button type="button" class="btn secondary" title="Pan Down" onclick="panFieldFs(0,1)" style="font-size:14px">▼</button><button type="button" class="btn secondary" title="Pan Left" onclick="panFieldFs(-1,0)" style="font-size:14px">◀</button><button type="button" class="btn secondary" title="Pan Right" onclick="panFieldFs(1,0)" style="font-size:14px">▶</button>`:"";
+  let toolbar=`<div class="fdFsToolbar">${exitBtn}${stepPills}${addStepBtn}${duplicateStepBtn}${removeStepBtn}${shapeBtns}${toolBtns}${finishArrowBtn}${cancelArrowBtn}${undoBtn}${redoBtn}${exportBtn}${clearBtn}${zoomOutBtn}${zoomLabel}${zoomInBtn}${panBtns}</div>`;
   // The wrapper's exact pixel width/height is computed and set by
   // sizeFullscreenCanvas() right after this markup is inserted — CSS
   // aspect-ratio inside a flex layout turns out to distort under flex-shrink
@@ -3480,11 +3538,16 @@ function fieldEditorHtml(fullscreen){
   </div>
   <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">${toolsHtml}</div>
   ${fieldDraft.pendingArrowPoints.length?`<div style="display:flex;gap:6px;margin-bottom:8px">${fieldDraft.pendingArrowPoints.length>=2?`<button type="button" class="btn primary" style="padding:6px 12px;font-size:var(--fs-2)" onclick="finishFieldArrow()">✓ Finish Arrow</button>`:""}<button type="button" class="btn danger" style="padding:6px 12px;font-size:var(--fs-2)" onclick="cancelFieldArrow()">Cancel Arrow</button></div>`:""}
-  <div class="muted" style="font-size:var(--fs-1);margin-bottom:6px">Tap the ground to place a marker, or drag an existing one to reposition it. For an arrow, tap a start point, then tap again for each bend, then Finish Arrow (or tap Cancel Arrow to discard it). Tap an existing marker or arrow to remove it. Full, Half and Square Ground each keep their own separate drawing for this step.</div>`;
+  <div class="muted" style="font-size:var(--fs-1);margin-bottom:6px">Tap the ground to place a marker, or drag an existing marker or arrow to reposition it. For an arrow, tap a start point, then tap again for each bend, then Finish Arrow (or tap Cancel Arrow to discard it). Tap (without dragging) an existing marker or arrow to remove it. Full, Half and Square Ground each keep their own separate drawing for this step.</div>`;
+ let redoKeyN=fieldHistoryKey();
+ let canRedoN=!!(fieldDraft.history&&fieldDraft.history[redoKeyN]&&fieldDraft.history[redoKeyN].redo.length);
  let bottomBar=`<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
    <button type="button" class="btn secondary" style="padding:6px 10px;font-size:var(--fs-2)" onclick="undoFieldLast()">Undo</button>
+   <button type="button" class="btn secondary" style="padding:6px 10px;font-size:var(--fs-2)" ${canRedoN?"":"disabled"} onclick="redoFieldLast()">Redo</button>
    <button type="button" class="btn danger" style="padding:6px 10px;font-size:var(--fs-2)" onclick="clearFieldStep()">Clear Step</button>
    <button type="button" class="btn secondary" style="padding:6px 10px;font-size:var(--fs-2)" onclick="openFieldFullscreen()">⛶ Fullscreen</button>
+   <button type="button" class="btn secondary" style="padding:6px 10px;font-size:var(--fs-2)" onclick="exportFieldDiagram()">Export Image</button>
+   <button type="button" class="btn secondary" style="padding:6px 10px;font-size:var(--fs-2)" onclick="suggestDrillEquipment()">Suggest Equipment</button>
   </div>`;
  return `${controlsHtml}<div style="max-width:min(480px,100%);margin:0 auto">${fieldDiagramSvg(view,{interactive:true})}</div>${bottomBar}`;
 }
@@ -3501,18 +3564,52 @@ function sizeFullscreenCanvas(){
  let step=fieldDraft.steps[fieldDraft.activeStep];
  if(!step)return;
  let aspect=fieldFsAspect(curFieldShape(step));
+ // Measure the true available space unzoomed first (a still-zoomed wrap can
+ // itself be forcing the area to report a stale, scrolled size).
+ area.style.overflow="hidden";
+ wrap.style.width="";wrap.style.height="";
  let availW=area.clientWidth,availH=area.clientHeight;
  if(availW<=0||availH<=0)return;
  let w=availW,h=w/aspect;
  if(h>availH){h=availH;w=h*aspect}
- wrap.style.width=w+"px";
- wrap.style.height=h+"px";
+ let zoom=fieldDraft.fsZoom||1;
+ // flex-shrink:0 — .fdFsCanvasArea is a flex container, which by default
+ // shrinks a child along the main axis to avoid overflow; without this a
+ // zoomed-in (wider-than-the-area) wrap would just get squeezed back down to
+ // the unzoomed size instead of actually overflowing/becoming scrollable.
+ wrap.style.flexShrink="0";
+ wrap.style.width=(w*zoom)+"px";
+ wrap.style.height=(h*zoom)+"px";
+ // Zooming in makes the ground bigger than the viewport on purpose (room to
+ // place a marker precisely) — scrolling/panning then reaches the rest of
+ // it. At 1x there's nothing to scroll, so overflow stays hidden to avoid a
+ // stray 1px scrollbar.
+ area.style.overflow=zoom>1?"auto":"hidden";
+}
+// Zoom/pan (fullscreen editor only): lets a marker be placed precisely on a
+// small phone screen by zooming into part of the ground, then panning with
+// the arrow buttons to reach the rest of it. Resets to 1x whenever the step
+// or shape changes (updateFieldStepShape/switchFieldStep), since a zoomed
+// view of one ground has no meaning on another.
+const FIELD_ZOOM_STEPS=[1,1.5,2,2.5,3];
+function zoomFieldBy(dir){
+ let i=FIELD_ZOOM_STEPS.indexOf(fieldDraft.fsZoom||1);
+ if(i<0)i=0;
+ i=Math.max(0,Math.min(FIELD_ZOOM_STEPS.length-1,i+dir));
+ fieldDraft.fsZoom=FIELD_ZOOM_STEPS[i];
+ renderFieldEditor();
+}
+function panFieldFs(dx,dy){
+ let area=document.getElementById("fieldFsCanvasArea");
+ if(!area)return;
+ area.scrollBy({left:dx*area.clientWidth*0.4,top:dy*area.clientHeight*0.4,behavior:"auto"});
 }
 function renderFieldEditor(){
  let box=document.getElementById("fieldEditorBody");
  if(box)box.innerHTML=fieldEditorHtml(false);
  let fsBox=document.getElementById("fieldEditorFullscreenBody");
  if(fsBox){fsBox.innerHTML=fieldEditorHtml(true);sizeFullscreenCanvas()}
+ if(box||fsBox)autosaveDrillDraft();
 }
 function openFieldFullscreen(){
  let overlay=document.createElement("div");
@@ -3541,6 +3638,7 @@ function closeFieldFullscreen(){
  window.removeEventListener("orientationchange",sizeFullscreenCanvas);
  let el=document.getElementById("fieldFullscreenOverlay");
  if(el)el.remove();
+ fieldDraft.fsZoom=1;
 }
 // One-time (ever) nudge to rotate for a bigger view — only worth showing for
 // Half Ground, since that wide shape is the one that actually gains a lot from
@@ -3565,7 +3663,7 @@ function setFieldTool(t){
  renderFieldEditor();
 }
 function switchFieldStep(i){
- fieldDraft.activeStep=i;fieldDraft.tool=null;fieldDraft.pendingArrowPoints=[];fieldDraft.pendingArrowStyle=null;
+ fieldDraft.activeStep=i;fieldDraft.tool=null;fieldDraft.pendingArrowPoints=[];fieldDraft.pendingArrowStyle=null;fieldDraft.fsZoom=1;
  renderFieldEditor();
 }
 function addFieldStep(){
@@ -3607,8 +3705,26 @@ function updateFieldStepShape(shape){
  // Just switches which of the step's independent drawings (full/half/square)
  // is being viewed and edited — never moves or copies items between them.
  step.activeShape=(shape==="half"||shape==="square")?shape:"full";
- fieldDraft.tool=null;fieldDraft.pendingArrowPoints=[];fieldDraft.pendingArrowStyle=null;
+ fieldDraft.tool=null;fieldDraft.pendingArrowPoints=[];fieldDraft.pendingArrowStyle=null;fieldDraft.fsZoom=1;
  renderFieldEditor();
+}
+// Undo/redo works on whole-items-array snapshots, kept per step+shape (so
+// undoing on Half Ground never touches Full Ground's history) and only in
+// memory for the current editing session — nothing here is persisted.
+function fieldHistoryKey(){
+ let step=fieldDraft.steps[fieldDraft.activeStep];
+ return step?(fieldDraft.activeStep+"_"+curFieldShape(step)):null;
+}
+function pushFieldHistory(){
+ let key=fieldHistoryKey();
+ let step=fieldDraft.steps[fieldDraft.activeStep];
+ if(!key||!step)return;
+ if(!fieldDraft.history)fieldDraft.history={};
+ if(!fieldDraft.history[key])fieldDraft.history[key]={undo:[],redo:[]};
+ let h=fieldDraft.history[key];
+ h.undo.push(JSON.stringify(curFieldItems(step)));
+ if(h.undo.length>25)h.undo.shift();
+ h.redo=[]; // a fresh action invalidates whatever could have been redone
 }
 function undoFieldLast(){
  // Mid-draw (an arrow with at least one point placed but not yet finished)
@@ -3621,10 +3737,22 @@ function undoFieldLast(){
   return;
  }
  let step=fieldDraft.steps[fieldDraft.activeStep];
- if(!step)return;
- let items=curFieldItems(step);
- if(!items.length)return;
- items.pop();
+ let key=fieldHistoryKey();
+ if(!step||!key)return;
+ let h=fieldDraft.history&&fieldDraft.history[key];
+ if(!h||!h.undo.length)return;
+ h.redo.push(JSON.stringify(curFieldItems(step)));
+ step[curFieldShape(step)].items=JSON.parse(h.undo.pop());
+ renderFieldEditor();
+}
+function redoFieldLast(){
+ let step=fieldDraft.steps[fieldDraft.activeStep];
+ let key=fieldHistoryKey();
+ if(!step||!key)return;
+ let h=fieldDraft.history&&fieldDraft.history[key];
+ if(!h||!h.redo.length)return;
+ h.undo.push(JSON.stringify(curFieldItems(step)));
+ step[curFieldShape(step)].items=JSON.parse(h.redo.pop());
  renderFieldEditor();
 }
 function clearFieldStep(){
@@ -3632,6 +3760,7 @@ function clearFieldStep(){
  if(!step)return;
  let shapeLabel=curFieldShape(step)==="half"?"Half Ground":curFieldShape(step)==="square"?"Square Ground":"Full Ground";
  if(!confirm(`Clear everything on this step's ${shapeLabel} diagram?`))return;
+ pushFieldHistory();
  step[curFieldShape(step)].items=[];
  renderFieldEditor();
 }
@@ -3671,13 +3800,38 @@ function drillFormHtml(d,mode){d=d||{};return `<div class="sheetHead"><h2>${mode
 function openDrillForm(existing,mode){
  drillDraftDiagram=existing&&existing.diagram?existing.diagram:null;
  editingDrillId=mode==="edit"?existing.id:null;
- fieldDraft={steps:existing&&existing.fieldSteps?JSON.parse(JSON.stringify(existing.fieldSteps)).map(normalizeFieldStep):[],activeStep:0,tool:null,pendingArrowPoints:[],pendingArrowStyle:null,dragState:null};
+ let baseSteps=existing&&existing.fieldSteps?JSON.parse(JSON.stringify(existing.fieldSteps)).map(normalizeFieldStep):[];
+ // Recover a field diagram from an interrupted session (modal closed, app
+ // backgrounded/crashed, tab closed) before it was ever explicitly saved —
+ // see autosaveDrillDraft(), called on every diagram edit.
+ let as=db.drillDraftAutosave;
+ if(as&&as.editingDrillId===editingDrillId&&as.fieldSteps&&as.fieldSteps.length&&JSON.stringify(as.fieldSteps)!==JSON.stringify(baseSteps)){
+  if(confirm("Found an unsaved field diagram from a previous session for this drill. Restore it?")){
+   baseSteps=as.fieldSteps.map(normalizeFieldStep);
+  }else{
+   db.drillDraftAutosave=null;save();
+  }
+ }
+ fieldDraft={steps:baseSteps,activeStep:0,tool:null,pendingArrowPoints:[],pendingArrowStyle:null,dragState:null,fsZoom:1};
  modal(drillFormHtml(existing,mode));
  renderDrillDiagramPreview();
  renderFieldEditor();
 }
 function newDrill(){openDrillForm(null,"new")}
 function editDrill(id){let d=db.drills.find(x=>x.id===id);if(!d)return;openDrillForm(d,"edit")}
+// Debounced autosave: keeps the in-progress field diagram backed up to the
+// db (so an interrupted session — closing the modal, the app being killed —
+// doesn't lose a half-built drawing) without writing to IndexedDB on every
+// single marker placement.
+let drillDraftAutosaveTimer=null;
+function autosaveDrillDraft(){
+ if(drillDraftAutosaveTimer)clearTimeout(drillDraftAutosaveTimer);
+ drillDraftAutosaveTimer=setTimeout(()=>{
+  if(!fieldDraft.steps||!fieldDraft.steps.length)return;
+  db.drillDraftAutosave={editingDrillId:editingDrillId,fieldSteps:JSON.parse(JSON.stringify(fieldDraft.steps)),ts:Date.now()};
+  save();
+ },800);
+}
 function saveDrill(e){
  e.preventDefault();
  if(!requireWriteAccess())return;
@@ -3686,16 +3840,102 @@ function saveDrill(e){
  d.fieldSteps=JSON.parse(JSON.stringify(fieldDraft.steps));
  if(editingDrillId){let idx=db.drills.findIndex(x=>x.id===editingDrillId);if(idx>-1){d.id=editingDrillId;db.drills[idx]=d}}
  else{d.id=uid("drill");db.drills.push(d)}
- editingDrillId=null;drillDraftDiagram=null;fieldDraft={steps:[],activeStep:0,tool:null,pendingArrowPoints:[],pendingArrowStyle:null,dragState:null};closeM();save();
+ editingDrillId=null;drillDraftDiagram=null;fieldDraft={steps:[],activeStep:0,tool:null,pendingArrowPoints:[],pendingArrowStyle:null,dragState:null,fsZoom:1};
+ db.drillDraftAutosave=null;
+ closeM();save();
 }
 function delDrill(id){if(confirm("Delete this drill?")){db.drills=db.drills.filter(x=>x.id!==id);save()}}
+function duplicateDrill(id){
+ if(!requireWriteAccess())return;
+ let d=db.drills.find(x=>x.id===id);
+ if(!d)return;
+ let copy=JSON.parse(JSON.stringify(d));
+ copy.id=uid("drill");
+ copy.name=(d.name||"Drill")+" (Copy)";
+ if(copy.fieldSteps)copy.fieldSteps=copy.fieldSteps.map(st=>{
+  st=normalizeFieldStep(st);
+  st.full.items=(st.full.items||[]).map(it=>({...it,id:uid("fditem")}));
+  st.half.items=(st.half.items||[]).map(it=>({...it,id:uid("fditem")}));
+  st.square.items=(st.square.items||[]).map(it=>({...it,id:uid("fditem")}));
+  return st;
+ });
+ db.drills.push(copy);
+ save();
+ drills();
+}
+// Equipment auto-tally: counts the marker types actually placed across every
+// step/shape of the drill being edited and turns that into a suggested
+// "Equipment needed" line — e.g. "4 cones, 2 stumps, 1 target". It fills the
+// field rather than silently overwriting whatever the coach already typed.
+const FIELD_EQUIPMENT_LABELS={cone:"cone",gate:"cone gate",stumps:"stumps",target:"target",ball:"ball",wk:"keeper"};
+function tallyFieldEquipment(){
+ let counts={};
+ let add=(label,n)=>{counts[label]=(counts[label]||0)+n};
+ fieldDraft.steps.forEach(step=>{
+  ["full","half","square"].forEach(shape=>{
+   (step[shape]&&step[shape].items||[]).forEach(it=>{
+    if(it.kind!=="marker")return;
+    let label=FIELD_EQUIPMENT_LABELS[it.type];
+    if(!label)return;
+    if(it.type==="gate"){add("cone gate",1);add("cone",2)} // each gate is built from 2 cones
+    else add(label,1);
+   });
+  });
+ });
+ return counts;
+}
+function suggestDrillEquipment(){
+ let counts=tallyFieldEquipment();
+ let parts=Object.keys(counts).map(label=>`${counts[label]} ${label}${counts[label]>1&&!label.endsWith("s")?"s":""}`);
+ if(!parts.length){alert("No cones, stumps, targets or gates placed on the diagram yet — add some markers first, or type equipment in manually.");return}
+ let input=document.querySelector('.modal.open input[name="equipment"]');
+ if(!input)return;
+ let suggestion=parts.join(", ");
+ if(input.value&&input.value.trim()&&!confirm(`Replace the current Equipment field with "${suggestion}"?`))return;
+ input.value=suggestion;
+}
+// Export Diagram: rasterizes the current step's ground (at a fixed, print-
+// quality pixel size) to a standalone PNG the coach can share outside the app
+// (WhatsApp, print handout, etc.) — separate from the full drill/session report.
+function exportFieldDiagram(){
+ let step=fieldDraft.steps[fieldDraft.activeStep];
+ if(!step){alert("No diagram to export.");return}
+ let shape=curFieldShape(step);
+ let items=curFieldItems(step);
+ if(!items.length){alert("This step's diagram is empty — add some markers first.");return}
+ let vb=shape==="half"?{w:1200,h:720}:{w:1200,h:1200};
+ let svgStr=fieldDiagramSvg({shape:shape,items:items},{exportPx:vb});
+ let blob=new Blob([svgStr],{type:"image/svg+xml;charset=utf-8"});
+ let url=URL.createObjectURL(blob);
+ let img=new Image();
+ img.onload=()=>{
+  let canvas=document.createElement("canvas");
+  canvas.width=vb.w;canvas.height=vb.h;
+  let ctx=canvas.getContext("2d");
+  ctx.drawImage(img,0,0,vb.w,vb.h);
+  URL.revokeObjectURL(url);
+  canvas.toBlob(pngBlob=>{
+   if(!pngBlob){alert("Couldn't export the diagram image.");return}
+   let pngUrl=URL.createObjectURL(pngBlob);
+   let nameInput=document.querySelector('.modal.open input[name="name"]');
+   let base=(nameInput&&nameInput.value.trim())||"drill-diagram";
+   let fname=(base+"-"+(step.label||("step"+(fieldDraft.activeStep+1)))).toLowerCase().replace(/[^a-z0-9]+/g,"-").replace(/(^-|-$)/g,"")||"drill-diagram";
+   let a=document.createElement("a");
+   a.href=pngUrl;a.download=fname+".png";
+   document.body.appendChild(a);a.click();a.remove();
+   setTimeout(()=>URL.revokeObjectURL(pngUrl),2000);
+  },"image/png");
+ };
+ img.onerror=()=>{URL.revokeObjectURL(url);alert("Couldn't export the diagram image.")};
+ img.src=url;
+}
 function fieldStepsPreviewHtml(fieldSteps,size){
  if(!fieldSteps||!fieldSteps.length)return "";
  size=size||130;
  let steps=fieldSteps.map(normalizeFieldStep);
  return `<div class="fieldStepPreviewWrap" style="display:flex;gap:${size>=200?16:8}px;flex-wrap:wrap;margin:10px 0">${steps.map(st=>{let shape=curFieldShape(st);let view={shape:shape,items:curFieldItems(st)};return `<div class="fieldStepBlock" style="width:${size}px"><div style="font-size:${size>=200?"var(--fs-2)":"var(--fs-1)"};color:var(--muted);margin-bottom:3px;text-align:center">${esc(st.label||"")}</div>${fieldDiagramSvg(view,{interactive:false})}</div>`}).join("")}</div>`;
 }
-function drillCardHtml(d){return `<div class="card"><span class="tag">${esc(d.cat||"General")}</span><h3>${esc(d.name)}</h3><div class="muted">${esc(d.players||"")}${d.duration?" · "+esc(d.duration):""}${d.equipment?" · "+esc(d.equipment):""}</div>${d.diagram?`<img src="${d.diagram}" style="max-width:100%;border-radius:10px;margin:10px 0">`:""}${fieldStepsPreviewHtml(d.fieldSteps)}<p>${esc(d.points||"")}</p>${d.progressions?`<div class="muted"><b>Progression:</b> ${esc(d.progressions)}</div>`:""}${d.regressions?`<div class="muted"><b>Regression:</b> ${esc(d.regressions)}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary iconBtn" title="Edit" onclick="editDrill('${d.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delDrill('${d.id}')">${icon("trash",17)}</button></div></div>`}
+function drillCardHtml(d){return `<div class="card"><span class="tag">${esc(d.cat||"General")}</span><h3>${esc(d.name)}</h3><div class="muted">${esc(d.players||"")}${d.duration?" · "+esc(d.duration):""}${d.equipment?" · "+esc(d.equipment):""}</div>${d.diagram?`<img src="${d.diagram}" style="max-width:100%;border-radius:10px;margin:10px 0">`:""}${fieldStepsPreviewHtml(d.fieldSteps)}<p>${esc(d.points||"")}</p>${d.progressions?`<div class="muted"><b>Progression:</b> ${esc(d.progressions)}</div>`:""}${d.regressions?`<div class="muted"><b>Regression:</b> ${esc(d.regressions)}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary iconBtn" title="Edit" onclick="editDrill('${d.id}')">${icon("edit",17)}</button><button class="btn secondary iconBtn" title="Duplicate Drill" onclick="duplicateDrill('${d.id}')">${icon("copy",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delDrill('${d.id}')">${icon("trash",17)}</button></div></div>`}
 function drillLibraryReport(){
  let list=db.drills.slice().sort((a,b)=>String(a.cat||"").localeCompare(String(b.cat||""))||String(a.name||"").localeCompare(String(b.name||"")));
  reportShell("Drill Library",`${list.length} drills`,
