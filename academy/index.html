@@ -1204,7 +1204,7 @@ const SUPABASE_URL = 'https://tjcrpnwmaadfcvdbthaz.supabase.co';
 // instead of silently staying stale. version.json must be redeployed
 // alongside this file on every future update, with a matching bump to
 // APP_BUILD_VERSION below — these two must always move together.
-const APP_BUILD_VERSION = '2026-09-30-14:05';
+const APP_BUILD_VERSION = '2026-10-03-20:28';
 async function checkForUpdate() {
   try {
     const res = await fetch('./version.json', { cache: 'no-store' });
@@ -1960,13 +1960,14 @@ function fillSelect(sel, items, placeholder) {
   for (const it of items) { const o = document.createElement('option'); o.value = it.id; o.textContent = it.name; sel.appendChild(o); }
 }
 
-function listRow(mainHtml, tagText, onEdit, onDelete) {
+function listRow(mainHtml, tagText, onEdit, onDelete, onDuplicate) {
   const row = document.createElement('div'); row.className = 'list-item';
   const left = document.createElement('span'); left.innerHTML = mainHtml;
   const right = document.createElement('span'); right.className = 'actions';
   const tag = document.createElement('span'); tag.className = 'role-tag'; tag.textContent = tagText || '';
   right.appendChild(tag);
   if (onEdit) { const b=document.createElement('button'); b.className='link-btn'; b.textContent='Edit'; b.onclick=onEdit; right.appendChild(b); }
+  if (onDuplicate) { const b=document.createElement('button'); b.className='link-btn'; b.textContent='Duplicate'; b.onclick=onDuplicate; right.appendChild(b); }
   if (onDelete) { const b=document.createElement('button'); b.className='link-btn danger'; b.textContent='Delete'; b.onclick=onDelete; right.appendChild(b); }
   row.appendChild(left); row.appendChild(right);
   return row;
@@ -4033,11 +4034,17 @@ document.getElementById('player-team-filter').addEventListener('change', (e) => 
 // adapted only to this app's icon()/esc()/btn class conventions.
 // ============================================================
 function fdUid(p) { return (p || 'id') + '_' + Math.random().toString(36).slice(2, 9) + Date.now().toString(36).slice(-4); }
-let fieldDraft = { steps: [], activeStep: 0, tool: null, pendingArrowStart: null };
+function freshFieldDraft() { return { steps: [], activeStep: 0, tool: null, pendingArrowPoints: [], pendingArrowStyle: null, history: {}, fsZoom: 1, dragState: null, suppressNextClick: false }; }
+let fieldDraft = freshFieldDraft();
+const FIELD_ZOOM_STEPS = [1, 1.5, 2, 2.5, 3];
+const FIELD_EQUIPMENT_LABELS = { cone: 'cone', stumps: 'stumps' };
 const FIELD_TOOLS = [
   { id: 'coach', label: 'Coach' },
   { id: 'player', label: 'Player' },
+  { id: 'wk', label: 'Keeper' },
   { id: 'cone', label: 'Cone' },
+  { id: 'gate', label: 'Cone Gate' },
+  { id: 'target', label: 'Target' },
   { id: 'ball', label: 'Ball' },
   { id: 'stumps', label: 'Stumps' },
   { id: 'arrowBall', label: 'Ball →' },
@@ -4061,6 +4068,9 @@ function fieldToolIconSvg(id) {
      <rect x="${x2 - sw / 2}" y="${topY - 1.3}" width="${gap + sw}" height="1.4" rx="0.4" fill="#c9a86a" stroke="#4a3620" stroke-width="0.6"/>
     </svg>`;
   }
+  if (id === 'wk') return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#2f5233" stroke="#0e1f11" stroke-width="1.3"/><text x="12" y="15.3" text-anchor="middle" font-size="7.5" font-weight="800" fill="#f4f1e8" font-family="inherit">WK</text></svg>`;
+  if (id === 'gate') return `<svg width="20" height="20" viewBox="0 0 24 24"><polygon points="6,8 2,20 10,20" fill="#f97316" stroke="#5c2c06" stroke-width="1.1"/><polygon points="18,8 14,20 22,20" fill="#f97316" stroke="#5c2c06" stroke-width="1.1"/></svg>`;
+  if (id === 'target') return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#2ecc71" stroke-width="1.6" stroke-dasharray="3 2"/><circle cx="12" cy="12" r="2" fill="#2ecc71"/></svg>`;
   if (id === 'arrowBall' || id === 'arrowPlayer') {
     const isBall = id === 'arrowBall';
     const color = isBall ? '#c0392b' : '#3b82f6';
@@ -4069,9 +4079,14 @@ function fieldToolIconSvg(id) {
   }
   if (id === 'shapeFull') return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="8.5"/></svg>`;
   if (id === 'shapeHalf') return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="3.5" y="7" width="17" height="10" rx="1.5"/></svg>`;
+  if (id === 'shapeSquare') return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="4" width="16" height="16" rx="1.5"/></svg>`;
   if (id === 'plus') return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>`;
   if (id === 'undo') return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`;
+  if (id === 'redo') return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="transform:scaleX(-1)"><path d="M9 14 4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/></svg>`;
   if (id === 'trash') return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16"/><path d="M10 11v6M14 11v6"/><path d="M6 7l1 12.5a2 2 0 0 0 2 1.8h6a2 2 0 0 0 2-1.8L18 7"/><path d="M9.5 7V4.5a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1V7"/></svg>`;
+  if (id === 'copy') return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="8" y="8" width="12" height="12" rx="1.5"/><path d="M5 15.5V5.5A1.5 1.5 0 0 1 6.5 4h10"/></svg>`;
+  if (id === 'check') return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5 10 17 19 7"/></svg>`;
+  if (id === 'download') return `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v12M7 11l5 5 5-5"/><path d="M5 19.5h14"/></svg>`;
   return '';
 }
 // opts.xComp counter-scales a marker's x-extent so it still looks round/upright
@@ -4087,20 +4102,41 @@ function fieldMarkerSvg(m, opts) {
   function textWrap(x, inner) { return xComp !== 1 ? `<g transform="translate(${x} 0) scale(${xComp} 1) translate(${-x} 0)">${inner}</g>` : inner; }
   if (m.type === 'player') {
     const r = 2.3 * k, fs = 1.5 * k;
-    return `<g class="fdMarker" data-id="${m.id}"><ellipse cx="${m.x}" cy="${m.y}" rx="${r * xComp}" ry="${r}" fill="#f4f1e8" stroke="#0a1420" stroke-width="0.45"/>${textWrap(m.x, `<text x="${m.x}" y="${m.y + 0.5 * k}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="#0a1420" font-family="inherit">${esc(m.label || '')}</text>`)}</g>`;
+    return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><ellipse cx="${m.x}" cy="${m.y}" rx="${r * xComp}" ry="${r}" fill="#f4f1e8" stroke="#0a1420" stroke-width="0.45"/>${textWrap(m.x, `<text x="${m.x}" y="${m.y + 0.5 * k}" text-anchor="middle" font-size="${fs}" font-weight="700" fill="#0a1420" font-family="inherit">${esc(m.label || '')}</text>`)}</g>`;
   }
   if (m.type === 'coach') {
     const r = 2.5 * k, fs = 1.7 * k;
-    return `<g class="fdMarker" data-id="${m.id}"><ellipse cx="${m.x}" cy="${m.y}" rx="${r * xComp}" ry="${r}" fill="#f2994a" stroke="#3d2410" stroke-width="0.45"/>${textWrap(m.x, `<text x="${m.x}" y="${m.y + 0.65 * k}" text-anchor="middle" font-size="${fs}" font-weight="800" fill="#2b1200" font-family="inherit">${esc(m.label || 'C')}</text>`)}</g>`;
+    return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><ellipse cx="${m.x}" cy="${m.y}" rx="${r * xComp}" ry="${r}" fill="#f2994a" stroke="#3d2410" stroke-width="0.45"/>${textWrap(m.x, `<text x="${m.x}" y="${m.y + 0.65 * k}" text-anchor="middle" font-size="${fs}" font-weight="800" fill="#2b1200" font-family="inherit">${esc(m.label || 'C')}</text>`)}</g>`;
+  }
+  if (m.type === 'wk') {
+    const r = 2.5 * k, fs = 1.3 * k;
+    return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><ellipse cx="${m.x}" cy="${m.y}" rx="${r * xComp}" ry="${r}" fill="#2f5233" stroke="#0e1f11" stroke-width="0.45"/>${textWrap(m.x, `<text x="${m.x}" y="${m.y + 0.5 * k}" text-anchor="middle" font-size="${fs}" font-weight="800" fill="#f4f1e8" font-family="inherit">${esc(m.label || 'WK')}</text>`)}</g>`;
   }
   if (m.type === 'cone') {
     const numHtml = m.label ? textWrap(m.x, `<text x="${m.x}" y="${m.y + 2.75}" text-anchor="middle" font-size="1.5" font-weight="700" fill="#f4f1e8" font-family="inherit">${esc(m.label)}</text>`) : '';
-    return `<g class="fdMarker" data-id="${m.id}"><polygon points="${m.x},${m.y - 1.9} ${m.x - 1.65 * xComp},${m.y + 1.5} ${m.x + 1.65 * xComp},${m.y + 1.5}" fill="#f97316" stroke="#5c2c06" stroke-width="0.35"/>${numHtml}</g>`;
+    return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><polygon points="${m.x},${m.y - 1.9} ${m.x - 1.65 * xComp},${m.y + 1.5} ${m.x + 1.65 * xComp},${m.y + 1.5}" fill="#f97316" stroke="#5c2c06" stroke-width="0.35"/>${numHtml}</g>`;
   }
-  if (m.type === 'ball') return `<g class="fdMarker" data-id="${m.id}"><ellipse cx="${m.x}" cy="${m.y}" rx="${1.4 * xComp}" ry="1.4" fill="#c0392b" stroke="#3d0f0a" stroke-width="0.35"/></g>`;
+  if (m.type === 'gate') {
+    // Two small cones a fixed gap apart, centered on the tapped point — the
+    // "run/throw through here" gate a lot of fielding drills use. One
+    // placeable/draggable unit (moves both cones together), not two markers.
+    const gap = 4 * xComp, leftX = m.x - gap, rightX = m.x + gap;
+    const numHtml = m.label ? textWrap(m.x, `<text x="${m.x}" y="${m.y + 2.75}" text-anchor="middle" font-size="1.4" font-weight="700" fill="#f4f1e8" font-family="inherit">${esc(m.label)}</text>`) : '';
+    return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer">
+     <polygon points="${leftX},${m.y - 1.5} ${leftX - 1.3 * xComp},${m.y + 1.2} ${leftX + 1.3 * xComp},${m.y + 1.2}" fill="#f97316" stroke="#5c2c06" stroke-width="0.3"/>
+     <polygon points="${rightX},${m.y - 1.5} ${rightX - 1.3 * xComp},${m.y + 1.2} ${rightX + 1.3 * xComp},${m.y + 1.2}" fill="#f97316" stroke="#5c2c06" stroke-width="0.3"/>
+     <line x1="${leftX}" y1="${m.y + 1.2}" x2="${rightX}" y2="${m.y + 1.2}" stroke="#f97316" stroke-width="0.25" stroke-dasharray="0.6 0.5"/>
+     ${numHtml}
+    </g>`;
+  }
+  if (m.type === 'target') {
+    const r = 2.6 * k;
+    return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><ellipse cx="${m.x}" cy="${m.y}" rx="${r * xComp}" ry="${r}" fill="rgba(46,204,113,0.18)" stroke="#2ecc71" stroke-width="0.5" stroke-dasharray="1 0.7"/><ellipse cx="${m.x}" cy="${m.y}" rx="${0.6 * xComp}" ry="0.6" fill="#2ecc71"/>${m.label ? textWrap(m.x, `<text x="${m.x}" y="${m.y - r - 0.8}" text-anchor="middle" font-size="1.5" font-weight="700" fill="#2ecc71" font-family="inherit">${esc(m.label)}</text>`) : ''}</g>`;
+  }
+  if (m.type === 'ball') return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><ellipse cx="${m.x}" cy="${m.y}" rx="${1.4 * xComp}" ry="1.4" fill="#c0392b" stroke="#3d0f0a" stroke-width="0.35"/></g>`;
   if (m.type === 'stumps') {
     const sw = 0.45 * xComp, sh = 3.2, gap = 1.1 * xComp, x1 = m.x - gap, x2 = m.x, x3 = m.x + gap, topY = m.y - 1.7;
-    return `<g class="fdMarker" data-id="${m.id}">
+    return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer">
      <rect x="${x1 - sw / 2}" y="${topY}" width="${sw}" height="${sh}" rx="0.13" fill="#e8c896" stroke="#4a3620" stroke-width="0.2"/>
      <rect x="${x2 - sw / 2}" y="${topY}" width="${sw}" height="${sh}" rx="0.13" fill="#e8c896" stroke="#4a3620" stroke-width="0.2"/>
      <rect x="${x3 - sw / 2}" y="${topY}" width="${sw}" height="${sh}" rx="0.13" fill="#e8c896" stroke="#4a3620" stroke-width="0.2"/>
@@ -4110,6 +4146,28 @@ function fieldMarkerSvg(m, opts) {
   }
   return '';
 }
+// An arrow can be a straight 2-point hop (the original shape) or a multi-point
+// path with bends added via Finish Arrow's "tap to add a point" flow. Older
+// saved arrows only ever have x1/y1/x2/y2 — arrowPointsOf reads either shape
+// so nothing already saved needs migrating.
+function arrowPointsOf(a) {
+  if (a.points && a.points.length) return a.points;
+  return [{ x: a.x1, y: a.y1 }, { x: a.x2, y: a.y2 }];
+}
+// Where to put a ball-path's numbered badge: the midpoint along the whole
+// path's length (not just the midpoint of the first/last point), so a bendy
+// path still gets its number roughly centered on the line the eye follows.
+function pathMidpoint(pts) {
+  if (pts.length < 2) return pts[0] || { x: 0, y: 0 };
+  const segLens = []; let total = 0;
+  for (let i = 0; i < pts.length - 1; i++) { const len = Math.hypot(pts[i + 1].x - pts[i].x, pts[i + 1].y - pts[i].y); segLens.push(len); total += len; }
+  const half = total / 2; let acc = 0;
+  for (let i = 0; i < segLens.length; i++) {
+    if (acc + segLens[i] >= half) { const t = segLens[i] ? (half - acc) / segLens[i] : 0; return { x: pts[i].x + (pts[i + 1].x - pts[i].x) * t, y: pts[i].y + (pts[i + 1].y - pts[i].y) * t }; }
+    acc += segLens[i];
+  }
+  return pts[pts.length - 1];
+}
 function fieldArrowSvg(a, opts) {
   opts = opts || {};
   const xComp = opts.xComp || 1;
@@ -4117,30 +4175,35 @@ function fieldArrowSvg(a, opts) {
   const color = isBall ? '#c0392b' : '#3b82f6';
   const dashAttr = isBall ? '' : ' stroke-dasharray="1.4 1"';
   const markerId = isBall ? 'fdArrowBall' : 'fdArrowPlayer';
-  const line = `<line class="fdArrow" data-id="${a.id}" x1="${a.x1}" y1="${a.y1}" x2="${a.x2}" y2="${a.y2}" stroke="${color}" stroke-width="0.65" ${dashAttr} marker-end="url(#${markerId})"/>`;
+  const pts = arrowPointsOf(a);
+  const pointsStr = pts.map(p => `${p.x},${p.y}`).join(' ');
+  const line = `<polyline points="${pointsStr}" fill="none" stroke="${color}" stroke-width="0.65" ${dashAttr} marker-end="url(#${markerId})"/>`;
   let badge = '';
   if (isBall && a.label) {
-    const mx = (a.x1 + a.x2) / 2, my = (a.y1 + a.y2) / 2;
+    const mid = pathMidpoint(pts), mx = mid.x, my = mid.y;
     const textEl = `<text x="${mx}" y="${my + 0.5}" text-anchor="middle" font-size="1.6" font-weight="700" fill="#f4f1e8" font-family="inherit">${esc(a.label)}</text>`;
     const textWrapped = xComp !== 1 ? `<g transform="translate(${mx} 0) scale(${xComp} 1) translate(${-mx} 0)">${textEl}</g>` : textEl;
-    badge = `<g class="fdArrow" data-id="${a.id}"><ellipse cx="${mx}" cy="${my}" rx="${1.5 * xComp}" ry="1.5" fill="#0a1420" stroke="${color}" stroke-width="0.3"/>${textWrapped}</g>`;
+    badge = `<ellipse cx="${mx}" cy="${my}" rx="${1.5 * xComp}" ry="1.5" fill="#0a1420" stroke="${color}" stroke-width="0.3"/>${textWrapped}`;
   }
-  return line + badge;
+  // Whole arrow (line + badge) is one <g class="fdArrow"> so a drag transform
+  // moves both together and tap-to-delete hit-tests a single element.
+  return `<g class="fdArrow" data-id="${a.id}" style="cursor:pointer">${line}${badge}</g>`;
 }
 // Each diagram step keeps a fully separate marker/arrow list per ground shape
-// (step.full.items and step.half.items) so switching the Full/Half Ground
-// toggle never mixes or loses a drawing — what's drawn on one shape's
-// canvas stays there when you switch to the other and switch back.
+// (step.full.items, step.half.items, step.square.items) so switching between
+// Full/Half/Square Ground never mixes or loses a drawing — what's drawn on
+// one shape's canvas stays there when you switch to another and switch back.
 function normalizeFieldStep(st) {
   st = st || {};
-  if (st.full || st.half) {
-    return { label: st.label || '', activeShape: st.activeShape === 'half' ? 'half' : 'full', full: { items: (st.full && st.full.items) || [] }, half: { items: (st.half && st.half.items) || [] } };
+  if (st.full || st.half || st.square) {
+    const activeShape = (st.activeShape === 'half' || st.activeShape === 'square') ? st.activeShape : 'full';
+    return { label: st.label || '', activeShape, full: { items: (st.full && st.full.items) || [] }, half: { items: (st.half && st.half.items) || [] }, square: { items: (st.square && st.square.items) || [] } };
   }
   const shape = st.shape === 'half' ? 'half' : 'full';
   const items = st.items || [];
-  return { label: st.label || '', activeShape: shape, full: { items: shape === 'half' ? [] : items }, half: { items: shape === 'half' ? items : [] } };
+  return { label: st.label || '', activeShape: shape, full: { items: shape === 'half' ? [] : items }, half: { items: shape === 'half' ? items : [] }, square: { items: [] } };
 }
-function curFieldShape(step) { return step.activeShape === 'half' ? 'half' : 'full'; }
+function curFieldShape(step) { return (step.activeShape === 'half' || step.activeShape === 'square') ? step.activeShape : 'full'; }
 function curFieldItems(step) {
   const shape = curFieldShape(step);
   if (!step[shape]) step[shape] = { items: [] };
@@ -4150,7 +4213,7 @@ function curFieldItems(step) {
 function fieldDiagramSvg(view, opts) {
   opts = opts || {};
   const interactive = !!opts.interactive;
-  const shape = view.shape === 'half' ? 'half' : 'full';
+  const shape = (view.shape === 'half' || view.shape === 'square') ? view.shape : 'full';
   const vb = shape === 'half' ? { w: 100, h: 60 } : { w: 100, h: 100 };
   // opts.aspect (Full Ground fullscreen-in-landscape only) lets the wrapper be
   // drawn wider than tall so the ground uses the extra landscape width — the
@@ -4159,24 +4222,45 @@ function fieldDiagramSvg(view, opts) {
   // so individual markers and labels still look round/upright on top of it.
   const dispAspect = opts.aspect || 1;
   const xComp = dispAspect !== 1 ? 1 / dispAspect : 1;
+  // Square Ground is deliberately bare — just a big green square, no pitch or
+  // boundary markings — for fielding drills that don't need the real ground's
+  // shape and want the most usable space.
   const bg = shape === 'half'
     ? `<rect x="0" y="0" width="100" height="60" fill="#1c4726"/><rect x="38" y="50" width="24" height="8" fill="rgba(244,241,232,0.12)" stroke="rgba(244,241,232,0.5)" stroke-width="0.4"/>`
+    : shape === 'square'
+    ? `<rect x="0" y="0" width="100" height="100" fill="#1c4726"/>`
     : `<circle cx="50" cy="50" r="48" fill="#1c4726" stroke="#f4f1e8" stroke-width="1"/><circle cx="50" cy="50" r="30" fill="none" stroke="rgba(238,242,246,0.4)" stroke-width="0.5" stroke-dasharray="2 2"/><rect x="46" y="40" width="8" height="20" fill="rgba(244,241,232,0.12)" stroke="rgba(244,241,232,0.5)" stroke-width="0.4"/>`;
   const defs = `<defs><marker id="fdArrowBall" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="3" markerHeight="3" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#c0392b"/></marker><marker id="fdArrowPlayer" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="2.6" markerHeight="2.6" orient="auto-start-reverse"><path d="M0,0L10,5L0,10z" fill="#3b82f6"/></marker></defs>`;
   const items = view.items || [];
   const markerOpts = { xComp: xComp, compact: !!opts.compactMarkers };
   const arrowsHtml = items.filter(it => it.kind === 'arrow').map(it => fieldArrowSvg(it, markerOpts)).join('');
   const markersHtml = items.filter(it => it.kind === 'marker').map(it => fieldMarkerSvg(it, markerOpts)).join('');
+  // Mid-draw arrow preview: a dashed ring at every point placed so far, joined
+  // by a dashed line, so a bend is visible before Finish Arrow commits it.
   let pendingHtml = '';
-  if (interactive && fieldDraft.pendingArrowStart) {
-    const p = fieldDraft.pendingArrowStart;
-    pendingHtml = `<ellipse cx="${p.x}" cy="${p.y}" rx="${1.6 * xComp}" ry="1.6" fill="none" stroke="#f4f1e8" stroke-width="0.4" stroke-dasharray="0.9 0.7"/>`;
+  if (interactive && fieldDraft.pendingArrowPoints && fieldDraft.pendingArrowPoints.length) {
+    const pts = fieldDraft.pendingArrowPoints;
+    const pendColor = fieldDraft.pendingArrowStyle === 'ball' ? '#c0392b' : '#3b82f6';
+    const polyHtml = pts.length > 1 ? `<polyline points="${pts.map(p => `${p.x},${p.y}`).join(' ')}" fill="none" stroke="${pendColor}" stroke-width="0.5" stroke-dasharray="1.2 0.8" opacity="0.85"/>` : '';
+    const dotsHtml = pts.map(p => `<ellipse cx="${p.x}" cy="${p.y}" rx="${1.6 * xComp}" ry="1.6" fill="none" stroke="#f4f1e8" stroke-width="0.4" stroke-dasharray="0.9 0.7"/>`).join('');
+    pendingHtml = polyHtml + dotsHtml;
+  }
+  // opts.exportPx: used only by exportFieldDiagram() to serialize a standalone
+  // image. A percentage-based style width/height has no containing block once
+  // the SVG is decoded on its own as an Image(), so this swaps in real pixel
+  // width/height attributes and an explicit xmlns instead.
+  if (opts.exportPx) {
+    const px = opts.exportPx;
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${vb.w} ${vb.h}" width="${px.w}" height="${px.h}" preserveAspectRatio="xMidYMid meet">${defs}${bg}${arrowsHtml}${markersHtml}</svg>`;
   }
   // fill mode (used in the fullscreen editor): the svg exactly fills its wrapper,
   // whose exact pixel size is computed by sizeFullscreenCanvas() — this is what
   // lets the ground grow to the actual maximum the screen allows.
   const sizeStyle = opts.fill ? 'width:100%;height:100%;display:block;border-radius:10px' : 'width:100%;height:auto;display:block;border-radius:10px';
-  const clickAttr = interactive ? ` class="fdCanvas" style="cursor:crosshair;${sizeStyle}"` : ` style="${sizeStyle}"`;
+  // touch-action:none stops a touch-drag on the ground from also trying to
+  // scroll the page — needed for marker/arrow dragging (handleFieldPointerDown/
+  // Move/Up) to track the finger cleanly instead of fighting a scroll gesture.
+  const clickAttr = interactive ? ` class="fdCanvas" style="cursor:crosshair;touch-action:none;${sizeStyle}"` : ` style="${sizeStyle}"`;
   return `<svg viewBox="0 0 ${vb.w} ${vb.h}" preserveAspectRatio="none"${clickAttr}>${defs}${bg}${arrowsHtml}${markersHtml}${pendingHtml}</svg>`;
 }
 function fieldCanvasCoords(evt, svgEl) {
@@ -4187,6 +4271,12 @@ function fieldCanvasCoords(evt, svgEl) {
   return { x: Math.max(0, Math.min(vb.width, px * vb.width)), y: Math.max(0, Math.min(vb.height, py * vb.height)) };
 }
 function handleFieldCanvasClick(evt, svgEl) {
+  // A click immediately following a marker/arrow drag (see
+  // handleFieldPointerUp) is the browser's own synthesized click for that
+  // same gesture — without this guard it would fall straight into the
+  // "tap to delete" branch below and erase the item that was just
+  // repositioned.
+  if (fieldDraft.suppressNextClick) { fieldDraft.suppressNextClick = false; return; }
   const step = fieldDraft.steps[fieldDraft.activeStep];
   if (!step) return;
   const items = curFieldItems(step);
@@ -4196,7 +4286,7 @@ function handleFieldCanvasClick(evt, svgEl) {
   if (markerEl) {
     const id = markerEl.getAttribute('data-id');
     const idx = items.findIndex(it => it.id === id);
-    if (idx > -1) items.splice(idx, 1);
+    if (idx > -1) { pushFieldHistory(); items.splice(idx, 1); }
     renderFieldEditor();
     return;
   }
@@ -4204,33 +4294,27 @@ function handleFieldCanvasClick(evt, svgEl) {
   if (arrowEl) {
     const id = arrowEl.getAttribute('data-id');
     const idx = items.findIndex(it => it.id === id);
-    if (idx > -1) items.splice(idx, 1);
+    if (idx > -1) { pushFieldHistory(); items.splice(idx, 1); }
     renderFieldEditor();
     return;
   }
   if (!fieldDraft.tool) return; // no tool selected — tapping empty ground does nothing
   const pos = fieldCanvasCoords(evt, svgEl);
   if (fieldDraft.tool === 'arrowBall' || fieldDraft.tool === 'arrowPlayer') {
-    if (!fieldDraft.pendingArrowStart) {
-      fieldDraft.pendingArrowStart = pos;
-    } else {
-      const isBall = fieldDraft.tool === 'arrowBall';
-      // Ball-path arrows are numbered in tap order (1st ball, 2nd ball...) so the
-      // sequence of a drill is readable at a glance; player-path arrows aren't.
-      let label = '';
-      if (isBall) {
-        const ballArrowCount = items.filter(it => it.kind === 'arrow' && it.style === 'ball').length;
-        label = String(ballArrowCount + 1);
-      }
-      items.push({ id: fdUid('fditem'), kind: 'arrow', style: isBall ? 'ball' : 'player', x1: fieldDraft.pendingArrowStart.x, y1: fieldDraft.pendingArrowStart.y, x2: pos.x, y2: pos.y, label });
-      fieldDraft.pendingArrowStart = null;
+    // Each tap on empty ground adds a point to the arrow being drawn — a
+    // straight arrow is just two points; Finish Arrow (finishFieldArrow)
+    // commits it, so a path can have as many bends as needed first.
+    if (!fieldDraft.pendingArrowPoints.length) {
+      fieldDraft.pendingArrowStyle = fieldDraft.tool === 'arrowBall' ? 'ball' : 'player';
     }
+    fieldDraft.pendingArrowPoints.push(pos);
     renderFieldEditor();
     return;
   }
-  // Player, Coach and Cone markers are numbered in the order they're tapped
-  // (P1/P2..., C1/C2..., 1/2...) so a drill's structure reads clearly; Ball
-  // and Stumps markers are unlabeled since they're usually single/fixed points.
+  // Player, Coach, Keeper, Cone, Cone Gate and Target markers are numbered in
+  // the order they're tapped (P1/P2..., C1/C2..., WK/WK2..., 1/2..., G1/G2...,
+  // T1/T2...) so a drill's structure reads clearly; Ball and Stumps markers
+  // are unlabeled since they're usually single/fixed points.
   let label = '';
   if (fieldDraft.tool === 'player') {
     const playerCount = items.filter(it => it.kind === 'marker' && it.type === 'player').length;
@@ -4238,11 +4322,131 @@ function handleFieldCanvasClick(evt, svgEl) {
   } else if (fieldDraft.tool === 'coach') {
     const coachCount = items.filter(it => it.kind === 'marker' && it.type === 'coach').length;
     label = 'C' + (coachCount + 1);
+  } else if (fieldDraft.tool === 'wk') {
+    const wkCount = items.filter(it => it.kind === 'marker' && it.type === 'wk').length;
+    label = wkCount ? 'WK' + (wkCount + 1) : 'WK';
   } else if (fieldDraft.tool === 'cone') {
     const coneCount = items.filter(it => it.kind === 'marker' && it.type === 'cone').length;
     label = String(coneCount + 1);
+  } else if (fieldDraft.tool === 'gate') {
+    const gateCount = items.filter(it => it.kind === 'marker' && it.type === 'gate').length;
+    label = gateCount ? 'G' + (gateCount + 1) : '';
+  } else if (fieldDraft.tool === 'target') {
+    const targetCount = items.filter(it => it.kind === 'marker' && it.type === 'target').length;
+    label = targetCount ? 'T' + (targetCount + 1) : '';
   }
+  pushFieldHistory();
   items.push({ id: fdUid('fditem'), kind: 'marker', type: fieldDraft.tool, x: pos.x, y: pos.y, label });
+  renderFieldEditor();
+}
+// Dragging a marker or arrow: pointerdown on one starts tracking; pointermove
+// (once past a small threshold, so a plain tap isn't mistaken for a drag)
+// nudges it live via a transform (cheap — avoids rebuilding the whole SVG
+// mid-drag, which would also drop the pointer capture); pointerup commits the
+// new position to the data and re-renders properly. A drag never deletes —
+// only a tap that didn't move does (handled by the suppressNextClick guard
+// inside handleFieldCanvasClick, which runs right after via the browser's
+// own synthesized click for the same gesture).
+function handleFieldPointerDown(evt, svgEl) {
+  const step = fieldDraft.steps[fieldDraft.activeStep];
+  if (!step) return;
+  const items = curFieldItems(step);
+  const pos = fieldCanvasCoords(evt, svgEl);
+  const markerEl = evt.target.closest && evt.target.closest('.fdMarker');
+  if (markerEl) {
+    const id = markerEl.getAttribute('data-id');
+    const item = items.find(it => it.id === id && it.kind === 'marker');
+    if (!item) return;
+    fieldDraft.dragState = { type: 'marker', id, startX: item.x, startY: item.y, startPointer: pos, pointerId: evt.pointerId, moved: false, dx: 0, dy: 0 };
+    return;
+  }
+  const arrowEl = evt.target.closest && evt.target.closest('.fdArrow');
+  if (arrowEl) {
+    const id = arrowEl.getAttribute('data-id');
+    const item = items.find(it => it.id === id && it.kind === 'arrow');
+    if (!item) return;
+    fieldDraft.dragState = { type: 'arrow', id, startPoints: arrowPointsOf(item).map(p => ({ x: p.x, y: p.y })), startPointer: pos, pointerId: evt.pointerId, moved: false, dx: 0, dy: 0 };
+    return;
+  }
+  // Pointer capture is deliberately NOT taken here. Capturing on every
+  // pointerdown — even a plain tap that never moves — makes the browser
+  // retarget the resulting click event to the svg element instead of the
+  // marker/arrow, so evt.target.closest() in handleFieldCanvasClick fails
+  // and tap-to-delete silently stops working. Capture is taken only once a
+  // real drag is confirmed, in handleFieldPointerMove below.
+}
+function handleFieldPointerMove(evt, svgEl) {
+  const d = fieldDraft.dragState;
+  if (!d) return;
+  const pos = fieldCanvasCoords(evt, svgEl);
+  const dx = pos.x - d.startPointer.x, dy = pos.y - d.startPointer.y;
+  if (!d.moved && Math.hypot(dx, dy) < 0.8) return; // below threshold — still a potential tap, not a drag yet
+  if (!d.moved && svgEl.setPointerCapture) { try { svgEl.setPointerCapture(d.pointerId); } catch (e) {} }
+  d.moved = true; d.dx = dx; d.dy = dy;
+  const sel = d.type === 'arrow' ? `.fdArrow[data-id="${d.id}"]` : `.fdMarker[data-id="${d.id}"]`;
+  const g = svgEl.querySelector(sel);
+  if (g) g.setAttribute('transform', `translate(${dx} ${dy})`);
+}
+function handleFieldPointerUp(evt, svgEl) {
+  const d = fieldDraft.dragState;
+  fieldDraft.dragState = null;
+  if (!d) return;
+  if (svgEl.hasPointerCapture && svgEl.hasPointerCapture(evt.pointerId)) { try { svgEl.releasePointerCapture(evt.pointerId); } catch (e) {} }
+  if (!d.moved) return; // a plain tap — let the normal click handler (delete) run
+  const step = fieldDraft.steps[fieldDraft.activeStep];
+  if (step) {
+    const items = curFieldItems(step);
+    const item = items.find(it => it.id === d.id);
+    if (item) {
+      pushFieldHistory();
+      const vb = svgEl.viewBox.baseVal;
+      if (d.type === 'arrow') {
+        // Clamp dx/dy as a whole (not per-point) so the arrow's shape isn't
+        // warped if one endpoint would otherwise clip against the edge.
+        const xs = d.startPoints.map(p => p.x), ys = d.startPoints.map(p => p.y);
+        const minX = Math.min(...xs), maxX = Math.max(...xs), minY = Math.min(...ys), maxY = Math.max(...ys);
+        const cdx = Math.max(-minX, Math.min(vb.width - maxX, d.dx));
+        const cdy = Math.max(-minY, Math.min(vb.height - maxY, d.dy));
+        const newPts = d.startPoints.map(p => ({ x: p.x + cdx, y: p.y + cdy }));
+        if (item.points) item.points = newPts;
+        else { item.x1 = newPts[0].x; item.y1 = newPts[0].y; item.x2 = newPts[1].x; item.y2 = newPts[1].y; }
+      } else {
+        item.x = Math.max(0, Math.min(vb.width, d.startX + d.dx));
+        item.y = Math.max(0, Math.min(vb.height, d.startY + d.dy));
+      }
+    }
+  }
+  fieldDraft.suppressNextClick = true;
+  // Self-clearing safety net: a drag's own pointerup is normally followed
+  // almost immediately by the browser's own synthesized click on the same
+  // gesture, which is what actually consumes this flag (see
+  // handleFieldCanvasClick). If that click never arrives for any reason,
+  // this stops the flag from permanently swallowing the next unrelated tap.
+  setTimeout(() => { fieldDraft.suppressNextClick = false; }, 400);
+  renderFieldEditor();
+}
+function finishFieldArrow() {
+  if (fieldDraft.pendingArrowPoints.length < 2) return;
+  const step = fieldDraft.steps[fieldDraft.activeStep];
+  if (!step) return;
+  const items = curFieldItems(step);
+  const isBall = fieldDraft.pendingArrowStyle === 'ball';
+  // Ball-path arrows are numbered in finish order (1st ball, 2nd ball...) so
+  // the sequence of a drill is readable at a glance; player-path arrows aren't.
+  let label = '';
+  if (isBall) {
+    const ballArrowCount = items.filter(it => it.kind === 'arrow' && it.style === 'ball').length;
+    label = String(ballArrowCount + 1);
+  }
+  pushFieldHistory();
+  items.push({ id: fdUid('fditem'), kind: 'arrow', style: isBall ? 'ball' : 'player', points: fieldDraft.pendingArrowPoints.map(p => ({ x: p.x, y: p.y })), label });
+  fieldDraft.pendingArrowPoints = [];
+  fieldDraft.pendingArrowStyle = null;
+  renderFieldEditor();
+}
+function cancelFieldArrow() {
+  fieldDraft.pendingArrowPoints = [];
+  fieldDraft.pendingArrowStyle = null;
   renderFieldEditor();
 }
 function fieldEditorHtml(fullscreen) {
@@ -4251,6 +4455,8 @@ function fieldEditorHtml(fullscreen) {
   if (!step) return `<button type="button" class="btn small ghost" data-action="addFieldStep">+ Add Diagram Step</button>`;
   const shape = curFieldShape(step);
   const view = { shape: shape, items: curFieldItems(step) };
+  const redoKey = fieldHistoryKey();
+  const canRedo = !!(fieldDraft.history && fieldDraft.history[redoKey] && fieldDraft.history[redoKey].redo.length);
   if (fullscreen) {
     // Fullscreen shows ONLY the ground and an icon-only toolbar for every control
     // (exit, step switch, shape, markers/arrows, undo, clear) — no text labels, no
@@ -4260,13 +4466,26 @@ function fieldEditorHtml(fullscreen) {
     // with a `title` tooltip on hover for reference.
     const stepPills = fieldDraft.steps.length > 1 ? fieldDraft.steps.map((st, i) => `<button type="button" class="btn small ${i === fieldDraft.activeStep ? '' : 'ghost'} fdFsStepPill" title="${esc(st.label || ('Step ' + (i + 1)))}" data-action="switchFieldStep" data-i="${i}">${i + 1}</button>`).join('') : '';
     const addStepBtn = fieldDraft.steps.length < 3 ? `<button type="button" class="btn small ghost" title="Add Diagram Step" data-action="addFieldStep">${fieldToolIconSvg('plus')}</button>` : '';
+    const duplicateStepBtn = fieldDraft.steps.length < 3 ? `<button type="button" class="btn small ghost" title="Duplicate Step" data-action="duplicateFieldStep">${fieldToolIconSvg('copy')}</button>` : '';
     const removeStepBtn = fieldDraft.steps.length > 1 ? `<button type="button" class="btn small danger" title="Remove This Step" data-action="removeFieldStep" data-i="${fieldDraft.activeStep}">${fieldToolIconSvg('trash')}</button>` : '';
-    const shapeBtns = `<button type="button" class="btn small ${shape !== 'half' ? '' : 'ghost'}" title="Full Ground" data-action="updateFieldStepShape" data-shape="full">${fieldToolIconSvg('shapeFull')}</button><button type="button" class="btn small ${shape === 'half' ? '' : 'ghost'}" title="Half Ground" data-action="updateFieldStepShape" data-shape="half">${fieldToolIconSvg('shapeHalf')}</button>`;
+    const shapeBtns = `<button type="button" class="btn small ${shape === 'full' ? '' : 'ghost'}" title="Full Ground" data-action="updateFieldStepShape" data-shape="full">${fieldToolIconSvg('shapeFull')}</button><button type="button" class="btn small ${shape === 'half' ? '' : 'ghost'}" title="Half Ground" data-action="updateFieldStepShape" data-shape="half">${fieldToolIconSvg('shapeHalf')}</button><button type="button" class="btn small ${shape === 'square' ? '' : 'ghost'}" title="Square Ground" data-action="updateFieldStepShape" data-shape="square">${fieldToolIconSvg('shapeSquare')}</button>`;
     const toolBtns = FIELD_TOOLS.map(t => `<button type="button" class="btn small ${fieldDraft.tool === t.id ? '' : 'ghost'}" title="${esc(t.label)}" data-action="setFieldTool" data-tool="${t.id}">${fieldToolIconSvg(t.id)}</button>`).join('');
+    // Shown only while an arrow is mid-draw (at least one point placed) — Finish
+    // commits it (needs 2+ points), Cancel discards the in-progress path.
+    const finishArrowBtn = fieldDraft.pendingArrowPoints.length >= 2 ? `<button type="button" class="btn small" title="Finish Arrow" data-action="finishFieldArrow">${fieldToolIconSvg('check')}</button>` : '';
+    const cancelArrowBtn = fieldDraft.pendingArrowPoints.length ? `<button type="button" class="btn small danger" title="Cancel Arrow" data-action="cancelFieldArrow" style="font-size:14px;font-weight:700">✕</button>` : '';
     const exitBtn = `<button type="button" class="btn small ghost" title="Exit Fullscreen" data-action="closeFieldFullscreen" style="font-size:16px;font-weight:700">✕</button>`;
     const undoBtn = `<button type="button" class="btn small ghost" title="Undo" data-action="undoFieldLast">${fieldToolIconSvg('undo')}</button>`;
+    const redoBtn = `<button type="button" class="btn small ghost" title="Redo" ${canRedo ? '' : 'disabled'} data-action="redoFieldLast">${fieldToolIconSvg('redo')}</button>`;
+    const exportBtn = `<button type="button" class="btn small ghost" title="Export Diagram as Image" data-action="exportFieldDiagram">${fieldToolIconSvg('download')}</button>`;
     const clearBtn = `<button type="button" class="btn small danger" title="Clear Drawing" data-action="clearFieldStep">${fieldToolIconSvg('trash')}</button>`;
-    const toolbar = `<div class="fdFsToolbar">${exitBtn}${stepPills}${addStepBtn}${removeStepBtn}${shapeBtns}${toolBtns}${undoBtn}${clearBtn}</div>`;
+    // Zoom (for precise placement on a small screen) + pan, fullscreen only.
+    const zoomPct = Math.round((fieldDraft.fsZoom || 1) * 100);
+    const zoomOutBtn = `<button type="button" class="btn small ghost" title="Zoom Out" ${fieldDraft.fsZoom <= FIELD_ZOOM_STEPS[0] ? 'disabled' : ''} data-action="zoomFieldBy" data-dir="-1" style="font-size:18px;font-weight:700">−</button>`;
+    const zoomLabel = `<div class="btn small ghost" style="width:44px;font-size:11px;pointer-events:none">${zoomPct}%</div>`;
+    const zoomInBtn = `<button type="button" class="btn small ghost" title="Zoom In" ${fieldDraft.fsZoom >= FIELD_ZOOM_STEPS[FIELD_ZOOM_STEPS.length - 1] ? 'disabled' : ''} data-action="zoomFieldBy" data-dir="1" style="font-size:18px;font-weight:700">+</button>`;
+    const panBtns = (fieldDraft.fsZoom || 1) > 1 ? `<button type="button" class="btn small ghost" title="Pan Up" data-action="panFieldFs" data-dx="0" data-dy="-1" style="font-size:14px">▲</button><button type="button" class="btn small ghost" title="Pan Down" data-action="panFieldFs" data-dx="0" data-dy="1" style="font-size:14px">▼</button><button type="button" class="btn small ghost" title="Pan Left" data-action="panFieldFs" data-dx="-1" data-dy="0" style="font-size:14px">◀</button><button type="button" class="btn small ghost" title="Pan Right" data-action="panFieldFs" data-dx="1" data-dy="0" style="font-size:14px">▶</button>` : '';
+    const toolbar = `<div class="fdFsToolbar">${exitBtn}${stepPills}${addStepBtn}${duplicateStepBtn}${removeStepBtn}${shapeBtns}${toolBtns}${finishArrowBtn}${cancelArrowBtn}${undoBtn}${redoBtn}${exportBtn}${clearBtn}${zoomOutBtn}${zoomLabel}${zoomInBtn}${panBtns}</div>`;
     // The wrapper's exact pixel width/height is computed and set by
     // sizeFullscreenCanvas() right after this markup is inserted — CSS
     // aspect-ratio inside a flex layout distorts under flex-shrink, so JS
@@ -4280,18 +4499,23 @@ function fieldEditorHtml(fullscreen) {
   const tabsHtml = fieldDraft.steps.map((st, i) => `<button type="button" class="btn small ${i === fieldDraft.activeStep ? '' : 'ghost'}" style="padding:6px 10px;font-size:12.5px" data-action="switchFieldStep" data-i="${i}">${esc(st.label || ('Step ' + (i + 1)))}</button>`).join('');
   const toolsHtml = FIELD_TOOLS.map(t => `<button type="button" class="btn small ${fieldDraft.tool === t.id ? '' : 'ghost'}" style="padding:6px 9px;font-size:12px;white-space:nowrap" data-action="setFieldTool" data-tool="${t.id}">${t.label}</button>`).join('');
   const controlsHtml = `
-   <div class="fd-tabs-row">${tabsHtml}${fieldDraft.steps.length < 3 ? `<button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12.5px" data-action="addFieldStep">+ Step</button>` : ''}${fieldDraft.steps.length > 1 ? `<button type="button" class="btn small danger" style="padding:6px 10px;font-size:12.5px" data-action="removeFieldStep" data-i="${fieldDraft.activeStep}">Remove Step</button>` : ''}</div>
+   <div class="fd-tabs-row">${tabsHtml}${fieldDraft.steps.length < 3 ? `<button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12.5px" data-action="addFieldStep">+ Step</button>` : ''}${fieldDraft.steps.length < 3 ? `<button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12.5px" data-action="duplicateFieldStep">Duplicate Step</button>` : ''}${fieldDraft.steps.length > 1 ? `<button type="button" class="btn small danger" style="padding:6px 10px;font-size:12.5px" data-action="removeFieldStep" data-i="${fieldDraft.activeStep}">Remove Step</button>` : ''}</div>
    <input type="text" class="fd-step-label-input" placeholder="Step label (optional) — e.g. Setup" value="${esc(step.label || '')}">
    <div class="fd-shape-row">
-    <button type="button" class="btn small ${shape !== 'half' ? '' : 'ghost'}" style="padding:6px 12px;font-size:12px" data-action="updateFieldStepShape" data-shape="full">Full Ground</button>
+    <button type="button" class="btn small ${shape === 'full' ? '' : 'ghost'}" style="padding:6px 12px;font-size:12px" data-action="updateFieldStepShape" data-shape="full">Full Ground</button>
     <button type="button" class="btn small ${shape === 'half' ? '' : 'ghost'}" style="padding:6px 12px;font-size:12px" data-action="updateFieldStepShape" data-shape="half">Half Ground</button>
+    <button type="button" class="btn small ${shape === 'square' ? '' : 'ghost'}" style="padding:6px 12px;font-size:12px" data-action="updateFieldStepShape" data-shape="square">Square Ground</button>
    </div>
    <div class="fd-tools-row">${toolsHtml}</div>
-   <div class="fd-hint">Tap the ground to place a marker, or to draw an arrow (tap start, then end). Tap an existing marker or arrow to remove it. Full Ground and Half Ground each keep their own separate drawing for this step.</div>`;
+   ${fieldDraft.pendingArrowPoints.length ? `<div class="fd-tools-row">${fieldDraft.pendingArrowPoints.length >= 2 ? `<button type="button" class="btn small" style="padding:6px 12px;font-size:12px" data-action="finishFieldArrow">✓ Finish Arrow</button>` : ''}<button type="button" class="btn small danger" style="padding:6px 12px;font-size:12px" data-action="cancelFieldArrow">Cancel Arrow</button></div>` : ''}
+   <div class="fd-hint">Tap the ground to place a marker, or to draw an arrow/ball-path (tap a start point, then tap again for each bend, then Finish Arrow — or Cancel Arrow to discard it). Tap an existing marker or arrow to remove it, or drag it to reposition. Full, Half and Square Ground each keep their own separate drawing for this step.</div>`;
   const bottomBar = `<div class="fd-bottom-bar">
     <button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12px" data-action="undoFieldLast">Undo</button>
+    <button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12px" ${canRedo ? '' : 'disabled'} data-action="redoFieldLast">Redo</button>
     <button type="button" class="btn small danger" style="padding:6px 10px;font-size:12px" data-action="clearFieldStep">Clear Step</button>
     <button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12px" data-action="openFieldFullscreen">⛶ Fullscreen</button>
+    <button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12px" data-action="exportFieldDiagram">Export Image</button>
+    <button type="button" class="btn small ghost" style="padding:6px 10px;font-size:12px" data-action="suggestDrillEquipment">Suggest Equipment</button>
    </div>`;
   return `${controlsHtml}<div class="fd-canvas-wrap">${fieldDiagramSvg(view, { interactive: true })}</div>${bottomBar}`;
 }
@@ -4311,18 +4535,33 @@ function wireFieldEditor(container) {
       else if (action === 'updateFieldStepShape') updateFieldStepShape(el.getAttribute('data-shape'));
       else if (action === 'setFieldTool') setFieldTool(el.getAttribute('data-tool'));
       else if (action === 'undoFieldLast') undoFieldLast();
+      else if (action === 'redoFieldLast') redoFieldLast();
       else if (action === 'clearFieldStep') clearFieldStep();
       else if (action === 'openFieldFullscreen') openFieldFullscreen();
       else if (action === 'closeFieldFullscreen') closeFieldFullscreen();
+      else if (action === 'duplicateFieldStep') duplicateFieldStep();
+      else if (action === 'finishFieldArrow') finishFieldArrow();
+      else if (action === 'cancelFieldArrow') cancelFieldArrow();
+      else if (action === 'exportFieldDiagram') exportFieldDiagram();
+      else if (action === 'suggestDrillEquipment') suggestDrillEquipment();
+      else if (action === 'zoomFieldBy') zoomFieldBy(parseInt(el.getAttribute('data-dir'), 10));
+      else if (action === 'panFieldFs') panFieldFs(parseFloat(el.getAttribute('data-dx')), parseFloat(el.getAttribute('data-dy')));
     });
   });
   const labelInput = container.querySelector('.fd-step-label-input');
   if (labelInput) labelInput.addEventListener('change', () => updateFieldStepLabel(labelInput.value));
   const canvas = container.querySelector('.fdCanvas');
-  if (canvas) canvas.addEventListener('click', (evt) => handleFieldCanvasClick(evt, canvas));
+  if (canvas) {
+    canvas.addEventListener('click', (evt) => handleFieldCanvasClick(evt, canvas));
+    canvas.addEventListener('pointerdown', (evt) => handleFieldPointerDown(evt, canvas));
+    canvas.addEventListener('pointermove', (evt) => handleFieldPointerMove(evt, canvas));
+    canvas.addEventListener('pointerup', (evt) => handleFieldPointerUp(evt, canvas));
+    canvas.addEventListener('pointercancel', (evt) => handleFieldPointerUp(evt, canvas));
+  }
 }
 // Full Ground stays a true circle (aspect 1) in every orientation. Half Ground
-// is already wide (100:60) and needs no change either way.
+// is already wide (100:60) and needs no change either way. Square Ground is
+// 1:1 like Full Ground.
 function isLandscapeNow() { return !!(window.matchMedia && window.matchMedia('(orientation: landscape)').matches); }
 function fieldFsAspect(shape) { return shape === 'half' ? (100 / 60) : 1; }
 function sizeFullscreenCanvas() {
@@ -4336,6 +4575,13 @@ function sizeFullscreenCanvas() {
   if (availW <= 0 || availH <= 0) return;
   let w = availW, h = w / aspect;
   if (h > availH) { h = availH; w = h * aspect; }
+  // Zooming in makes the ground bigger than the viewport on purpose (room to
+  // place a marker precisely) — scrolling/panning then reaches the rest of
+  // it. At 1x there's nothing to scroll, so overflow stays hidden to avoid a
+  // stray 1px scrollbar.
+  const zoom = fieldDraft.fsZoom || 1;
+  area.style.overflow = zoom > 1 ? 'auto' : 'hidden';
+  w *= zoom; h *= zoom;
   wrap.style.width = w + 'px';
   wrap.style.height = h + 'px';
 }
@@ -4344,6 +4590,7 @@ function renderFieldEditor() {
   if (box) { box.innerHTML = fieldEditorHtml(false); wireFieldEditor(box); }
   const fsBox = document.getElementById('fieldEditorFullscreenBody');
   if (fsBox) { fsBox.innerHTML = fieldEditorHtml(true); wireFieldEditor(fsBox); sizeFullscreenCanvas(); }
+  if (box || fsBox) autosaveDrillDraft();
 }
 function openFieldFullscreen() {
   const overlay = document.createElement('div');
@@ -4393,23 +4640,38 @@ function maybeShowLandscapeHint() {
 }
 function setFieldTool(t) {
   fieldDraft.tool = fieldDraft.tool === t ? null : t;
-  fieldDraft.pendingArrowStart = null;
+  fieldDraft.pendingArrowPoints = []; fieldDraft.pendingArrowStyle = null;
   renderFieldEditor();
 }
 function switchFieldStep(i) {
-  fieldDraft.activeStep = i; fieldDraft.tool = null; fieldDraft.pendingArrowStart = null;
+  fieldDraft.activeStep = i; fieldDraft.tool = null; fieldDraft.pendingArrowPoints = []; fieldDraft.pendingArrowStyle = null; fieldDraft.fsZoom = 1;
   renderFieldEditor();
 }
 function addFieldStep() {
   if (fieldDraft.steps.length >= 3) return;
-  fieldDraft.steps.push({ label: '', activeShape: 'full', full: { items: [] }, half: { items: [] } });
-  fieldDraft.activeStep = fieldDraft.steps.length - 1; fieldDraft.tool = null; fieldDraft.pendingArrowStart = null;
+  fieldDraft.steps.push({ label: '', activeShape: 'full', full: { items: [] }, half: { items: [] }, square: { items: [] } });
+  fieldDraft.activeStep = fieldDraft.steps.length - 1; fieldDraft.tool = null; fieldDraft.pendingArrowPoints = []; fieldDraft.pendingArrowStyle = null;
+  renderFieldEditor();
+}
+// Clones the active step's markers/arrows (every ground shape's drawing,
+// whichever is being viewed or not) into a new step right after it, so a
+// multi-phase drill that's mostly a repeat of the last setup doesn't mean
+// re-placing every marker by hand — just adjust what's changed.
+function duplicateFieldStep() {
+  if (fieldDraft.steps.length >= 3) return;
+  const cur = fieldDraft.steps[fieldDraft.activeStep];
+  if (!cur) return;
+  const copy = JSON.parse(JSON.stringify(cur));
+  ['full', 'half', 'square'].forEach(shape => { copy[shape].items = (copy[shape].items || []).map(it => ({ ...it, id: fdUid('fditem') })); });
+  fieldDraft.steps.splice(fieldDraft.activeStep + 1, 0, copy);
+  fieldDraft.activeStep = fieldDraft.activeStep + 1;
+  fieldDraft.tool = null; fieldDraft.pendingArrowPoints = []; fieldDraft.pendingArrowStyle = null;
   renderFieldEditor();
 }
 function removeFieldStep(i) {
   fieldDraft.steps.splice(i, 1);
   fieldDraft.activeStep = Math.max(0, Math.min(fieldDraft.activeStep, fieldDraft.steps.length - 1));
-  fieldDraft.tool = null; fieldDraft.pendingArrowStart = null;
+  fieldDraft.tool = null; fieldDraft.pendingArrowPoints = []; fieldDraft.pendingArrowStyle = null;
   renderFieldEditor();
 }
 function updateFieldStepLabel(value) {
@@ -4419,27 +4681,179 @@ function updateFieldStepLabel(value) {
 function updateFieldStepShape(shape) {
   const step = fieldDraft.steps[fieldDraft.activeStep];
   if (!step) return;
-  // Just switches which of the step's two independent drawings (full/half)
+  // Just switches which of the step's independent drawings (full/half/square)
   // is being viewed and edited — never moves or copies items between them.
-  step.activeShape = shape === 'half' ? 'half' : 'full';
-  fieldDraft.tool = null; fieldDraft.pendingArrowStart = null;
+  step.activeShape = (shape === 'half' || shape === 'square') ? shape : 'full';
+  fieldDraft.tool = null; fieldDraft.pendingArrowPoints = []; fieldDraft.pendingArrowStyle = null; fieldDraft.fsZoom = 1;
   renderFieldEditor();
 }
-function undoFieldLast() {
+// Undo/redo works on whole-items-array snapshots, kept per step+shape (so
+// undoing on Half Ground never touches Full Ground's history) and only in
+// memory for the current editing session — nothing here is persisted.
+function fieldHistoryKey() {
   const step = fieldDraft.steps[fieldDraft.activeStep];
-  if (!step) return;
-  const items = curFieldItems(step);
-  if (!items.length) return;
-  items.pop();
+  return step ? (fieldDraft.activeStep + '_' + curFieldShape(step)) : null;
+}
+function pushFieldHistory() {
+  const key = fieldHistoryKey();
+  const step = fieldDraft.steps[fieldDraft.activeStep];
+  if (!key || !step) return;
+  if (!fieldDraft.history) fieldDraft.history = {};
+  if (!fieldDraft.history[key]) fieldDraft.history[key] = { undo: [], redo: [] };
+  const h = fieldDraft.history[key];
+  h.undo.push(JSON.stringify(curFieldItems(step)));
+  if (h.undo.length > 25) h.undo.shift();
+  h.redo = []; // a fresh action invalidates whatever could have been redone
+}
+function undoFieldLast() {
+  // Mid-draw (an arrow with at least one point placed but not yet finished):
+  // Undo removes just the last point, so a bend can be corrected without
+  // restarting the whole arrow.
+  if (fieldDraft.pendingArrowPoints.length) {
+    fieldDraft.pendingArrowPoints.pop();
+    if (!fieldDraft.pendingArrowPoints.length) fieldDraft.pendingArrowStyle = null;
+    renderFieldEditor();
+    return;
+  }
+  const step = fieldDraft.steps[fieldDraft.activeStep];
+  const key = fieldHistoryKey();
+  if (!step || !key) return;
+  const h = fieldDraft.history && fieldDraft.history[key];
+  if (!h || !h.undo.length) return;
+  h.redo.push(JSON.stringify(curFieldItems(step)));
+  step[curFieldShape(step)].items = JSON.parse(h.undo.pop());
+  renderFieldEditor();
+}
+function redoFieldLast() {
+  const step = fieldDraft.steps[fieldDraft.activeStep];
+  const key = fieldHistoryKey();
+  if (!step || !key) return;
+  const h = fieldDraft.history && fieldDraft.history[key];
+  if (!h || !h.redo.length) return;
+  h.undo.push(JSON.stringify(curFieldItems(step)));
+  step[curFieldShape(step)].items = JSON.parse(h.redo.pop());
   renderFieldEditor();
 }
 function clearFieldStep() {
   const step = fieldDraft.steps[fieldDraft.activeStep];
   if (!step) return;
-  const shapeLabel = curFieldShape(step) === 'half' ? 'Half Ground' : 'Full Ground';
+  const shapeLabel = curFieldShape(step) === 'half' ? 'Half Ground' : curFieldShape(step) === 'square' ? 'Square Ground' : 'Full Ground';
   if (!confirm(`Clear everything on this step's ${shapeLabel} diagram?`)) return;
+  pushFieldHistory();
   step[curFieldShape(step)].items = [];
   renderFieldEditor();
+}
+// Zoom/pan (fullscreen editor only): lets a marker be placed precisely on a
+// small phone screen by zooming into part of the ground, then panning with
+// the arrow buttons to reach the rest of it. Resets to 1x whenever the step
+// or shape changes, since a zoomed view of one ground has no meaning on another.
+function zoomFieldBy(dir) {
+  let i = FIELD_ZOOM_STEPS.indexOf(fieldDraft.fsZoom || 1);
+  if (i < 0) i = 0;
+  i = Math.max(0, Math.min(FIELD_ZOOM_STEPS.length - 1, i + dir));
+  fieldDraft.fsZoom = FIELD_ZOOM_STEPS[i];
+  renderFieldEditor();
+}
+function panFieldFs(dx, dy) {
+  const area = document.getElementById('fieldFsCanvasArea');
+  if (!area) return;
+  area.scrollBy({ left: dx * area.clientWidth * 0.4, top: dy * area.clientHeight * 0.4, behavior: 'auto' });
+}
+// Equipment auto-tally: counts the marker types actually placed across every
+// step/shape of the drill being edited and turns that into a suggested
+// "Equipment needed" line. Fills the field rather than silently overwriting
+// whatever the coach already typed.
+function tallyFieldEquipment() {
+  const counts = {};
+  const add = (label, n) => { counts[label] = (counts[label] || 0) + n; };
+  fieldDraft.steps.forEach(step => {
+    ['full', 'half', 'square'].forEach(shape => {
+      (step[shape] && step[shape].items || []).forEach(it => {
+        if (it.kind !== 'marker') return;
+        // A Cone Gate is one placeable unit on the ground but physically two
+        // cones, so it counts toward the same 'cone' tally rather than its
+        // own equipment line.
+        if (it.type === 'gate') { add('cone', 2); return; }
+        const label = FIELD_EQUIPMENT_LABELS[it.type];
+        if (!label) return;
+        add(label, 1);
+      });
+    });
+  });
+  return counts;
+}
+function suggestDrillEquipment() {
+  const counts = tallyFieldEquipment();
+  const parts = Object.keys(counts).map(label => `${counts[label]} ${label}${counts[label] > 1 && !label.endsWith('s') ? 's' : ''}`);
+  if (!parts.length) { showToast('No cones or stumps placed on the diagram yet — add some markers first, or type equipment in manually.', 'error'); return; }
+  const input = document.getElementById('drill-equipment');
+  if (!input) return;
+  const suggestion = parts.join(', ');
+  if (input.value && input.value.trim() && !confirm(`Replace the current Equipment field with "${suggestion}"?`)) return;
+  input.value = suggestion;
+}
+// Export Diagram: rasterizes the current step's ground (at a fixed, print-
+// quality pixel size) to a standalone PNG the coach can share outside the app
+// (WhatsApp, print handout, etc.) — separate from the full drill/session report.
+function exportFieldDiagram() {
+  const step = fieldDraft.steps[fieldDraft.activeStep];
+  if (!step) { showToast('No diagram to export.', 'error'); return; }
+  const shape = curFieldShape(step);
+  const items = curFieldItems(step);
+  if (!items.length) { showToast("This step's diagram is empty — add some markers first.", 'error'); return; }
+  const vb = shape === 'half' ? { w: 1200, h: 720 } : { w: 1200, h: 1200 };
+  const svgStr = fieldDiagramSvg({ shape, items }, { exportPx: vb });
+  const blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const img = new Image();
+  img.onload = () => {
+    const canvas = document.createElement('canvas');
+    canvas.width = vb.w; canvas.height = vb.h;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0, vb.w, vb.h);
+    URL.revokeObjectURL(url);
+    canvas.toBlob(pngBlob => {
+      if (!pngBlob) { showToast("Couldn't export the diagram image.", 'error'); return; }
+      const pngUrl = URL.createObjectURL(pngBlob);
+      const nameInput = document.getElementById('drill-name');
+      const base = (nameInput && nameInput.value.trim()) || 'drill-diagram';
+      const fname = (base + '-' + (step.label || ('step' + (fieldDraft.activeStep + 1)))).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '') || 'drill-diagram';
+      const a = document.createElement('a');
+      a.href = pngUrl; a.download = fname + '.png';
+      document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(pngUrl), 2000);
+    }, 'image/png');
+  };
+  img.src = url;
+}
+// Debounced autosave: keeps the in-progress field diagram backed up to
+// localStorage (device-local, same as the single-coach app's own db-backed
+// autosave) so an interrupted editing session — navigating away, closing the
+// tab, the browser crashing — doesn't lose a half-built drawing before it was
+// ever explicitly saved. Scoped per-org since this device may be used to
+// coach at more than one academy.
+let drillDraftAutosaveTimer = null;
+function drillDraftAutosaveKey() { return `procoach_academy_drilldraft_${currentOrgId}`; }
+function autosaveDrillDraft() {
+  if (drillDraftAutosaveTimer) clearTimeout(drillDraftAutosaveTimer);
+  drillDraftAutosaveTimer = setTimeout(() => {
+    if (!fieldDraft.steps || !fieldDraft.steps.length) return;
+    try { localStorage.setItem(drillDraftAutosaveKey(), JSON.stringify({ editingDrillId: editing.drills || null, fieldSteps: fieldDraft.steps, ts: Date.now() })); } catch (e) { /* best-effort only */ }
+  }, 800);
+}
+// Checks for and offers to restore an autosaved draft that doesn't match what
+// the form is about to show — called whenever the drill form is (re)opened
+// for a given drill (or a blank "new drill"), before the editor renders.
+function maybeRecoverDrillDraft(editingDrillId, baseSteps) {
+  let as = null;
+  try { as = JSON.parse(localStorage.getItem(drillDraftAutosaveKey()) || 'null'); } catch (e) { /* ignore */ }
+  if (as && as.editingDrillId === editingDrillId && as.fieldSteps && as.fieldSteps.length && JSON.stringify(as.fieldSteps) !== JSON.stringify(baseSteps)) {
+    if (confirm('Found an unsaved field diagram from a previous session for this drill. Restore it?')) {
+      return as.fieldSteps.map(st => JSON.parse(JSON.stringify(normalizeFieldStep(st))));
+    }
+    try { localStorage.removeItem(drillDraftAutosaveKey()); } catch (e) { /* ignore */ }
+  }
+  return baseSteps;
 }
 function fieldStepsPreviewHtml(fieldSteps, size) {
   if (!fieldSteps || !fieldSteps.length) return '';
@@ -4456,7 +4870,11 @@ async function loadDrills() {
   // Initialize/reset the Field Diagram editor up front so it always renders
   // correctly, whether the drills list below ends up empty, errors out, or
   // loads normally — this must not depend on any of those outcomes.
-  if (!editing.drills) { fieldDraft = { steps: [], activeStep: 0, tool: null, pendingArrowStart: null }; renderFieldEditor(); }
+  if (!editing.drills) {
+    fieldDraft = freshFieldDraft();
+    fieldDraft.steps = maybeRecoverDrillDraft(null, []);
+    renderFieldEditor();
+  }
   const listEl = document.getElementById('drills-list');
   listEl.innerHTML = '<div class="empty-state">Loading...</div>';
   const { data, error } = await supabase.from('drills').select('*').eq('org_id', currentOrgId).order('name');
@@ -4465,7 +4883,8 @@ async function loadDrills() {
   if (!cache.drills.length) { listEl.innerHTML = '<div class="empty-state">No drills yet.</div>'; return; }
   renderPagedList(listEl, cache.drills, d => listRow(esc(d.name) + fieldStepsPreviewHtml(d.field_steps, 70), d.category || '',
     roleAtLeast('head_coach') ? () => editDrill(d) : null,
-    roleAtLeast('head_coach') ? async () => { if (!confirmDelete(d.name)) return; await supabase.from('drills').delete().eq('id', d.id); loadDrills(); } : null
+    roleAtLeast('head_coach') ? async () => { if (!confirmDelete(d.name)) return; await supabase.from('drills').delete().eq('id', d.id); loadDrills(); } : null,
+    roleAtLeast('head_coach') ? () => duplicateDrill(d) : null
   ));
 }
 function editDrill(d) {
@@ -4480,15 +4899,46 @@ function editDrill(d) {
   document.getElementById('drill-regressions').value = d.regressions || '';
   document.getElementById('save-drill-btn').textContent = 'Save changes';
   document.getElementById('cancel-drill-btn').style.display = 'inline-block';
-  fieldDraft = { steps: (d.field_steps || []).map(st => JSON.parse(JSON.stringify(normalizeFieldStep(st)))), activeStep: 0, tool: null, pendingArrowStart: null };
+  const baseSteps = (d.field_steps || []).map(st => JSON.parse(JSON.stringify(normalizeFieldStep(st))));
+  fieldDraft = freshFieldDraft();
+  // Recover a field diagram from an interrupted session (navigated away, tab
+  // closed, browser crashed) before it was ever explicitly saved — see
+  // autosaveDrillDraft(), called on every diagram edit.
+  fieldDraft.steps = maybeRecoverDrillDraft(d.id, baseSteps);
   renderFieldEditor();
+}
+// Clones an existing drill (including its field diagram steps, with fresh
+// item ids so the copy's markers/arrows are independent of the original) as
+// a starting point for a variant, rather than rebuilding one from scratch.
+async function duplicateDrill(d) {
+  const copy = {
+    org_id: currentOrgId,
+    name: (d.name || 'Drill') + ' (Copy)',
+    category: d.category || null,
+    duration: d.duration || null,
+    equipment: d.equipment || null,
+    diagram_url: d.diagram_url || null,
+    points: d.points || null,
+    progressions: d.progressions || null,
+    regressions: d.regressions || null,
+    field_steps: (d.field_steps || []).map(st => {
+      const ns = normalizeFieldStep(st);
+      ['full', 'half', 'square'].forEach(shape => { ns[shape].items = (ns[shape].items || []).map(it => ({ ...it, id: fdUid('fditem') })); });
+      return ns;
+    }),
+  };
+  const { error } = await supabase.from('drills').insert(copy);
+  if (error) { showToast(error.message, 'error'); return; }
+  showToast('Drill duplicated.', 'ok');
+  loadDrills();
 }
 document.getElementById('cancel-drill-btn').addEventListener('click', () => {
   editing.drills = null;
   ['drill-name','drill-category','drill-duration','drill-equipment','drill-diagram','drill-points','drill-progressions','drill-regressions'].forEach(id => document.getElementById(id).value = '');
   document.getElementById('save-drill-btn').textContent = 'Add drill';
   document.getElementById('cancel-drill-btn').style.display = 'none';
-  fieldDraft = { steps: [], activeStep: 0, tool: null, pendingArrowStart: null };
+  try { localStorage.removeItem(drillDraftAutosaveKey()); } catch (e) { /* ignore */ }
+  fieldDraft = freshFieldDraft();
   renderFieldEditor();
 });
 document.getElementById('save-drill-btn').addEventListener('click', async () => {
@@ -5415,6 +5865,26 @@ const DEFAULT_ASSESSMENT_TEMPLATE = {
 };
 let assessmentQuery = '', assessmentPlayerFilterVal = '';
 
+// Format-specific metrics, layered on top of a Batting/Bowling skill area's
+// core criteria — a player can be strong on the core fundamentals but weak
+// specifically under T20 pressure, say, and this is where that gets rated.
+// Only Batting and Bowling have these; other skill areas (Wicketkeeping,
+// Fielding, or a coach's own custom template categories) never show a
+// Format Focus picker at all.
+const FORMAT_SKILLS = {
+  Batting: {
+    T20: ['Intent vs New Ball', 'Hitting Spin (Middle Overs)', 'Range Hitting', 'Match-up Reading', 'Dot-ball Recovery', 'Powerplay Adaptation'],
+    ODI: ['Phase Awareness', 'Running & Rotation', 'Rebuilding After Wicket', 'Finishing (Overs 40-50)', 'Strike Rotation Control', 'Anchoring'],
+    Test: ['Shot Discipline', 'Converting Starts', 'Moving Ball & Bouncers', 'Spin Defense', 'Crease Occupation', 'Pressure Handling'],
+  },
+  Bowling: {
+    T20: ['Death-overs Execution', 'Variation Disguise', 'Powerplay Execution', 'Reading Batter Intent', 'Bounce-back After Runs', 'Pressure Composure'],
+    ODI: ['Opening-overs Control', 'Middle-overs Containment', 'Powerplay Wicket-taking', 'Death-overs Execution', 'Older-ball Effectiveness', 'Control Under Restrictions'],
+    Test: ['Opening-spell Discipline', 'Older-ball Effectiveness', 'Long-spell Consistency', 'Building Pressure', 'Situational Bowling', 'Role Control Across Ends'],
+  },
+};
+const ASSESSMENT_FORMATS = ['T20', 'ODI', 'Test'];
+
 function assessmentAvg(a) {
   const flatten = (obj) => Object.values(obj || {}).flatMap(v => (v && typeof v === 'object') ? flatten(v) : [v]);
   const vals = flatten(a.ratings).map(Number).filter(Number.isFinite);
@@ -5469,16 +5939,16 @@ function assessmentItemCard(a) {
   card.querySelector('[data-act="delete"]').onclick = async () => { if (!confirmDelete('this assessment')) return; await supabase.from('assessments').delete().eq('id', a.id); loadAssessments(); };
   return card;
 }
-function renderAssessmentCriteriaGroups(template, checkedSkillAreas, existingRatings) {
+function renderAssessmentCriteriaGroups(template, checkedSkillAreas, existingRatings, existingFormatRatings) {
   const box = document.getElementById('sheet-assessment-criteria-box');
   const checked = new Set(checkedSkillAreas || []);
   box.innerHTML = `
     <label class="field-label">Choose Skill Areas</label>
     <div class="muted" style="margin-bottom:6px; font-size:12px;">Select as many as required.</div>
     <div class="checkbox-list">${template.categories.map(cat => `<label><input type="checkbox" class="skill-area-check" value="${esc(cat.category)}" style="width:auto; margin:0;" ${checked.has(cat.category) ? 'checked' : ''}> ${esc(cat.category)}</label>`).join('')}</div>`;
-  renderSkillAreaMetrics(template, Array.from(checked).filter(c => template.categories.some(cat => cat.category === c)), existingRatings || {});
+  renderSkillAreaMetrics(template, Array.from(checked).filter(c => template.categories.some(cat => cat.category === c)), existingRatings || {}, existingFormatRatings || {});
 }
-function renderSkillAreaMetrics(template, checkedSkillAreas, existingRatings) {
+function renderSkillAreaMetrics(template, checkedSkillAreas, existingRatings, existingFormatRatings) {
   const box = document.getElementById('sheet-assessment-ratings-box');
   if (!checkedSkillAreas.length) { box.innerHTML = '<div class="empty-state">Select at least one skill area above to rate it.</div>'; return; }
   box.innerHTML = checkedSkillAreas.map(skillArea => {
@@ -5490,6 +5960,7 @@ function renderSkillAreaMetrics(template, checkedSkillAreas, existingRatings) {
     const savedForSkill = (existingRatings && existingRatings[skillArea] && typeof existingRatings[skillArea] === 'object') ? existingRatings[skillArea] : {};
     const extraMetrics = Object.keys(savedForSkill).filter(m => !cat.criteria.includes(m));
     const allMetrics = [...cat.criteria, ...extraMetrics];
+    const savedFormats = (existingFormatRatings && existingFormatRatings[skillArea] && typeof existingFormatRatings[skillArea] === 'object') ? existingFormatRatings[skillArea] : {};
     return `<div class="entityCard metric-skill-card" data-skill-area="${esc(skillArea)}" style="margin-top:10px;">
       <label class="field-label" style="margin-bottom:8px;">${esc(skillArea)} · Rate 1-10</label>
       ${allMetrics.map(m => metricRowHtml(m, Object.prototype.hasOwnProperty.call(savedForSkill, m) ? savedForSkill[m] : 5)).join('')}
@@ -5497,9 +5968,30 @@ function renderSkillAreaMetrics(template, checkedSkillAreas, existingRatings) {
         <input type="text" class="add-custom-metric-input" placeholder="Add custom metric" style="flex:1;">
         <button type="button" class="btn ghost add-custom-metric-btn" style="width:auto;">+ Add</button>
       </div>
+      ${formatFocusPickerHtml(skillArea, Object.keys(savedFormats))}
+      ${Object.keys(savedFormats).map(f => formatMetricsBlockHtml(skillArea, f, savedFormats[f])).join('')}
     </div>`;
   }).join('');
   wireMetricRowEvents();
+}
+// Format-specific metrics, layered on top of a Batting/Bowling skill area's
+// core criteria (see FORMAT_SKILLS above). formatFocusPickerHtml renders
+// nothing for a skill area that has no format-specific metrics defined
+// (Wicketkeeping, Fielding, or any custom template category).
+function formatFocusPickerHtml(skillArea, checkedFormats) {
+  if (!FORMAT_SKILLS[skillArea]) return '';
+  const checked = new Set(checkedFormats || []);
+  return `<div class="format-focus-picker" style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--surface-border);">
+    <label class="field-label" style="margin-bottom:4px; font-size:12.5px;">Format Focus <span class="muted" style="font-weight:400;">(optional — extra metrics for a specific format)</span></label>
+    <div class="checkbox-list">${ASSESSMENT_FORMATS.map(f => `<label><input type="checkbox" class="format-focus-check" value="${esc(f)}" style="width:auto; margin:0;" ${checked.has(f) ? 'checked' : ''}> ${esc(f)}</label>`).join('')}</div>
+  </div>`;
+}
+function formatMetricsBlockHtml(skillArea, format, existingVals) {
+  const skills = (FORMAT_SKILLS[skillArea] && FORMAT_SKILLS[skillArea][format]) || [];
+  return `<div class="format-metrics-block" data-format="${esc(format)}" style="margin-top:10px;">
+    <label class="field-label" style="margin-bottom:6px; font-size:12.5px;">${esc(format)} Focus</label>
+    ${skills.map(m => metricRowHtml(m, existingVals && Object.prototype.hasOwnProperty.call(existingVals, m) ? existingVals[m] : 5)).join('')}
+  </div>`;
 }
 function metricRowHtml(metricName, value) {
   return `<div class="metric-row" data-metric="${esc(metricName)}" style="margin-bottom:14px; font-family:inherit; font-size:14px; transition:opacity .15s;">
@@ -5539,6 +6031,27 @@ function wireMetricRowEvents() {
       input.value = '';
     };
   });
+  // Format Focus: checking a format inserts its extra metric block right
+  // after the picker; unchecking removes that block. Surgical insert/remove,
+  // same reasoning as the skill-area toggle above — never wipe sibling state.
+  box.querySelectorAll('.format-focus-check').forEach(chk => {
+    chk.onchange = () => {
+      const card = chk.closest('.metric-skill-card');
+      const skillArea = card.dataset.skillArea;
+      const format = chk.value;
+      if (chk.checked) {
+        if (card.querySelector(`.format-metrics-block[data-format="${CSS.escape(format)}"]`)) return;
+        const wrapper = document.createElement('div');
+        wrapper.innerHTML = formatMetricsBlockHtml(skillArea, format, {});
+        const existingBlocks = card.querySelectorAll('.format-metrics-block');
+        const anchor = existingBlocks.length ? existingBlocks[existingBlocks.length - 1] : card.querySelector('.format-focus-picker');
+        anchor.insertAdjacentElement('afterend', wrapper.firstElementChild);
+        wireMetricRowEvents();
+      } else {
+        card.querySelector(`.format-metrics-block[data-format="${CSS.escape(format)}"]`)?.remove();
+      }
+    };
+  });
 }
 function assessmentFormHtml(a) {
   const templateOptions = [`<option value="default">${esc(DEFAULT_ASSESSMENT_TEMPLATE.name)}</option>`]
@@ -5562,9 +6075,9 @@ function openAssessmentForm(a) {
   editing.assessments = a ? a.id : null;
   openSheet(assessmentFormHtml(a));
   const initialTemplate = getAssessmentTemplateById(null); // always start from default view; existing ratings still shown regardless of which template originally created them
-  renderAssessmentCriteriaGroups(initialTemplate, a?.disciplines || [], a?.ratings || {});
+  renderAssessmentCriteriaGroups(initialTemplate, a?.disciplines || [], a?.ratings || {}, a?.format_ratings || {});
   document.getElementById('sheet-assessment-template').addEventListener('change', (e) => {
-    renderAssessmentCriteriaGroups(getAssessmentTemplateById(e.target.value), [], {});
+    renderAssessmentCriteriaGroups(getAssessmentTemplateById(e.target.value), [], {}, {});
   });
   // Surgical add/remove per skill area on toggle — deliberately not a full
   // re-render, which would need to capture and restore every other already-
@@ -5587,6 +6100,7 @@ function openAssessmentForm(a) {
           <input type="text" class="add-custom-metric-input" placeholder="Add custom metric" style="flex:1;">
           <button type="button" class="btn ghost add-custom-metric-btn" style="width:auto;">+ Add</button>
         </div>
+        ${formatFocusPickerHtml(skillArea, [])}
       </div>`;
       ratingsBox.appendChild(wrapper.firstElementChild);
       wireMetricRowEvents();
@@ -5604,19 +6118,33 @@ function openAssessmentForm(a) {
     // "Footwork" under Wicketkeeping are genuinely different metrics, and a
     // flat {metric: value} map would let one silently overwrite the other.
     const ratings = {};
+    const formatRatings = {};
     document.querySelectorAll('.metric-skill-card').forEach(card => {
       const skillRatings = {};
-      card.querySelectorAll('.metric-row').forEach(row => {
+      card.querySelectorAll(':scope > .metric-row').forEach(row => {
         if (row.querySelector('.metric-assessed-check').checked) {
           skillRatings[row.dataset.metric] = Number(row.querySelector('.metric-slider').value);
         }
       });
       if (Object.keys(skillRatings).length) ratings[card.dataset.skillArea] = skillRatings;
+      const skillFormatRatings = {};
+      card.querySelectorAll('.format-metrics-block').forEach(fblock => {
+        const format = fblock.dataset.format;
+        const fRatings = {};
+        fblock.querySelectorAll('.metric-row').forEach(row => {
+          if (row.querySelector('.metric-assessed-check').checked) {
+            fRatings[row.dataset.metric] = Number(row.querySelector('.metric-slider').value);
+          }
+        });
+        if (Object.keys(fRatings).length) skillFormatRatings[format] = fRatings;
+      });
+      if (Object.keys(skillFormatRatings).length) formatRatings[card.dataset.skillArea] = skillFormatRatings;
     });
     const row = {
       org_id: currentOrgId, player_id: playerId, assessed_by: session.user.id, date,
       disciplines,
       ratings: Object.keys(ratings).length ? ratings : null,
+      format_ratings: Object.keys(formatRatings).length ? formatRatings : null,
       priority: document.getElementById('sheet-assessment-priority').value.trim() || null,
       comments: document.getElementById('sheet-assessment-comments').value.trim() || null,
       media_links: document.getElementById('sheet-assessment-links').value.split('\n').map(s => s.trim()).filter(Boolean),
@@ -5647,24 +6175,42 @@ function lastRatingForPlayerSkill(playerId, skillArea) {
     .sort((a, b) => (a.date < b.date ? 1 : -1));
   return rows[0]?.ratings[skillArea] || {};
 }
-function bulkAssessTableHtml(skillArea, teamPlayers) {
+function lastFormatRatingForPlayerSkill(playerId, skillArea, format) {
+  const rows = cache.assessments
+    .filter(a => a.player_id === playerId && a.format_ratings && a.format_ratings[skillArea] && a.format_ratings[skillArea][format])
+    .sort((a, b) => (a.date < b.date ? 1 : -1));
+  return rows[0]?.format_ratings[skillArea][format] || {};
+}
+// Which formats the Bulk Assess Format Focus picker currently has checked —
+// reset whenever the chosen skill area changes (Batting/Bowling only; see
+// FORMAT_SKILLS). Applies the same checked formats across every player in
+// the squad pass, unlike the single-assessment form's per-card picker.
+let bulkCheckedFormats = new Set();
+function bulkStepperHtml(metric, value, format) {
+  return `<div class="bulk-stepper" data-metric="${esc(metric)}"${format ? ` data-format="${esc(format)}"` : ''}>
+    <button type="button" class="bulk-stepper-minus" aria-label="Decrease">−</button>
+    <span class="bulk-stepper-value">${esc(value)}</span>
+    <button type="button" class="bulk-stepper-plus" aria-label="Increase">+</button>
+  </div>`;
+}
+function bulkAssessTableHtml(skillArea, teamPlayers, checkedFormats) {
   const cat = DEFAULT_ASSESSMENT_TEMPLATE.categories.find(c => c.category === skillArea);
   if (!cat) return '<div class="empty-state">Unknown skill area.</div>';
   if (!teamPlayers.length) return '<div class="empty-state">No players on this team yet.</div>';
+  const formats = checkedFormats || [];
+  const formatMetrics = formats.map(f => ({ format: f, metrics: (FORMAT_SKILLS[skillArea] && FORMAT_SKILLS[skillArea][f]) || [] }));
+  const formatHeaderCells = formatMetrics.map(({ format, metrics }) => metrics.map(m => `<th data-format="${esc(format)}">${esc(format)} · ${esc(m)}</th>`).join('')).join('');
   const rows = teamPlayers.map(p => {
     const last = lastRatingForPlayerSkill(p.id, skillArea);
-    const cells = cat.criteria.map(metric => {
-      const value = Number(last[metric] ?? 5);
-      return `<td><div class="bulk-stepper" data-metric="${esc(metric)}">
-        <button type="button" class="bulk-stepper-minus" aria-label="Decrease">−</button>
-        <span class="bulk-stepper-value">${esc(value)}</span>
-        <button type="button" class="bulk-stepper-plus" aria-label="Increase">+</button>
-      </div></td>`;
+    const cells = cat.criteria.map(metric => `<td>${bulkStepperHtml(metric, Number(last[metric] ?? 5))}</td>`).join('');
+    const formatCells = formatMetrics.map(({ format, metrics }) => {
+      const lastF = lastFormatRatingForPlayerSkill(p.id, skillArea, format);
+      return metrics.map(metric => `<td data-format="${esc(format)}">${bulkStepperHtml(metric, Number(lastF[metric] ?? 5), format)}</td>`).join('');
     }).join('');
-    return `<tr data-player="${esc(p.id)}"><td class="player-name-cell">${esc(p.name)}</td>${cells}</tr>`;
+    return `<tr data-player="${esc(p.id)}"><td class="player-name-cell">${esc(p.name)}</td>${cells}${formatCells}</tr>`;
   }).join('');
   return `<div class="bulk-assess-table-wrap"><table class="bulk-assess-table">
-    <thead><tr><th class="player-name-th">Player</th>${cat.criteria.map(m => `<th>${esc(m)}</th>`).join('')}</tr></thead>
+    <thead><tr><th class="player-name-th">Player</th>${cat.criteria.map(m => `<th>${esc(m)}</th>`).join('')}${formatHeaderCells}</tr></thead>
     <tbody>${rows}</tbody>
   </table></div>`;
 }
@@ -5676,14 +6222,35 @@ function bulkAssessFormHtml() {
     <div class="skill-radio-grid" id="bulk-assess-skill-grid">
       ${categories.map((c, i) => `<label class="skill-radio-btn"><input type="radio" name="bulk-assess-skill" value="${esc(c.category)}" ${i === 0 ? 'checked' : ''}><span>${esc(c.category)}</span></label>`).join('')}
     </div>
+    <div id="bulk-format-focus-box"></div>
     <div id="bulk-assess-table-box"></div>
     <button class="btn primary" id="bulk-assess-save-btn" style="margin-top:16px; width:auto;">Save All Ratings</button>`;
+}
+function renderBulkFormatFocusBox() {
+  const skillArea = document.querySelector('input[name="bulk-assess-skill"]:checked').value;
+  const box = document.getElementById('bulk-format-focus-box');
+  if (!FORMAT_SKILLS[skillArea]) { box.innerHTML = ''; return; }
+  box.innerHTML = `<div style="margin-top:10px; padding-top:10px; border-top:1px dashed var(--surface-border);">
+    <label class="field-label" style="margin-bottom:4px; font-size:12.5px;">Format Focus <span class="muted" style="font-weight:400;">(optional — extra metrics for a specific format, applied across the whole squad)</span></label>
+    <div class="checkbox-list">${ASSESSMENT_FORMATS.map(f => `<label><input type="checkbox" class="bulk-format-focus-check" value="${esc(f)}" style="width:auto; margin:0;" ${bulkCheckedFormats.has(f) ? 'checked' : ''}> ${esc(f)}</label>`).join('')}</div>
+  </div>`;
+  box.querySelectorAll('.bulk-format-focus-check').forEach(chk => {
+    chk.onchange = () => {
+      if (chk.checked) bulkCheckedFormats.add(chk.value); else bulkCheckedFormats.delete(chk.value);
+      renderBulkAssessTable();
+    };
+  });
+}
+function onBulkSkillAreaChange() {
+  bulkCheckedFormats = new Set();
+  renderBulkFormatFocusBox();
+  renderBulkAssessTable();
 }
 function renderBulkAssessTable() {
   const skillArea = document.querySelector('input[name="bulk-assess-skill"]:checked').value;
   const teamId = document.getElementById('bulk-assess-team').value;
   const teamPlayers = cache.players.filter(p => p.team_id === teamId);
-  document.getElementById('bulk-assess-table-box').innerHTML = bulkAssessTableHtml(skillArea, teamPlayers);
+  document.getElementById('bulk-assess-table-box').innerHTML = bulkAssessTableHtml(skillArea, teamPlayers, Array.from(bulkCheckedFormats));
   wireBulkAssessSteppers();
 }
 function wireBulkAssessSteppers() {
@@ -5698,9 +6265,11 @@ function wireBulkAssessSteppers() {
 function openBulkAssessForm() {
   if (!cache.teams.length) { showToast('Add a team before running a bulk assessment.', 'error'); return; }
   openSheet(bulkAssessFormHtml());
+  bulkCheckedFormats = new Set();
+  renderBulkFormatFocusBox();
   renderBulkAssessTable();
   document.getElementById('bulk-assess-team').addEventListener('change', renderBulkAssessTable);
-  document.getElementById('bulk-assess-skill-grid').addEventListener('change', renderBulkAssessTable);
+  document.getElementById('bulk-assess-skill-grid').addEventListener('change', onBulkSkillAreaChange);
   document.getElementById('bulk-assess-save-btn').addEventListener('click', async () => {
     const skillArea = document.querySelector('input[name="bulk-assess-skill"]:checked').value;
     const today = new Date().toISOString().slice(0, 10);
@@ -5708,12 +6277,22 @@ function openBulkAssessForm() {
     document.querySelectorAll('#bulk-assess-table-box tbody tr').forEach(tr => {
       const playerId = tr.dataset.player;
       const skillRatings = {};
+      const formatRatings = {};
       tr.querySelectorAll('.bulk-stepper').forEach(stepper => {
-        skillRatings[stepper.dataset.metric] = Number(stepper.querySelector('.bulk-stepper-value').textContent);
+        const metric = stepper.dataset.metric;
+        const format = stepper.dataset.format;
+        const value = Number(stepper.querySelector('.bulk-stepper-value').textContent);
+        if (format) {
+          formatRatings[format] = formatRatings[format] || {};
+          formatRatings[format][metric] = value;
+        } else {
+          skillRatings[metric] = value;
+        }
       });
       rowsByPlayer.push({
         org_id: currentOrgId, player_id: playerId, assessed_by: session.user.id, date: today,
         disciplines: [skillArea], ratings: { [skillArea]: skillRatings },
+        format_ratings: Object.keys(formatRatings).length ? { [skillArea]: formatRatings } : null,
       });
     });
     if (!rowsByPlayer.length) { showToast('No players to assess for this team.', 'error'); return; }
@@ -6149,8 +6728,52 @@ document.getElementById('analysis-type-filter').addEventListener('change', (e) =
 // ============================================================
 let reflectionQuery = '';
 
+// Theme chips: quick multi-select tags layered above each reflection
+// section's free-text box, so a coach can tag common patterns in one tap
+// instead of writing them out every time. Session-only lists (the individual
+// coach app also has separate Match-reflection variants, but academy's
+// reflection form has no session/match linkage distinction, so only the
+// session set is offered here).
+const COACH_WENT_WELL_THEMES = ['Communication Clarity', 'Session Planning & Structure', 'Time Management', 'Adapting on the Fly', 'Individual Attention Given', 'Energy & Enthusiasm', 'Patience & Tone', 'Feedback Quality', 'Group / Behavior Management', 'Technical Knowledge Applied'];
+const COACH_BETTER_THEMES = ['Session Planning', 'Time Management', 'Group Management', 'Communication Clarity', 'Individual Attention', 'Adaptability', 'Instructions / Demonstrations', 'Energy / Pacing Control'];
+const COACH_CHANGE_THEMES = ['Adjust Session Structure', 'Use Smaller Groups', 'Give More 1:1 Attention', 'Revisit Drill / Technique Teaching', 'Communicate Expectations More Clearly', 'Manage Time Better', 'Rotate Players More Effectively', 'Simplify Instructions', 'Build in More Game-based Practice'];
+const COACH_NEXT_FOCUS_THEMES = ['Communication', 'Session Planning', 'Game-day Tactics', 'Player Management', 'Time Management', 'Feedback Delivery', 'Preparation', 'Adaptability', 'Technical Knowledge', 'Composure'];
+// Match-reflection variants — a coach reflecting on a match is weighing
+// tactical/in-game decisions rather than session delivery, so these are
+// deliberately a different vocabulary, not a relabeling of the session set.
+// "Next focus" has no match variant (same forward-looking themes either way).
+const COACH_WENT_WELL_MATCH_THEMES = ['Tactical Decision-making', 'In-game Communication', 'Composure Under Pressure', 'Player Man-management', 'Adaptability to Match Situations', 'Pre-match Preparation', 'Clarity of Instructions', 'Reading the Game'];
+const COACH_BETTER_MATCH_THEMES = ['Tactical Calls', 'Team Selection', 'In-game Communication', 'Composure', 'Player Management / Rotation', 'Preparation', 'Adaptability to Match Situations'];
+const COACH_CHANGE_MATCH_THEMES = ['Reconsider Team Selection Approach', 'Adjust Tactical Approach', 'Manage Match Situations Better', 'Communicate More Calmly Under Pressure', 'Do Closer Opposition Analysis', 'Trust Preparation More'];
+function themesForReflectionSection(section, type) {
+  const isMatch = type === 'match';
+  if (section === 'well') return isMatch ? COACH_WENT_WELL_MATCH_THEMES : COACH_WENT_WELL_THEMES;
+  if (section === 'better') return isMatch ? COACH_BETTER_MATCH_THEMES : COACH_BETTER_THEMES;
+  if (section === 'change') return isMatch ? COACH_CHANGE_MATCH_THEMES : COACH_CHANGE_THEMES;
+  return COACH_NEXT_FOCUS_THEMES;
+}
+function themeChipsHtml(section, themes, checkedValues) {
+  const checked = new Set(checkedValues || []);
+  return `<div class="theme-chip-box" data-section="${esc(section)}" style="margin:6px 0;">
+    <div class="muted theme-chip-count" style="font-size:12px; margin-bottom:4px;">${checked.size} selected</div>
+    <div class="checkbox-list">${themes.map(t => `<label><input type="checkbox" class="theme-chip-check" data-section="${esc(section)}" value="${esc(t)}" style="width:auto; margin:0;" ${checked.has(t) ? 'checked' : ''}> ${esc(t)}</label>`).join('')}</div>
+  </div>`;
+}
+function wireThemeChipEvents(root) {
+  root.querySelectorAll('.theme-chip-box').forEach(box => {
+    const update = () => {
+      const n = box.querySelectorAll('.theme-chip-check:checked').length;
+      box.querySelector('.theme-chip-count').textContent = `${n} selected`;
+    };
+    box.querySelectorAll('.theme-chip-check').forEach(chk => { chk.onchange = update; });
+  });
+}
+function checkedThemeValues(root, section) {
+  return Array.from(root.querySelectorAll(`.theme-chip-check[data-section="${CSS.escape(section)}"]:checked`)).map(c => c.value);
+}
 async function loadReflections() {
   if (!cache.sessions.length) await loadSessions();
+  if (!cache.matches.length) await loadMatches();
   const listEl = document.getElementById('reflections-list');
   listEl.innerHTML = '<div class="empty-state">Loading...</div>';
   const { data, error } = await supabase.from('reflections').select('*').eq('org_id', currentOrgId).order('date', { ascending: false });
@@ -6167,13 +6790,17 @@ function renderReflectionsList() {
   renderPagedList(listEl, list, reflectionItemCard, 'No reflections match.');
 }
 function reflectionItemCard(r) {
-  const linkedSession = r.session_id ? cache.sessions.find(s => s.id === r.session_id) : null;
-  const label = linkedSession ? (linkedSession.title || nameById(cache.teams, linkedSession.team_id)) : 'Reflection';
+  const isMatch = r.type === 'match';
+  const linkedSession = !isMatch && r.session_id ? cache.sessions.find(s => s.id === r.session_id) : null;
+  const linkedMatch = isMatch && r.match_id ? cache.matches.find(m => m.id === r.match_id) : null;
+  const label = isMatch
+    ? (linkedMatch ? `vs ${linkedMatch.opponent || '—'}` : 'Match reflection')
+    : (linkedSession ? (linkedSession.title || nameById(cache.teams, linkedSession.team_id)) : 'Reflection');
   const canEdit = r.coach_id === session.user.id;
   const card = document.createElement('div'); card.className = 'itemCard';
   card.innerHTML = `
     <div class="itemMain">
-      <b>${esc(r.date)} · ${esc(label)}</b>
+      <b>${esc(r.date)} · ${esc(label)}</b> <span class="tagPill">${isMatch ? 'Match' : 'Session'}</span>
       <div class="muted">${r.rating ? `Rating ${esc(String(r.rating))}/10` : 'No rating'}</div>
       ${r.well ? `<small>${esc(r.well)}</small>` : ''}
     </div>
@@ -6190,17 +6817,30 @@ function reflectionItemCard(r) {
 }
 function reflectionFormHtml(r) {
   const recentSessions = cache.sessions.slice(0, 60);
+  const recentMatches = cache.matches.slice(0, 60);
+  const type = r?.type === 'match' ? 'match' : 'session';
   return sheetHead(r ? 'Edit Reflection' : 'Coach Self Reflection') + `
     <div class="formgrid">
+      <div class="full"><label style="margin-bottom:6px; display:block;">Reflecting on</label><div style="display:flex; gap:6px;">
+        <button type="button" class="btn ${type !== 'match' ? 'primary' : 'secondary'}" id="reflection-type-session-btn" style="padding:8px 14px; width:auto;">Practice Session</button>
+        <button type="button" class="btn ${type === 'match' ? 'primary' : 'secondary'}" id="reflection-type-match-btn" style="padding:8px 14px; width:auto;">Match</button>
+      </div></div>
       <label>Date<input type="date" id="sheet-reflection-date" value="${esc(r?.date || new Date().toISOString().slice(0, 10))}"></label>
-      <label class="full">Link to a specific session <span class="muted" style="font-weight:400;">(optional)</span><select id="sheet-reflection-session"><option value="">— No specific session —</option>${recentSessions.map(s => `<option value="${s.id}" ${r?.session_id === s.id ? 'selected' : ''}>${esc(s.date)} · ${esc(s.title || nameById(cache.teams, s.team_id))}</option>`).join('')}</select></label>
+      <div class="full formgrid" id="reflection-session-block" style="padding:0; margin:0; ${type === 'match' ? 'display:none;' : ''}">
+        <label class="full">Link to a specific session <span class="muted" style="font-weight:400;">(optional)</span><select id="sheet-reflection-session"><option value="">— No specific session —</option>${recentSessions.map(s => `<option value="${s.id}" ${r?.session_id === s.id ? 'selected' : ''}>${esc(s.date)} · ${esc(s.title || nameById(cache.teams, s.team_id))}</option>`).join('')}</select></label>
+      </div>
+      <div class="full formgrid" id="reflection-match-block" style="padding:0; margin:0; ${type === 'match' ? '' : 'display:none;'}">
+        <label class="full">Link to a specific match <span class="muted" style="font-weight:400;">(optional)</span><select id="sheet-reflection-match"><option value="">— No specific match —</option>${recentMatches.map(m => `<option value="${m.id}" ${r?.match_id === m.id ? 'selected' : ''}>${esc(m.date)} · vs ${esc(m.opponent || '—')}</option>`).join('')}</select></label>
+        <label>Tactical decisions (1-10)<input type="number" min="1" max="10" id="sheet-reflection-tactical" value="${r?.tactical_decisions ?? ''}"></label>
+        <label>Player management / rotation (1-10)<input type="number" min="1" max="10" id="sheet-reflection-player-mgmt" value="${r?.player_management ?? ''}"></label>
+      </div>
       <label>Overall rating (1-10)<input type="number" min="1" max="10" id="sheet-reflection-rating" value="${r?.rating ?? ''}"></label>
       <label>Communication (1-10)<input type="number" min="1" max="10" id="sheet-reflection-communication" value="${r?.communication ?? ''}"></label>
-      <label class="full" style="display:block;">What went well?</label>${presetRowHtml('reflection_well', 'sheet-reflection-well')}<textarea class="full" id="sheet-reflection-well">${esc(r?.well || '')}</textarea>
-      <label class="full" style="display:block;">What could be better?</label>${presetRowHtml('reflection_better', 'sheet-reflection-better')}<textarea class="full" id="sheet-reflection-better">${esc(r?.better || '')}</textarea>
+      <label class="full" style="display:block;">What went well?</label><div id="reflection-well-themes-box">${themeChipsHtml('well', themesForReflectionSection('well', type), r?.well_themes)}</div>${presetRowHtml('reflection_well', 'sheet-reflection-well')}<textarea class="full" id="sheet-reflection-well">${esc(r?.well || '')}</textarea>
+      <label class="full" style="display:block;">What could be better?</label><div id="reflection-better-themes-box">${themeChipsHtml('better', themesForReflectionSection('better', type), r?.better_themes)}</div>${presetRowHtml('reflection_better', 'sheet-reflection-better')}<textarea class="full" id="sheet-reflection-better">${esc(r?.better || '')}</textarea>
       <label class="full" style="display:block;">Player notes</label>${presetRowHtml('reflection_players', 'sheet-reflection-players')}<textarea class="full" id="sheet-reflection-players">${esc(r?.players || '')}</textarea>
-      <label class="full" style="display:block;">What will I change next time?</label>${presetRowHtml('reflection_change', 'sheet-reflection-change')}<textarea class="full" id="sheet-reflection-change">${esc(r?.change || '')}</textarea>
-      <label class="full" style="display:block;">Next focus</label>${presetRowHtml('reflection_next', 'sheet-reflection-next')}<textarea class="full" id="sheet-reflection-next">${esc(r?.next || '')}</textarea>
+      <label class="full" style="display:block;">What will I change next time?</label><div id="reflection-change-themes-box">${themeChipsHtml('change', themesForReflectionSection('change', type), r?.change_themes)}</div>${presetRowHtml('reflection_change', 'sheet-reflection-change')}<textarea class="full" id="sheet-reflection-change">${esc(r?.change || '')}</textarea>
+      <label class="full" style="display:block;">Next focus</label>${themeChipsHtml('next', COACH_NEXT_FOCUS_THEMES, r?.next_themes)}${presetRowHtml('reflection_next', 'sheet-reflection-next')}<textarea class="full" id="sheet-reflection-next">${esc(r?.next || '')}</textarea>
     </div>
     <button class="btn primary" id="sheet-save-reflection-btn" style="margin-top:14px; width:auto;">${r ? 'Save changes' : 'Save Reflection'}</button>`;
 }
@@ -6209,11 +6849,39 @@ async function openReflectionForm(r) {
   await loadPresetsCache();
   openSheet(reflectionFormHtml(r));
   attachPresetHandlers(document);
+  wireThemeChipEvents(document);
+  // Tracks which half of the form (Session vs Match) is currently showing —
+  // a closure var rather than reading a hidden input, since it also decides
+  // which theme vocabulary (themesForReflectionSection) the three themed
+  // sections below should be rendered with.
+  let reflectionType = r?.type === 'match' ? 'match' : 'session';
+  function setReflectionType(newType) {
+    reflectionType = newType;
+    document.getElementById('reflection-type-session-btn').className = `btn ${newType !== 'match' ? 'primary' : 'secondary'}`;
+    document.getElementById('reflection-type-match-btn').className = `btn ${newType === 'match' ? 'primary' : 'secondary'}`;
+    document.getElementById('reflection-session-block').style.display = newType === 'match' ? 'none' : '';
+    document.getElementById('reflection-match-block').style.display = newType === 'match' ? '' : 'none';
+    // Each chip grid is a completely different vocabulary between Session
+    // and Match (see themesForReflectionSection) — carrying over "checked"
+    // selections across a type switch would submit themes from the wrong
+    // list, so each box is cleared and rebuilt fresh here.
+    ['well', 'better', 'change'].forEach(section => {
+      document.getElementById(`reflection-${section}-themes-box`).innerHTML = themeChipsHtml(section, themesForReflectionSection(section, newType), []);
+    });
+    wireThemeChipEvents(document);
+  }
+  document.getElementById('reflection-type-session-btn').addEventListener('click', () => setReflectionType('session'));
+  document.getElementById('reflection-type-match-btn').addEventListener('click', () => setReflectionType('match'));
   document.getElementById('sheet-save-reflection-btn').addEventListener('click', async () => {
     const date = document.getElementById('sheet-reflection-date').value;
     if (!date) { showToast('Date is required.', 'error'); return; }
+    const isMatch = reflectionType === 'match';
     const row = {
-      org_id: currentOrgId, session_id: document.getElementById('sheet-reflection-session').value || null,
+      org_id: currentOrgId, type: reflectionType,
+      session_id: isMatch ? null : (document.getElementById('sheet-reflection-session').value || null),
+      match_id: isMatch ? (document.getElementById('sheet-reflection-match').value || null) : null,
+      tactical_decisions: isMatch ? (document.getElementById('sheet-reflection-tactical').value || null) : null,
+      player_management: isMatch ? (document.getElementById('sheet-reflection-player-mgmt').value || null) : null,
       coach_id: session.user.id, date,
       rating: document.getElementById('sheet-reflection-rating').value || null,
       communication: document.getElementById('sheet-reflection-communication').value || null,
@@ -6222,6 +6890,10 @@ async function openReflectionForm(r) {
       players: document.getElementById('sheet-reflection-players').value.trim() || null,
       change: document.getElementById('sheet-reflection-change').value.trim() || null,
       next: document.getElementById('sheet-reflection-next').value.trim() || null,
+      well_themes: checkedThemeValues(document, 'well'),
+      better_themes: checkedThemeValues(document, 'better'),
+      change_themes: checkedThemeValues(document, 'change'),
+      next_themes: checkedThemeValues(document, 'next'),
     };
     const { error } = editing.reflections
       ? await supabase.from('reflections').update(row).eq('id', editing.reflections)
@@ -6247,8 +6919,8 @@ const FIELD_LABELS = {
   seasons: { name: 'Name', team_id: 'Team', start_date: 'Start date', end_date: 'End date', notes: 'Notes' },
   sessions: { team_id: 'Team', date: 'Date', time: 'Time', title: 'Title', session_type: 'Type', duration: 'Duration', venue: 'Venue', focus: 'Focus', objectives: 'Objectives', warmup: 'Warm-up', main: 'Main activity', game: 'Game', cues: 'Cues', success: 'Success criteria', attendance: 'Attendance', main_drill_ids: 'Main drills', game_drill_ids: 'Game drills', equipment_ids: 'Equipment used' },
   matches: { team_id: 'Team', tournament_id: 'Tournament', date: 'Date', opponent: 'Opponent', venue: 'Venue', format: 'Format', result: 'Result', toss: 'Toss', toss_decision: 'Toss decision', conditions: 'Conditions', team_rating: 'Team rating', team_batting_rating: 'Team batting rating', team_bowling_rating: 'Team bowling rating', team_fielding_rating: 'Team fielding rating', team_notes: 'Team review', playing_xi: 'Playing XI', batting_review: 'Batting review', bowling_review: 'Bowling review', fielding_review: 'Fielding review', batting_ratings: 'Batting ratings', bowling_ratings: 'Bowling ratings', fielding_ratings: 'Fielding ratings', batting_notes: 'Batting notes', bowling_notes: 'Bowling notes', actions: 'Actions', notes: 'Notes' },
-  assessments: { player_id: 'Player', date: 'Date', disciplines: 'Disciplines', ratings: 'Ratings', discipline_notes: 'Discipline notes', priority: 'Priority', comments: 'Comments', media_links: 'Media links' },
-  reflections: { session_id: 'Session', date: 'Date', rating: 'Rating', communication: 'Communication', well: 'What went well', better: 'What could be better', players: 'Player notes', change: 'What to change', next: 'Next steps' },
+  assessments: { player_id: 'Player', date: 'Date', disciplines: 'Disciplines', ratings: 'Ratings', format_ratings: 'Format ratings', discipline_notes: 'Discipline notes', priority: 'Priority', comments: 'Comments', media_links: 'Media links' },
+  reflections: { type: 'Type', session_id: 'Session', match_id: 'Match', tactical_decisions: 'Tactical decisions', player_management: 'Player management', date: 'Date', rating: 'Rating', communication: 'Communication', well: 'What went well', well_themes: 'What went well (themes)', better: 'What could be better', better_themes: 'What could be better (themes)', players: 'Player notes', change: 'What to change', change_themes: 'What to change (themes)', next: 'Next steps', next_themes: 'Next steps (themes)' },
   phases: { name: 'Name', start_date: 'Start date', end_date: 'End date', focus: 'Focus', session_target: 'Session target' },
   fixtures: { date: 'Date', opponent: 'Opponent', venue: 'Venue', notes: 'Notes' },
 };
