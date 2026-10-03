@@ -5473,7 +5473,7 @@ function buildSessionReport(){
  let hasAnyTags=categoryCounts.some(c=>c.count>0);
  reportShell("Session Report",rangeLabel(from,to),sessions.length?`
  ${hasAnyTags?`<h2>Objective Category Breakdown</h2><div class="card">${categoryCounts.map(c=>`<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${esc(c.name)}</span><b>${c.count} session${c.count!==1?"s":""}</b></div>`).join("")}</div>`:""}
- <table class="reportTable"><tr><th>Date</th><th>Title</th><th>Type</th><th>Focus</th><th>Categories</th><th>Objectives</th><th>Net Plan</th></tr>${sessions.slice().sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b))).map(s=>`<tr><td>${esc(fmtDate(s.date))}</td><td>${esc(s.title||"—")}</td><td>${esc(sessionTypeLabel(s.sessionType))}</td><td>${esc(s.focus)}</td><td>${(s.objectiveTags||[]).map(t=>esc(t)).join(", ")||"—"}</td><td>${esc(s.objectives)}</td><td>${s.netPlan&&s.netPlan.length?esc(netPlanSummaryText(s.netPlan)).replace(/\n/g,"<br>"):"—"}</td></tr>`).join("")}</table>`:empty("No sessions documented."));
+ <table class="reportTable"><tr><th>Date</th><th>Title</th><th>Type</th><th>Focus</th><th>Categories</th><th>Objectives</th></tr>${sessions.slice().sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b))).map(s=>`<tr><td>${esc(fmtDate(s.date))}</td><td>${esc(s.title||"—")}</td><td>${esc(sessionTypeLabel(s.sessionType))}</td><td>${esc(s.focus)}</td><td>${(s.objectiveTags||[]).map(t=>esc(t)).join(", ")||"—"}</td><td>${esc(s.objectives)}</td></tr>`).join("")}</table>`:empty("No sessions documented."));
 }
 function matchReport(){reportRangeModal("Match Report","buildMatchReport")}
 function buildMatchReport(){
