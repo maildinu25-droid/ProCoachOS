@@ -6,6 +6,7 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#08121e">
 <title>ProCoach OS (Premium Testing)</title>
+<link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="apple-touch-icon.png">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -4995,16 +4996,69 @@ function invoiceCenter(){
  <div class="card">${list.length?list.map(i=>{let p=db.players.find(x=>x.id===i.playerId);return `<div class="item"><div><b>${esc(invoiceNoDisplay(i.invNo))} · ${esc(p?p.name:"Unknown player")}</b><div class="muted">${esc(fmtDate(i.date))} · ₹${invoiceTotal(i).toFixed(0)}</div></div><div class="toolbar"><span class="tag" style="${i.paid?"":"background:var(--redTint);color:var(--red)"}">${i.paid?"Paid":"Unpaid"}</span><button class="btn secondary iconBtn" title="View" onclick="invoiceReturnTo=invoiceCenter;viewInvoice('${i.id}')">${icon("eye",17)}</button></div></div>`}).join(""):empty("No invoices yet.")}</div>`);
 }
 function invoiceRowHtml(row,i){
- return `<tr><td><input value="${esc(row.desc||"")}" placeholder="e.g. Coaching sessions - September" oninput="invoiceDraft[${i}].desc=this.value"></td>
- <td><input type="number" min="0" step="1" style="width:64px" value="${esc(row.qty||1)}" oninput="invoiceDraft[${i}].qty=this.value;updateInvoiceTotal()"></td>
- <td><input type="number" min="0" step="0.01" style="width:90px" value="${esc(row.rate||"")}" oninput="invoiceDraft[${i}].rate=this.value;updateInvoiceTotal()"></td>
+ return `<tr><td><input value="${esc(row.desc||"")}" placeholder="e.g. Coaching sessions - September" oninput="invoiceDraft[${i}].desc=this.value;delete invoiceDraft[${i}].autoFilled"></td>
+ <td><input type="number" min="0" step="1" style="width:64px" value="${esc(row.qty||1)}" oninput="invoiceDraft[${i}].qty=this.value;delete invoiceDraft[${i}].autoFilled;updateInvoiceTotal()"></td>
+ <td><input type="number" min="0" step="0.01" style="width:90px" value="${esc(row.rate||"")}" oninput="invoiceDraft[${i}].rate=this.value;delete invoiceDraft[${i}].autoFilled;updateInvoiceTotal()"></td>
  <td style="text-align:right">₹${((Number(row.qty)||0)*(Number(row.rate)||0)).toFixed(0)}</td>
  <td><button type="button" class="btn danger" style="padding:6px 10px" onclick="removeInvoiceRow(${i})">×</button></td></tr>`;
 }
-function renderInvoiceRows(){document.getElementById("invoiceRows").innerHTML=invoiceDraft.length?invoiceDraft.map(invoiceRowHtml).join(""):`<tr><td colspan="5">${empty("No line items yet.")}</td></tr>`;updateInvoiceTotal()}
+function renderInvoiceRows(){document.getElementById("invoiceRows").innerHTML=invoiceDraft.length?invoiceDraft.map(invoiceRowHtml).join(""):`<tr><td colspan="5">${empty("No line items yet.")}</td></tr>`;updateInvoiceTotal();renderUninvoicedSessionsBox()}
 function addInvoiceRow(){invoiceDraft.push({desc:"",qty:1,rate:""});renderInvoiceRows()}
 function removeInvoiceRow(i){invoiceDraft.splice(i,1);renderInvoiceRows()}
 function updateInvoiceTotal(){let el=document.getElementById("invoiceTotalDisplay");if(el)el.textContent="₹"+invoiceDraft.reduce((a,it)=>a+((Number(it.qty)||0)*(Number(it.rate)||0)),0).toFixed(0)}
+// --- Uninvoiced sessions picker -------------------------------------------
+// Line items created from a session carry a sessionId so we can tell which
+// sessions have already been billed. invoicedSessionIds() scans every saved
+// invoice (not just the one being edited) so a session can never be double-
+// billed by accident. The sessionId sticks to the row even if the coach
+// edits its description/qty/rate afterwards — it still represents that
+// session having been billed.
+function invoicedSessionIds(excludeInvoiceId){
+ let set=new Set();
+ db.invoices.forEach(inv=>{
+  if(excludeInvoiceId&&inv.id===excludeInvoiceId)return;
+  (inv.items||[]).forEach(it=>{if(it.sessionId)set.add(it.sessionId)});
+ });
+ return set;
+}
+function uninvoicedSessionsForPlayer(player){
+ if(!player)return [];
+ let invoiced=invoicedSessionIds(editingInvoiceId);
+ // Sessions already added to the current draft shouldn't be offered again.
+ let inDraft=new Set(invoiceDraft.filter(it=>it.sessionId).map(it=>it.sessionId));
+ return playerSessions(player).filter(s=>!invoiced.has(s.id)&&!inDraft.has(s.id));
+}
+function renderUninvoicedSessionsBox(){
+ let box=document.getElementById("uninvoicedSessionsBox");
+ if(!box)return;
+ let sel=document.getElementById("invoicePlayerSelect");
+ let player=sel?db.players.find(p=>p.id===sel.value):null;
+ let list=uninvoicedSessionsForPlayer(player);
+ if(!list.length){box.innerHTML="";return}
+ box.innerHTML=`<div class="card" style="margin:10px 0">
+  <b>Uninvoiced sessions for ${esc(player.name)}</b>
+  <p class="muted" style="font-size:var(--fs-1);margin:4px 0 8px">Sessions already on a previous invoice aren't listed here, so you can't bill the same session twice.</p>
+  <div>${list.map(s=>`<label style="display:flex;align-items:center;gap:8px;padding:5px 0"><input type="checkbox" id="uis_${s.id}" value="${s.id}"><span>${esc(fmtDate(s.date))} — ${esc(sessionLabel(s))}</span></label>`).join("")}</div>
+  <button type="button" class="btn secondary" style="margin-top:8px" onclick="addUninvoicedSessionsToInvoice('${player.id}')">+ Add Selected to Invoice</button>
+ </div>`;
+}
+function addUninvoicedSessionsToInvoice(playerId){
+ let player=db.players.find(p=>p.id===playerId);if(!player)return;
+ let list=uninvoicedSessionsForPlayer(player);
+ let picked=list.filter(s=>{let cb=document.getElementById("uis_"+s.id);return cb&&cb.checked});
+ if(!picked.length)return;
+ // Drop the single placeholder row the form starts with (blank, or the
+ // generic "Coaching session(s)" row auto-filled from the player's session
+ // rate) so picking sessions doesn't leave a redundant line sitting above
+ // them.
+ if(invoiceDraft.length===1&&!invoiceDraft[0].sessionId&&(invoiceDraft[0].autoFilled||(!invoiceDraft[0].desc&&!invoiceDraft[0].rate))){
+  invoiceDraft=[];
+ }
+ picked.forEach(s=>{
+  invoiceDraft.push({desc:`${sessionLabel(s)} (${fmtDate(s.date)})`,qty:1,rate:player.sessionRate||"",sessionId:s.id});
+ });
+ renderInvoiceRows();
+}
 function invoiceFormHtml(inv,mode){
  inv=inv||{};
  let sorted=db.players.slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
@@ -5016,6 +5070,7 @@ function invoiceFormHtml(inv,mode){
  <label>Due date <span class="muted" style="font-weight:400">(optional)</span><input type="date" name="dueDate" value="${esc(inv.dueDate||"")}"></label>
  <label class="full">Billed by <span class="muted" style="font-weight:400">(shown on the printed invoice)</span><input name="billedBy" value="${esc(inv.billedBy||db.settings.businessName||db.settings.coachName||"")}"></label>
  </div>
+ <div id="uninvoicedSessionsBox"></div>
  <div class="matchEntryWrap" style="margin-top:12px"><table class="matchEntryTable"><thead><tr><th style="width:46%">Description</th><th style="width:14%">Qty</th><th style="width:18%">Rate ₹</th><th style="width:16%">Amount</th><th style="width:34px"></th></tr></thead><tbody id="invoiceRows"></tbody></table></div>
  <button type="button" class="btn secondary" style="margin:10px 0" onclick="addInvoiceRow()">+ Add line item</button>
  <div class="card" style="text-align:right;font-size:var(--fs-6);font-weight:800">Total: <span id="invoiceTotalDisplay">₹0</span></div>
@@ -5026,7 +5081,13 @@ function invoiceFormHtml(inv,mode){
 function onInvoicePlayerPick(playerId){
  let p=db.players.find(x=>x.id===playerId);
  if(p&&p.sessionRate&&invoiceDraft.length===1&&!invoiceDraft[0].desc&&!invoiceDraft[0].rate){
-  invoiceDraft[0]={desc:"Coaching session(s)",qty:1,rate:p.sessionRate};renderInvoiceRows();
+  // autoFilled marks this as a generic placeholder (not tied to any
+  // specific session) so picking uninvoiced sessions below can safely
+  // replace it instead of leaving a redundant "Coaching session(s)" line
+  // alongside the per-session ones.
+  invoiceDraft[0]={desc:"Coaching session(s)",qty:1,rate:p.sessionRate,autoFilled:true};renderInvoiceRows();
+ } else {
+  renderUninvoicedSessionsBox();
  }
 }
 function openInvoiceForm(existing,mode){
@@ -5977,6 +6038,18 @@ async function saveAvailability(){
   alert("Couldn't save your availability right now. Check your connection and try again.");
  }
 }
+// A shortcut for the common case: "I just approved/ran this session, now
+// let me bill it" without leaving the Booking page to go find the player's
+// profile. Only shown once the booking is matched to a real player in the
+// roster (newInvoice needs a playerId), and reuses the same uninvoiced-
+// sessions picker as the invoice form, so this session can't be billed
+// twice even if it's also invoiced later from the player's profile.
+function bookingInvoiceBtnHtml(b){
+ if(b.status!=="approved")return "";
+ let p=findExactPlayerMatch(b.playerName);
+ if(!p)return "";
+ return `<button type="button" class="btn secondary" style="padding:6px 10px;flex-shrink:0" onclick="invoiceReturnTo=booking;newInvoice('${p.id}')">Invoice</button>`;
+}
 function findExactPlayerMatch(typedName){
  let norm=String(typedName||"").trim().toLowerCase();
  return activePlayers().find(p=>String(p.name||"").trim().toLowerCase()===norm)||null;
@@ -6095,7 +6168,7 @@ function booking(){
  let link=bookingLink();
  let pending=bookingState.requests.filter(b=>b.status==="pending").sort((a,b)=>a.date.localeCompare(b.date));
  let upcomingConfirmed=bookingState.requests.filter(b=>b.status==="approved"&&b.date>=today()).sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time)).slice(0,10);
- let upcomingConfirmedHtml=upcomingConfirmed.length?`<h2 class="section">Upcoming Confirmed Sessions</h2><div class="card">${upcomingConfirmed.map(b=>`<div class="item"><div><b>${esc(b.playerName)}</b><div class="muted">${esc(fmtDate(b.date))} at ${esc(b.time)}${b.venue?" · "+esc(b.venue):""}</div></div></div>`).join("")}</div>`:"";
+ let upcomingConfirmedHtml=upcomingConfirmed.length?`<h2 class="section">Upcoming Confirmed Sessions</h2><div class="card">${upcomingConfirmed.map(b=>`<div class="item"><div><b>${esc(b.playerName)}</b><div class="muted">${esc(fmtDate(b.date))} at ${esc(b.time)}${b.venue?" · "+esc(b.venue):""}</div></div>${bookingInvoiceBtnHtml(b)}</div>`).join("")}</div>`:"";
  let past=bookingState.requests.filter(b=>b.status!=="pending").sort((a,b)=>b.requestedAt-a.requestedAt).slice(0,20);
 
  // A recurring request creates several individual booking records (one per
@@ -6283,7 +6356,7 @@ function booking(){
 
  let oneHistoryHtml=function(b){
   let statusColor=b.status==="approved"?"var(--g)":b.status==="cancelled"?"var(--muted)":"var(--red)";
-  return `<div class="card" style="margin-bottom:6px;opacity:.75;display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>${esc(b.playerName)}</b> · ${esc(fmtDate(b.date))} at ${esc(b.time)} <span style="color:${statusColor}">· ${b.status}</span></span><button type="button" class="btn danger iconBtn" title="Delete" onclick="deleteBookingHistoryEntry('${b.id}')">${icon("trash",17)}</button></div>`;
+  return `<div class="card" style="margin-bottom:6px;opacity:.75;display:flex;justify-content:space-between;align-items:center;gap:8px"><span><b>${esc(b.playerName)}</b> · ${esc(fmtDate(b.date))} at ${esc(b.time)} <span style="color:${statusColor}">· ${b.status}</span></span><div style="display:flex;gap:6px;align-items:center">${bookingInvoiceBtnHtml(b)}<button type="button" class="btn danger iconBtn" title="Delete" onclick="deleteBookingHistoryEntry('${b.id}')">${icon("trash",17)}</button></div></div>`;
  };
  let historySectionHtml=past.length?`<h2 class="section">Recent History <span class="muted" style="font-weight:400;font-size:var(--fs-1)">(last ${past.length}, most recent first)</span></h2>${past.map(oneHistoryHtml).join("")}`:"";
 
