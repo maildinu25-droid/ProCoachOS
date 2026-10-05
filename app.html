@@ -3526,7 +3526,13 @@ function fieldArrowTagSelectHtml(style){
  if(cur&&!isPresetFieldTag(cur)&&!mine.includes(cur))mine.push(cur); // an in-use tag that wasn't saved (list was full)
  if(mine.length)html+=`<optgroup label="My tags">${mine.map(t=>opt(t)).join("")}</optgroup>`;
  html+=`<optgroup label="More"><option value="__new">+ New custom tag…</option>${saved.length?`<option value="__manage">Manage my tags…</option>`:""}</optgroup>`;
- return `<select title="Tag for ball arrows" onchange="setFieldArrowTag(this.value)" style="${style}">${html}</select>`;
+ // Looks exactly like the neighbouring tool buttons (a "btn secondary" label
+ // showing the current tag) with the real <select> laid invisibly on top, so
+ // tapping opens the native picker. The select keeps font-size 16px on purpose:
+ // the app forces that on every select on phones, because anything smaller
+ // makes iOS Safari zoom the page when it's focused.
+ let shown=cur||"Ball tag";
+ return `<span style="position:relative;display:inline-flex;flex:none;max-width:130px"><span class="btn secondary" style="flex:none;max-width:130px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:inline-flex;align-items:center;${style}">${esc(shown)} ▾</span><select title="Tag for ball arrows" onchange="setFieldArrowTag(this.value)" style="position:absolute;left:0;top:0;width:100%;height:100%;opacity:0;cursor:pointer;font-size:16px;padding:0;border:0">${html}</select></span>`;
 }
 // Legend: one chip per tagged ball arrow ("1 – Flat catch"), in arrow-number
 // order, coloured by category — shown under the diagram (editor + previews)
@@ -3584,7 +3590,7 @@ function fieldEditorHtml(fullscreen){
   let toolBtns=FIELD_TOOLS.map(t=>`<button type="button" class="btn ${fieldDraft.tool===t.id?"primary":"secondary"}" title="${esc(t.label)}" onclick="setFieldTool('${t.id}')">${fieldToolIconSvg(t.id)}</button>`).join("");
   // Shown only while an arrow is mid-draw (at least one point placed) — Finish
   // commits it (needs 2+ points), Cancel discards the in-progress path.
-  let arrowTagSel=fieldArrowTagSelectHtml("width:auto;max-width:130px;padding:6px 8px;font-size:12px");
+  let arrowTagSel=fieldArrowTagSelectHtml("height:34px;padding:0 9px;font-size:11px;border-radius:8px;max-width:112px");
   let finishArrowBtn=fieldDraft.pendingArrowPoints.length>=2?`<button type="button" class="btn primary" title="Finish Arrow" onclick="finishFieldArrow()">${icon("check",16)}</button>`:"";
   let cancelArrowBtn=fieldDraft.pendingArrowPoints.length?`<button type="button" class="btn danger" title="Cancel Arrow" onclick="cancelFieldArrow()" style="font-size:14px;font-weight:700">✕</button>`:"";
   let exitBtn=`<button type="button" class="btn secondary" title="Exit Fullscreen" onclick="closeFieldFullscreen()" style="font-size:16px;font-weight:700">✕</button>`;
@@ -3628,7 +3634,7 @@ function fieldEditorHtml(fullscreen){
    <button type="button" class="btn ${shape==="square"?"primary":"secondary"}" style="padding:6px 12px;font-size:var(--fs-2)" onclick="updateFieldStepShape('square')">Square Ground</button>
   </div>
   <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">${toolsHtml}</div>
-  <div style="margin-bottom:8px">${fieldArrowTagSelectHtml("width:auto;padding:6px 10px;font-size:var(--fs-2)")} <span class="muted" style="font-size:var(--fs-1)">${fieldDraft.tool==="tagArrow"?"Tap a ball arrow to apply this tag (choose \"none\" to clear it).":"Applied to each new ball arrow you finish."}</span></div>
+  <div style="margin-bottom:8px">${fieldArrowTagSelectHtml("padding:6px 9px;font-size:var(--fs-1)")} <span class="muted" style="font-size:var(--fs-1)">${fieldDraft.tool==="tagArrow"?"Tap a ball arrow to apply this tag (choose \"none\" to clear it).":"Applied to each new ball arrow you finish."}</span></div>
   ${fieldDraft.pendingArrowPoints.length?`<div style="display:flex;gap:6px;margin-bottom:8px">${fieldDraft.pendingArrowPoints.length>=2?`<button type="button" class="btn primary" style="padding:6px 12px;font-size:var(--fs-2)" onclick="finishFieldArrow()">✓ Finish Arrow</button>`:""}<button type="button" class="btn danger" style="padding:6px 12px;font-size:var(--fs-2)" onclick="cancelFieldArrow()">Cancel Arrow</button></div>`:""}
   <div class="muted" style="font-size:var(--fs-1);margin-bottom:6px">Tap the ground to place a marker, or drag an existing marker or arrow to reposition it. For an arrow, tap a start point, then tap again for each bend, then Finish Arrow (or tap Cancel Arrow to discard it). Tap (without dragging) an existing marker or arrow to remove it. Full, Half and Square Ground each keep their own separate drawing for this step.</div>`;
  let redoKeyN=fieldHistoryKey();
