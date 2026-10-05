@@ -3071,12 +3071,14 @@ const FIELD_TOOLS=[
  {id:"ball",label:"Ball"},
  {id:"stumps",label:"Stumps"},
  {id:"arrowBall",label:"Ball →"},
- {id:"arrowPlayer",label:"Player →"}
+ {id:"arrowPlayer",label:"Player →"},
+ {id:"tagArrow",label:"Tag Arrow"}
 ];
 // Small colored glyphs (mirroring the actual on-ground marker/arrow look) used
 // for the icon-only fullscreen toolbar, so each button is recognizable without
 // a text label — the normal (non-fullscreen) editor keeps full text buttons.
 function fieldToolIconSvg(id){
+ if(id==="tagArrow")return `<svg width="20" height="20" viewBox="0 0 24 24"><rect x="2" y="7" width="20" height="10" rx="5" fill="#7c3aed" stroke="#f4f1e8" stroke-width="1"/><text x="12" y="14.6" text-anchor="middle" font-size="6.5" font-weight="800" fill="#f4f1e8" font-family="Poppins,sans-serif">TAG</text></svg>`;
  if(id==="coach")return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#f2994a" stroke="#3d2410" stroke-width="1.3"/><text x="12" y="16" text-anchor="middle" font-size="10" font-weight="800" fill="#2b1200" font-family="Poppins,sans-serif">C</text></svg>`;
  if(id==="player")return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#f4f1e8" stroke="#0a1420" stroke-width="1.3"/><text x="12" y="15.5" text-anchor="middle" font-size="9" font-weight="700" fill="#0a1420" font-family="Poppins,sans-serif">P</text></svg>`;
  if(id==="wk")return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="#2f5233" stroke="#0e1f11" stroke-width="1.3"/><text x="12" y="15.3" text-anchor="middle" font-size="7.5" font-weight="800" fill="#f4f1e8" font-family="Poppins,sans-serif">WK</text></svg>`;
@@ -3206,6 +3208,13 @@ function fieldArrowSvg(a,opts){
   let textEl=`<text x="${mx}" y="${my+0.5}" text-anchor="middle" font-size="1.6" font-weight="700" fill="#f4f1e8" font-family="Poppins,sans-serif">${esc(a.label)}</text>`;
   let textWrapped=xComp!==1?`<g transform="translate(${mx} 0) scale(${xComp} 1) translate(${-mx} 0)">${textEl}</g>`:textEl;
   badge=`<ellipse cx="${mx}" cy="${my}" rx="${1.5*xComp}" ry="1.5" fill="#0a1420" stroke="${color}" stroke-width="0.3"/>${textWrapped}`;
+  // Optional short purpose tag (Ground fielding / Flat catch / High catch...)
+  // as a small pill just above the number badge.
+  if(a.tag){
+   let tw=Math.max(6,String(a.tag).length*0.82+2),ty=my-3.6;
+   let tagEl=`<rect x="${mx-tw/2}" y="${ty-1.3}" width="${tw}" height="2.6" rx="1.3" fill="${fieldTagColor(a.tag)}" stroke="#f4f1e8" stroke-width="0.2"/><text x="${mx}" y="${ty+0.5}" text-anchor="middle" font-size="1.4" font-weight="700" fill="#f4f1e8" font-family="Poppins,sans-serif">${esc(a.tag)}</text>`;
+   badge+=xComp!==1?`<g transform="translate(${mx} 0) scale(${xComp} 1) translate(${-mx} 0)">${tagEl}</g>`:tagEl;
+  }
  }
  // Whole arrow (line + badge) is one <g class="fdArrow"> so a drag transform
  // moves both together and tap-to-delete hit-tests a single element.
@@ -3307,6 +3316,16 @@ function handleFieldCanvasClick(evt,svgEl){
  let step=fieldDraft.steps[fieldDraft.activeStep];
  if(!step)return;
  let items=curFieldItems(step);
+ // Tag Arrow tool: tapping a ball arrow applies the tag currently chosen in
+ // the dropdown (none = clear it); it never deletes or places anything.
+ if(fieldDraft.tool==="tagArrow"){
+  let tEl=evt.target.closest&&evt.target.closest(".fdArrow");
+  if(tEl){
+   let tItem=items.find(it=>it.id===tEl.getAttribute("data-id")&&it.kind==="arrow");
+   if(tItem&&tItem.style==="ball"){pushFieldHistory();tItem.tag=fieldDraft.arrowTag||"";renderFieldEditor()}
+  }
+  return;
+ }
  // Tapping any existing marker or arrow always deletes it — a quick way
  // to correct a mistake without a separate delete mode.
  let markerEl=evt.target.closest&&evt.target.closest(".fdMarker");
@@ -3450,6 +3469,76 @@ function handleFieldPointerUp(evt,svgEl){
  setTimeout(()=>{fieldDraft.suppressNextClick=false},400);
  renderFieldEditor();
 }
+// Ball-arrow purpose tags. Presets are grouped by category, and each category
+// has its own pill colour so a diagram reads at a glance; the coach's own
+// saved tags (db.settings.customFieldTags, max FIELD_CUSTOM_TAG_MAX) share one
+// neutral colour.
+const FIELD_TAG_GROUPS=[
+ {name:"Catching",color:"#d97706",tags:["High catch","Flat catch","Slip catch","Diving catch","Boundary catch"]},
+ {name:"Fielding",color:"#0d9488",tags:["Ground fielding","Pick-up & throw"]},
+ {name:"Throwing",color:"#7c3aed",tags:["Overarm throw","Underarm throw","Direct hit","Relay throw","Return to keeper"]},
+ {name:"Batting & bowling",color:"#2563eb",tags:["Drive","Pull","Cut","Delivery"]}
+];
+const FIELD_TAG_CUSTOM_COLOR="#475569",FIELD_CUSTOM_TAG_MAX=10,FIELD_TAG_MAXLEN=18;
+function fieldTagColor(tag){
+ for(let g of FIELD_TAG_GROUPS)if(g.tags.includes(tag))return g.color;
+ return FIELD_TAG_CUSTOM_COLOR;
+}
+function savedFieldTags(){
+ let l=db.settings&&db.settings.customFieldTags;
+ return Array.isArray(l)?l:[];
+}
+function isPresetFieldTag(t){return FIELD_TAG_GROUPS.some(g=>g.tags.includes(t))}
+function setFieldArrowTag(v){
+ if(v==="__new"){
+  let t=prompt("New tag for ball arrows (max "+FIELD_TAG_MAXLEN+" characters), e.g. Direct hit:","");
+  t=t?t.trim().slice(0,FIELD_TAG_MAXLEN):"";
+  if(t){
+   if(!isPresetFieldTag(t)&&!savedFieldTags().includes(t)){
+    if(savedFieldTags().length>=FIELD_CUSTOM_TAG_MAX){
+     alert("You already have "+FIELD_CUSTOM_TAG_MAX+" saved custom tags. Use it this time, but delete one under \"Manage my tags…\" to be able to save new ones.");
+    } else if(requireWriteAccess()){
+     db.settings.customFieldTags=savedFieldTags().concat([t]);save();
+    }
+   }
+   fieldDraft.arrowTag=t;
+  }
+ } else if(v==="__manage"){
+  let list=savedFieldTags();
+  if(!list.length){alert("You have no saved custom tags yet.");renderFieldEditor();return}
+  let ans=prompt("Your saved tags:\n"+list.map((x,i)=>(i+1)+". "+x).join("\n")+"\n\nType a number to delete that tag (arrows already using it keep their text):","");
+  let n=parseInt(ans,10);
+  if(n>=1&&n<=list.length&&requireWriteAccess()){
+   let gone=list[n-1];
+   db.settings.customFieldTags=list.filter((_,i)=>i!==n-1);save();
+   if(fieldDraft.arrowTag===gone)fieldDraft.arrowTag="";
+  }
+ } else fieldDraft.arrowTag=v;
+ renderFieldEditor();
+}
+function fieldArrowTagSelectHtml(style){
+ let cur=fieldDraft.arrowTag||"";
+ let saved=savedFieldTags();
+ let opt=(v,label)=>`<option value="${esc(v)}" ${v===cur?"selected":""}>${esc(label==null?v:label)}</option>`;
+ let html=opt("","Ball tag: none");
+ FIELD_TAG_GROUPS.forEach(g=>{html+=`<optgroup label="${esc(g.name)}">${g.tags.map(t=>opt(t)).join("")}</optgroup>`});
+ let mine=saved.slice();
+ if(cur&&!isPresetFieldTag(cur)&&!mine.includes(cur))mine.push(cur); // an in-use tag that wasn't saved (list was full)
+ if(mine.length)html+=`<optgroup label="My tags">${mine.map(t=>opt(t)).join("")}</optgroup>`;
+ html+=`<optgroup label="More"><option value="__new">+ New custom tag…</option>${saved.length?`<option value="__manage">Manage my tags…</option>`:""}</optgroup>`;
+ return `<select title="Tag for ball arrows" onchange="setFieldArrowTag(this.value)" style="${style}">${html}</select>`;
+}
+// Legend: one chip per tagged ball arrow ("1 – Flat catch"), in arrow-number
+// order, coloured by category — shown under the diagram (editor + previews)
+// and drawn into exported images, since pills alone can overlap on a busy ground.
+function fieldLegendEntries(items){
+ return (items||[]).filter(it=>it.kind==="arrow"&&it.style==="ball"&&it.tag).map(it=>({label:it.label||"",tag:it.tag,color:fieldTagColor(it.tag)})).sort((a,b)=>(Number(a.label)||0)-(Number(b.label)||0));
+}
+function fieldLegendHtml(items,small){
+ let list=fieldLegendEntries(items);
+ if(!list.length)return "";
+ return `<div class="fieldLegend" style="display:flex;flex-wrap:wrap;gap:4px 6px;margin-top:6px;justify-content:center">${list.map(e=>`<span style="background:${e.color};color:#f4f1e8;border-radius:999px;padding:${small?"1px 6px":"2px 9px"};font-size:${small?"10px":"var(--fs-1)"};font-weight:700;white-space:nowrap">${esc(e.label)} – ${esc(e.tag)}</span>`).join("")}</div>`;
+}
 function finishFieldArrow(){
  if(fieldDraft.pendingArrowPoints.length<2)return;
  let step=fieldDraft.steps[fieldDraft.activeStep];
@@ -3464,7 +3553,7 @@ function finishFieldArrow(){
   label=String(ballArrowCount+1);
  }
  pushFieldHistory();
- items.push({id:uid("fditem"),kind:"arrow",style:isBall?"ball":"player",points:fieldDraft.pendingArrowPoints.map(p=>({x:p.x,y:p.y})),label});
+ items.push({id:uid("fditem"),kind:"arrow",style:isBall?"ball":"player",points:fieldDraft.pendingArrowPoints.map(p=>({x:p.x,y:p.y})),label,tag:isBall?(fieldDraft.arrowTag||""):""});
  fieldDraft.pendingArrowPoints=[];
  fieldDraft.pendingArrowStyle=null;
  renderFieldEditor();
@@ -3495,6 +3584,7 @@ function fieldEditorHtml(fullscreen){
   let toolBtns=FIELD_TOOLS.map(t=>`<button type="button" class="btn ${fieldDraft.tool===t.id?"primary":"secondary"}" title="${esc(t.label)}" onclick="setFieldTool('${t.id}')">${fieldToolIconSvg(t.id)}</button>`).join("");
   // Shown only while an arrow is mid-draw (at least one point placed) — Finish
   // commits it (needs 2+ points), Cancel discards the in-progress path.
+  let arrowTagSel=fieldArrowTagSelectHtml("width:auto;max-width:130px;padding:6px 8px;font-size:12px");
   let finishArrowBtn=fieldDraft.pendingArrowPoints.length>=2?`<button type="button" class="btn primary" title="Finish Arrow" onclick="finishFieldArrow()">${icon("check",16)}</button>`:"";
   let cancelArrowBtn=fieldDraft.pendingArrowPoints.length?`<button type="button" class="btn danger" title="Cancel Arrow" onclick="cancelFieldArrow()" style="font-size:14px;font-weight:700">✕</button>`:"";
   let exitBtn=`<button type="button" class="btn secondary" title="Exit Fullscreen" onclick="closeFieldFullscreen()" style="font-size:16px;font-weight:700">✕</button>`;
@@ -3514,7 +3604,7 @@ function fieldEditorHtml(fullscreen){
   let zoomLabel=`<div class="btn secondary" style="width:44px;font-size:11px;pointer-events:none">${zoomPct}%</div>`;
   let zoomInBtn=`<button type="button" class="btn secondary" title="Zoom In" ${fieldDraft.fsZoom>=FIELD_ZOOM_STEPS[FIELD_ZOOM_STEPS.length-1]?"disabled":""} onclick="zoomFieldBy(1)" style="font-size:18px;font-weight:700">+</button>`;
   let panBtns=(fieldDraft.fsZoom||1)>1?`<button type="button" class="btn secondary" title="Pan Up" onclick="panFieldFs(0,-1)" style="font-size:14px">▲</button><button type="button" class="btn secondary" title="Pan Down" onclick="panFieldFs(0,1)" style="font-size:14px">▼</button><button type="button" class="btn secondary" title="Pan Left" onclick="panFieldFs(-1,0)" style="font-size:14px">◀</button><button type="button" class="btn secondary" title="Pan Right" onclick="panFieldFs(1,0)" style="font-size:14px">▶</button>`:"";
-  let toolbar=`<div class="fdFsToolbar">${exitBtn}${stepPills}${addStepBtn}${duplicateStepBtn}${removeStepBtn}${shapeBtns}${toolBtns}${finishArrowBtn}${cancelArrowBtn}${undoBtn}${redoBtn}${exportBtn}${clearBtn}${zoomOutBtn}${zoomLabel}${zoomInBtn}${panBtns}</div>`;
+  let toolbar=`<div class="fdFsToolbar">${exitBtn}${stepPills}${addStepBtn}${duplicateStepBtn}${removeStepBtn}${shapeBtns}${toolBtns}${arrowTagSel}${finishArrowBtn}${cancelArrowBtn}${undoBtn}${redoBtn}${exportBtn}${clearBtn}${zoomOutBtn}${zoomLabel}${zoomInBtn}${panBtns}</div>`;
   // The wrapper's exact pixel width/height is computed and set by
   // sizeFullscreenCanvas() right after this markup is inserted — CSS
   // aspect-ratio inside a flex layout turns out to distort under flex-shrink
@@ -3538,6 +3628,7 @@ function fieldEditorHtml(fullscreen){
    <button type="button" class="btn ${shape==="square"?"primary":"secondary"}" style="padding:6px 12px;font-size:var(--fs-2)" onclick="updateFieldStepShape('square')">Square Ground</button>
   </div>
   <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">${toolsHtml}</div>
+  <div style="margin-bottom:8px">${fieldArrowTagSelectHtml("width:auto;padding:6px 10px;font-size:var(--fs-2)")} <span class="muted" style="font-size:var(--fs-1)">${fieldDraft.tool==="tagArrow"?"Tap a ball arrow to apply this tag (choose \"none\" to clear it).":"Applied to each new ball arrow you finish."}</span></div>
   ${fieldDraft.pendingArrowPoints.length?`<div style="display:flex;gap:6px;margin-bottom:8px">${fieldDraft.pendingArrowPoints.length>=2?`<button type="button" class="btn primary" style="padding:6px 12px;font-size:var(--fs-2)" onclick="finishFieldArrow()">✓ Finish Arrow</button>`:""}<button type="button" class="btn danger" style="padding:6px 12px;font-size:var(--fs-2)" onclick="cancelFieldArrow()">Cancel Arrow</button></div>`:""}
   <div class="muted" style="font-size:var(--fs-1);margin-bottom:6px">Tap the ground to place a marker, or drag an existing marker or arrow to reposition it. For an arrow, tap a start point, then tap again for each bend, then Finish Arrow (or tap Cancel Arrow to discard it). Tap (without dragging) an existing marker or arrow to remove it. Full, Half and Square Ground each keep their own separate drawing for this step.</div>`;
  let redoKeyN=fieldHistoryKey();
@@ -3550,7 +3641,7 @@ function fieldEditorHtml(fullscreen){
    <button type="button" class="btn secondary" style="padding:6px 10px;font-size:var(--fs-2)" onclick="exportFieldDiagram()">Export Image</button>
    <button type="button" class="btn secondary" style="padding:6px 10px;font-size:var(--fs-2)" onclick="suggestDrillEquipment()">Suggest Equipment</button>
   </div>`;
- return `${controlsHtml}<div style="max-width:min(480px,100%);margin:0 auto">${fieldDiagramSvg(view,{interactive:true})}</div>${bottomBar}`;
+ return `${controlsHtml}<div style="max-width:min(480px,100%);margin:0 auto">${fieldDiagramSvg(view,{interactive:true})}${fieldLegendHtml(view.items)}</div>${bottomBar}`;
 }
 // Full Ground stays a true circle (aspect 1) in every orientation — an oval
 // stretch was tried to use extra landscape width but looked off, so it was
@@ -3911,9 +4002,32 @@ function exportFieldDiagram(){
  let img=new Image();
  img.onload=()=>{
   let canvas=document.createElement("canvas");
-  canvas.width=vb.w;canvas.height=vb.h;
+  // Legend band under the ground (only when some ball arrow is tagged).
+  let legend=fieldLegendEntries(items),chipH=56,gapPx=14,pad=30,font="bold 32px Poppins,Inter,sans-serif";
+  let chips=[],bandH=0;
+  if(legend.length){
+   let m=document.createElement("canvas").getContext("2d");m.font=font;
+   let x=pad,row=0;
+   legend.forEach(e=>{
+    let text=e.label+" – "+e.tag,w=Math.ceil(m.measureText(text).width)+40;
+    if(x+w>vb.w-pad&&x>pad){x=pad;row++}
+    chips.push({text,w,x,row,color:e.color});x+=w+gapPx;
+   });
+   bandH=pad+(row+1)*(chipH+gapPx);
+  }
+  canvas.width=vb.w;canvas.height=vb.h+bandH;
   let ctx=canvas.getContext("2d");
   ctx.drawImage(img,0,0,vb.w,vb.h);
+  if(bandH){
+   ctx.fillStyle="#0a1420";ctx.fillRect(0,vb.h,vb.w,bandH);
+   ctx.font=font;ctx.textBaseline="middle";ctx.textAlign="center";
+   chips.forEach(c=>{
+    let y=vb.h+pad/2+c.row*(chipH+gapPx),r=chipH/2;
+    ctx.fillStyle=c.color;ctx.beginPath();
+    ctx.moveTo(c.x+r,y);ctx.arc(c.x+c.w-r,y+r,r,-Math.PI/2,Math.PI/2);ctx.arc(c.x+r,y+r,r,Math.PI/2,Math.PI*1.5);ctx.closePath();ctx.fill();
+    ctx.fillStyle="#f4f1e8";ctx.fillText(c.text,c.x+c.w/2,y+r+1);
+   });
+  }
   URL.revokeObjectURL(url);
   canvas.toBlob(pngBlob=>{
    if(!pngBlob){alert("Couldn't export the diagram image.");return}
@@ -3934,7 +4048,7 @@ function fieldStepsPreviewHtml(fieldSteps,size){
  if(!fieldSteps||!fieldSteps.length)return "";
  size=size||130;
  let steps=fieldSteps.map(normalizeFieldStep);
- return `<div class="fieldStepPreviewWrap" style="display:flex;gap:${size>=200?16:8}px;flex-wrap:wrap;margin:10px 0">${steps.map(st=>{let shape=curFieldShape(st);let view={shape:shape,items:curFieldItems(st)};return `<div class="fieldStepBlock" style="width:${size}px"><div style="font-size:${size>=200?"var(--fs-2)":"var(--fs-1)"};color:var(--muted);margin-bottom:3px;text-align:center">${esc(st.label||"")}</div>${fieldDiagramSvg(view,{interactive:false})}</div>`}).join("")}</div>`;
+ return `<div class="fieldStepPreviewWrap" style="display:flex;gap:${size>=200?16:8}px;flex-wrap:wrap;margin:10px 0">${steps.map(st=>{let shape=curFieldShape(st);let view={shape:shape,items:curFieldItems(st)};return `<div class="fieldStepBlock" style="width:${size}px"><div style="font-size:${size>=200?"var(--fs-2)":"var(--fs-1)"};color:var(--muted);margin-bottom:3px;text-align:center">${esc(st.label||"")}</div>${fieldDiagramSvg(view,{interactive:false})}${fieldLegendHtml(view.items,true)}</div>`}).join("")}</div>`;
 }
 function drillCardHtml(d){return `<div class="card"><span class="tag">${esc(d.cat||"General")}</span><h3>${esc(d.name)}</h3><div class="muted">${esc(d.players||"")}${d.duration?" · "+esc(d.duration):""}${d.equipment?" · "+esc(d.equipment):""}</div>${d.diagram?`<img src="${d.diagram}" style="max-width:100%;border-radius:10px;margin:10px 0">`:""}${fieldStepsPreviewHtml(d.fieldSteps)}<p>${esc(d.points||"")}</p>${d.progressions?`<div class="muted"><b>Progression:</b> ${esc(d.progressions)}</div>`:""}${d.regressions?`<div class="muted"><b>Regression:</b> ${esc(d.regressions)}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary iconBtn" title="Edit" onclick="editDrill('${d.id}')">${icon("edit",17)}</button><button class="btn secondary iconBtn" title="Duplicate Drill" onclick="duplicateDrill('${d.id}')">${icon("copy",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delDrill('${d.id}')">${icon("trash",17)}</button></div></div>`}
 function drillLibraryReport(){
