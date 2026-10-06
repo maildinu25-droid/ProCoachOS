@@ -22,13 +22,13 @@
 // doesn't leave a stale cache lingering for someone who hasn't opened the
 // app in a while.
 
-const CACHE_VERSION = "procoachos-v2";
+const CACHE_VERSION = "procoachos-v3";
 
 // Every real, installable shell this service worker covers. Each entry's
 // filename is also what the fetch handler matches request URLs against, and
 // what a failed shell falls back to caching-wise — matched to its OWN
 // cached copy, never a different tool's shell.
-const SHELL_FILES = ["app.html", "pitchmap.html", "battingmap.html", "livesession.html"];
+const SHELL_FILES = ["app.html", "pitchmap.html", "battingmap.html", "livesession.html", "scorer.html"];
 
 const PRECACHE_URLS = [
   ...SHELL_FILES.map((f) => `./${f}`),

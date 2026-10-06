@@ -4105,8 +4105,34 @@ function matches(){
  <label>Format<select onchange="matchFormatFilter=this.value;matches()"><option value="">All formats</option>${MATCH_FORMATS.map(f=>`<option value="${f}" ${matchFormatFilter===f?"selected":""}>${f}</option>`).join("")}</select></label>
  <label>Result<select onchange="matchResultFilter=this.value;matches()"><option value="">All results</option>${["Win","Loss","Draw","NR","Other"].map(f=>`<option value="${f}" ${matchResultFilter===f?"selected":""}>${f}</option>`).join("")}</select></label>
  </div></div>
+ <div id="scorerImportBox"></div>
  <h2 class="section">Match History (${list.length})</h2><div class="grid g2">${list.length?list.map(matchCardHtml).join(""):empty("No matches recorded yet.")}</div>`;
+ refreshScorerImportBox();
  let sEl=document.getElementById("matchSearch");if(sEl&&matchSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
+}
+/* ===== Match Scorer → Match Centre bridge =====
+   The scorer keeps its own IndexedDB ("procoachos_scorer"); finished matches carry a ready-made
+   "export" record. Nothing is written into the coach profile until the coach taps Import. */
+function scorerDbAll(){return new Promise(res=>{try{const r=indexedDB.open("procoachos_scorer",1);r.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains("matches"))d.createObjectStore("matches",{keyPath:"id"})};r.onsuccess=()=>{try{const d=r.result;const q=d.transaction("matches","readonly").objectStore("matches").getAll();q.onsuccess=()=>{d.close();res(q.result||[])};q.onerror=()=>{d.close();res([])}}catch(e){res([])}};r.onerror=()=>res([])}catch(e){res([])}})}
+function scorerDbPut(rec){return new Promise(res=>{try{const r=indexedDB.open("procoachos_scorer",1);r.onsuccess=()=>{try{const d=r.result;const t=d.transaction("matches","readwrite");t.objectStore("matches").put(rec);t.oncomplete=()=>{d.close();res(true)};t.onerror=()=>{d.close();res(false)}}catch(e){res(false)}};r.onerror=()=>res(false)}catch(e){res(false)}})}
+async function pendingScoredMatches(){const all=await scorerDbAll();return all.filter(x=>x&&x.status==="completed"&&x.export&&!x.imported&&!db.matches.some(m=>m.scorerId===x.id))}
+async function refreshScorerImportBox(){
+ const box=document.getElementById("scorerImportBox");if(!box)return;
+ const list=await pendingScoredMatches();
+ const b2=document.getElementById("scorerImportBox");if(!b2)return;
+ if(!list.length){b2.innerHTML="";return}
+ b2.innerHTML=`<div class="card" style="margin:15px 0;border:1px solid var(--accent,#22c58b)"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><b>${list.length} scored match${list.length>1?"es":""} ready to add</b><div class="muted">${list.map(x=>esc(x.export.team)+" v "+esc(x.export.opp)+" — "+esc(x.export.result||"")).join("<br>")}</div></div><button class="btn primary" onclick="importScoredMatches()">Add to Match Centre</button></div></div>`;
+}
+async function importScoredMatches(){
+ if(!requireWriteAccess())return;
+ const list=await pendingScoredMatches();let n=0;
+ for(const x of list){
+  const e=x.export;
+  const m=Object.assign({},e,{id:uid("m"),scorerId:x.id,source:"scorer"});
+  db.matches.push(m);n++;
+  await scorerDbPut(Object.assign({},x,{imported:true,importedMatchId:m.id}));
+ }
+ if(n){save()}
 }
 function matchCardHtml(m){
  let linkedReflection=db.reflections.find(r=>r.matchId===m.id);
@@ -4349,6 +4375,7 @@ function matchReportView(id){
  ${m.battingRatings?`<div class="card" style="margin-top:10px"><b>Batting Assessment · ${avgRatingObj(m.battingRatings).toFixed(1)}/10 avg</b>${metricRows(m.battingRatings)}${m.battingAssessmentNotes?`<p style="margin-top:8px">${esc(m.battingAssessmentNotes)}</p>`:""}</div>`:""}
  <h2>Bowling Review</h2>${bowlingRows?`<table class="reportTable"><tr><th>Bowler</th><th>Overs</th><th>Runs</th><th>Wickets</th><th>Notes</th></tr>${bowlingRows}</table>`:empty("No bowling entries recorded.")}
  ${m.bowlingRatings?`<div class="card" style="margin-top:10px"><b>Bowling Assessment · ${avgRatingObj(m.bowlingRatings).toFixed(1)}/10 avg</b>${metricRows(m.bowlingRatings)}${m.bowlingAssessmentNotes?`<p style="margin-top:8px">${esc(m.bowlingAssessmentNotes)}</p>`:""}</div>`:""}
+ ${m.scorecardText?`<h2>Full Scorecard</h2><div class="card"><pre style="white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit;font-size:var(--fs-2);line-height:1.5">${esc(m.scorecardText)}</pre></div>`:""}
  <h2>Fielding Review</h2><div class="card">${(m.taken||m.missed||m.runouts||m.misfields)?`<p>Chances taken ${esc(m.taken||0)} · Missed ${esc(m.missed||0)} · Run outs ${esc(m.runouts||0)} · Misfields ${esc(m.misfields||0)}</p>`:""}${m.fieldingRatings?`<b>Fielding Assessment · ${avgRatingObj(m.fieldingRatings).toFixed(1)}/10 avg</b>${metricRows(m.fieldingRatings)}`:""}<p style="margin-top:8px">${esc(m.notes||"—")}</p></div>
  <h2>Team Review</h2><div class="card"><p><b>Rating:</b> ${esc(m.teamRating||"—")}/10</p><p>${esc(m.teamNotes||"—")}</p></div>
  <h2>Key Learnings &amp; Training Actions</h2><div class="card"><p>${esc(m.actions||"—")}</p></div>`;
@@ -5786,7 +5813,8 @@ function analysisTools(){
  let tools=[
   ["pitchmap.html","Pitch Map","Ball-by-ball bowling analysis — length, line, outcomes and wagon wheel, all in one view."],
   ["battingmap.html","Batting Map","Shot-by-shot batting analysis — footwork, shot type, and where every run came from."],
-  ["livesession.html","Live Session","Track a full bowler-vs-batter session live, ball by ball, with match-style context."]
+  ["livesession.html","Live Session","Track a full bowler-vs-batter session live, ball by ball, with match-style context."],
+  ["scorer.html","Match Scorer","Score Test / multi-day, intra-squad and practice matches ball by ball — roster loads automatically and results flow into Match Centre."]
  ];
  document.getElementById("analysisTools").innerHTML=head("Analysis Tools","Deep, ball-by-ball analysis tools — open the one you need for this session.")+
   `<div class="grid">${tools.map(([url,name,desc])=>`<div class="card">
