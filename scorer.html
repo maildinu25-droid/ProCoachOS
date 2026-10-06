@@ -162,11 +162,11 @@ function loadRoster(){
 /* ============================================================
    ENGINE
    ============================================================ */
-var CREDIT=["Bowled","Caught","Caught & bowled","LBW","Stumped","Hit wicket"];
-var WK_TYPES=["Bowled","Caught","Caught & bowled","LBW","Run out","Stumped","Hit wicket","Obstructing the field","Handled the ball","Hit the ball twice"];
+var CREDIT=["Bowled","Caught","Caught behind","Caught & bowled","LBW","Stumped","Hit wicket"];
+var WK_TYPES=["Bowled","Caught","Caught behind","Caught & bowled","LBW","Run out","Stumped","Hit wicket","Obstructing the field","Handled the ball","Hit the ball twice"];
 var WK_X={"Run out":["","wd","nb"],"Stumped":["","wd"],"Hit wicket":["","wd","nb"]};
 var CHOOSE_OUT=["Run out","Obstructing the field","Handled the ball","Hit the ball twice"];
-var NEEDS_FIELDER=["Caught","Stumped"];
+var NEEDS_FIELDER=["Caught","Caught behind","Stumped"];
 
 function allPlayers(m){return m.teams[0].players.concat(m.teams[1].players)}
 function pname(m,id){var p=allPlayers(m).find(function(x){return x.id===id});return p?p.name:"?"}
@@ -177,6 +177,7 @@ function dismissalText(m,w,bowlerId){
   switch(w.type){
     case"Bowled":return"b "+b;
     case"Caught":return(f&&f!==b?"c "+f+" b "+b:"c & b "+b);
+    case"Caught behind":return"c †"+f+" b "+b;
     case"Caught & bowled":return"c & b "+b;
     case"LBW":return"lbw b "+b;
     case"Stumped":return"st "+f+" b "+b;
@@ -772,12 +773,12 @@ function wicketRender(){
   if(chooseOut)h+='<div class="lbl">Who is out</div><div class="seg">'+[S.striker,S.non].map(function(id){return'<button class="chip '+(W.out===id?'on':'')+'" onclick="D.wk.out=\''+id+'\';wicketRender()">'+esc(pname(m,id))+(id===S.striker?' (striker)':'')+'</button>'}).join("")+'</div>';
   if(W.type==="Run out")h+='<div class="lbl">Runs completed before the run-out</div><div class="seg">'+[0,1,2,3].map(function(r){return'<button class="chip '+(W.r===r?'on':'')+'" onclick="D.wk.r='+r+';wicketRender()">'+r+'</button>'}).join("")+'</div>';
   if(xs.length>1)h+='<div class="lbl">Delivery</div><div class="seg">'+xs.map(function(x){return'<button class="chip '+(W.x===x?'on':'')+'" onclick="D.wk.x=\''+x+'\';wicketRender()">'+(x===""?'Normal':x==="wd"?'Wide':'No ball')+'</button>'}).join("")+'</div>';
-  if(needF)h+='<div class="lbl">'+(W.type==="Caught"?'Caught by (pick bowler for caught &amp; bowled)':W.type==="Stumped"?'Wicket-keeper':'Fielder (optional)')+'</div><div class="seg">'+bw.players.map(function(p){return'<button class="chip '+(W.fielder===p.id?'on':'')+'" onclick="D.wk.fielder=\''+p.id+'\';wicketRender()">'+esc(p.name)+(p.id===S.bowler?' •':'')+'</button>'}).join("")+'</div>';
+  if(needF)h+='<div class="lbl">'+(W.type==="Caught"?'Caught by (pick bowler for caught &amp; bowled)':(W.type==="Stumped"||W.type==="Caught behind")?'Wicket-keeper':'Fielder (optional)')+'</div><div class="seg">'+bw.players.map(function(p){return'<button class="chip '+(W.fielder===p.id?'on':'')+'" onclick="D.wk.fielder=\''+p.id+'\';wicketRender()">'+esc(p.name)+(p.id===S.bowler?' •':'')+'</button>'}).join("")+'</div>';
   if(!pairs){
     h+='<div class="lbl">Next batter</div>'+(cand.length?cand.map(function(p){var b=S.bat[p.id];return'<div class="pl '+(W.in===p.id?'on':'')+'" onclick="D.wk.in=\''+p.id+'\';wicketRender()"><div class="n">'+esc(p.name)+'</div><div class="m">'+(b.ret?'returning · '+b.runs+' ('+b.balls+')':'')+'</div></div>'}).join(""):'<div class="banner">No batters left — this wicket ends the innings (all out).</div>');
   }else h+='<div class="banner" style="margin-top:12px">Pairs cricket: the batter stays in; 5 runs are deducted.</div>';
   var ok=(!needF||W.type==="Run out"||W.fielder)&&(pairs||!cand.length||W.in);
-  if(W.type==="Caught"&&!W.fielder)ok=false;
+  if((W.type==="Caught"||W.type==="Caught behind")&&!W.fielder)ok=false;
   h+='<div class="row stick"><button class="btn sec grow" onclick="closeSheet()">Cancel</button><button class="btn danger grow" style="background:var(--danger);color:#fff" onclick="wicketDone()" '+(ok?'':'disabled')+'>Confirm out</button></div>';
   openSheet(h);
 }
@@ -878,7 +879,35 @@ function manualEnd(type,silent){
 }
 function copyCard(){var t=buildScorecardText(D.M);if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(function(){toast("Scorecard copied")},function(){fallbackCopy(t)})}else fallbackCopy(t)}
 function fallbackCopy(t){var a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy");toast("Scorecard copied")}catch(e){toast("Copy not available")}a.remove()}
-function printCard(){$("print-report").textContent=buildScorecardText(D.M);window.print()}
+function printHtml(m){
+  var MS=matchState(m),res=resultOf(m,MS),h=[];
+  h.push('<h1>'+esc(m.teams[0].name)+' v '+esc(m.teams[1].name)+'</h1>');
+  h.push('<div class="meta">'+esc((m.title?m.title+" · ":"")+(m.settings.pairs?"Pairs cricket · ":"")+(totalInnings(m)===4?"Test / multi-day":"Multi-day, 1 innings a side")+" · "+fmtDate(m.date)+(m.venue?" · "+m.venue:""))+'</div>');
+  if(m.toss)h.push('<div class="meta">Toss: '+esc(m.teams[m.toss.winner].name)+' won and chose to '+m.toss.elected+'</div>');
+  if(res)h.push('<div class="res">'+esc(res.text)+'</div>');
+  MS.inn.forEach(function(S,i){
+    var bt=m.teams[S.inn.bat],bw=m.teams[S.inn.bowl];
+    h.push('<h2>'+esc(bt.name)+' — '+ordinal(i+1)+' innings'+(S.inn.followOn?' (following on)':'')+'<span>'+S.runs+'/'+S.wkts+(S.ended&&S.ended.reason==="Declared"?' d':'')+' ('+S.oversStr+' ov)</span></h2>');
+    h.push('<table><tr><th>Batter</th><th>How out</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th></tr>'+S.order.map(function(id){var b=S.bat[id];var how=b.out?b.out.text:(b.ret?"retired not out":"not out");if(m.settings.pairs&&b.outs.length)how=b.outs.length+"× out ("+b.outs.join("; ")+")";return'<tr><td>'+esc(pname(m,id))+'</td><td>'+esc(how)+'</td><td><b>'+b.runs+'</b></td><td>'+b.balls+'</td><td>'+b.fours+'</td><td>'+b.sixes+'</td><td>'+(b.balls?(b.runs*100/b.balls).toFixed(1):'-')+'</td></tr>'}).join("")+'</table>');
+    var dnb=bt.players.filter(function(p){return!S.bat[p.id].batted}).map(function(p){return esc(p.name)});
+    if(dnb.length)h.push('<div class="meta">Did not bat: '+dnb.join(", ")+'</div>');
+    h.push('<div class="meta">Extras: <b>'+S.extrasTotal+'</b> (b '+S.ex.b+', lb '+S.ex.lb+', w '+S.ex.wd+', nb '+S.ex.nb+(S.ex.pen?', pen '+S.ex.pen:'')+')'+(S.pairPenalty?' · Pairs penalty −'+S.pairPenalty:'')+'</div>');
+    if(S.fow.length)h.push('<div class="meta"><b>Fall of wickets:</b> '+S.fow.map(function(f){return f.n+'-'+f.runs+' ('+esc(pname(m,f.pid))+', '+f.over+')'}).join(", ")+'</div>');
+    var bows=bw.players.filter(function(p){var b=S.bowl[p.id];return b.balls||b.runs||b.wd||b.nb});
+    if(bows.length)h.push('<table><tr><th>Bowler ('+esc(bw.name)+')</th><th>O</th><th>M</th><th>R</th><th>W</th><th>Econ</th></tr>'+bows.map(function(p){var b=S.bowl[p.id];return'<tr><td>'+esc(p.name)+'</td><td>'+oversStr(b.balls)+'</td><td>'+b.maidens+'</td><td>'+b.runs+'</td><td><b>'+b.wkts+'</b></td><td>'+(b.balls?(b.runs*6/b.balls).toFixed(2):'-')+'</td></tr>'}).join("")+'</table>');
+  });
+  var css='body{font-family:Arial,Helvetica,sans-serif;color:#111;margin:0;padding:20px;max-width:800px;margin:0 auto}h1{font-size:22px;margin:0 0 4px}h2{font-size:15px;margin:22px 0 6px;padding:6px 8px;background:#e8f3ec;display:flex;justify-content:space-between}table{width:100%;border-collapse:collapse;font-size:13px;margin:6px 0}th{text-align:left;font-size:11px;text-transform:uppercase;color:#555;border-bottom:2px solid #333;padding:4px}td{padding:4px;border-bottom:1px solid #ddd}th:nth-child(n+3),td:nth-child(n+3){text-align:right}.meta{font-size:12px;color:#444;margin:4px 0}.res{font-size:17px;font-weight:bold;margin:8px 0;color:#0a6b43}.bar{position:sticky;top:0;background:#fff;padding:8px 0;margin-bottom:8px}.bar button{font-size:15px;padding:10px 16px;border:0;border-radius:8px;background:#0a6b43;color:#fff;font-weight:bold}.hint{font-size:12px;color:#666;margin-left:8px}@media print{.bar{display:none}body{padding:0}}';
+  return '<!DOCTYPE html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>'+esc(m.teams[0].name)+' v '+esc(m.teams[1].name)+' — Scorecard</title><style>'+css+'</style></head><body><div class="bar"><button onclick="window.print()">Print / Save as PDF</button><span class="hint">On iPhone: Share → Print, or pinch-out on the preview to save a PDF</span></div>'+h.join("")+'</body></html>';
+}
+function printCard(){
+  var html=printHtml(D.M),blob=new Blob([html],{type:"text/html"}),url=URL.createObjectURL(blob);
+  var w=null;try{w=window.open(url,"_blank")}catch(e){}
+  if(w)return;
+  // popup blocked / not allowed: show the printable page inside the app instead
+  var ov=document.createElement("div");ov.id="printOv";ov.style.cssText="position:fixed;inset:0;z-index:90;background:#fff;display:flex;flex-direction:column";
+  ov.innerHTML='<div style="padding:8px;background:#0a1420;display:flex;gap:8px"><button class="btn sm" onclick="try{document.getElementById(\'printFrame\').contentWindow.print()}catch(e){}">Print / Save as PDF</button><button class="btn sec sm" onclick="document.getElementById(\'printOv\').remove()">Close</button></div><iframe id="printFrame" style="flex:1;border:0;width:100%"></iframe>';
+  document.body.appendChild(ov);$("printFrame").srcdoc=html;
+}
 
 
 /* ============================================================
