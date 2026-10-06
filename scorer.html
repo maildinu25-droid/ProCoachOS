@@ -2,8 +2,11 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, viewport-fit=cover">
 <meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="Match Scorer">
+<meta name="theme-color" content="#0a1420">
 <title>Match Scorer — ProCoach OS</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
@@ -11,7 +14,7 @@
   html,body{margin:0;min-height:100%;background:#0a1420}
   #app,#sheet{--bg:#0a1420;--card:#111d30;--card2:#16253c;--line:rgba(255,255,255,.08);--accent:#22c58b;--accent-dim:rgba(34,197,139,.15);--gold:#e0ab2c;--blue:#3d8bd6;--text:#eef2f6;--dim:#8b96a5;--danger:#ff6b52;--purple:#b98ce0;
     font-family:'Inter',sans-serif;color:var(--text)}
-  #app{background:var(--bg);min-height:100vh;max-width:640px;margin:0 auto;padding:10px 10px 92px;padding-top:max(12px,env(safe-area-inset-top))}
+  #app{background:var(--bg);min-height:100vh;max-width:640px;margin:0 auto;padding:10px 10px 92px;padding-top:18px;padding-top:calc(10px + max(8px,constant(safe-area-inset-top)));padding-top:calc(10px + max(8px,env(safe-area-inset-top)))}
   h1,h2,h3{font-family:'Poppins',sans-serif;margin:0}
   .hdr{display:flex;align-items:center;gap:10px;margin-bottom:10px}
   .hdr .t{flex:1;min-width:0}
@@ -428,19 +431,21 @@ function matchLine(m){
   try{var MS=matchState(m);var parts=[];MS.inn.forEach(function(S){parts.push(esc(m.teams[S.inn.bat].name.slice(0,12))+" "+S.runs+"/"+S.wkts)});return parts.join(" · ")}catch(e){return""}
 }
 function renderHome(){
-  var live=D.matches.filter(function(m){return m.status!=="completed"}).sort(function(a,b){return b.updated-a.updated});
+  var upc=D.matches.filter(function(m){return m.status==="upcoming"&&!m.toss}).sort(function(a,b){return String(a.date).localeCompare(String(b.date))});
+  var live=D.matches.filter(function(m){return m.status!=="completed"&&!(m.status==="upcoming"&&!m.toss)}).sort(function(a,b){return b.updated-a.updated});
   var done=D.matches.filter(function(m){return m.status==="completed"}).sort(function(a,b){return b.updated-a.updated});
   function card(m){
     var MS=matchState(m),res=resultOf(m,MS);
     return '<div class="card"><div class="row"><div class="grow"><div style="font-weight:800">'+esc(m.teams[0].name)+' v '+esc(m.teams[1].name)+'</div><div class="dim small">'+esc(fmtDate(m.date))+(m.venue?' · '+esc(m.venue):'')+(m.mode==="intra"?' · Intra-squad':'')+(m.settings.pairs?' · Pairs':'')+'</div></div>'+
-      (m.status==="completed"?'<span class="chip on" style="cursor:default">'+(m.imported?'In Match Centre':'Completed')+'</span>':'<span class="chip gold on" style="cursor:default">Live</span>')+'</div>'+
-      '<div class="small mono" style="margin:8px 0 2px;color:#cfe0ee">'+(matchLine(m)||'No innings yet')+'</div>'+
+      (m.status==="completed"?'<span class="chip on" style="cursor:default">'+(m.imported?'In Match Centre':'Completed')+'</span>':(!m.toss?'<span class="chip" style="cursor:default">Upcoming</span>':'<span class="chip gold on" style="cursor:default">Live</span>'))+'</div>'+
+      '<div class="small mono" style="margin:8px 0 2px;color:#cfe0ee">'+(!m.toss?m.teams[0].players.length+' v '+m.teams[1].players.length+' players · toss not done':(matchLine(m)||'No innings yet'))+'</div>'+
       (res?'<div class="small" style="color:var(--accent);font-weight:700">'+esc(res.text)+'</div>':'')+
-      '<div class="row" style="margin-top:10px"><button class="btn sm grow" onclick="openMatch(\''+m.id+'\')">'+(m.status==="completed"?'View':'Resume')+'</button><button class="btn sm danger" onclick="delMatchUI(\''+m.id+'\')">Delete</button></div></div>';
+      '<div class="row" style="margin-top:10px"><button class="btn sm grow" onclick="openMatch(\''+m.id+'\')">'+(m.status==="completed"?'View':!m.toss?'Toss &amp; start':'Resume')+'</button>'+(!m.toss?'<button class="btn sec sm" onclick="editMatchSetup(\''+m.id+'\')">Edit</button>':'')+'<button class="btn sm danger" onclick="delMatchUI(\''+m.id+'\')">Delete</button></div></div>';
   }
   $("app").innerHTML=
     '<div class="hdr"><a href="app.html" class="ib" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">←</a><div class="t"><div class="ttl">Match Scorer</div><div class="sub">Test · Multi-day · Practice matches</div></div></div>'+
     '<button class="btn full" style="margin-bottom:12px" onclick="newMatch()">+ New Match</button>'+
+    (upc.length?'<div class="lbl">Upcoming — squads saved</div>'+upc.map(card).join(""):'')+
     (live.length?'<div class="lbl">In progress</div>'+live.map(card).join(""):'')+
     (done.length?'<div class="lbl">Completed</div>'+done.map(card).join(""):'')+
     (!D.matches.length?'<div class="card dim" style="text-align:center;padding:26px 14px">No matches yet.<br>Set up an intra-squad game or a match against another team — your roster loads automatically.</div>':'')+
@@ -455,7 +460,7 @@ function goHome(){D.M=null;closeSheet();renderHome()}
    SETUP
    ============================================================ */
 function newMatch(){
-  D.draft={title:"",date:todayStr(),venue:"",mode:"vs",sides:[{name:"",players:[]},{name:"",players:[]}],
+  D.editId=null;D.draft={title:"",date:todayStr(),venue:"",mode:"vs",sides:[{name:"",players:[]},{name:"",players:[]}],
     settings:{days:3,inns:2,margin:200,cap:0,pairs:false,pairOvers:4}};
   D.screen="setup";renderSetup();
 }
@@ -477,7 +482,7 @@ function sideCard(i){
 function renderSetup(){
   var d=D.draft,st=d.settings;
   $("app").innerHTML=
-    '<div class="hdr"><button class="ib" onclick="goHome()">←</button><div class="t"><div class="ttl">New Match</div><div class="sub">Set up sides and rules</div></div></div>'+
+    '<div class="hdr"><button class="ib" onclick="goHome()">←</button><div class="t"><div class="ttl">'+(D.editId?'Edit Match':'New Match')+'</div><div class="sub">Set up sides and rules</div></div></div>'+
     '<div class="card"><div class="lbl" style="margin-top:0">Match type</div><div class="seg"><button class="chip '+(d.mode==="vs"?'on':'')+'" onclick="setMode(\'vs\')">Vs other team</button><button class="chip '+(d.mode==="intra"?'on':'')+'" onclick="setMode(\'intra\')">Intra-squad</button></div>'+
     '<div class="lbl">Title (optional)</div><input class="in" placeholder="e.g. Practice match #3" value="'+esc(d.title)+'" oninput="D.draft.title=this.value">'+
     '<div class="row" style="margin-top:2px"><div class="grow"><div class="lbl">Date</div><input class="in" type="date" value="'+esc(d.date)+'" oninput="D.draft.date=this.value"></div><div class="grow"><div class="lbl">Venue</div><input class="in" value="'+esc(d.venue)+'" placeholder="Ground" oninput="D.draft.venue=this.value"></div></div></div>'+
@@ -491,7 +496,7 @@ function renderSetup(){
     '<div class="lbl">Pairs cricket</div><div class="seg"><button class="chip '+(!st.pairs?'on':'')+'" onclick="setSet(\'pairs\',false)">Off</button><button class="chip '+(st.pairs?'on':'')+'" onclick="setSet(\'pairs\',true)">On</button></div>'+
     (st.pairs?'<div class="dim small" style="margin-top:6px">You choose the pairs when each innings starts. Each pair faces a set number of overs; a dismissal costs 5 runs and the batter stays in. Innings length = pairs × overs.</div><div class="lbl">Overs per pair</div><input class="in" type="number" inputmode="numeric" value="'+st.pairOvers+'" oninput="D.draft.settings.pairOvers=Math.max(1,+this.value||4)">':'')+
     '</div>'+
-    '<button class="btn full" onclick="startMatch()">Continue to toss →</button>';
+    '<button class="btn full" onclick="startMatch(true)">Continue to toss →</button><button class="btn sec full" style="margin-top:8px" onclick="startMatch(false)">Save for later (toss &amp; scoring after)</button>';
 }
 function setMode(md){var d=D.draft;if(d.mode===md)return;d.mode=md;if(md==="intra"){d.sides[1].players=d.sides[1].players.filter(function(p){return p.roster})}renderSetup()}
 function setSet(k,v){D.draft.settings[k]=v;if(k==="pairs"&&v)D.draft.settings.margin=0;renderSetup()}
@@ -542,15 +547,26 @@ function splitDone(){
   if(!d.sides[0].name)d.sides[0].name="Blues";if(!d.sides[1].name)d.sides[1].name="Reds";
   closeSheet();renderSetup();
 }
-function startMatch(){
+function startMatch(goToss){
   var d=D.draft;
   for(var i=0;i<2;i++){d.sides[i].name=(d.sides[i].name||"").trim();if(!d.sides[i].name){toast("Name both sides");return}if(d.sides[i].players.length<2){toast(d.sides[i].name+" needs at least 2 players");return}}
   if(d.sides[0].name===d.sides[1].name){toast("Side names must differ");return}
-  if(d.settings.pairs&&(d.sides[0].players.length<2||d.sides[1].players.length<2)){toast("Pairs needs at least 2 players per side");return}
-  var m={id:sid(),created:Date.now(),updated:Date.now(),status:"live",mode:d.mode,title:d.title.trim(),date:d.date||todayStr(),venue:d.venue.trim(),
-    settings:JSON.parse(JSON.stringify(d.settings)),toss:null,innings:[],followOnDecision:null,manualResult:null,
-    teams:d.sides.map(function(s,ti){return{name:s.name,players:s.players.map(function(p,k){return{id:(ti?"b":"a")+(k+1),name:p.name,roster:!!p.roster}})}})};
-  D.M=m;D.draft=null;D.tab="score";D.cardInn=0;D.prompted=null;persist().then(function(){render()});
+  var teams=d.sides.map(function(s,ti){return{name:s.name,players:s.players.map(function(p,k){return{id:(ti?"b":"a")+(k+1),name:p.name,roster:!!p.roster}})}});
+  var m=D.editId?D.matches.find(function(x){return x.id===D.editId}):null;
+  if(m){m.mode=d.mode;m.title=d.title.trim();m.date=d.date||todayStr();m.venue=d.venue.trim();m.settings=JSON.parse(JSON.stringify(d.settings));m.teams=teams}
+  else m={id:sid(),created:Date.now(),updated:Date.now(),status:"upcoming",mode:d.mode,title:d.title.trim(),date:d.date||todayStr(),venue:d.venue.trim(),
+    settings:JSON.parse(JSON.stringify(d.settings)),toss:null,innings:[],followOnDecision:null,manualResult:null,teams:teams};
+  D.draft=null;D.editId=null;
+  if(goToss===false){D.M=null;persist0(m).then(function(){toast("Saved — open it from the home screen after the toss");renderHome()});return}
+  D.M=m;D.tab="score";D.cardInn=0;D.prompted=null;persist().then(function(){render()});
+}
+function persist0(m){var old=D.M;D.M=m;return persist().then(function(){D.M=old})}
+function editMatchSetup(id){
+  var m=D.matches.find(function(x){return x.id===id});if(!m||m.toss)return;
+  D.editId=id;
+  D.draft={title:m.title||"",date:m.date,venue:m.venue||"",mode:m.mode,settings:JSON.parse(JSON.stringify(m.settings)),
+    sides:m.teams.map(function(t){return{name:t.name,players:t.players.map(function(p){return{name:p.name,roster:p.roster}})}})};
+  D.screen="setup";renderSetup();
 }
 
 /* ============================================================
@@ -568,7 +584,7 @@ function tossPick(w){D.t.w=w;$("tw0").classList.toggle("on",w===0);$("tw1").clas
 function tossEl(e){D.t.e=e;$("te0").classList.toggle("on",e==="bat");$("te1").classList.toggle("on",e==="bowl")}
 function tossGo(){
   if(D.t.w===null||!D.t.e){toast("Pick the winner and the decision");return}
-  var m=D.M;m.toss={winner:D.t.w,elected:D.t.e};
+  var m=D.M;m.toss={winner:D.t.w,elected:D.t.e};m.status="live";
   var bat=D.t.e==="bat"?D.t.w:1-D.t.w;
   startInnings(m,bat);persist().then(render);
 }
