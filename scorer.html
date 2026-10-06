@@ -76,7 +76,7 @@
   /* sheet */
   #sheet{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;display:none;align-items:flex-end;justify-content:center}
   #sheet.show{display:flex}
-  .sh{background:#0f1a2b;border-radius:20px 20px 0 0;border:1px solid var(--line);width:100%;max-width:640px;max-height:90vh;overflow:auto;padding:16px 14px max(18px,env(safe-area-inset-bottom))}
+  .sh{overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:#0f1a2b;border-radius:20px 20px 0 0;border:1px solid var(--line);width:100%;max-width:640px;max-height:90vh;overflow:auto;padding:16px 14px max(18px,env(safe-area-inset-bottom))}
   .sh h3{font-size:16px;margin-bottom:4px}
   .pl{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--line);border-radius:12px;margin-bottom:6px;background:var(--card2);cursor:pointer}
   .pl.on{border-color:var(--accent);background:var(--accent-dim)}
@@ -420,8 +420,14 @@ window.SC={D:D,computeInn:computeInn,matchState:matchState,resultOf:resultOf,bui
 function $(id){return document.getElementById(id)}
 function persist(){var m=D.M;if(!m)return Promise.resolve();m.updated=Date.now();return dbPut(m).then(function(){var i=D.matches.findIndex(function(x){return x.id===m.id});if(i<0)D.matches.unshift(m);else D.matches[i]=m}).catch(function(e){console.error(e)})}
 
-function openSheet(html){var s=$("sheet");s.innerHTML='<div class="sh" onclick="event.stopPropagation()">'+html+'</div>';s.classList.add("show");D.sheetOpen=true}
-function closeSheet(){var s=$("sheet");s.classList.remove("show");s.innerHTML="";D.sheetOpen=false;D.wk=null}
+function openSheet(html){
+  var s=$("sheet"),old=s.querySelector(".sh"),keep=(old&&s.classList.contains("show"))?old.scrollTop:0;
+  s.innerHTML='<div class="sh" onclick="event.stopPropagation()">'+html+'</div>';
+  s.classList.add("show");D.sheetOpen=true;
+  document.body.style.overflow="hidden";            // page behind the sheet stays put
+  var n=s.querySelector(".sh");if(n&&keep)n.scrollTop=keep;   // re-render keeps your place in the list
+}
+function closeSheet(){var s=$("sheet");s.classList.remove("show");s.innerHTML="";D.sheetOpen=false;D.wk=null;document.body.style.overflow=""}
 function toast(t){var d=document.createElement("div");d.textContent=t;d.style.cssText="position:fixed;left:50%;bottom:90px;transform:translateX(-50%);background:#16253c;color:#eef2f6;border:1px solid rgba(255,255,255,.15);padding:10px 16px;border-radius:12px;font-size:13px;font-weight:600;z-index:99";document.body.appendChild(d);setTimeout(function(){d.remove()},1900)}
 
 /* ============================================================
@@ -437,14 +443,15 @@ function renderHome(){
   function card(m){
     var MS=matchState(m),res=resultOf(m,MS);
     return '<div class="card"><div class="row"><div class="grow"><div style="font-weight:800">'+esc(m.teams[0].name)+' v '+esc(m.teams[1].name)+'</div><div class="dim small">'+esc(fmtDate(m.date))+(m.venue?' · '+esc(m.venue):'')+(m.mode==="intra"?' · Intra-squad':'')+(m.settings.pairs?' · Pairs':'')+'</div></div>'+
-      (m.status==="completed"?'<span class="chip on" style="cursor:default">'+(m.imported?'In Match Centre':'Completed')+'</span>':(!m.toss?'<span class="chip" style="cursor:default">Upcoming</span>':'<span class="chip gold on" style="cursor:default">Live</span>'))+'</div>'+
+      (m.handedOver?'<span class="chip gold on" style="cursor:default">Handed over</span>':m.status==="completed"?'<span class="chip on" style="cursor:default">'+(m.imported?'In Match Centre':'Completed')+'</span>':(!m.toss?'<span class="chip" style="cursor:default">Upcoming</span>':'<span class="chip gold on" style="cursor:default">Live</span>'))+'</div>'+
       '<div class="small mono" style="margin:8px 0 2px;color:#cfe0ee">'+(!m.toss?m.teams[0].players.length+' v '+m.teams[1].players.length+' players · toss not done':(matchLine(m)||'No innings yet'))+'</div>'+
       (res?'<div class="small" style="color:var(--accent);font-weight:700">'+esc(res.text)+'</div>':'')+
-      '<div class="row" style="margin-top:10px"><button class="btn sm grow" onclick="openMatch(\''+m.id+'\')">'+(m.status==="completed"?'View':!m.toss?'Toss &amp; start':'Resume')+'</button>'+(!m.toss?'<button class="btn sec sm" onclick="editMatchSetup(\''+m.id+'\')">Edit</button>':'')+'<button class="btn sm danger" onclick="delMatchUI(\''+m.id+'\')">Delete</button></div></div>';
+      '<div class="row" style="margin-top:10px"><button class="btn sm grow" onclick="openMatch(\''+m.id+'\')">'+(m.status==="completed"?'View':!m.toss?'Toss &amp; start':'Resume')+'</button>'+(!m.toss&&!m.handedOver&&!D.guest?'<button class="btn sec sm" onclick="editMatchSetup(\''+m.id+'\')">Edit</button>':'')+(!m.handedOver&&m.status!=="completed"?'<button class="btn sec sm" onclick="handOver(D.matches.find(function(x){return x.id===\''+m.id+'\'}))">'+(D.guest?'Send back':'Hand over')+'</button>':'')+'<button class="btn sm danger" onclick="delMatchUI(\''+m.id+'\')">Delete</button></div></div>';
   }
   $("app").innerHTML=
-    '<div class="hdr"><a href="app.html" class="ib" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">←</a><div class="t"><div class="ttl">Match Scorer</div><div class="sub">Test · Multi-day · Practice matches</div></div></div>'+
-    '<button class="btn full" style="margin-bottom:12px" onclick="newMatch()">+ New Match</button>'+
+    '<div class="hdr">'+(D.guest?'':'<a href="app.html" class="ib" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">←</a>')+'<div class="t"><div class="ttl">Match Scorer</div><div class="sub">Test · Multi-day · Practice matches</div></div></div>'+
+    (D.guest?'<div class="card dim small">You are scoring as a guest. Matches handed to you open here. To score your own matches, get ProCoach OS at procoachos.in.</div>':'<button class="btn full" style="margin-bottom:12px" onclick="newMatch()">+ New Match</button>')+
+    '<button class="btn sec full" style="margin-bottom:12px" onclick="pickFile()">Open a match file</button>'+
     (upc.length?'<div class="lbl">Upcoming — squads saved</div>'+upc.map(card).join(""):'')+
     (live.length?'<div class="lbl">In progress</div>'+live.map(card).join(""):'')+
     (done.length?'<div class="lbl">Completed</div>'+done.map(card).join(""):'')+
@@ -602,6 +609,7 @@ function render(){
   else if(!res&&m.status==="completed"){m.status="live";m.export=null;m.result="";m.imported=false;persist()}
   else if(res&&m.status==="completed"&&!m.imported){m.export=buildExport(m);m.result=res.text}
   var step=matchStep(m,MS);
+  if(m.handedOver&&(D.tab==="score"||!m.innings.length||D.tab==="match")){D.tab=m.innings.length?D.tab:"score";if(D.tab==="match")D.tab="score";$("app").innerHTML=lockedScreen(m);return}
   if(step.s==="toss"){renderToss();return}
   D.screen="score";
   var tab=D.tab;
@@ -650,7 +658,7 @@ function scoreTab(m,MS,step){
   var out="";
   if(step.s==="finished"){
     var res=step.res||resultOf(m,MS);
-    out+=sb+'<div class="banner ok"><div class="res">'+esc(res?res.text:"Match complete")+'</div><div class="small dim" style="margin:4px 0 10px">'+(m.imported?'Already added to Match Centre.':'Open ProCoach OS → Match Centre to add this match with every player\'s batting and bowling figures.')+'</div><div class="row wrap"><a class="btn sm" style="text-decoration:none;display:inline-flex;align-items:center" href="app.html">Open ProCoach OS</a><button class="btn sec sm" onclick="D.tab=\'card\';render()">Scorecard</button><button class="btn sec sm" onclick="copyCard()">Copy</button></div></div>';
+    out+=sb+'<div class="banner ok"><div class="res">'+esc(res?res.text:"Match complete")+'</div><div class="small dim" style="margin:4px 0 10px">'+(D.guest?'Match complete. Send the result back so the coach can add it to Match Centre.':m.imported?'Already added to Match Centre.':'Open ProCoach OS → Match Centre to add this match with every player\'s batting and bowling figures.')+'</div><div class="row wrap">'+(D.guest?'<button class="btn sm" onclick="handOver(D.M)">Send result back to coach</button>':'<a class="btn sm" style="text-decoration:none;display:inline-flex;align-items:center" href="app.html">Open ProCoach OS</a>')+'<button class="btn sec sm" onclick="D.tab=\'card\';render()">Scorecard</button><button class="btn sec sm" onclick="copyCard()">Copy</button></div></div>';
     return out+'<button class="btn sec full" onclick="undoLast()">↶ Undo last ball (reopen match)</button>';
   }
   out+=sb;
@@ -846,10 +854,11 @@ function matchTab(m,MS,step){
     rows.push(['Declare match drawn','manualEnd(\'draw\')']);
     rows.push(['Abandon match','manualEnd(\'abandoned\')']);
   }
+  if(!m.handedOver)rows.push([D.guest?'Send back to coach (link / file)':'Hand over to another scorer (link / file)','handOver(D.M)']);
   rows.push(['Copy scorecard as text','copyCard()']);
   rows.push(['Print / save PDF','printCard()']);
   h+='<div class="card"><div class="lbl" style="margin-top:0">Actions</div>'+rows.map(function(r){return'<button class="btn sec full" style="margin-bottom:8px;text-align:left" onclick="'+r[1]+'">'+r[0]+'</button>'}).join("")+'</div>';
-  if(res){h+='<div class="card"><div class="small dim" style="margin-bottom:8px">'+(m.imported?'This match is already in Match Centre.':'Open ProCoach OS and use the banner on the Match Centre page to add this match and every player\'s figures.')+'</div><a class="btn full" style="text-decoration:none;display:flex;align-items:center;justify-content:center" href="app.html">Open ProCoach OS →</a></div>'}
+  if(res&&!D.guest){h+='<div class="card"><div class="small dim" style="margin-bottom:8px">'+(m.imported?'This match is already in Match Centre.':'Open ProCoach OS and use the banner on the Match Centre page to add this match and every player\'s figures.')+'</div><a class="btn full" style="text-decoration:none;display:flex;align-items:center;justify-content:center" href="app.html">Open ProCoach OS →</a></div>'}
   return h;
 }
 function declareInn(){if(confirm("Declare the innings?"))push({k:"declare"})}
@@ -871,15 +880,172 @@ function copyCard(){var t=buildScorecardText(D.M);if(navigator.clipboard&&naviga
 function fallbackCopy(t){var a=document.createElement("textarea");a.value=t;document.body.appendChild(a);a.select();try{document.execCommand("copy");toast("Scorecard copied")}catch(e){toast("Copy not available")}a.remove()}
 function printCard(){$("print-report").textContent=buildScorecardText(D.M);window.print()}
 
+
+/* ============================================================
+   HAND-OVER  (link / file) — lets another person score a match
+   on their own phone with no app and no subscription. The whole
+   match travels inside the link; nothing is stored on a server.
+   Everything received is rebuilt field-by-field (never trusted).
+   ============================================================ */
+function cleanId(v){return typeof v==="string"&&/^[ab]\d{1,3}$/.test(v)?v:null}
+function cleanStr(v,n){return String(v==null?"":v).replace(/[\u0000-\u001f]/g," ").slice(0,n||60)}
+function clampN(v,lo,hi,d){v=Math.round(+v);return isFinite(v)?Math.max(lo,Math.min(hi,v)):d}
+function cleanEvent(e){
+  if(!e||typeof e!=="object")return null;
+  var k=e.k,o={k:k},id;
+  switch(k){
+    case"open":{o.s=cleanId(e.s);o.n=cleanId(e.n);o.b=cleanId(e.b);if(!o.s||!o.n||!o.b)return null;
+      if(Array.isArray(e.pairs)){o.pairs=[];for(var i=0;i<e.pairs.length&&i<20;i++){var a=cleanId(e.pairs[i][0]),b=cleanId(e.pairs[i][1]);if(!a||!b)return null;o.pairs.push([a,b])}}
+      return o}
+    case"bowler":o.b=cleanId(e.b);return o.b?o:null;
+    case"swap":case"stumps":case"declare":return o;
+    case"pen":o.runs=clampN(e.runs,0,20,0);return o;
+    case"end":o.reason=cleanStr(e.reason,30)||"Innings closed";return o;
+    case"retire":o.p=cleanId(e.p);o.kind=e.kind==="out"?"out":"nr";o.in=cleanId(e.in);return o.p?o:null;
+    case"ball":{o.r=clampN(e.r,0,8,0);if(e.x){if(["wd","nb","b","lb"].indexOf(e.x)<0)return null;o.x=e.x}
+      if(e.nbk){if(["bat","b","lb"].indexOf(e.nbk)<0)return null;o.nbk=e.nbk}
+      if(e.w){if(WK_TYPES.indexOf(e.w.type)<0)return null;o.w={type:e.w.type,out:cleanId(e.w.out),fielder:cleanId(e.w.fielder),in:cleanId(e.w.in)}}
+      return o}
+  }
+  return null;
+}
+function validateMatch(r){
+  try{
+    if(!r||typeof r!=="object"||!/^sc_[a-z0-9]{3,20}$/.test(r.id)||!Array.isArray(r.teams)||r.teams.length!==2)return null;
+    var seen={},teams=[];
+    for(var t=0;t<2;t++){
+      var rt=r.teams[t],pl=[];if(!rt||!Array.isArray(rt.players)||rt.players.length<2||rt.players.length>30)return null;
+      for(var i=0;i<rt.players.length;i++){var q=rt.players[i],pid=cleanId(q&&q.id);if(!pid||seen[pid])return null;seen[pid]=1;pl.push({id:pid,name:cleanStr(q.name,40)||"Player",roster:!!q.roster})}
+      teams.push({name:cleanStr(rt.name,40)||"Team",players:pl});
+    }
+    var st=r.settings||{};
+    var m={id:r.id,created:+r.created||Date.now(),updated:Date.now(),status:r.status==="completed"?"completed":(r.toss?"live":"upcoming"),mode:r.mode==="intra"?"intra":"vs",
+      title:cleanStr(r.title,60),date:/^\d{4}-\d{2}-\d{2}$/.test(r.date)?r.date:todayStr(),venue:cleanStr(r.venue,60),
+      settings:{days:clampN(st.days,1,5,3),inns:st.inns===1?1:2,margin:clampN(st.margin,0,999,0),cap:clampN(st.cap,0,500,0),pairs:!!st.pairs,pairOvers:clampN(st.pairOvers,1,50,4)},
+      teams:teams,toss:null,innings:[],followOnDecision:r.followOnDecision==="enforced"?"enforced":(r.followOnDecision==="declined"?"declined":null),manualResult:null,
+      rev:clampN(r.rev,0,100000,0),handedOver:false,guestOk:true,imported:false,export:null};
+    if(r.toss&&(r.toss.winner===0||r.toss.winner===1)&&(r.toss.elected==="bat"||r.toss.elected==="bowl"))m.toss={winner:r.toss.winner,elected:r.toss.elected};
+    if(r.manualResult&&(r.manualResult.type==="draw"||r.manualResult.type==="abandoned"))m.manualResult=r.manualResult.type==="draw"?{type:"draw",winner:null,text:"Match drawn"}:{type:"abandoned",winner:null,text:"Match abandoned"};
+    if(!Array.isArray(r.innings)||r.innings.length>4)return null;
+    for(var n=0;n<r.innings.length;n++){
+      var ri=r.innings[n],bat=ri.bat===1?1:0,evs=[];
+      if(!Array.isArray(ri.events)||ri.events.length>6000)return null;
+      for(var j=0;j<ri.events.length;j++){var ce=cleanEvent(ri.events[j]);if(!ce)return null;evs.push(ce)}
+      var inn={no:n+1,bat:bat,bowl:1-bat,events:evs,maxOvers:clampN(ri.maxOvers,0,500,0)};
+      if(ri.target)inn.target=clampN(ri.target,1,99999,1);
+      if(ri.followOn)inn.followOn=true;
+      m.innings.push(inn);
+    }
+    var MS=matchState(m);               // throws if any event references a player that doesn't exist
+    var res=resultOf(m,MS);
+    if(res){m.status="completed";m.result=res.text;m.export=buildExport(m)}
+    else if(m.status==="completed")m.status=m.toss?"live":"upcoming";
+    return m;
+  }catch(e){return null}
+}
+function b64uEnc(bytes){var s="";for(var i=0;i<bytes.length;i++)s+=String.fromCharCode(bytes[i]);return btoa(s).replace(/\+/g,"-").replace(/\//g,"_").replace(/=+$/,"")}
+function b64uDec(str){str=str.replace(/-/g,"+").replace(/_/g,"/");while(str.length%4)str+="=";var b=atob(str),a=new Uint8Array(b.length);for(var i=0;i<b.length;i++)a[i]=b.charCodeAt(i);return a}
+function streamBytes(stream){return new Response(stream).arrayBuffer().then(function(b){return new Uint8Array(b)})}
+function payloadOf(m){var c=JSON.parse(JSON.stringify(m));delete c.export;delete c.imported;delete c.importedMatchId;c.handedOver=false;c.guestOk=true;return c}
+function encodePayload(m){
+  var json=JSON.stringify(payloadOf(m)),raw=new TextEncoder().encode(json);
+  if(typeof CompressionStream==="undefined")return Promise.resolve("p."+b64uEnc(raw));
+  var cs=new CompressionStream("gzip"),w=cs.writable.getWriter();w.write(raw);w.close();
+  return streamBytes(cs.readable).then(function(b){return"g."+b64uEnc(b)});
+}
+function decodePayload(str){
+  var kind=str.slice(0,2),data=b64uDec(str.slice(2));
+  if(kind==="p.")return Promise.resolve(JSON.parse(new TextDecoder().decode(data)));
+  if(kind!=="g."||typeof DecompressionStream==="undefined")return Promise.reject(new Error("unsupported"));
+  var ds=new DecompressionStream("gzip"),w=ds.writable.getWriter();w.write(data);w.close();
+  return streamBytes(ds.readable).then(function(b){return JSON.parse(new TextDecoder().decode(b))});
+}
+function linkFor(code){return location.href.split("#")[0]+"#h="+code}
+
+var HO=null;
+function handOver(m,again){
+  var who=D.guest?"back to the coach":"to another scorer";
+  if(!again&&!confirm("Hand this match "+who+"?\n\nYou will not be able to score it on this phone until you take it back. Only one phone should score at a time."))return;
+  if(!again){m.rev=(m.rev||0)+1;m.handedOver=true;m.guestOk=true}
+  var prev=D.M;D.M=m;
+  persist().then(function(){D.M=prev;return encodePayload(m)}).then(function(code){HO={m:m,code:code,url:linkFor(code)};handOverSheet();if(D.M===m)render()});
+}
+function handOverSheet(){
+  var m=HO.m,len=HO.url.length;
+  openSheet('<h3>'+(D.guest?'Send back to the coach':'Hand over to another scorer')+'</h3>'+
+    '<div class="dim small" style="margin:4px 0 10px">'+(D.guest?'Send this link to the coach. Opening it loads the match with everything you scored.':'Send this link to the person who will score. They tap it, the match opens in their browser — no app or subscription needed — and they carry on from exactly where you stopped.')+'</div>'+
+    '<div class="row"><button class="btn grow" onclick="shareLink()">Share link</button><button class="btn sec grow" onclick="copyLink()">Copy link</button></div>'+
+    '<button class="btn sec full" style="margin-top:8px" onclick="saveFile()">Save as file instead</button>'+
+    (len>5500?'<div class="banner" style="margin-top:10px"><b>Long link ('+Math.round(len/1000)+'k characters).</b><div class="small dim">Some chat apps cut very long links. If it fails to open, use “Save as file” and send the file — the receiver taps “Open match file” on the scorer home screen.</div></div>':'')+
+    '<div class="dim small" style="margin-top:12px">While handed over, this phone can only view the match. You can take it back at any time from the match screen.</div>'+
+    '<button class="btn sec full" style="margin-top:10px" onclick="closeSheet();render()">Done</button>');
+}
+function shareLink(){
+  var m=HO.m,title=m.teams[0].name+" v "+m.teams[1].name;
+  if(navigator.share){navigator.share({title:"Score: "+title,text:"Score this match — "+title,url:HO.url}).catch(function(){})}
+  else copyLink();
+}
+function copyLink(){
+  var t=HO.url;
+  if(navigator.clipboard&&navigator.clipboard.writeText)navigator.clipboard.writeText(t).then(function(){toast("Link copied")},function(){fallbackCopy(t)});
+  else fallbackCopy(t);
+}
+function saveFile(){
+  var m=HO.m,blob=new Blob([JSON.stringify(payloadOf(m))],{type:"application/json"}),a=document.createElement("a");
+  a.href=URL.createObjectURL(blob);a.download=("match-"+m.teams[0].name+"-v-"+m.teams[1].name+".json").replace(/[^\w.\-]+/g,"_");
+  document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);
+}
+function takeBack(id){
+  var m=D.matches.find(function(x){return x.id===id});if(!m)return;
+  if(!confirm("Take scoring back to this phone?\n\nAnything scored on the other phone after the hand-over will be ignored unless you re-open their link."))return;
+  m.handedOver=false;m.rev=(m.rev||0)+1;var prev=D.M;D.M=m;persist().then(function(){D.M=prev;if(D.M)render();else renderHome()});
+}
+function shareAgain(id){var m=D.matches.find(function(x){return x.id===id});if(m)handOver(m,true)}
+function importMatchObject(raw){
+  var m=validateMatch(raw);
+  if(!m){alert("This match link or file could not be read. Ask the sender to share it again.");return Promise.resolve(false)}
+  var ex=D.matches.find(function(x){return x.id===m.id});
+  if(ex&&!ex.handedOver&&(m.rev||0)<=(ex.rev||0)){
+    if(!confirm("This phone already has a copy of this match that is not handed over.\n\nReplace it with the one you just opened?"))return Promise.resolve(ex);
+  }
+  var prev=D.M;D.M=m;
+  return persist().then(function(){return m});
+}
+function openReceived(m){D.M=m;D.tab="score";D.cardInn=Math.max(0,m.innings.length-1);D.prompted=null;render()}
+function importFromHash(){
+  var h=location.hash||"";if(h.indexOf("#h=")!==0)return Promise.resolve(null);
+  var code=h.slice(3);
+  try{history.replaceState(null,"",location.href.split("#")[0])}catch(e){}
+  return decodePayload(code).then(importMatchObject).catch(function(){alert("This match link could not be read. Ask the sender to share it again.");return null});
+}
+function pickFile(){var i=document.createElement("input");i.type="file";i.accept=".json,application/json";i.onchange=function(){var f=i.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{importMatchObject(JSON.parse(r.result)).then(function(m){if(m&&m.id)openReceived(m)})}catch(e){alert("That file is not a ProCoach match file.")}};r.readAsText(f)};i.click()}
+function lockedScreen(m){
+  return '<div class="hdr"><button class="ib" onclick="goHome()">←</button><div class="t"><div class="ttl">'+esc(m.teams[0].name)+' v '+esc(m.teams[1].name)+'</div><div class="sub">Handed over</div></div></div>'+
+    '<div class="banner"><b>Scoring has been handed over</b><div class="small dim" style="margin:6px 0 12px">This phone is view-only until the match is handed back. If the other person has finished, open the link they send you to bring the match back with all their scoring.</div>'+
+    '<div class="row wrap"><button class="btn sm" onclick="shareAgain(\''+m.id+'\')">Share link again</button><button class="btn sec sm" onclick="pickFile()">Open match file</button><button class="btn danger sm" onclick="takeBack(\''+m.id+'\')">Take back scoring</button></div></div>'+
+    (m.innings.length?'<button class="btn sec full" onclick="D.tab=\'card\';render()">View scorecard so far</button>':'');
+}
+
 /* ============================================================
    BOOT
    ============================================================ */
 function boot(){
-  if(!isPremiumUser()){showPremiumLockedMessage();return}
-  Promise.all([loadRoster(),dbAll()]).then(function(r){
-    D.roster=r[0];D.matches=r[1];renderHome();
+  var hashOpen=(location.hash||"").indexOf("#h=")===0;
+  var premium=isPremiumUser();
+  dbAll().catch(function(){return[]}).then(function(all){
+    D.matches=all;
+    var hasGuest=all.some(function(m){return m.guestOk});
+    if(!premium&&!hashOpen&&!hasGuest){showPremiumLockedMessage();return}
+    D.guest=!premium;
+    return (premium?loadRoster():Promise.resolve({players:[],teams:[]})).then(function(r){
+      D.roster=r;
+      if(D.guest)D.matches=D.matches.filter(function(m){return m.guestOk});
+      if(hashOpen)return importFromHash().then(function(m){if(m&&m.id)openReceived(m);else renderHome()});
+      renderHome();
+    });
   }).catch(function(){renderHome()});
 }
+window.addEventListener('hashchange',function(){if((location.hash||'').indexOf('#h=')===0&&D.roster!==undefined&&(isPremiumUser()||D.guest!==undefined)){importFromHash().then(function(m){if(m&&m.id){D.guest=!isPremiumUser();openReceived(m)}})}});
 boot();
 </script>
 </body>
