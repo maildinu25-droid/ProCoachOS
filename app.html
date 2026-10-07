@@ -4115,21 +4115,23 @@ function matches(){
    "export" record. Nothing is written into the coach profile until the coach taps Import. */
 function scorerDbAll(){return new Promise(res=>{try{const r=indexedDB.open("procoachos_scorer",1);r.onupgradeneeded=e=>{const d=e.target.result;if(!d.objectStoreNames.contains("matches"))d.createObjectStore("matches",{keyPath:"id"})};r.onsuccess=()=>{try{const d=r.result;const q=d.transaction("matches","readonly").objectStore("matches").getAll();q.onsuccess=()=>{d.close();res(q.result||[])};q.onerror=()=>{d.close();res([])}}catch(e){res([])}};r.onerror=()=>res([])}catch(e){res([])}})}
 function scorerDbPut(rec){return new Promise(res=>{try{const r=indexedDB.open("procoachos_scorer",1);r.onsuccess=()=>{try{const d=r.result;const t=d.transaction("matches","readwrite");t.objectStore("matches").put(rec);t.oncomplete=()=>{d.close();res(true)};t.onerror=()=>{d.close();res(false)}}catch(e){res(false)}};r.onerror=()=>res(false)}catch(e){res(false)}})}
-async function pendingScoredMatches(){const all=await scorerDbAll();return all.filter(x=>x&&x.status==="completed"&&x.export&&!x.imported&&!db.matches.some(m=>m.scorerId===x.id))}
+async function pendingScoredMatches(){const all=await scorerDbAll();return all.filter(x=>x&&x.status==="completed"&&x.export&&!x.imported)}
 async function refreshScorerImportBox(){
  const box=document.getElementById("scorerImportBox");if(!box)return;
  const list=await pendingScoredMatches();
  const b2=document.getElementById("scorerImportBox");if(!b2)return;
  if(!list.length){b2.innerHTML="";return}
- b2.innerHTML=`<div class="card" style="margin:15px 0;border:1px solid var(--accent,#22c58b)"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><b>${list.length} scored match${list.length>1?"es":""} ready to add</b><div class="muted">${list.map(x=>esc(x.export.team)+" v "+esc(x.export.opp)+" — "+esc(x.export.result||"")).join("<br>")}</div></div><button class="btn primary" onclick="importScoredMatches()">Add to Match Centre</button></div></div>`;
+ b2.innerHTML=`<div class="card" style="margin:15px 0;border:1px solid var(--accent,#22c58b)"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><b>${list.length} scored match${list.length>1?"es":""} ready to ${list.some(x=>db.matches.some(m=>m.scorerId===x.id))?"add / update":"add"}</b><div class="muted">${list.map(x=>esc(x.export.team)+" v "+esc(x.export.opp)+" — "+esc(x.export.result||"")).join("<br>")}</div></div><button class="btn primary" onclick="importScoredMatches()">Add / update in Match Centre</button></div></div>`;
 }
 async function importScoredMatches(){
  if(!requireWriteAccess())return;
  const list=await pendingScoredMatches();let n=0;
  for(const x of list){
   const e=x.export;
-  const m=Object.assign({},e,{id:uid("m"),scorerId:x.id,source:"scorer"});
-  db.matches.push(m);n++;
+  let m=db.matches.find(z=>z.scorerId===x.id);
+  if(m){Object.assign(m,e)}   // update the existing entry; ratings, reflections and coach notes are untouched
+  else{m=Object.assign({},e,{id:uid("m"),scorerId:x.id,source:"scorer"});db.matches.push(m)}
+  n++;
   await scorerDbPut(Object.assign({},x,{imported:true,importedMatchId:m.id}));
  }
  if(n){save()}
@@ -4137,7 +4139,7 @@ async function importScoredMatches(){
 function matchCardHtml(m){
  let linkedReflection=db.reflections.find(r=>r.matchId===m.id);
  let showReflectionStatus=(m.date||"")<=today();
- return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div><b>${esc(m.team||"My Team")} vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.date||"")} ${m.venue?"· "+esc(m.venue):""} ${m.format?"· "+esc(m.format):""}</div></div><span class="tag">${esc(matchResultOutcome(m))}</span></div><p>${esc(m.result||"No result recorded")}</p>${(m.battingReview&&m.battingReview.length)||(m.bowlingReview&&m.bowlingReview.length)?`<div class="muted">${(m.battingReview&&m.battingReview.length)?m.battingReview.length+" batting entries":""}${(m.battingReview&&m.battingReview.length)&&(m.bowlingReview&&m.bowlingReview.length)?" · ":""}${(m.bowlingReview&&m.bowlingReview.length)?m.bowlingReview.length+" bowling entries":""}</div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForMatch('${m.id}')">Reflection pending</span>`}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary" onclick="matchReportView('${m.id}')">Report</button><button class="btn secondary iconBtn" title="Edit" onclick="editMatch('${m.id}')">${icon("edit",17)}</button><button class="btn secondary iconBtn" title="Duplicate" onclick="duplicateMatch('${m.id}')">${icon("copy",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delMatch('${m.id}')">${icon("trash",17)}</button></div></div>`;
+ return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div><b>${esc(m.team||"My Team")} vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.date||"")} ${m.venue?"· "+esc(m.venue):""} ${m.format?"· "+esc(m.format):""}</div></div><span class="tag">${esc(matchResultOutcome(m))}</span></div><p>${esc(m.result||"No result recorded")}</p>${m.scoreLine?`<div class="muted"><b>${esc(m.scoreLine)}</b></div>`:""}${!m.scoreLine&&((m.battingReview&&m.battingReview.length)||(m.bowlingReview&&m.bowlingReview.length))?`<div class="muted">${(m.battingReview&&m.battingReview.length)?m.battingReview.length+" batting entries":""}${(m.battingReview&&m.battingReview.length)&&(m.bowlingReview&&m.bowlingReview.length)?" · ":""}${(m.bowlingReview&&m.bowlingReview.length)?m.bowlingReview.length+" bowling entries":""}</div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForMatch('${m.id}')">Reflection pending</span>`}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary" onclick="matchReportView('${m.id}')">Report</button><button class="btn secondary iconBtn" title="Edit" onclick="editMatch('${m.id}')">${icon("edit",17)}</button><button class="btn secondary iconBtn" title="Duplicate" onclick="duplicateMatch('${m.id}')">${icon("copy",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delMatch('${m.id}')">${icon("trash",17)}</button></div></div>`;
 }
 
 const DISMISSAL_TYPES=["Not out","Bowled","Caught","Caught and bowled","LBW","Run out","Stumped","Hit wicket","Retired hurt","Other"];
@@ -4358,6 +4360,21 @@ function saveMatch(e){
 }
 function delMatch(id){if(confirm("Delete this match? This cannot be undone.")){db.matches=db.matches.filter(x=>x.id!==id);save()}}
 
+function scorerInningsHtml(m){
+ const ord=n=>n+(["th","st","nd","rd"][(n%100>10&&n%100<14)?0:(n%10<4?n%10:0)]);
+ const nm=p=>esc(p.name)+(p.c?" (c)":"")+(p.w?" †":"");
+ const info=(m.teamsInfo||[]).filter(t=>t.captain||t.keeper).map(t=>`<b>${esc(t.name)}</b>${t.captain?" · Captain: "+esc(t.captain):""}${t.keeper?" · WK: "+esc(t.keeper):""}`).join("<br>");
+ return `<h2>Scorecard</h2>${info?`<div class="card muted" style="margin-bottom:10px;line-height:1.6">${info}</div>`:""}`+(m.scorerInnings||[]).map(inn=>{
+  const bat=inn.bat.map(b=>`<tr><td>${nm(b)}</td><td class="muted">${esc(b.how)}</td><td><b>${b.runs}</b></td><td>${b.balls}</td><td>${b.fours}</td><td>${b.sixes}</td><td>${b.balls?(b.runs*100/b.balls).toFixed(1):"-"}</td></tr>`).join("");
+  const bowl=inn.bowl.map(b=>`<tr><td>${nm(b)}</td><td>${esc(b.overs)}</td><td>${b.maidens}</td><td>${b.runs}</td><td><b>${b.wkts}</b></td><td>${b.econ.toFixed(2)}</td></tr>`).join("");
+  const e=inn.extras||{};
+  return `<div class="card" style="margin-top:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><b>${esc(inn.team)} — ${ord(inn.no)} innings${inn.followOn?" (following on)":""}</b><b>${inn.runs}/${inn.wkts}${inn.declared?" d":""} <span class="muted" style="font-weight:400">(${esc(inn.overs)} ov)</span></b></div>
+  <table class="reportTable" style="margin-top:8px"><tr><th>Batter</th><th>How out</th><th>R</th><th>B</th><th>4s</th><th>6s</th><th>SR</th></tr>${bat}</table>
+  ${inn.dnb&&inn.dnb.length?`<p class="muted" style="margin:6px 0">Did not bat: ${inn.dnb.map(nm).join(", ")}</p>`:""}
+  <p style="margin:6px 0">Extras <b>${e.total||0}</b> <span class="muted">(b ${e.b||0}, lb ${e.lb||0}, w ${e.wd||0}, nb ${e.nb||0}${e.pen?", pen "+e.pen:""})</span>${inn.penalty?` · Pairs penalty −${inn.penalty}`:""}</p>
+  ${inn.fow&&inn.fow.length?`<p class="muted" style="margin:6px 0"><b>Fall of wickets:</b> ${inn.fow.map(f=>`${f.n}-${f.runs} (${esc(f.name)}, ${esc(f.over)})`).join(", ")}</p>`:""}
+  ${bowl?`<table class="reportTable" style="margin-top:8px"><tr><th>Bowler (${esc(inn.opp)})</th><th>O</th><th>M</th><th>R</th><th>W</th><th>Econ</th></tr>${bowl}</table>`:""}</div>`}).join("");
+}
 function matchReportView(id){
  let m=db.matches.find(x=>x.id===id);if(!m)return;
  let tournament=m.tournamentId?db.tournaments.find(t=>t.id===m.tournamentId):null;
@@ -4371,11 +4388,11 @@ function matchReportView(id){
  </div>
  <div class="card" style="margin-top:12px"><p><b>Venue:</b> ${esc(m.venue||"—")}</p></div>
  <h2>Foundation</h2><div class="card"><p><b>Conditions:</b> ${esc(m.conditions||"—")}</p></div>
- <h2>Batting Review</h2>${battingRows?`<table class="reportTable"><tr><th>Batter</th><th>Runs</th><th>Balls</th><th>Dismissal</th><th>Notes</th></tr>${battingRows}</table>`:empty("No batting entries recorded.")}
+ ${m.scorerInnings?scorerInningsHtml(m):`<h2>Batting Review</h2>${battingRows?`<table class="reportTable"><tr><th>Batter</th><th>Runs</th><th>Balls</th><th>Dismissal</th><th>Notes</th></tr>${battingRows}</table>`:empty("No batting entries recorded.")}`}
  ${m.battingRatings?`<div class="card" style="margin-top:10px"><b>Batting Assessment · ${avgRatingObj(m.battingRatings).toFixed(1)}/10 avg</b>${metricRows(m.battingRatings)}${m.battingAssessmentNotes?`<p style="margin-top:8px">${esc(m.battingAssessmentNotes)}</p>`:""}</div>`:""}
- <h2>Bowling Review</h2>${bowlingRows?`<table class="reportTable"><tr><th>Bowler</th><th>Overs</th><th>Runs</th><th>Wickets</th><th>Notes</th></tr>${bowlingRows}</table>`:empty("No bowling entries recorded.")}
+ ${m.scorerInnings?"":`<h2>Bowling Review</h2>${bowlingRows?`<table class="reportTable"><tr><th>Bowler</th><th>Overs</th><th>Runs</th><th>Wickets</th><th>Notes</th></tr>${bowlingRows}</table>`:empty("No bowling entries recorded.")}`}
  ${m.bowlingRatings?`<div class="card" style="margin-top:10px"><b>Bowling Assessment · ${avgRatingObj(m.bowlingRatings).toFixed(1)}/10 avg</b>${metricRows(m.bowlingRatings)}${m.bowlingAssessmentNotes?`<p style="margin-top:8px">${esc(m.bowlingAssessmentNotes)}</p>`:""}</div>`:""}
- ${m.scorecardText?`<h2>Full Scorecard</h2><div class="card"><pre style="white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit;font-size:var(--fs-2);line-height:1.5">${esc(m.scorecardText)}</pre></div>`:""}
+ ${m.scorecardText&&!m.scorerInnings?`<h2>Full Scorecard</h2><div class="card"><pre style="white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit;font-size:var(--fs-2);line-height:1.5">${esc(m.scorecardText)}</pre></div>`:""}
  <h2>Fielding Review</h2><div class="card">${(m.taken||m.missed||m.runouts||m.misfields)?`<p>Chances taken ${esc(m.taken||0)} · Missed ${esc(m.missed||0)} · Run outs ${esc(m.runouts||0)} · Misfields ${esc(m.misfields||0)}</p>`:""}${m.fieldingRatings?`<b>Fielding Assessment · ${avgRatingObj(m.fieldingRatings).toFixed(1)}/10 avg</b>${metricRows(m.fieldingRatings)}`:""}<p style="margin-top:8px">${esc(m.notes||"—")}</p></div>
  <h2>Team Review</h2><div class="card"><p><b>Rating:</b> ${esc(m.teamRating||"—")}/10</p><p>${esc(m.teamNotes||"—")}</p></div>
  <h2>Key Learnings &amp; Training Actions</h2><div class="card"><p>${esc(m.actions||"—")}</p></div>`;
@@ -5332,6 +5349,7 @@ function matchNarrative(m){
  let parts=[`${teamLabel} played ${oppLabel}${m.venue?" at "+m.venue:""} on ${fmtDate(m.date)}${m.format?` in a ${m.format} match`:""}.`];
  if(m.toss==="Won")parts.push(`${teamLabel} won the toss and chose to ${(m.tossDecision||"bat").toLowerCase()} first.`);
  else if(m.toss==="Lost")parts.push(`${oppLabel} won the toss.`);
+ if(m.scoreLine)parts.push(`Scores: ${m.scoreLine}.`);
  let topBat=(m.battingReview||[]).filter(r=>r.name).slice().sort((a,b)=>(Number(b.runs)||0)-(Number(a.runs)||0))[0];
  if(topBat&&Number(topBat.runs)>0)parts.push(`${topBat.name} top-scored with ${topBat.runs}${topBat.balls?` off ${topBat.balls} balls`:""}${topBat.dismissal&&topBat.dismissal!=="Not out"?` (${topBat.dismissal})`:topBat.dismissal==="Not out"?" (not out)":""}.`);
  let topBowl=(m.bowlingReview||[]).filter(r=>r.name).slice().sort((a,b)=>(Number(b.wickets)||0)-(Number(a.wickets)||0))[0];
