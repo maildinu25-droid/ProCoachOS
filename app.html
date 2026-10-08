@@ -152,6 +152,15 @@ input[type=range]{accent-color:var(--g);width:100%;height:6px;padding:0;backgrou
 @media(max-width:850px){.layout{grid-template-columns:1fr}aside{position:fixed;z-index:40;left:-260px;top:calc(68px + env(safe-area-inset-top));bottom:0;width:250px;transition:.2s;box-shadow:var(--shadow);overflow-y:auto;overscroll-behavior:contain;-webkit-overflow-scrolling:touch;touch-action:pan-y}aside .nav{padding-bottom:140px}aside.open{left:0}.sideOverlay{display:none;position:fixed;inset:calc(68px + env(safe-area-inset-top)) 0 0 0;background:rgba(0,0,0,.5);z-index:39}.sideOverlay.open{display:block}.g4,.g3{grid-template-columns:repeat(2,1fr)}main{padding:17px;padding-bottom:max(160px,calc(120px + env(safe-area-inset-bottom)))}.formgrid{grid-template-columns:1fr}.full{grid-column:auto}}
 @media(max-width:520px){.g4,.g3,.g2{grid-template-columns:1fr}.hero h1{font-size:var(--fs-7)}.card{padding:16px}.brand small{display:none}.brand{font-size:18px}#profileBadge{max-width:110px}}
 @page{size:A4 portrait;margin:10mm}
+.msdBtn{width:100%;display:flex;justify-content:space-between;align-items:center;background:var(--card2,#0f1b2a);color:inherit;border:1px solid var(--line,#26364a);border-radius:12px;padding:12px 14px;font:inherit;cursor:pointer;text-align:left}
+.msdPanel{margin-top:6px;border:1px solid var(--line,#26364a);border-radius:12px;background:var(--card,#0b1623);max-height:320px;overflow:auto;padding:6px 10px}
+.msdGroupLabel{font-size:var(--fs-1);font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);margin:10px 0 4px}
+.msdItem{display:flex!important;gap:10px;align-items:flex-start;padding:8px 2px;margin:0!important;font-weight:400!important;cursor:pointer}
+.msdItem input{width:auto!important;margin-top:3px;flex:none}
+.msdFoot{position:sticky;bottom:0;display:flex;gap:8px;justify-content:flex-end;padding:8px 0;background:var(--card,#0b1623)}
+.msdChips{margin-top:8px;display:flex;flex-wrap:wrap;gap:4px}
+.msdAdd{display:flex;gap:8px;margin:6px 0 4px}.msdAdd input{flex:1;min-width:0}
+.msdDel{background:none;border:0;color:var(--muted);font-size:18px;line-height:1;padding:0 6px;cursor:pointer}
 @media print{
 html,body{margin:0!important;padding:0!important;background:#fff!important;width:100%!important;height:auto!important;min-height:0!important;overflow:visible!important}
 body>*{display:none!important}
@@ -1382,12 +1391,74 @@ function sessionFormHtml(s,mode){
  ${drillPickerHtml("main")}
  <label class="full">Competitive / Game Block<textarea name="game">${esc(s.game||"")}</textarea></label>
  ${drillPickerHtml("game")}
- <label class="full">Coaching Cues<textarea name="cues">${esc(s.cues||"")}</textarea></label>
- <label class="full">Success Criteria<textarea name="success">${esc(s.success||"")}</textarea></label>
+ ${multiDropdownHtml("cueTags","Coaching Cues",CUE_PRESETS,s.cueTags)}
+${s.cues?`<input type="hidden" name="cues" value="${esc(s.cues)}"><div class="full muted" style="font-size:var(--fs-2);margin-top:-6px">Earlier notes kept: ${esc(s.cues)}</div>`:""}
+ ${multiDropdownHtml("successTags","Success Criteria",SUCCESS_PRESETS,s.successTags)}
+${s.success?`<input type="hidden" name="success" value="${esc(s.success)}"><div class="full muted" style="font-size:var(--fs-2);margin-top:-6px">Earlier notes kept: ${esc(s.success)}</div>`:""}
  <div class="full"><label style="margin-bottom:6px">Attachment (optional)</label><div class="muted" style="font-size:var(--fs-3);margin-bottom:8px">Upload a Word, Excel, PDF or image version of this session plan (under 2MB) — only if you have one.</div><input id="sessionAttachmentInput" type="file" accept=".doc,.docx,.xls,.xlsx,.pdf,image/*" onchange="handleSessionAttachment(this)"><div id="sessionAttachmentPreview" style="margin-top:8px"></div></div>
  <button class="btn primary">Save Session</button>
  ${mode==="new"?`<button type="button" class="btn secondary" style="margin-top:8px" onclick="saveAsTemplate()">Save as Template (without saving this session)</button>`:""}
  </form>`;
+}
+
+const CUE_PRESETS={
+ "Batting":["Watch the ball onto the bat","Head still, eyes level","Stable base — weight over front foot","Soft hands on defence","Early decision: forward or back","Full face of the bat through the line","Balance at the finish","Rotate the strike — look for ones"],
+ "Bowling":["Smooth, rhythmic run-up","Strong front-foot landing","Tall and still at release","Hit the top of off — line first","Follow through towards the target","Repeat the same action every ball","Vary pace with the same action"],
+ "Fielding":["Get low — ready position early","Watch the ball into the hands","Move through the ball","Soft hands, give with the catch","Quick transfer and release","Throw to the top of the stumps","Talk — call early and loud","Back up every throw"],
+ "Keeping":["Stay low until the ball passes the stumps","Watch the ball into the gloves","Move feet first, then hands","Give with the ball, take it late","Soft hands, fingers pointing down","Stand up/back based on pace"],
+ "Mindset & Team":["Positive body language","Next-ball focus","Clear communication","Pressure — breathe and reset","Back your plan","Encourage each other"]
+};
+const SUCCESS_PRESETS={
+ "Batting":["80%+ of balls middled or defended cleanly","Hit 8 of 10 balls along the ground","Dismissals under control: no more than 2 per net","Score at 6+ an over","Rotate strike on 40%+ of balls","Leave or defend every ball outside off stump"],
+ "Bowling":["60%+ of balls on the target line and length","6 of 10 balls in the target zone","Dot balls: 50% or more","No more than 1 wide or no-ball per over","Repeatable action — same landing spot","Take a wicket-ball in each spell"],
+ "Fielding":["Take 8 of 10 catches","Direct hit on 3 of 10 throws","Clean pick-up and throw under 3 seconds","Zero misfields in the final round","Every throw backed up"],
+ "Keeping":["Take 9 of 10 clean balls","Complete 2 stumpings or run-outs in a set","No byes in the session"],
+ "Session & Team":["Everyone engaged for the full session","Stay on time through all stations","Each player gets a set number of balls","Players can explain the session focus","Coach feedback logged for every player"]
+};
+function msdItemHtml(name,v,checked,custom){
+ return `<label class="msdItem"><input type="checkbox" name="${name}" value="${esc(v)}" ${checked?"checked":""} onchange="updateMsdCount('${name}')"> <span style="flex:1">${esc(v)}</span>${custom?`<button type="button" class="msdDel" title="Remove from my list" data-v="${esc(v)}" onclick="event.preventDefault();removeMsdCustom('${name}',this)">×</button>`:""}</label>`;
+}
+function msdCustomKey(name){return name==="cueTags"?"customCues":"customSuccess"}
+function multiDropdownHtml(name,label,presets,selected){
+ selected=selected||[];
+ let key=msdCustomKey(name);
+ let all=[].concat(...Object.values(presets));
+ let saved=(db.settings&&db.settings[key])||[];
+ let mine=saved.slice();selected.forEach(v=>{if(!all.includes(v)&&!mine.includes(v))mine.push(v)});
+ let groups=Object.keys(presets).map(g=>`<div class="msdGroup"><div class="msdGroupLabel">${esc(g)}</div>${presets[g].map(v=>msdItemHtml(name,v,selected.includes(v),false)).join("")}</div>`).join("");
+ let mineHtml=`<div class="msdGroup"><div class="msdGroupLabel">My own</div><div id="msdMine-${name}">${mine.map(v=>msdItemHtml(name,v,selected.includes(v),true)).join("")}</div><div class="msdAdd"><input type="text" id="msdNew-${name}" maxlength="120" placeholder="Add your own…" onkeydown="if(event.key==='Enter'){event.preventDefault();addMsdCustom('${name}')}"><button type="button" class="btn secondary" onclick="addMsdCustom('${name}')">Add</button></div></div>`;
+ return `<div class="full msd" id="msd-${name}"><label style="margin-bottom:6px">${esc(label)}</label><button type="button" class="msdBtn" onclick="toggleMsd('${name}')"><span id="msdCount-${name}">None selected</span><span class="msdCaret">▾</span></button><div class="msdPanel" id="msdPanel-${name}" style="display:none">${mineHtml}${groups}<div class="msdFoot"><button type="button" class="btn secondary" onclick="clearMsd('${name}')">Clear</button><button type="button" class="btn primary" onclick="toggleMsd('${name}')">Done</button></div></div><div class="msdChips" id="msdChips-${name}"></div></div>`;
+}
+function addMsdCustom(name){
+ let inp=document.getElementById("msdNew-"+name);if(!inp)return;
+ let v=inp.value.trim().replace(/\s+/g," ").slice(0,120);if(!v)return;
+ let box=document.getElementById("msdMine-"+name);
+ let existing=[...document.querySelectorAll('input[name="'+name+'"]')].find(cb=>cb.value.toLowerCase()===v.toLowerCase());
+ if(existing){existing.checked=true;updateMsdCount(name);inp.value="";return}
+ let key=msdCustomKey(name);
+ db.settings=db.settings||{};db.settings[key]=db.settings[key]||[];
+ db.settings[key].push(v);save();
+ box.insertAdjacentHTML("beforeend",msdItemHtml(name,v,true,true));
+ inp.value="";updateMsdCount(name);
+}
+function removeMsdCustom(name,btn){
+ let v=btn.dataset.v,key=msdCustomKey(name);
+ if(!confirm('Remove "'+v+'" from your own list? Sessions that already use it keep it.'))return;
+ if(db.settings&&db.settings[key]){db.settings[key]=db.settings[key].filter(x=>x!==v);save()}
+ btn.closest("label").remove();updateMsdCount(name);
+}
+function toggleMsd(name){let p=document.getElementById("msdPanel-"+name);if(!p)return;let open=p.style.display==="none";document.querySelectorAll(".msdPanel").forEach(x=>x.style.display="none");p.style.display=open?"block":"none"}
+function clearMsd(name){document.querySelectorAll('input[name="'+name+'"]').forEach(cb=>cb.checked=false);updateMsdCount(name)}
+function updateMsdCount(name){
+ let all=[...document.querySelectorAll('input[name="'+name+'"]')],on=all.filter(cb=>cb.checked);
+ let c=document.getElementById("msdCount-"+name),chips=document.getElementById("msdChips-"+name);
+ if(c)c.textContent=on.length?on.length+" selected":"None selected";
+ if(chips)chips.innerHTML=on.map(cb=>`<span class="tag" style="cursor:pointer" onclick="this.remove();document.querySelectorAll('input[name=&quot;${name}&quot;]').forEach(x=>{if(x.value===${esc(JSON.stringify(cb.value))})x.checked=false});updateMsdCount('${name}')">${esc(cb.value)} ×</span>`).join("");
+}
+function setMsd(name,vals){document.querySelectorAll('input[name="'+name+'"]').forEach(cb=>{cb.checked=(vals||[]).includes(cb.value)});updateMsdCount(name)}
+function tagListHtml(title,tags,text){
+ if(!(tags&&tags.length)&&!text)return"";
+ return `<h2>${esc(title)}</h2><div class="card">${(tags&&tags.length)?`<ul style="margin:0 0 ${text?"8px":"0"} 18px;padding:0">${tags.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`:""}${text?esc(text):""}</div>`;
 }
 function openSessionForm(existing,mode){
  sessionDrillLinks={main:existing&&existing.mainDrillIds?[...existing.mainDrillIds]:[],game:existing&&existing.gameDrillIds?[...existing.gameDrillIds]:[]};
@@ -1397,7 +1468,7 @@ function openSessionForm(existing,mode){
  editingSessionId=mode==="edit"?existing.id:null;
  modal(sessionFormHtml(existing,mode));
  renderDrillLinks("main");renderDrillLinks("game");renderSessionAttachmentPreview();renderNetPlanBuilder();
- updateFormSectionCount("attendance","marked present");updateFormSectionCount("objectiveTags","selected");
+ updateFormSectionCount("attendance","marked present");updateFormSectionCount("objectiveTags","selected");updateMsdCount("cueTags");updateMsdCount("successTags");
 }
 // --- Net Plan builder (Sets -> Nets, each with batters/bowlers/duration) ---
 // Mirrors how the coach already plans nets on paper: a Set is a rotation
@@ -1763,8 +1834,8 @@ function printSessionPlan(id){
   ${s.warmup?`<h2>Warm-up / Preparation</h2><div class="card">${esc(s.warmup)}</div>`:""}
   ${(s.main||mainDrills.length)?`<h2>Main Skill Block</h2>${(s.main||drillPrintMode==="names")?`<div class="card">${s.main?esc(s.main):""}${drillPrintMode==="names"?drillBlockHtml(mainDrills,"names"):""}</div>`:""}${drillPrintMode==="names"?"":drillBlockHtml(mainDrills,drillPrintMode)}`:""}
   ${(s.game||gameDrills.length)?`<h2>Competitive / Game Block</h2>${(s.game||drillPrintMode==="names")?`<div class="card">${s.game?esc(s.game):""}${drillPrintMode==="names"?drillBlockHtml(gameDrills,"names"):""}</div>`:""}${drillPrintMode==="names"?"":drillBlockHtml(gameDrills,drillPrintMode)}`:""}
-  ${s.cues?`<h2>Coaching Cues</h2><div class="card">${esc(s.cues)}</div>`:""}
-  ${s.success?`<h2>Success Criteria</h2><div class="card">${esc(s.success)}</div>`:""}
+  ${tagListHtml("Coaching Cues",s.cueTags,s.cues)}
+  ${tagListHtml("Success Criteria",s.successTags,s.success)}
   ${sessionAttachmentPrintHtml(s)}
  `;
  if(mainDrills.length||gameDrills.length){body=`<div class="noPrint" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px"><span class="muted" style="font-size:var(--fs-2)">Drill detail:</span>${[["compact","Diagram + coaching points"],["full","Full detail"],["names","Names only"]].map(([k,l])=>`<button type="button" class="btn ${drillPrintMode===k?"primary":"secondary"}" onclick="setDrillPrintMode('${id}','${k}')">${l}</button>`).join("")}</div>`+body}
@@ -1805,6 +1876,7 @@ function saveSession(e){
   s.attendees=fd.getAll("attendees");
  }
  s.objectiveTags=fd.getAll("objectiveTags");
+ s.cueTags=fd.getAll("cueTags");s.successTags=fd.getAll("successTags");
  delete s.squadTeam;delete s.squadCustom;
  s.mainDrillIds=[...sessionDrillLinks.main];
  s.gameDrillIds=[...sessionDrillLinks.game];
@@ -1819,7 +1891,7 @@ function saveSession(e){
   let weeks=repeatChecked?Math.max(2,Math.min(26,+document.getElementById("sessionRepeatWeeks").value||2)):1;
   let baseDate=s.date;
   for(let i=0;i<weeks;i++){
-   let copy={...s,attendees:[...(s.attendees||[])],objectiveTags:[...(s.objectiveTags||[])],mainDrillIds:[...(s.mainDrillIds||[])],gameDrillIds:[...(s.gameDrillIds||[])],netPlan:JSON.parse(JSON.stringify(s.netPlan||[]))};
+   let copy={...s,attendees:[...(s.attendees||[])],objectiveTags:[...(s.objectiveTags||[])],cueTags:[...(s.cueTags||[])],successTags:[...(s.successTags||[])],mainDrillIds:[...(s.mainDrillIds||[])],gameDrillIds:[...(s.gameDrillIds||[])],netPlan:JSON.parse(JSON.stringify(s.netPlan||[]))};
    copy.id=uid("sess");
    if(i>0){
     let d=new Date(baseDate+"T00:00:00Z");
@@ -1854,7 +1926,7 @@ function copyLastSessionPlan(){
  setVal("objectives",last.objectives);setVal("warmup",last.warmup);setVal("main",last.main);
  setVal("game",last.game);setVal("cues",last.cues);setVal("success",last.success);
  form.querySelectorAll('input[name="objectiveTags"]').forEach(cb=>{cb.checked=(last.objectiveTags||[]).includes(cb.value)});
- updateFormSectionCount("objectiveTags","selected");
+ updateFormSectionCount("objectiveTags","selected");setMsd("cueTags",last.cueTags);setMsd("successTags",last.successTags);
  sessionDrillLinks.main=[...(last.mainDrillIds||[])];
  sessionDrillLinks.game=[...(last.gameDrillIds||[])];
  renderDrillLinks("main");renderDrillLinks("game");
@@ -1872,7 +1944,7 @@ function applySessionTemplate(templateId){
  setVal("objectives",t.objectives);setVal("warmup",t.warmup);setVal("main",t.main);
  setVal("game",t.game);setVal("cues",t.cues);setVal("success",t.success);
  form.querySelectorAll('input[name="objectiveTags"]').forEach(cb=>{cb.checked=(t.objectiveTags||[]).includes(cb.value)});
- updateFormSectionCount("objectiveTags","selected");
+ updateFormSectionCount("objectiveTags","selected");setMsd("cueTags",t.cueTags);setMsd("successTags",t.successTags);
  sessionDrillLinks.main=[...(t.mainDrillIds||[])];
  sessionDrillLinks.game=[...(t.gameDrillIds||[])];
  renderDrillLinks("main");renderDrillLinks("game");
@@ -1890,7 +1962,7 @@ function saveAsTemplate(){
   duration:fd.get("duration")||"",focus:fd.get("focus")||"",venue:fd.get("venue")||"",
   objectives:fd.get("objectives")||"",objectiveTags:fd.getAll("objectiveTags"),
   warmup:fd.get("warmup")||"",main:fd.get("main")||"",game:fd.get("game")||"",
-  cues:fd.get("cues")||"",success:fd.get("success")||"",
+  cues:fd.get("cues")||"",success:fd.get("success")||"",cueTags:fd.getAll("cueTags"),successTags:fd.getAll("successTags"),
   mainDrillIds:[...sessionDrillLinks.main],gameDrillIds:[...sessionDrillLinks.game],
   netPlan:JSON.parse(JSON.stringify(sessionNetPlanDraft))
  };
@@ -5162,6 +5234,8 @@ function sessionSummaryText(s){
  if(s.objectiveTags&&s.objectiveTags.length)lines.push(`Objectives: ${s.objectiveTags.join(", ")}`);
  if(s.attendees&&s.attendees.length)lines.push(`Attendance (${s.attendees.length}): ${s.attendees.join(", ")}`);
  if(s.netPlan&&s.netPlan.length)lines.push(`Net Plan:\n${netPlanSummaryText(s.netPlan)}`);
+ if(s.cueTags&&s.cueTags.length)lines.push(`Coaching cues: ${s.cueTags.join("; ")}`);
+ if(s.successTags&&s.successTags.length)lines.push(`Success criteria: ${s.successTags.join("; ")}`);
  if(s.objectives)lines.push(`Notes: ${s.objectives}`);
  return lines.join("\n");
 }
@@ -5832,7 +5906,7 @@ function exportExcel(){
     netPlan:netPlanSummaryText(s.netPlan).replace(/\n/g,' | '),
     game:s.game,
     gameDrills:(s.gameDrillIds||[]).map(id=>{let d=db.drills.find(x=>x.id===id);return d?d.name:null}).filter(Boolean).join('; '),
-    cues:s.cues,success:s.success,
+    cues:[...(s.cueTags||[]),...(s.cues?[s.cues]:[])].join("; "),success:[...(s.successTags||[]),...(s.success?[s.success]:[])].join("; "),
     attachment:s.attachment?s.attachment.name:'No'
   })),
   Players:db.players,
@@ -6746,7 +6820,7 @@ function globalSearchResultsHtml(){
  let q=globalSearchQuery.trim().toLowerCase();
  if(!q)return `<div class="muted">Start typing to search sessions, players, drills, assessments, matches and calendar events.</div>`;
  let hit=v=>String(v||"").toLowerCase().includes(q);
- let sessionHits=activeSessions().filter(s=>[s.title,s.squad,s.focus,s.venue,s.objectives,...(s.objectiveTags||[]),s.warmup,s.main,s.game,s.cues,s.success,s.attachment&&s.attachment.name,...(s.mainDrillIds||[]).map(id=>{let d=db.drills.find(x=>x.id===id);return d&&d.name}),...(s.gameDrillIds||[]).map(id=>{let d=db.drills.find(x=>x.id===id);return d&&d.name})].some(hit));
+ let sessionHits=activeSessions().filter(s=>[s.title,s.squad,s.focus,s.venue,s.objectives,...(s.objectiveTags||[]),s.warmup,s.main,s.game,s.cues,s.success,...(s.cueTags||[]),...(s.successTags||[]),s.attachment&&s.attachment.name,...(s.mainDrillIds||[]).map(id=>{let d=db.drills.find(x=>x.id===id);return d&&d.name}),...(s.gameDrillIds||[]).map(id=>{let d=db.drills.find(x=>x.id===id);return d&&d.name})].some(hit));
  let reflectionHits=db.reflections.filter(r=>reflectionSearchableText(r).some(hit));
  let playerHits=db.players.filter(p=>[p.name,p.team,p.group,p.role,p.strengths,p.areas,p.focus,p.notes].some(hit));
  let drillHits=db.drills.filter(d=>[d.name,d.cat,d.equipment,d.points,d.progressions,d.regressions].some(hit));
