@@ -1056,16 +1056,35 @@ function computeSuggestions(){
  return suggestions;
 }
 function coachingActivityScore(){
- let ratings=db.assessments.map(a=>Number(assessmentAvg(a))).filter(Number.isFinite);
+ // Four parts, each 0-100, averaged. Parts that cannot apply yet (e.g. no sessions to reflect on) are left out rather than scored as zero.
+ let players=activePlayers(),names=new Set(players.map(p=>p.name));
+ // 1. Assessment quality: average rating (1-5 scale, x20) across assessments of players still on the roster.
+ let ratings=db.assessments.filter(a=>names.has(a.player)).map(a=>Number(assessmentAvg(a))).filter(Number.isFinite);
  let teamAvg=ratings.length?ratings.reduce((a,b)=>a+b,0)/ratings.length:0;
- let weeks=[0,1,2,3].map(w=>{let end=new Date();end.setDate(end.getDate()-w*7);let start=new Date(end);start.setDate(start.getDate()-7);let sk=start.toISOString().slice(0,10),ek=end.toISOString().slice(0,10);return activeSessions().some(s=>s.date>=sk&&s.date<=ek)});
- let sessionConsistency=weeks.filter(Boolean).length/4*100;
- let coverage=activePlayers().length?activePlayers().filter(p=>db.assessments.some(a=>a.player===p.name)).length/activePlayers().length*100:0;
- let last30=[...Array(30)].map((_,i)=>{let d=new Date();d.setDate(d.getDate()-i);return d.toISOString().slice(0,10)});
- let reflectDays=last30.filter(d=>db.reflections.some(r=>r.date===d)).length;
- let reflectionConsistency=reflectDays/30*100;
- let composite=Math.round((teamAvg*20+sessionConsistency+coverage+reflectionConsistency)/4);
- return{composite,teamAvg,sessionConsistency,coverage,reflectionConsistency};
+ // 2. Session consistency: last 4 calendar weeks (this week + 3 before). Each week scores held sessions + matches
+ //    against your weekly goal (1 if none set). A week still in progress is only counted once it has met the goal.
+ let goal=Math.max(1,Number(db.settings&&db.settings.weeklySessionGoal)||1);
+ let t0=today();
+ let weekScores=[];
+ for(let w=0;w<4;w++){
+  let ws=weekStart(w),we=weekEnd(w);
+  let n=activeSessions().filter(s=>s.date>=ws&&s.date<=we&&s.date<=t0).length+db.matches.filter(m=>m.date>=ws&&m.date<=we&&m.date<=t0).length;
+  let sc=Math.min(1,n/goal);
+  if(w===0&&sc<1)continue; // current week not finished yet — no penalty
+  weekScores.push(sc);
+ }
+ let sessionConsistency=weekScores.length?weekScores.reduce((a,b)=>a+b,0)/weekScores.length*100:0;
+ // 3. Assessment coverage: share of active players with at least one assessment.
+ let coverage=players.length?players.filter(p=>db.assessments.some(a=>a.player===p.name)).length/players.length*100:0;
+ // 4. Reflection consistency: of sessions and matches held in the last 30 days, how many have a reflection.
+ let cut=new Date();cut.setDate(cut.getDate()-30);let cutKey=cut.toISOString().slice(0,10);
+ let held=activeSessions().filter(s=>s.date>=cutKey&&s.date<=t0).map(s=>({k:"sessionId",id:s.id})).concat(db.matches.filter(m=>m.date>=cutKey&&m.date<=t0).map(m=>({k:"matchId",id:m.id})));
+ let reflected=held.filter(h=>db.reflections.some(r=>r[h.k]===h.id)).length;
+ let reflectionConsistency=held.length?reflected/held.length*100:null;
+ let parts=[teamAvg*20,sessionConsistency,coverage];
+ if(reflectionConsistency!==null)parts.push(reflectionConsistency);
+ let composite=Math.round(parts.reduce((a,b)=>a+b,0)/parts.length);
+ return{composite,teamAvg,sessionConsistency,coverage,reflectionConsistency:reflectionConsistency===null?0:reflectionConsistency,goal};
 }
 function scoreCaption(s){if(s>=85)return"Excellent work! Keep it up.";if(s>=60)return"Good progress — stay consistent.";if(s>=30)return"Building momentum — keep logging.";return"Let's get started — log a session or reflection."}
 function scoreRingSvg(score,size){size=size||100;let r=44,c=2*Math.PI*r,offset=c*(1-Math.min(score,100)/100);return `<svg viewBox="0 0 100 100" width="${size}" height="${size}"><circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--line)" stroke-width="9"/><circle cx="50" cy="50" r="${r}" fill="none" stroke="var(--g)" stroke-width="9" stroke-linecap="round" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}" transform="rotate(-90 50 50)"/></svg>`}
