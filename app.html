@@ -3093,6 +3093,8 @@ const FIELD_TOOLS=[
  {id:"target",label:"Target"},
  {id:"ball",label:"Ball"},
  {id:"stumps",label:"Stumps"},
+ {id:"katchet",label:"Katchet Board"},
+ {id:"pugg",label:"Pugg Net"},
  {id:"arrowBall",label:"Ball →"},
  {id:"arrowPlayer",label:"Player →"},
  {id:"tagArrow",label:"Tag Arrow"}
@@ -3109,6 +3111,9 @@ function fieldToolIconSvg(id){
  if(id==="gate")return `<svg width="20" height="20" viewBox="0 0 24 24"><polygon points="6,8 2,20 10,20" fill="#f97316" stroke="#5c2c06" stroke-width="1.1"/><polygon points="18,8 14,20 22,20" fill="#f97316" stroke="#5c2c06" stroke-width="1.1"/></svg>`;
  if(id==="target")return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#2ecc71" stroke-width="1.6" stroke-dasharray="3 2"/><circle cx="12" cy="12" r="2" fill="#2ecc71"/></svg>`;
  if(id==="ball")return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5" fill="#c0392b" stroke="#3d0f0a" stroke-width="1.2"/></svg>`;
+
+ if(id==="katchet")return `<svg width="20" height="20" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2" fill="#f97316" stroke="#5c2c06" stroke-width="1.2"/><path d="M5 9.5h14M5 12h14M5 14.5h14" stroke="#5c2c06" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="2.2 1.6"/></svg>`;
+ if(id==="pugg")return `<svg width="20" height="20" viewBox="0 0 24 24"><defs><clipPath id="puggIc"><path d="M3 19V10Q3 4.5 12 4.5Q21 4.5 21 10V19Z"/></clipPath></defs><path d="M3 19V10Q3 4.5 12 4.5Q21 4.5 21 10V19Z" fill="rgba(226,232,240,0.3)" stroke="#1e293b" stroke-width="1.6"/><path d="M-2 19L16 4M3 19L21 4M8 19L26 4M-2 4L16 19M3 4L21 19M8 4L26 19" clip-path="url(#puggIc)" stroke="#64748b" stroke-width="0.8"/><line x1="3" y1="19" x2="21" y2="19" stroke="#f97316" stroke-width="2" stroke-linecap="round"/></svg>`;
  if(id==="stumps"){
   let sw=1.6,sh=13,gap=4.2,x1=12-gap,x2=12,x3=12+gap,topY=12-6.5;
   return `<svg width="20" height="20" viewBox="0 0 24 24">
@@ -3150,8 +3155,8 @@ function fieldMarkerSvg(m,opts){
   return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><ellipse cx="${m.x}" cy="${m.y}" rx="${r*xComp}" ry="${r}" fill="#f2994a" stroke="#3d2410" stroke-width="0.45"/>${textWrap(m.x,`<text x="${m.x}" y="${m.y+0.65*k}" text-anchor="middle" font-size="${fs}" font-weight="800" fill="#2b1200" font-family="Poppins,sans-serif">${esc(m.label||"C")}</text>`)}</g>`;
  }
  if(m.type==="cone"){
-  let numHtml=m.label?textWrap(m.x,`<text x="${m.x}" y="${m.y+2.75}" text-anchor="middle" font-size="1.5" font-weight="700" fill="#f4f1e8" font-family="Poppins,sans-serif">${esc(m.label)}</text>`):"";
-  return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><polygon points="${m.x},${m.y-1.9} ${m.x-1.65*xComp},${m.y+1.5} ${m.x+1.65*xComp},${m.y+1.5}" fill="#f97316" stroke="#5c2c06" stroke-width="0.35"/>${numHtml}</g>`;
+  let numHtml=m.label?textWrap(m.x,`<text x="${m.x}" y="${m.y+2.2}" text-anchor="middle" font-size="1.3" font-weight="700" fill="#f4f1e8" font-family="Poppins,sans-serif">${esc(m.label)}</text>`):"";
+  return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><polygon points="${m.x},${m.y-1.35} ${m.x-1.15*xComp},${m.y+1.05} ${m.x+1.15*xComp},${m.y+1.05}" fill="#f97316" stroke="#5c2c06" stroke-width="0.28"/>${numHtml}</g>`;
  }
  if(m.type==="wk"){
   let r=2.5*k,fs=1.3*k;
@@ -3162,11 +3167,11 @@ function fieldMarkerSvg(m,opts){
   // "run/throw through here" gate a lot of fielding drills use. One placeable
   // unit (drag moves both cones together) rather than two separate markers.
   let gap=4*xComp,leftX=m.x-gap,rightX=m.x+gap;
-  let numHtml=m.label?textWrap(m.x,`<text x="${m.x}" y="${m.y+2.75}" text-anchor="middle" font-size="1.4" font-weight="700" fill="#f4f1e8" font-family="Poppins,sans-serif">${esc(m.label)}</text>`):"";
+  let numHtml=m.label?textWrap(m.x,`<text x="${m.x}" y="${m.y+2.1}" text-anchor="middle" font-size="1.2" font-weight="700" fill="#f4f1e8" font-family="Poppins,sans-serif">${esc(m.label)}</text>`):"";
   return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer">
-   <polygon points="${leftX},${m.y-1.5} ${leftX-1.3*xComp},${m.y+1.2} ${leftX+1.3*xComp},${m.y+1.2}" fill="#f97316" stroke="#5c2c06" stroke-width="0.3"/>
-   <polygon points="${rightX},${m.y-1.5} ${rightX-1.3*xComp},${m.y+1.2} ${rightX+1.3*xComp},${m.y+1.2}" fill="#f97316" stroke="#5c2c06" stroke-width="0.3"/>
-   <line x1="${leftX}" y1="${m.y+1.2}" x2="${rightX}" y2="${m.y+1.2}" stroke="#f97316" stroke-width="0.25" stroke-dasharray="0.6 0.5"/>
+   <polygon points="${leftX},${m.y-1.05} ${leftX-0.9*xComp},${m.y+0.85} ${leftX+0.9*xComp},${m.y+0.85}" fill="#f97316" stroke="#5c2c06" stroke-width="0.24"/>
+   <polygon points="${rightX},${m.y-1.05} ${rightX-0.9*xComp},${m.y+0.85} ${rightX+0.9*xComp},${m.y+0.85}" fill="#f97316" stroke="#5c2c06" stroke-width="0.24"/>
+   <line x1="${leftX}" y1="${m.y+0.85}" x2="${rightX}" y2="${m.y+0.85}" stroke="#f97316" stroke-width="0.2" stroke-dasharray="0.6 0.5"/>
    ${numHtml}
   </g>`;
  }
@@ -3175,6 +3180,18 @@ function fieldMarkerSvg(m,opts){
   return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><ellipse cx="${m.x}" cy="${m.y}" rx="${r*xComp}" ry="${r}" fill="rgba(46,204,113,0.18)" stroke="#2ecc71" stroke-width="0.5" stroke-dasharray="1 0.7"/><ellipse cx="${m.x}" cy="${m.y}" rx="${0.6*xComp}" ry="0.6" fill="#2ecc71"/>${m.label?textWrap(m.x,`<text x="${m.x}" y="${m.y-r-0.8}" text-anchor="middle" font-size="1.5" font-weight="700" fill="#2ecc71" font-family="Poppins,sans-serif">${esc(m.label)}</text>`):""}</g>`;
  }
  if(m.type==="ball")return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><ellipse cx="${m.x}" cy="${m.y}" rx="${1.4*xComp}" ry="1.4" fill="#c0392b" stroke="#3d0f0a" stroke-width="0.35"/></g>`;
+
+ if(m.type==="katchet"){
+  let w=3.6*xComp,h=2.3,x0=m.x-w,y0=m.y-h/2;
+  return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><rect x="${x0}" y="${y0}" width="${w*2}" height="${h}" rx="0.45" fill="#f97316" stroke="#5c2c06" stroke-width="0.3"/><path d="M${x0+0.7*xComp} ${m.y-0.55}H${m.x+w-0.7*xComp}M${x0+0.7*xComp} ${m.y}H${m.x+w-0.7*xComp}M${x0+0.7*xComp} ${m.y+0.55}H${m.x+w-0.7*xComp}" stroke="#5c2c06" stroke-width="0.22" stroke-linecap="round" stroke-dasharray="0.7 0.5"/></g>`;
+ }
+ if(m.type==="pugg"){
+  // Ball-collection net: open front (bottom), curved mesh back. Light mesh with a dark outline so it reads on the green.
+  let w=3.6*xComp,h=3.4,x0=m.x-w,x1=m.x+w,yb=m.y+h/2,yt=m.y-h/2,cid="pg"+String(m.id).replace(/[^a-z0-9]/gi,"");
+  let d=`M${x0} ${yb}V${yt+h*0.45}Q${x0} ${yt} ${m.x} ${yt}Q${x1} ${yt} ${x1} ${yt+h*0.45}V${yb}Z`;
+  let mesh="";for(let k=-5;k<=5;k++){mesh+=`M${m.x+k*w*0.38-h} ${yb}L${m.x+k*w*0.38+h} ${yt}M${m.x+k*w*0.38+h} ${yb}L${m.x+k*w*0.38-h} ${yt}`}
+  return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><clipPath id="${cid}"><path d="${d}"/></clipPath><path d="${d}" fill="rgba(248,250,252,0.30)" stroke="#0f172a" stroke-width="0.7"/><path d="${mesh}" clip-path="url(#${cid})" stroke="#f8fafc" stroke-width="0.14" fill="none"/><path d="${d}" fill="none" stroke="#f8fafc" stroke-width="0.34"/><line x1="${x0}" y1="${yb}" x2="${x1}" y2="${yb}" stroke="#f97316" stroke-width="0.55" stroke-linecap="round"/></g>`;
+ }
  if(m.type==="stumps"){
   let sw=0.45*xComp,sh=3.2,gap=1.1*xComp,x1=m.x-gap,x2=m.x,x3=m.x+gap,topY=m.y-1.7;
   return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer">
@@ -3988,7 +4005,7 @@ function duplicateDrill(id){
 // step/shape of the drill being edited and turns that into a suggested
 // "Equipment needed" line — e.g. "4 cones, 2 stumps, 1 target". It fills the
 // field rather than silently overwriting whatever the coach already typed.
-const FIELD_EQUIPMENT_LABELS={cone:"cone",gate:"cone gate",stumps:"stumps",target:"target",ball:"ball",wk:"keeper"};
+const FIELD_EQUIPMENT_LABELS={cone:"cone",gate:"cone gate",stumps:"stumps",katchet:"katchet board",pugg:"Pugg net",target:"target",ball:"ball",wk:"keeper"};
 function tallyFieldEquipment(){
  let counts={};
  let add=(label,n)=>{counts[label]=(counts[label]||0)+n};
@@ -4008,7 +4025,7 @@ function tallyFieldEquipment(){
 function suggestDrillEquipment(){
  let counts=tallyFieldEquipment();
  let parts=Object.keys(counts).map(label=>`${counts[label]} ${label}${counts[label]>1&&!label.endsWith("s")?"s":""}`);
- if(!parts.length){alert("No cones, stumps, targets or gates placed on the diagram yet — add some markers first, or type equipment in manually.");return}
+ if(!parts.length){alert("No cones, stumps, boards, nets, targets or gates placed on the diagram yet — add some markers first, or type equipment in manually.");return}
  let input=document.querySelector('.modal.open input[name="equipment"]');
  if(!input)return;
  let suggestion=parts.join(", ");
