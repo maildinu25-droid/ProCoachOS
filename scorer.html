@@ -11,8 +11,8 @@
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@600;700;800&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
   *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
-  html,body{margin:0;min-height:100%;background:#0a1420}
-  #app,#sheet{--bg:#0a1420;--card:#111d30;--card2:#16253c;--line:rgba(255,255,255,.08);--accent:#22c58b;--accent-dim:rgba(34,197,139,.15);--gold:#e0ab2c;--blue:#3d8bd6;--text:#eef2f6;--dim:#8b96a5;--danger:#ff6b52;--purple:#b98ce0;
+  html,body{margin:0;min-height:100%;background:var(--bg)}
+  :root,#app,#sheet{--on-accent:#04140d;--blue-t:#8cc0f2;--sheet-bg:#0f1a2b;--tabs-bg:rgba(10,20,32,.97);--sb-bg:linear-gradient(160deg,#173d20,#0f2a1a 60%,#111d30);--sb-bd:rgba(34,197,139,.25);--sb-tn:#9fd9bc;--sb-ov:#bfe9d3;--sb-ctx:#d3efe1;--sb-ctx2:#8fb8a3;--ball-bg:#33445f;--ball-fg:#fff;--dot-bg:#56677f;--dot-fg:#fff;--dot-bd:#9fb2c8;--shadow:none;--bg:#0a1420;--card:#111d30;--card2:#16253c;--line:rgba(255,255,255,.08);--accent:#22c58b;--accent-dim:rgba(34,197,139,.15);--gold:#e0ab2c;--blue:#3d8bd6;--text:#eef2f6;--dim:#8b96a5;--danger:#ff6b52;--purple:#b98ce0;
     font-family:'Inter',sans-serif;color:var(--text)}
   #app{background:var(--bg);min-height:100vh;max-width:640px;margin:0 auto;padding:10px 10px 92px;padding-top:18px;padding-top:calc(10px + max(8px,constant(safe-area-inset-top)));padding-top:calc(10px + max(8px,env(safe-area-inset-top)))}
   h1,h2,h3{font-family:'Poppins',sans-serif;margin:0}
@@ -21,8 +21,8 @@
   .hdr .ttl{font-family:'Poppins',sans-serif;font-weight:800;font-size:18px;color:var(--accent);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .hdr .sub{font-size:10px;letter-spacing:.12em;text-transform:uppercase;color:var(--dim);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .ib{background:var(--card);border:1px solid var(--line);color:var(--text);border-radius:12px;min-width:40px;height:40px;font-size:17px;cursor:pointer;font-family:inherit;font-weight:700}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:10px}
-  .btn{background:var(--accent);color:#04140d;border:0;border-radius:12px;padding:12px 16px;font-weight:800;font-family:'Poppins',sans-serif;font-size:13.5px;cursor:pointer;min-height:44px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:12px;margin-bottom:10px;box-shadow:var(--shadow)}
+  .btn{background:var(--accent);color:var(--on-accent);border:0;border-radius:12px;padding:12px 16px;font-weight:800;font-family:'Poppins',sans-serif;font-size:13.5px;cursor:pointer;min-height:44px}
   .btn.sec{background:var(--card2);color:var(--text);border:1px solid var(--line);font-weight:700}
   .btn.danger{background:rgba(255,107,82,.14);color:var(--danger);border:1px solid rgba(255,107,82,.4)}
   .btn.full{width:100%}.btn.sm{padding:7px 11px;min-height:34px;font-size:12px;border-radius:10px}
@@ -40,12 +40,12 @@
   .chip.red.on{background:rgba(255,107,82,.16);color:var(--danger);border-color:var(--danger)}
   .seg{display:flex;gap:6px;flex-wrap:wrap}
   /* scoreboard */
-  .sb{background:linear-gradient(160deg,#173d20,#0f2a1a 60%,#111d30);border:1px solid rgba(34,197,139,.25);border-radius:18px;padding:14px;margin-bottom:10px}
-  .sb .tn{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:#9fd9bc;font-weight:700}
+  .sb{background:var(--sb-bg);border:1px solid var(--sb-bd);border-radius:18px;padding:14px;margin-bottom:10px}
+  .sb .tn{font-size:11px;letter-spacing:.1em;text-transform:uppercase;color:var(--sb-tn);font-weight:700}
   .sb .big{font-family:'Poppins',sans-serif;font-weight:800;font-size:40px;line-height:1.05;letter-spacing:-.02em}
-  .sb .ov{font-family:'IBM Plex Mono',monospace;font-size:14px;color:#bfe9d3;margin-left:6px}
-  .sb .ctx{font-size:12.5px;color:#d3efe1;margin-top:4px;font-weight:600}
-  .sb .ctx2{font-size:11px;color:#8fb8a3;margin-top:2px}
+  .sb .ov{font-family:'IBM Plex Mono',monospace;font-size:14px;color:var(--sb-ov);margin-left:6px}
+  .sb .ctx{font-size:12.5px;color:var(--sb-ctx);margin-top:4px;font-weight:600}
+  .sb .ctx2{font-size:11px;color:var(--sb-ctx2);margin-top:2px}
   table{width:100%;border-collapse:collapse}
   th{font-size:10px;text-transform:uppercase;letter-spacing:.06em;color:var(--dim);text-align:right;font-weight:700;padding:5px 4px}
   th:first-child,td:first-child{text-align:left}
@@ -56,18 +56,18 @@
   tr.strike td .nm::after{content:" *";color:var(--accent)}
   tr.strike td{background:rgba(34,197,139,.06)}
   .balls{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0 2px}
-  .ball{min-width:38px;height:38px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;background:#33445f;color:#fff;padding:0 6px;font-family:'IBM Plex Mono',monospace}
-  .ball.r4{background:var(--blue);color:#fff}.ball.r6{background:var(--gold);color:#241a00}.ball.w{background:var(--danger);color:#fff}.ball.x{background:var(--purple);color:#1d0f2e}.ball.d{background:#56677f;color:#fff;border:2px solid #9fb2c8}
+  .ball{min-width:38px;height:38px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;font-size:16px;font-weight:800;background:var(--ball-bg);color:var(--ball-fg);padding:0 6px;font-family:'IBM Plex Mono',monospace}
+  .ball.r4{background:var(--blue);color:#fff}.ball.r6{background:var(--gold);color:#241a00}.ball.w{background:var(--danger);color:#fff}.ball.x{background:var(--purple);color:#1d0f2e}.ball.d{background:var(--dot-bg);color:var(--dot-fg);border:2px solid var(--dot-bd)}
   .pad{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:8px}
   .pad button{height:58px;border-radius:14px;border:1px solid var(--line);background:var(--card2);color:var(--text);font-size:20px;font-weight:800;font-family:'Poppins',sans-serif;cursor:pointer}
   .pad button:active{transform:scale(.96)}
-  .pad .r4{background:rgba(61,139,214,.22);color:#8cc0f2;border-color:rgba(61,139,214,.5)}
+  .pad .r4{background:rgba(61,139,214,.22);color:var(--blue-t);border-color:rgba(61,139,214,.5)}
   .pad .r6{background:rgba(224,171,44,.2);color:var(--gold);border-color:rgba(224,171,44,.5)}
   .pad .ex{background:rgba(185,140,224,.14);color:var(--purple);font-size:15px;border-color:rgba(185,140,224,.4)}
   .pad .wk{background:rgba(255,107,82,.2);color:var(--danger);border-color:rgba(255,107,82,.55);font-size:16px}
   .pad .ut{font-size:13px;color:var(--dim)}
   .pad.off{opacity:.35;pointer-events:none}
-  .tabs{position:fixed;left:0;right:0;bottom:0;background:rgba(10,20,32,.97);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px 8px max(8px,env(safe-area-inset-bottom));z-index:20}
+  .tabs{position:fixed;left:0;right:0;bottom:0;background:var(--tabs-bg);border-top:1px solid var(--line);display:flex;justify-content:center;padding:6px 8px max(8px,env(safe-area-inset-bottom));z-index:20}
   .tabs .in2{display:flex;width:100%;max-width:640px;gap:6px}
   .tabs button{flex:1;background:transparent;border:0;color:var(--dim);font-weight:700;font-size:12px;padding:9px 4px;border-radius:10px;font-family:inherit;cursor:pointer}
   .tabs button.on{background:var(--accent-dim);color:var(--accent)}
@@ -76,20 +76,46 @@
   /* sheet */
   #sheet{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:50;display:none;align-items:flex-end;justify-content:center}
   #sheet.show{display:flex}
-  .sh{overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:#0f1a2b;border-radius:20px 20px 0 0;border:1px solid var(--line);width:100%;max-width:640px;max-height:90vh;overflow:auto;padding:16px 14px max(18px,env(safe-area-inset-bottom))}
+  .sh{overscroll-behavior:contain;-webkit-overflow-scrolling:touch;background:var(--sheet-bg);border-radius:20px 20px 0 0;border:1px solid var(--line);width:100%;max-width:640px;max-height:90vh;overflow:auto;padding:16px 14px max(18px,env(safe-area-inset-bottom))}
   .sh h3{font-size:16px;margin-bottom:4px}
   .pl{display:flex;align-items:center;gap:8px;padding:10px;border:1px solid var(--line);border-radius:12px;margin-bottom:6px;background:var(--card2);cursor:pointer}
   .pl.on{border-color:var(--accent);background:var(--accent-dim)}
   .pl .n{flex:1;min-width:0;font-weight:700;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
   .pl .m{font-size:11px;color:var(--dim)}
   .pl.off{opacity:.4;pointer-events:none}
-  .stick{position:sticky;bottom:-18px;background:#0f1a2b;padding:10px 0 4px;margin-top:10px!important}
+  .stick{position:sticky;bottom:-18px;background:var(--sheet-bg);padding:10px 0 4px;margin-top:10px!important}
   .mini.role{width:auto;padding:0 7px;font-size:11px;font-weight:800}.mini.role.on{background:var(--accent-dim);color:var(--accent);border-color:var(--accent)}
   .mini{background:var(--card);border:1px solid var(--line);color:var(--dim);border-radius:8px;width:32px;height:32px;font-size:14px;cursor:pointer;font-family:inherit}
   .res{font-family:'Poppins',sans-serif;font-weight:800;font-size:18px}
   #print-report{display:none}
+  /* ---- light theme (sunlight friendly) ---- */
+  html[data-theme=light],html[data-theme=light] #app,html[data-theme=light] #sheet{--bg:#f3f6f9;--card:#ffffff;--card2:#eaf0f5;--line:rgba(10,30,50,.2);--accent:#0a7d52;--accent-dim:rgba(10,125,82,.13);--gold:#8a5a00;--blue:#1b62b3;--text:#0a1520;--dim:#43546a;--danger:#c2301a;--purple:#6c35ad;
+    --on-accent:#ffffff;--blue-t:#164f93;--sheet-bg:#ffffff;--tabs-bg:rgba(255,255,255,.98);--sb-bg:linear-gradient(160deg,#dff3e8,#cdeadb);--sb-bd:rgba(10,125,82,.45);--sb-tn:#0a6b45;--sb-ov:#27553f;--sb-ctx:#0f3a28;--sb-ctx2:#3f6a55;
+    --ball-bg:#4a5b72;--ball-fg:#fff;--dot-bg:#ffffff;--dot-fg:#0a1520;--dot-bd:#0a1520;--shadow:0 1px 3px rgba(10,30,50,.12)}
+  html[data-theme=light] body::before{content:"";position:fixed;top:0;left:0;right:0;height:env(safe-area-inset-top);background:#0a1420;z-index:100}
+  html[data-theme=light] #sheet{background:rgba(10,20,32,.45)}
+  html[data-theme=light] .chip{color:#2b3b4f;border-color:rgba(10,30,50,.3)}
+  html[data-theme=light] .chip.on{color:var(--accent);border-color:var(--accent);background:var(--accent-dim)}
+  html[data-theme=light] .ball.r6{color:#2a1c00}
+  html[data-theme=light] .ball.x{background:#c9a8ee;color:#2a1050}
+  html[data-theme=light] .pad button{border-color:rgba(10,30,50,.28);color:#0a1520}
+  html[data-theme=light] .pad .r4{background:rgba(27,98,179,.14);border-color:rgba(27,98,179,.6)}
+  html[data-theme=light] .pad .r6{background:rgba(190,130,0,.17);border-color:rgba(160,105,0,.7);color:#7a4f00}
+  html[data-theme=light] .pad .ex{background:rgba(108,53,173,.1);border-color:rgba(108,53,173,.5);color:#5a2a95}
+  html[data-theme=light] .pad .wk{background:rgba(194,48,26,.12);border-color:rgba(194,48,26,.65);color:#b02511}
+  html[data-theme=light] .btn.danger{background:rgba(194,48,26,.1);color:#b02511;border-color:rgba(194,48,26,.5)}
+  html[data-theme=light] .banner{background:rgba(190,130,0,.12);border-color:rgba(160,105,0,.55)}
+  html[data-theme=light] .banner.ok{background:var(--accent-dim);border-color:rgba(10,125,82,.55)}
+  html[data-theme=light] tr.strike td{background:rgba(10,125,82,.1)}
+  html[data-theme=light] .chip.gold.on{background:rgba(190,130,0,.14)}
+  html[data-theme=light] .chip.red.on{background:rgba(194,48,26,.12)}
+  html[data-theme=light] input[type=date]{color-scheme:light}
+
   @media print{#app,#sheet,.tabs{display:none!important}#print-report{display:block;color:#000;background:#fff;font-family:Arial,sans-serif;font-size:12px;white-space:pre-wrap;font-family:'Courier New',monospace}html,body{background:#fff}}
 </style>
+<script>
+(function(){var t=null;try{t=localStorage.getItem("scorer_theme")}catch(e){}if(t!=="dark"&&t!=="light")t="light";document.documentElement.setAttribute("data-theme",t)})();
+</script>
 <script>
 function isPremiumUser(){
   var keys=["coachbook_license"];
@@ -472,14 +498,15 @@ function renderHome(){
     var MS=matchState(m),res=resultOf(m,MS);
     return '<div class="card"><div class="row"><div class="grow"><div style="font-weight:800">'+esc(m.teams[0].name)+' v '+esc(m.teams[1].name)+'</div><div class="dim small">'+esc(fmtDate(m.date))+(m.venue?' · '+esc(m.venue):'')+(m.mode==="intra"?' · Intra-squad':'')+(m.settings.pairs?' · Pairs':'')+'</div></div>'+
       (m.handedOver?'<span class="chip gold on" style="cursor:default">Handed over</span>':m.status==="completed"?'<span class="chip on" style="cursor:default">'+(m.imported?'In Match Centre':'Completed')+'</span>':(!m.toss?'<span class="chip" style="cursor:default">Upcoming</span>':'<span class="chip gold on" style="cursor:default">Live</span>'))+'</div>'+
-      '<div class="small mono" style="margin:8px 0 2px;color:#cfe0ee">'+(!m.toss?m.teams[0].players.length+' v '+m.teams[1].players.length+' players · toss not done':(matchLine(m)||'No innings yet'))+'</div>'+
+      '<div class="small mono" style="margin:8px 0 2px;color:var(--text)">'+(!m.toss?m.teams[0].players.length+' v '+m.teams[1].players.length+' players · toss not done':(matchLine(m)||'No innings yet'))+'</div>'+
       (res?'<div class="small" style="color:var(--accent);font-weight:700">'+esc(res.text)+'</div>':'')+
       '<div class="row" style="margin-top:10px"><button class="btn sm grow" onclick="openMatch(\''+m.id+'\')">'+(m.status==="completed"?'View':!m.toss?'Toss &amp; start':'Resume')+'</button>'+(!m.toss&&!m.handedOver&&!D.guest?'<button class="btn sec sm" onclick="editMatchSetup(\''+m.id+'\')">Edit</button>':'')+(!m.handedOver&&m.status!=="completed"?'<button class="btn sec sm" onclick="handOver(D.matches.find(function(x){return x.id===\''+m.id+'\'}))">'+(D.guest?'Send back':'Hand over')+'</button>':'')+'<button class="btn sm danger" onclick="delMatchUI(\''+m.id+'\')">Delete</button></div></div>';
   }
   $("app").innerHTML=
     '<div class="hdr">'+(D.guest?'':'<a href="app.html" class="ib" style="display:inline-flex;align-items:center;justify-content:center;text-decoration:none">←</a>')+'<div class="t"><div class="ttl">Match Scorer</div><div class="sub">Test · Multi-day · Practice matches</div></div></div>'+
     (D.guest?'<div class="card dim small">You are scoring as a guest. Matches handed to you open here. To score your own matches, get ProCoach OS at procoachos.in.</div>':'<button class="btn full" style="margin-bottom:12px" onclick="newMatch()">+ New Match</button>')+
-    '<button class="btn sec full" style="margin-bottom:12px" onclick="pickFile()">Open a match file</button>'+
+    '<button class="btn sec full" style="margin-bottom:12px" onclick="pickFile()">Open a match or backup file</button>'+
+    (D.guest||!D.matches.length?'':'<div class="card dim small" style="margin-bottom:12px"><div class="row"><div class="grow">Matches are stored on this device only.'+(function(){try{var l=localStorage.getItem("scorer_last_backup");return l?" Last backup: "+l+".":" No backup yet."}catch(e){return ""}})()+'</div><button class="btn sm" onclick="backupAll()">Back up all</button></div></div>')+
     (upc.length?'<div class="lbl">Upcoming — squads saved</div>'+upc.map(card).join(""):'')+
     (live.length?'<div class="lbl">In progress</div>'+live.map(card).join(""):'')+
     (done.length?'<div class="lbl">Completed</div>'+done.map(card).join(""):'')+
@@ -1103,7 +1130,36 @@ function importFromHash(){
   try{history.replaceState(null,"",location.href.split("#")[0])}catch(e){}
   return decodePayload(code).then(importMatchObject).catch(function(){alert("This match link could not be read. Ask the sender to share it again.");return null});
 }
-function pickFile(){var i=document.createElement("input");i.type="file";i.accept=".json,application/json";i.onchange=function(){var f=i.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{importMatchObject(JSON.parse(r.result)).then(function(m){if(m&&m.id)openReceived(m)})}catch(e){alert("That file is not a ProCoach match file.")}};r.readAsText(f)};i.click()}
+function backupAll(){
+  dbAll().then(function(ms){
+    if(!ms.length){alert("There are no matches to back up yet.");return}
+    var blob=new Blob([JSON.stringify({procoachScorerBackup:1,saved:Date.now(),matches:ms})],{type:"application/json"});
+    var a=document.createElement("a");a.href=URL.createObjectURL(blob);
+    a.download="ProCoach-Scorer-Backup-"+new Date().toISOString().slice(0,10)+".json";
+    document.body.appendChild(a);a.click();setTimeout(function(){URL.revokeObjectURL(a.href);a.remove()},500);
+    try{localStorage.setItem("scorer_last_backup",new Date().toISOString().slice(0,10))}catch(e){}
+    renderHome();
+  })
+}
+function restoreBackupObj(b){
+  var list=Array.isArray(b.matches)?b.matches:[],n=0,skipped=0,chain=Promise.resolve();
+  list.forEach(function(raw){chain=chain.then(function(){
+    var m=validateMatch(raw);if(!m){skipped++;return}
+    var ex=D.matches.find(function(x){return x.id===m.id});
+    if(ex&&(ex.rev||0)>(m.rev||0)){skipped++;return}
+    if(ex&&(ex.rev||0)===(m.rev||0)&&(ex.updated||0)>=(raw.updated||0)){skipped++;return}
+    m.handedOver=!!raw.handedOver;m.imported=!!raw.imported;if(raw.importedMatchId)m.importedMatchId=String(raw.importedMatchId).slice(0,60);
+    m.updated=Number(raw.updated)||Date.now();
+    return dbPut(m).then(function(){n++})
+  })});
+  chain.then(function(){return dbAll()}).then(function(all){
+    D.matches=all.sort(function(a,c){return (c.updated||0)-(a.updated||0)});
+    alert("Restored "+n+" match"+(n===1?"":"es")+(skipped?" ("+skipped+" skipped — a newer copy is already here or the entry was unreadable).":"."));
+    renderHome();
+  })
+}
+function pickBackup(){pickFile()}
+function pickFile(){var i=document.createElement("input");i.type="file";i.accept=".json,application/json";i.onchange=function(){var f=i.files[0];if(!f)return;var r=new FileReader();r.onload=function(){try{var pj=JSON.parse(r.result);if(pj&&pj.procoachScorerBackup){restoreBackupObj(pj);return}if(pj&&Array.isArray(pj._scorerMatches)){restoreBackupObj({matches:pj._scorerMatches});return}importMatchObject(pj).then(function(m){if(m&&m.id)openReceived(m)})}catch(e){alert("That file is not a ProCoach match file.")}};r.readAsText(f)};i.click()}
 function lockedScreen(m){
   return '<div class="hdr"><button class="ib" onclick="goHome()">←</button><div class="t"><div class="ttl">'+esc(m.teams[0].name)+' v '+esc(m.teams[1].name)+'</div><div class="sub">Handed over</div></div></div>'+
     '<div class="banner"><b>Scoring has been handed over</b><div class="small dim" style="margin:6px 0 12px">This phone is view-only until the match is handed back. If the other person has finished, open the link they send you to bring the match back with all their scoring.</div>'+
@@ -1114,6 +1170,11 @@ function lockedScreen(m){
 /* ============================================================
    BOOT
    ============================================================ */
+function themeNow(){return document.documentElement.getAttribute("data-theme")==="dark"?"dark":"light"}
+function themeIcons(){var d=themeNow()==="dark";document.querySelectorAll(".themeBtn").forEach(function(b){b.textContent=d?"☀":"☾";b.title=d?"Switch to light (sunlight) theme":"Switch to dark theme"});var m=document.querySelector('meta[name=theme-color]');if(m)m.setAttribute("content",d?"#0a1420":"#f3f6f9")}
+function toggleTheme(){var n=themeNow()==="dark"?"light":"dark";document.documentElement.setAttribute("data-theme",n);try{localStorage.setItem("scorer_theme",n)}catch(e){}themeIcons()}
+function addThemeBtn(){var h=document.querySelector("#app .hdr");if(h&&!h.querySelector(".themeBtn")){var b=document.createElement("button");b.className="ib themeBtn";b.onclick=toggleTheme;h.appendChild(b)}themeIcons()}
+new MutationObserver(addThemeBtn).observe($("app"),{childList:true});
 function boot(){
   var hashOpen=(location.hash||"").indexOf("#h=")===0;
   var premium=isPremiumUser();

@@ -160,6 +160,7 @@ body>*{display:none!important}
 .sheetHead,.reportActions,.noPrint{display:none!important}
 .report{display:block!important;position:static!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important}
 .fieldStepPreviewWrap{gap:14mm!important}
+.drillPrint .fieldStepBlock{width:50mm!important}.drillPrint .fieldStepPreviewWrap{gap:4mm!important;margin:1.5mm 0!important}.drillPrint img.dpPhoto{max-height:55mm!important;width:auto!important}.drillPrint h3{font-size:11.5pt!important;margin:0 0 1mm!important}.drillPrint p,.drillPrint .dpPts{font-size:9.5pt!important;line-height:1.35!important;margin:1mm 0!important}
 .fieldStepBlock{width:80mm!important;break-inside:avoid!important;page-break-inside:avoid!important}
 .report h1{margin:0 0 2mm!important;padding:0!important;font-size:22pt!important;line-height:1.12!important;color:#10b981!important}
 .report h2{margin:6mm 0 2.5mm!important;padding:0!important;font-size:14pt!important;line-height:1.2!important;break-after:avoid!important;page-break-after:avoid!important}
@@ -1286,7 +1287,7 @@ function sessions(){
   let gameDrills=(s.gameDrillIds||[]).map(id=>db.drills.find(d=>d.id===id)).filter(Boolean);
   let linkedReflection=db.reflections.find(r=>r.sessionId===s.id);
   let showReflectionStatus=s.date<=today();
-  return `<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}${gameDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px"><a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar wrap3"><button class="btn secondary iconBtn" title="Share via WhatsApp" onclick="shareSessionSummary('${s.id}')">${icon("share",17)}</button><button class="btn secondary iconBtn" title="Copy Text" onclick="copySessionSummary('${s.id}')">${icon("copy",17)}</button><button class="btn secondary iconBtn" title="Print Plan" onclick="printSessionPlan('${s.id}')">${icon("print",17)}</button><button class="btn secondary iconBtn" title="Edit" onclick="editSession('${s.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delSession('${s.id}')">${icon("trash",17)}</button></div></div>`;
+  return `<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.concat(gameDrills).map(d=>`<span class="tag" style="cursor:pointer" onclick="viewDrill('${d.id}')">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px"><a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar wrap3"><button class="btn secondary iconBtn" title="Share via WhatsApp" onclick="shareSessionSummary('${s.id}')">${icon("share",17)}</button><button class="btn secondary iconBtn" title="Copy Text" onclick="copySessionSummary('${s.id}')">${icon("copy",17)}</button><button class="btn secondary iconBtn" title="Print Plan" onclick="printSessionPlan('${s.id}')">${icon("print",17)}</button><button class="btn secondary iconBtn" title="Edit" onclick="editSession('${s.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delSession('${s.id}')">${icon("trash",17)}</button></div></div>`;
  }).join("")}</div>`:empty("No sessions match your search.")}</div>`;
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -1704,6 +1705,26 @@ function netPlanPrintHtml(netPlan){
 // Formatted single-session printable page — pulls in everything a coach
 // (or an assistant standing in) would need on the day: the net plan
 // front and centre, plus the rest of the plan below it.
+
+let drillPrintMode=(function(){try{let v=localStorage.getItem("pc_drill_print");return["compact","full","names"].includes(v)?v:"compact"}catch(e){return"compact"}})();
+function setDrillPrintMode(id,m){drillPrintMode=m;try{localStorage.setItem("pc_drill_print",m)}catch(e){}printSessionPlan(id)}
+function drillPrintHtml(d,mode){
+ if(mode==="names")return `<span class="tag">🎯 ${esc(d.name)}</span>`;
+ let meta=[d.cat,d.players,d.duration,d.equipment?"Equipment: "+d.equipment:""].filter(Boolean).map(esc).join(" · ");
+ let pts=String(d.points||"").trim();
+ let visual=d.diagram?`<img class="dpPhoto" src="${d.diagram}" style="max-width:100%;border-radius:8px;margin:6px 0">`:fieldStepsPreviewHtml(d.fieldSteps,110);
+ return `<div class="card drillPrint" style="margin:8px 0"><h3 style="margin:0 0 2px">🎯 ${esc(d.name)}</h3>${meta?`<div class="muted" style="font-size:var(--fs-2)">${meta}</div>`:""}${visual}${pts?`<div class="dpPts"><b>Coaching points:</b> ${esc(pts).replace(/\n/g,"<br>")}</div>`:""}${mode==="full"&&d.progressions?`<div class="dpPts"><b>Progression:</b> ${esc(d.progressions)}</div>`:""}${mode==="full"&&d.regressions?`<div class="dpPts"><b>Regression:</b> ${esc(d.regressions)}</div>`:""}</div>`;
+}
+function drillBlockHtml(list,mode){
+ if(!list.length)return"";
+ return mode==="names"?`<div style="margin-top:8px">${list.map(d=>drillPrintHtml(d,mode)).join("")}</div>`:list.map(d=>drillPrintHtml(d,mode)).join("");
+}
+function viewDrill(id){let d=db.drills.find(x=>x.id===id);if(!d)return;reportShell(esc(d.name),esc(d.cat||"Drill"),drillPrintHtml(d,"full"))}
+function sessionAttachmentPrintHtml(s){
+ let at=s.attachment;if(!at||!at.name)return"";
+ if(/^image\//.test(at.type||"")&&at.dataUrl)return `<h2>Attached Plan</h2><div class="card"><img src="${at.dataUrl}" style="max-width:100%;max-height:230mm"></div>`;
+ return `<div class="muted" style="margin-top:10px">📎 Attached file: ${esc(at.name)} (open it in ProCoach OS — not printed here)</div>`;
+}
 function printSessionPlan(id){
  let s=db.sessions.find(x=>x.id===id);
  if(!s)return;
@@ -1721,11 +1742,13 @@ function printSessionPlan(id){
   ${s.objectives?`<h2>Objectives</h2><div class="card">${esc(s.objectives)}</div>`:""}
   ${netPlanPrintHtml(s.netPlan)}
   ${s.warmup?`<h2>Warm-up / Preparation</h2><div class="card">${esc(s.warmup)}</div>`:""}
-  ${(s.main||mainDrills.length)?`<h2>Main Skill Block</h2><div class="card">${s.main?esc(s.main):""}${mainDrills.length?`<div style="margin-top:8px">${mainDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}</div>`:""}
-  ${(s.game||gameDrills.length)?`<h2>Competitive / Game Block</h2><div class="card">${s.game?esc(s.game):""}${gameDrills.length?`<div style="margin-top:8px">${gameDrills.map(d=>`<span class="tag">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}</div>`:""}
+  ${(s.main||mainDrills.length)?`<h2>Main Skill Block</h2>${(s.main||drillPrintMode==="names")?`<div class="card">${s.main?esc(s.main):""}${drillPrintMode==="names"?drillBlockHtml(mainDrills,"names"):""}</div>`:""}${drillPrintMode==="names"?"":drillBlockHtml(mainDrills,drillPrintMode)}`:""}
+  ${(s.game||gameDrills.length)?`<h2>Competitive / Game Block</h2>${(s.game||drillPrintMode==="names")?`<div class="card">${s.game?esc(s.game):""}${drillPrintMode==="names"?drillBlockHtml(gameDrills,"names"):""}</div>`:""}${drillPrintMode==="names"?"":drillBlockHtml(gameDrills,drillPrintMode)}`:""}
   ${s.cues?`<h2>Coaching Cues</h2><div class="card">${esc(s.cues)}</div>`:""}
   ${s.success?`<h2>Success Criteria</h2><div class="card">${esc(s.success)}</div>`:""}
+  ${sessionAttachmentPrintHtml(s)}
  `;
+ if(mainDrills.length||gameDrills.length){body=`<div class="noPrint" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px"><span class="muted" style="font-size:var(--fs-2)">Drill detail:</span>${[["compact","Diagram + coaching points"],["full","Full detail"],["names","Names only"]].map(([k,l])=>`<button type="button" class="btn ${drillPrintMode===k?"primary":"secondary"}" onclick="setDrillPrintMode('${id}','${k}')">${l}</button>`).join("")}</div>`+body}
  reportShell(sessionLabel(s),fmtDate(s.date),body);
 }
 function newSession(){openSessionForm(null,"new")}
@@ -5936,8 +5959,9 @@ function deleteProfile(id){
  if(activeId===id){localStorage.setItem(ACTIVE_KEY,profiles[0].id);location.reload()}
  else accountPage();
 }
-function exportBackup(){
+async function exportBackup(){
  let exportData={...db,_license:getLicenseState()};
+ try{let sm=await scorerDbAll();if(sm.length)exportData._scorerMatches=sm}catch(e){}
  let blob=new Blob([JSON.stringify(exportData,null,2)],{type:"application/json"});
  let url=URL.createObjectURL(blob);
  let a=document.createElement("a");a.href=url;a.download="ProCoach-OS-Backup-"+today()+".json";
@@ -5957,6 +5981,8 @@ function handleRestoreFile(input){
   if(!confirm("Restore this backup? This will replace all current data for this profile. This cannot be undone.")){input.value="";return}
   let licenseFromBackup=parsed._license;
   delete parsed._license;
+  let scorerFromBackup=Array.isArray(parsed._scorerMatches)?parsed._scorerMatches:[];
+  delete parsed._scorerMatches;
   ["sessions","reflections","players","assessments","matches","drills","events"].forEach(k=>{parsed[k]=Array.isArray(parsed[k])?parsed[k]:[]});
   parsed.matches.forEach(m=>{if(!m.id)m.id=uid("m")});
   parsed.drills.forEach(d=>{if(!d.id)d.id=uid("drill")});
@@ -5968,9 +5994,10 @@ function handleRestoreFile(input){
    // next time the app opens, since the server stays the source of truth.
    saveLicenseState(licenseFromBackup);
   }
-  idbSet(DB_KEY,db).catch(err=>console.warn("IndexedDB save failed",err)).then(()=>{
+  idbSet(DB_KEY,db).catch(err=>console.warn("IndexedDB save failed",err)).then(async()=>{
+   for(const sm of scorerFromBackup){if(sm&&typeof sm.id==="string")await scorerDbPut(sm)}
    try{localStorage.setItem(DB_KEY,JSON.stringify(db))}catch(e){}
-   alert("Backup restored successfully.");
+   alert("Backup restored successfully."+(scorerFromBackup.length?" Includes "+scorerFromBackup.length+" scored match"+(scorerFromBackup.length===1?"":"es")+".":""));
    location.reload();
   });
  };
@@ -6627,7 +6654,7 @@ function accountPage(){
  </div>
  ${daysSince!==null&&daysSince>=7?`<div class="card" style="border-color:var(--gold);margin-bottom:12px">It's been ${daysSince} days since your last backup — consider exporting one now.</div>`:""}
  <div class="card">
- <p class="muted">Export a full backup of this profile's data, or restore from a previous backup file.</p>
+ <p class="muted">Export a full backup of this profile's data (including matches scored in the Match Scorer), or restore from a previous backup file.</p>
  <div class="toolbar">
  <button class="btn primary" onclick="exportBackup()">Export Backup (.json)</button>
  <label class="btn secondary" style="cursor:pointer">Restore from Backup<input type="file" accept="application/json" style="display:none" onchange="handleRestoreFile(this)"></label>
