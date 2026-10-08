@@ -3095,6 +3095,7 @@ const FIELD_TOOLS=[
  {id:"stumps",label:"Stumps"},
  {id:"katchet",label:"Katchet Board"},
  {id:"pugg",label:"Pugg Net"},
+ {id:"rotate",label:"Rotate ⟳"},
  {id:"arrowBall",label:"Ball →"},
  {id:"arrowPlayer",label:"Player →"},
  {id:"tagArrow",label:"Tag Arrow"}
@@ -3112,6 +3113,7 @@ function fieldToolIconSvg(id){
  if(id==="target")return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" fill="none" stroke="#2ecc71" stroke-width="1.6" stroke-dasharray="3 2"/><circle cx="12" cy="12" r="2" fill="#2ecc71"/></svg>`;
  if(id==="ball")return `<svg width="20" height="20" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5" fill="#c0392b" stroke="#3d0f0a" stroke-width="1.2"/></svg>`;
 
+ if(id==="rotate")return `<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#38bdf8" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 12a7.5 7.5 0 1 1-2.4-5.5"/><polyline points="19.5 3.5 19.5 7.5 15.5 7.5" fill="none"/></svg>`;
  if(id==="katchet")return `<svg width="20" height="20" viewBox="0 0 24 24"><rect x="2.5" y="6" width="19" height="12" rx="2" fill="#f97316" stroke="#5c2c06" stroke-width="1.2"/><path d="M5 9.5h14M5 12h14M5 14.5h14" stroke="#5c2c06" stroke-width="1.1" stroke-linecap="round" stroke-dasharray="2.2 1.6"/></svg>`;
  if(id==="pugg")return `<svg width="20" height="20" viewBox="0 0 24 24"><defs><clipPath id="puggIc"><path d="M3 19V10Q3 4.5 12 4.5Q21 4.5 21 10V19Z"/></clipPath></defs><path d="M3 19V10Q3 4.5 12 4.5Q21 4.5 21 10V19Z" fill="rgba(226,232,240,0.3)" stroke="#1e293b" stroke-width="1.6"/><path d="M-2 19L16 4M3 19L21 4M8 19L26 4M-2 4L16 19M3 4L21 19M8 4L26 19" clip-path="url(#puggIc)" stroke="#64748b" stroke-width="0.8"/><line x1="3" y1="19" x2="21" y2="19" stroke="#f97316" stroke-width="2" stroke-linecap="round"/></svg>`;
  if(id==="stumps"){
@@ -3181,16 +3183,20 @@ function fieldMarkerSvg(m,opts){
  }
  if(m.type==="ball")return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><ellipse cx="${m.x}" cy="${m.y}" rx="${1.4*xComp}" ry="1.4" fill="#c0392b" stroke="#3d0f0a" stroke-width="0.35"/></g>`;
 
- if(m.type==="katchet"){
-  let w=3.6*xComp,h=2.3,x0=m.x-w,y0=m.y-h/2;
-  return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><rect x="${x0}" y="${y0}" width="${w*2}" height="${h}" rx="0.45" fill="#f97316" stroke="#5c2c06" stroke-width="0.3"/><path d="M${x0+0.7*xComp} ${m.y-0.55}H${m.x+w-0.7*xComp}M${x0+0.7*xComp} ${m.y}H${m.x+w-0.7*xComp}M${x0+0.7*xComp} ${m.y+0.55}H${m.x+w-0.7*xComp}" stroke="#5c2c06" stroke-width="0.22" stroke-linecap="round" stroke-dasharray="0.7 0.5"/></g>`;
- }
- if(m.type==="pugg"){
-  // Ball-collection net: open front (bottom), curved mesh back. Light mesh with a dark outline so it reads on the green.
-  let w=3.6*xComp,h=3.4,x0=m.x-w,x1=m.x+w,yb=m.y+h/2,yt=m.y-h/2,cid="pg"+String(m.id).replace(/[^a-z0-9]/gi,"");
-  let d=`M${x0} ${yb}V${yt+h*0.45}Q${x0} ${yt} ${m.x} ${yt}Q${x1} ${yt} ${x1} ${yt+h*0.45}V${yb}Z`;
-  let mesh="";for(let k=-5;k<=5;k++){mesh+=`M${m.x+k*w*0.38-h} ${yb}L${m.x+k*w*0.38+h} ${yt}M${m.x+k*w*0.38+h} ${yb}L${m.x+k*w*0.38-h} ${yt}`}
-  return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><clipPath id="${cid}"><path d="${d}"/></clipPath><path d="${d}" fill="rgba(248,250,252,0.30)" stroke="#0f172a" stroke-width="0.7"/><path d="${mesh}" clip-path="url(#${cid})" stroke="#f8fafc" stroke-width="0.14" fill="none"/><path d="${d}" fill="none" stroke="#f8fafc" stroke-width="0.34"/><line x1="${x0}" y1="${yb}" x2="${x1}" y2="${yb}" stroke="#f97316" stroke-width="0.55" stroke-linecap="round"/></g>`;
+ if(m.type==="katchet"||m.type==="pugg"){
+  // Drawn at true proportions, then rotated about its centre. The scale(xComp) keeps it undistorted when the diagram is stretched wide.
+  let rot=Number(m.rot)||0,inner="";
+  if(m.type==="katchet"){
+   let w=3.6,h=2.3,x0=m.x-w,y0=m.y-h/2;
+   inner=`<rect x="${x0}" y="${y0}" width="${w*2}" height="${h}" rx="0.45" fill="#f97316" stroke="#5c2c06" stroke-width="0.3"/><path d="M${x0+0.7} ${m.y-0.55}H${m.x+w-0.7}M${x0+0.7} ${m.y}H${m.x+w-0.7}M${x0+0.7} ${m.y+0.55}H${m.x+w-0.7}" stroke="#5c2c06" stroke-width="0.22" stroke-linecap="round" stroke-dasharray="0.7 0.5"/>`;
+  } else {
+   // Ball-collection net: open front (bottom, orange bar), curved mesh back.
+   let w=3.6,h=3.4,x0=m.x-w,x1=m.x+w,yb=m.y+h/2,yt=m.y-h/2,cid="pg"+String(m.id).replace(/[^a-z0-9]/gi,"");
+   let d=`M${x0} ${yb}V${yt+h*0.45}Q${x0} ${yt} ${m.x} ${yt}Q${x1} ${yt} ${x1} ${yt+h*0.45}V${yb}Z`;
+   let mesh="";for(let k=-5;k<=5;k++){mesh+=`M${m.x+k*w*0.38-h} ${yb}L${m.x+k*w*0.38+h} ${yt}M${m.x+k*w*0.38+h} ${yb}L${m.x+k*w*0.38-h} ${yt}`}
+   inner=`<clipPath id="${cid}"><path d="${d}"/></clipPath><path d="${d}" fill="rgba(248,250,252,0.30)" stroke="#0f172a" stroke-width="0.7"/><path d="${mesh}" clip-path="url(#${cid})" stroke="#f8fafc" stroke-width="0.14" fill="none"/><path d="${d}" fill="none" stroke="#f8fafc" stroke-width="0.34"/><line x1="${x0}" y1="${yb}" x2="${x1}" y2="${yb}" stroke="#f97316" stroke-width="0.55" stroke-linecap="round"/>`;
+  }
+  return `<g class="fdMarker" data-id="${m.id}" style="cursor:pointer"><g transform="translate(${m.x} ${m.y}) scale(${xComp} 1) rotate(${rot}) translate(${-m.x} ${-m.y})">${inner}</g></g>`;
  }
  if(m.type==="stumps"){
   let sw=0.45*xComp,sh=3.2,gap=1.1*xComp,x1=m.x-gap,x2=m.x,x3=m.x+gap,topY=m.y-1.7;
@@ -3356,6 +3362,16 @@ function handleFieldCanvasClick(evt,svgEl){
  let step=fieldDraft.steps[fieldDraft.activeStep];
  if(!step)return;
  let items=curFieldItems(step);
+ // Rotate tool: tapping a Katchet board or Pugg net turns it 45 degrees (8 directions);
+ // anything else is ignored, so it never deletes or places.
+ if(fieldDraft.tool==="rotate"){
+  let rEl=evt.target.closest&&evt.target.closest(".fdMarker");
+  if(rEl){
+   let rItem=items.find(it=>it.id===rEl.getAttribute("data-id")&&it.kind==="marker");
+   if(rItem&&(rItem.type==="katchet"||rItem.type==="pugg")){pushFieldHistory();rItem.rot=((rItem.rot||0)+45)%360;renderFieldEditor()}
+  }
+  return;
+ }
  // Tag Arrow tool: tapping a ball arrow applies the tag currently chosen in
  // the dropdown (none = clear it); it never deletes or places anything.
  if(fieldDraft.tool==="tagArrow"){
@@ -3676,7 +3692,7 @@ function fieldEditorHtml(fullscreen){
   <div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:8px">${toolsHtml}</div>
   <div style="margin-bottom:8px">${fieldArrowTagSelectHtml("padding:6px 9px;font-size:var(--fs-1)")} <span class="muted" style="font-size:var(--fs-1)">${fieldDraft.tool==="tagArrow"?"Tap a ball arrow to apply this tag (choose \"none\" to clear it).":"Applied to each new ball arrow you finish."}</span></div>
   ${fieldDraft.pendingArrowPoints.length?`<div style="display:flex;gap:6px;margin-bottom:8px">${fieldDraft.pendingArrowPoints.length>=2?`<button type="button" class="btn primary" style="padding:6px 12px;font-size:var(--fs-2)" onclick="finishFieldArrow()">✓ Finish Arrow</button>`:""}<button type="button" class="btn danger" style="padding:6px 12px;font-size:var(--fs-2)" onclick="cancelFieldArrow()">Cancel Arrow</button></div>`:""}
-  <div class="muted" style="font-size:var(--fs-1);margin-bottom:6px">Tap the ground to place a marker, or drag an existing marker or arrow to reposition it. For an arrow, tap a start point, then tap again for each bend, then Finish Arrow (or tap Cancel Arrow to discard it). Tap (without dragging) an existing marker or arrow to remove it. Full, Half and Square Ground each keep their own separate drawing for this step.</div>`;
+  <div class="muted" style="font-size:var(--fs-1);margin-bottom:6px">Tap the ground to place a marker, or drag an existing marker or arrow to reposition it. For an arrow, tap a start point, then tap again for each bend, then Finish Arrow (or tap Cancel Arrow to discard it). Tap (without dragging) an existing marker or arrow to remove it. To turn a Katchet Board or Pugg Net, pick Rotate and tap it — each tap turns it 45°. Full, Half and Square Ground each keep their own separate drawing for this step.</div>`;
  let redoKeyN=fieldHistoryKey();
  let canRedoN=!!(fieldDraft.history&&fieldDraft.history[redoKeyN]&&fieldDraft.history[redoKeyN].redo.length);
  let bottomBar=`<div style="display:flex;gap:8px;margin-top:8px;flex-wrap:wrap">
