@@ -927,6 +927,7 @@ function matchTab(m,MS,step){
     rows.push(['Abandon match','manualEnd(\'abandoned\')']);
   }
   if(!m.handedOver)rows.push(['Captains & wicket-keepers','rolesSheet()']);
+  if(!m.handedOver)rows.push(['Fix players (rename, move team, add late player)','fixPlayersSheet()']);
   if(!m.handedOver)rows.push([D.guest?'Send back to coach (link / file)':'Hand over to another scorer (link / file)','handOver(D.M)']);
   if('wakeLock' in navigator)rows.push(['Keep screen awake while scoring: '+(wakeWanted()?'ON':'OFF'),'toggleWake()']);
   rows.push(['Copy scorecard as text','copyCard()']);
@@ -942,6 +943,116 @@ function rolesSheet(){
   m.teams.forEach(function(t,ti){h+='<div class="lbl">'+esc(t.name)+'</div>'+t.players.map(function(p){return'<div class="pl" style="cursor:default"><div class="n">'+esc(p.name)+'</div><button class="mini role '+(p.c?'on':'')+'" onclick="setRole('+ti+',\''+p.id+'\',\'c\')">C</button><button class="mini role '+(p.w?'on':'')+'" onclick="setRole('+ti+',\''+p.id+'\',\'w\')">WK</button></div>'}).join("")});
   h+='<div class="row stick"><button class="btn grow" onclick="closeSheet();render()">Done</button></div>';
   openSheet(h);
+}
+
+// ---- Fix players during a match: rename, move to the other team, add a late player ----
+// The innings are replayed from their event log by player id, so a player can only be moved
+// while no ball, wicket, over or pair refers to him. Renaming is always safe (the id stays).
+function playerUsed(m,id){var j=JSON.stringify(m.innings||[]),k='"'+id+'"';return j.indexOf(k)>=0}
+function fixPlayersSheet(){
+  var m=D.M;
+  var h='<h3>Fix players</h3><div class="dim small">Tap a name to rename. Use ⇄ to move a player to the other side (only if he has not batted, bowled or fielded yet). Use + to add a late player.</div>';
+  m.teams.forEach(function(t,ti){
+    h+='<div class="lbl">'+esc(t.name)+'</div>'+t.players.map(function(p){
+      return'<div class="pl" style="cursor:default"><div class="n" style="cursor:pointer" onclick="fixRename('+ti+',\''+p.id+'\')">'+esc(p.name)+(playerUsed(m,p.id)?' <span class="dim small">· in play</span>':'')+'</div><button class="mini" onclick="fixMove('+ti+',\''+p.id+'\')" title="Move to '+esc(m.teams[1-ti].name)+'">⇄</button></div>'}).join("")+
+    '<button class="btn sec full" style="margin-top:6px" onclick="fixAdd('+ti+')">+ Add player to '+esc(t.name)+'</button>';
+  });
+  h+='<div class="lbl">Scoring</div><button class="btn sec full" onclick="fixOversSheet()">Change who bowled an over</button>';
+  h+='<div class="row stick"><button class="btn grow" onclick="closeSheet();render()">Done</button></div>';
+  openSheet(h);
+}
+function fixNameTaken(m,name,exceptId){return allPlayers(m).some(function(p){return p.id!==exceptId&&p.name.toLowerCase()===name.toLowerCase()})}
+function fixAfter(){var m=D.M;if(m.imported)m.imported=false;persist().then(fixPlayersSheet)}
+function fixRename(ti,id){
+  var m=D.M,p=m.teams[ti].players.find(function(x){return x.id===id});if(!p)return;
+  var v=prompt("Player name",p.name);if(v===null)return;v=v.trim();if(!v||v===p.name)return;
+  if(fixNameTaken(m,v,id)){toast("That name is already in this match");return}
+  p.name=v;p.roster=false;fixAfter();
+}
+function fixMove(ti,id){
+  var m=D.M,from=m.teams[ti],to=m.teams[1-ti],i=from.players.findIndex(function(x){return x.id===id});if(i<0)return;
+  var p=from.players[i];
+  if(playerUsed(m,id)){
+    if(fixBowlerOnly(m,id)){fixReassignSheet(ti,id);return}
+    alert(p.name+" already appears in the scoring as a batter, fielder or in a pair. He can't be moved without breaking the scorecard. You can rename him instead, or undo back to before his first ball.");return}
+  if(from.players.length<=2){toast(from.name+" must keep at least 2 players");return}
+  if(!confirm("Move "+p.name+" from "+from.name+" to "+to.name+"?"))return;
+  from.players.splice(i,1);
+  var pre=(1-ti)?"b":"a",n=1,used={};allPlayers(m).forEach(function(x){used[x.id]=1});while(used[pre+n])n++;
+  p.id=pre+n;p.c=false;p.w=false;to.players.push(p);fixAfter();
+}
+
+// A player whose only appearances are as a bowler (open / bowler events) can have those overs
+// handed to a team-mate who really bowled them; after that he is unused and can be moved.
+function fixRewrite(m,id,toId){
+  var c=JSON.parse(JSON.stringify(m.innings||[]));
+  c.forEach(function(inn){(inn.events||[]).forEach(function(e){if((e.k==="open"||e.k==="bowler")&&e.b===id)e.b=toId})});
+  return c;
+}
+function fixBowlerOnly(m,id){return !playerUsed({innings:fixRewrite(m,id,"__x__")},id)}
+function fixReassignSheet(ti,id){
+  var m=D.M,t=m.teams[ti],p=t.players.find(function(x){return x.id===id});
+  var h='<h3>Who really bowled '+esc(p.name)+'\'s over(s)?</h3><div class="dim small">'+esc(p.name)+' only appears as a bowler. Pick the '+esc(t.name)+' player who actually bowled them. The balls, runs and wickets stay exactly as scored and move to that bowler. Then '+esc(p.name)+' can be moved to the right team.</div><div class="lbl">'+esc(t.name)+'</div>';
+  h+=t.players.filter(function(x){return x.id!==id}).map(function(x){return'<button class="btn sec full" style="margin-bottom:6px;text-align:left" onclick="fixReassignDo('+ti+',\''+id+'\',\''+x.id+'\')">'+esc(x.name)+'</button>'}).join("");
+  h+='<div class="row stick"><button class="btn sec grow" onclick="fixPlayersSheet()">Back</button></div>';
+  openSheet(h);
+}
+function fixReassignDo(ti,id,toId){
+  var m=D.M,p=m.teams[ti].players.find(function(x){return x.id===id}),q=m.teams[ti].players.find(function(x){return x.id===toId});if(!p||!q)return;
+  if(!confirm("Give all of "+p.name+"'s overs to "+q.name+"?"))return;
+  m.innings=fixRewrite(m,id,toId);
+  try{m.innings.forEach(function(x,i){computeInn(m,i)})}catch(e){alert("That change doesn't replay cleanly, so it was not applied.");return}
+  fixAfter();
+}
+
+// ---- Change the bowler of one over (e.g. an over scored under the wrong bowler's name) ----
+function fixOverMap(m,ii){
+  var inn=m.innings[ii],rec=[],ctrl=-1,idx=0,inOv=0,legalIn=0;
+  (inn.events||[]).forEach(function(e,i){
+    if(e.k==="open"||e.k==="bowler"){if(e.k==="bowler"&&inOv>0&&rec[idx])rec[idx].mixed=true;ctrl=i}
+    else if(e.k==="ball"){
+      if(inOv===0&&!rec[idx])rec[idx]={ctrl:ctrl,mixed:false};
+      inOv++;
+      if(e.x!=="wd"&&e.x!=="nb"){legalIn++;if(legalIn===BPO){idx++;legalIn=0;inOv=0}}
+    }
+  });
+  return rec;
+}
+function fixOversSheet(){
+  var m=D.M,h='<h3>Change who bowled an over</h3><div class="dim small">Tap the over that was scored under the wrong bowler. Runs, wickets and balls stay exactly as scored; only the bowler changes.</div>';
+  m.innings.forEach(function(inn,ii){
+    var S=computeInn(m,ii),rec=fixOverMap(m,ii);
+    if(!rec.length)return;
+    h+='<div class="lbl">Innings '+(ii+1)+' · '+esc(m.teams[inn.bat].name)+' batting</div>';
+    rec.forEach(function(r,k){
+      var done=S.overs[k],bid=done?done.bowler:S.bowler;
+      h+='<button class="btn sec full" style="margin-bottom:6px;text-align:left" onclick="fixOverPick('+ii+','+k+')">Over '+(k+1)+' · '+esc(dn(m,bid))+(done?' · '+done.runs+' runs':' · in progress')+'</button>'});
+  });
+  h+='<div class="row stick"><button class="btn sec grow" onclick="fixPlayersSheet()">Back</button></div>';
+  openSheet(h);
+}
+function fixOverPick(ii,k){
+  var m=D.M,inn=m.innings[ii],rec=fixOverMap(m,ii)[k];
+  if(!rec||rec.ctrl<0){toast("Can't change that over");return}
+  if(rec.mixed){alert("The bowler was changed in the middle of this over, so it can't be reassigned automatically.");return}
+  var h='<h3>Over '+(k+1)+': who really bowled it?</h3><div class="lbl">'+esc(m.teams[inn.bowl].name)+'</div>';
+  h+=m.teams[inn.bowl].players.map(function(p){return'<button class="btn sec full" style="margin-bottom:6px;text-align:left" onclick="fixOverDo('+ii+','+k+',\''+p.id+'\')">'+esc(p.name)+'</button>'}).join("");
+  h+='<div class="row stick"><button class="btn sec grow" onclick="fixOversSheet()">Back</button></div>';
+  openSheet(h);
+}
+function fixOverDo(ii,k,pid){
+  var m=D.M,rec=fixOverMap(m,ii)[k];if(!rec||rec.ctrl<0||rec.mixed)return;
+  var old=JSON.parse(JSON.stringify(m.innings));
+  m.innings[ii].events[rec.ctrl].b=pid;
+  try{m.innings.forEach(function(x,i){computeInn(m,i)})}catch(e){m.innings=old;alert("That change doesn't replay cleanly, so it was not applied.");return}
+  fixAfter();toast("Over "+(k+1)+" now credited to "+pname(m,pid));
+}
+function fixAdd(ti){
+  var m=D.M,t=m.teams[ti];
+  var v=prompt("New player for "+t.name,"");if(v===null)return;v=v.trim();if(!v)return;
+  if(fixNameTaken(m,v,null)){toast("That name is already in this match");return}
+  var pre=ti?"b":"a",n=1,used={};allPlayers(m).forEach(function(x){used[x.id]=1});while(used[pre+n])n++;
+  t.players.push({id:pre+n,name:v,roster:false,c:false,w:false});fixAfter();
 }
 function setRole(ti,id,k){var m=D.M,pl=m.teams[ti].players,t=pl.find(function(p){return p.id===id}),on=!t[k];pl.forEach(function(p){p[k]=false});t[k]=on;persist().then(rolesSheet)}
 function reimport(){var m=D.M;m.imported=false;m.export=buildExport(m);persist().then(function(){toast("Ready — open Match Centre and tap Update");render()})}
