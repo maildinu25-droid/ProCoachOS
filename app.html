@@ -252,6 +252,13 @@ h3{font-family:'Sora',sans-serif;font-size:16px;font-weight:700;line-height:1.3}
 
 .report{box-sizing:border-box;padding:0 3px}.report .grid>*{min-width:0}
 @media print{.report{padding:0}}
+
+.stageChips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;margin:10px 0 0;-webkit-overflow-scrolling:touch}.stageChip{flex:0 0 auto;background:var(--surface2);border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:7px 12px;font-size:var(--fs-3);font-weight:600;cursor:pointer;display:inline-flex;gap:6px;align-items:center}.stageChip b{color:var(--g)}.stageChip.on{background:var(--g);border-color:var(--g);color:#04130d}.stageChip.on b{color:#04130d}
+
+.ssRow{align-items:center!important;gap:12px}.ssRow .ssChk{flex:0 0 22px;width:22px;height:22px;accent-color:var(--g)}.ssRow .ssMain{flex:1 1 auto;min-width:0;display:grid;gap:6px}.ssRow .ssName{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}.ssRow .ssNote{width:100%;padding:8px 10px;font-size:var(--fs-3)}
+
+.stageChips{width:100%;max-width:100%;box-sizing:border-box;min-width:0;contain:inline-size}
+#players{min-width:0;overflow-x:hidden}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
@@ -1360,7 +1367,7 @@ function sessions(){
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
 function attendanceOptionsHtml(s,teamFilter,checkedOverride,defaultAllChecked){
- let players=teamFilter?activePlayers().filter(p=>p.team===teamFilter):activePlayers();
+ let players=(teamFilter?activePlayers().filter(p=>p.team===teamFilter):activePlayers()).filter(p=>!isReleased(p)||(s&&Array.isArray(s.attendees)&&s.attendees.includes(p.name)));
  if(!players.length)return `<div class="muted">${teamFilter?"No players in this team yet.":"No players yet — add players to enable attendance tracking."}</div>`;
  // Priority: an explicit override (e.g. switching teams mid-form) > a
  // session's own real saved attendance, even if it's genuinely empty >
@@ -2441,14 +2448,100 @@ function kebabMenu(id,items){return `<div class="kebabWrap"><button type="button
 function closeKebabs(){document.querySelectorAll(".kebabMenu.open").forEach(m=>m.classList.remove("open"))}
 function toggleKebab(id,ev){ev.stopPropagation();let m=document.getElementById("kb-"+id);if(!m)return;let was=m.classList.contains("open");closeKebabs();if(was)return;m.classList.remove("up");m.classList.add("open");let r=m.getBoundingClientRect();if(r.bottom>window.innerHeight-80)m.classList.add("up")}
 document.addEventListener("click",function(e){if(!e.target.closest(".kebabWrap"))closeKebabs()});
-function playerCardHtml(p){return `<div class="item"><div class="avatar">${esc(initials(p.name))}</div><div><b>${esc(p.name)}</b>${p.available==="no"?` <span class="tag" style="background:var(--redTint);color:var(--red)">Unavailable</span>`:""}<div class="muted">${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}${p.group?" · "+esc(p.group):""}</div></div><div class="toolbar"><button class="btn secondary" onclick="playerView('${p.id}')">Profile</button>${kebabMenu("p"+p.id,[{label:"Edit",icon:"edit",fn:`editPlayer('${p.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delPlayer('${p.id}')`}])}</div></div>`}
+function playerCardHtml(p){return `<div class="item"><div class="avatar">${esc(initials(p.name))}</div><div><b>${esc(p.name)}</b>${stageBadge(p)}${p.available==="no"?` <span class="tag" style="background:var(--redTint);color:var(--red)">Unavailable</span>`:""}<div class="muted">${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}${p.group?" · "+esc(p.group):""}</div></div><div class="toolbar"><button class="btn secondary" onclick="playerView('${p.id}')">Profile</button>${kebabMenu("p"+p.id,[{label:"Edit",icon:"edit",fn:`editPlayer('${p.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delPlayer('${p.id}')`}])}</div></div>`}
+/* ===== Squad stages (Camp 1 → Camp 2 → Tournament → Released) ===== */
+const DEFAULT_STAGES=[{id:"st1",name:"Camp 1"},{id:"st2",name:"Camp 2"},{id:"st3",name:"Tournament squad"},{id:"stR",name:"Released",released:true}];
+let stageFilter="";
+function stagesList(){let s=db.settings;if(!Array.isArray(s.stages)||!s.stages.length)s.stages=JSON.parse(JSON.stringify(DEFAULT_STAGES));if(!s.stages.some(x=>x.released))s.stages.push({id:"stR",name:"Released",released:true});return s.stages}
+function stageOf(p){let L=stagesList();return L.find(s=>s.id===p.stage)||L[0]}
+function isReleased(p){return !!stageOf(p).released}
+function stagesInUse(){let first=stagesList()[0].id;return db.players.some(p=>!p.deletedAt&&p.stage&&p.stage!==first)}
+function stageBadge(p){if(!stagesInUse())return "";let st=stageOf(p);return ` <span class="tag" style="${st.released?"background:var(--redTint);color:var(--red)":""}">${esc(st.name)}</span>`}
+function stagePlayers(id){return activePlayers().filter(p=>stageOf(p).id===id).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")))}
+function stageChipsHtml(){
+ if(!stagesInUse())return "";
+ let L=stagesList(),all=activePlayers().length;
+ const chip=(id,label,n)=>`<button type="button" class="stageChip${stageFilter===id?" on":""}" onclick="stageFilter='${id}';players()">${esc(label)} <b>${n}</b></button>`;
+ return `<div class="stageChips noPrint">${chip("","All",all)}${L.map(s=>chip(s.id,s.name,stagePlayers(s.id).length)).join("")}${stageFilter?`<button type="button" class="stageChip" onclick="stageListReport('${stageFilter}')">${icon("print",14)} Print</button>`:""}</div>`;
+}
+function stageLogHtml(p){
+ let L=stagesList(),nm=id=>(L.find(s=>s.id===id)||{name:"?"}).name,log=Array.isArray(p.stageLog)?p.stageLog:[];
+ return log.length?log.map(e=>`<div class="item"><div><b>${esc(nm(e.from))} → ${esc(nm(e.to))}</b><div class="muted">${esc(fmtDate(e.date))}${e.reason?" · "+esc(e.reason):""}</div></div></div>`).join(""):`<div class="muted">Still in ${esc(stageOf(p).name)} — no moves yet.</div>`;
+}
+function playerStageHtml(p){
+ let L=stagesList();
+ return `<h2 class="section">Selection</h2><div class="card"><label>Stage<select onchange="setPlayerStage('${p.id}',this.value)">${L.map(s=>`<option value="${s.id}" ${stageOf(p).id===s.id?"selected":""}>${esc(s.name)}</option>`).join("")}</select></label>
+ <label style="margin-top:10px">Selection note (private)<textarea rows="2" onchange="setPlayerStageNote('${p.id}',this.value)" placeholder="Why selected / released, areas to revisit...">${esc(p.stageNote||"")}</textarea></label>
+ <div style="margin-top:10px">${stageLogHtml(p)}</div></div>`;
+}
+function setPlayerStage(id,to){
+ if(!requireWriteAccess())return;
+ let p=db.players.find(x=>x.id===id);if(!p||stageOf(p).id===to)return;
+ if(!Array.isArray(p.stageLog))p.stageLog=[];
+ p.stageLog.push({date:today(),from:stageOf(p).id,to,reason:""});p.stage=to;db.settings.lastSelection=null;save();playerView(id);
+}
+function setPlayerStageNote(id,v){let p=db.players.find(x=>x.id===id);if(!p)return;p.stageNote=v;save()}
+function squadSelectSheet(fromId){
+ let L=stagesList(),open=L.filter(s=>!s.released);
+ if(!fromId||!L.find(s=>s.id===fromId))fromId=(open.find(s=>stagePlayers(s.id).length)||open[0]).id;
+ let fi=L.findIndex(s=>s.id===fromId),toDefault=(L[fi+1]&&!L[fi+1].released)?L[fi+1].id:(open[fi+1]||L[fi]).id;
+ let rel=L.find(s=>s.released),players=stagePlayers(fromId),last=db.settings.lastSelection;
+ modal(`<div class="sheetHead"><h2>Select squad</h2><button class="x" onclick="closeM()">×</button></div>
+ <p class="muted">Tick the players who move on. Nobody is deleted — everyone keeps all sessions, assessments and match history.</p>
+ <div class="formgrid"><label>Choose from<select id="ssFrom" onchange="squadSelectSheet(this.value)">${open.map(s=>`<option value="${s.id}" ${s.id===fromId?"selected":""}>${esc(s.name)} (${stagePlayers(s.id).length})</option>`).join("")}</select></label>
+ <label>Ticked players move to<select id="ssTo">${L.filter(s=>s.id!==fromId&&!s.released).map(s=>`<option value="${s.id}" ${s.id===toDefault?"selected":""}>${esc(s.name)}</option>`).join("")}</select></label>
+ <label class="full">Players not ticked<select id="ssMode"><option value="release">Move to ${esc(rel.name)}</option><option value="stay">Leave in ${esc(L[fi].name)}</option></select></label></div>
+ <div style="display:flex;gap:8px;margin:10px 0"><button class="btn secondary" onclick="document.querySelectorAll('.ssChk').forEach(c=>c.checked=true)">Tick all</button><button class="btn secondary" onclick="document.querySelectorAll('.ssChk').forEach(c=>c.checked=false)">Clear</button><span class="muted" style="align-self:center" id="ssCount"></span></div>
+ <div class="list">${players.length?players.map(p=>`<div class="item ssRow"><input type="checkbox" class="ssChk" data-id="${p.id}" checked onchange="ssUpdateCount()"><div class="ssMain"><div class="ssName"><b>${esc(p.name)}</b> <span class="muted">${esc(p.role||"Player")}</span></div><input class="ssNote" data-id="${p.id}" placeholder="Note (optional)"></div></div>`).join(""):empty("No players in this stage.")}</div>
+ <div style="display:grid;gap:8px;margin-top:14px"><button class="btn primary" onclick="applySquadSelection('${fromId}')">Apply selection</button>
+ <div class="actionRow"><button class="btn secondary" onclick="stageListReport('${fromId}')">Print this list</button><button class="btn secondary" onclick="stagesSettingsSheet()">Edit stages</button></div>
+ ${last?`<button class="btn danger" onclick="undoSquadSelection()">Undo last selection (${esc(fmtDate(last.date))}, ${last.moves.length} moved)</button>`:""}</div>`);
+ ssUpdateCount();
+}
+function ssUpdateCount(){let n=document.querySelectorAll('.ssChk:checked').length,t=document.querySelectorAll('.ssChk').length,e=document.getElementById('ssCount');if(e)e.textContent=n+" of "+t+" ticked"}
+function applySquadSelection(fromId){
+ if(!requireWriteAccess())return;
+ let L=stagesList(),to=document.getElementById("ssTo").value,mode=document.getElementById("ssMode").value,rel=L.find(s=>s.released).id;
+ let checked=new Set([...document.querySelectorAll('.ssChk:checked')].map(c=>c.dataset.id)),notes={};document.querySelectorAll('.ssNote').forEach(i=>notes[i.dataset.id]=i.value.trim());
+ let ps=stagePlayers(fromId),promote=ps.filter(p=>checked.has(p.id)).length,drop=mode==="release"?ps.length-promote:0;
+ if(!ps.length)return;
+ if(!confirm(`Move ${promote} player${promote===1?"":"s"} to ${L.find(s=>s.id===to).name}`+(drop?` and ${drop} to ${L.find(s=>s.id===rel).name}`:"")+"?\n\nNo data is deleted. You can undo this right after."))return;
+ let moves=[];
+ ps.forEach(p=>{let target=checked.has(p.id)?to:(mode==="release"?rel:fromId);if(target===fromId)return;
+  if(!Array.isArray(p.stageLog))p.stageLog=[];p.stageLog.push({date:today(),from:fromId,to:target,reason:notes[p.id]||""});p.stage=target;moves.push({id:p.id,from:fromId})});
+ db.settings.lastSelection=moves.length?{date:today(),moves}:null;save();closeM();players();
+}
+function undoSquadSelection(){
+ let last=db.settings.lastSelection;if(!last||!confirm("Undo the last squad selection? Those players go back to where they were."))return;
+ last.moves.forEach(m=>{let p=db.players.find(x=>x.id===m.id);if(p){p.stage=m.from;if(Array.isArray(p.stageLog))p.stageLog.pop()}});
+ db.settings.lastSelection=null;save();closeM();players();
+}
+function stageListReport(id){
+ let st=stagesList().find(s=>s.id===id)||stagesList()[0],ps=stagePlayers(st.id);
+ reportShell(esc(st.name),`${ps.length} players · ${esc(fmtDate(today()))}`,ps.length?ps.map((p,i)=>`<div class="card"><b>${i+1}. ${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span>${playingStyleLabel(p)?`<p class="muted">${esc(playingStyleLabel(p))}</p>`:""}</div>`).join(""):empty("No players in this stage."));
+}
+function stagesSettingsSheet(){
+ let L=stagesList();
+ modal(`<div class="sheetHead"><h2>Edit stages</h2><button class="x" onclick="squadSelectSheet()">×</button></div>
+ <p class="muted">Rename, reorder or add stages (up to 8). The last one is where released players go. A stage can only be removed when it has no players.</p>
+ <div class="list">${L.map((s,i)=>`<div class="item" style="align-items:center"><input value="${esc(s.name)}" onchange="renameStage('${s.id}',this.value)" style="flex:1 1 auto;min-width:0"><div class="toolbar">${s.released?"":`<button class="btn secondary iconBtn" ${i===0?"disabled":""} onclick="moveStage('${s.id}',-1)">↑</button><button class="btn secondary iconBtn" ${(i>=L.length-2)?"disabled":""} onclick="moveStage('${s.id}',1)">↓</button><button class="btn danger iconBtn" onclick="removeStage('${s.id}')">${icon("trash",16)}</button>`}</div></div>`).join("")}</div>
+ <button class="btn primary" style="margin-top:12px" onclick="addStage()" ${L.length>=8?"disabled":""}>+ Add stage</button>`);
+}
+function renameStage(id,v){v=v.trim();if(!v)return;let s=stagesList().find(x=>x.id===id);if(s){s.name=v;save();stagesSettingsSheet()}}
+function moveStage(id,d){let L=stagesList(),i=L.findIndex(x=>x.id===id),j=i+d;if(j<0||j>=L.length-1||L[i].released)return;[L[i],L[j]]=[L[j],L[i]];save();stagesSettingsSheet()}
+function removeStage(id){let L=stagesList(),s=L.find(x=>x.id===id);if(!s||s.released)return;if(L.filter(x=>!x.released).length<2){alert("Keep at least one stage.");return}if(stagePlayers(id).length){alert("Move the players out of this stage first.");return}if(!confirm("Remove stage \""+s.name+"\"?"))return;db.settings.stages=L.filter(x=>x.id!==id);save();stagesSettingsSheet()}
+function addStage(){let L=stagesList();if(L.length>=8)return;let n=L.filter(x=>!x.released).length+1;L.splice(L.length-1,0,{id:uid("st"),name:"Stage "+n});save();stagesSettingsSheet()}
+/* ===== end squad stages ===== */
 function players(){
  let list=db.players.filter(p=>!p.deletedAt).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
  if(playerQuery){let q=playerQuery.toLowerCase();list=list.filter(p=>[p.name,p.team,p.group,p.strengths,p.areas,p.focus,p.notes].some(v=>String(v||"").toLowerCase().includes(q)))}
  if(playerRoleFilter)list=list.filter(p=>p.role===playerRoleFilter);
  if(playerTeamFilter)list=list.filter(p=>p.team===playerTeamFilter);
+ if(stageFilter&&!stagesList().some(x=>x.id===stageFilter))stageFilter="";
+ if(stageFilter)list=list.filter(p=>stageOf(p).id===stageFilter);
  document.getElementById("players").innerHTML=head("Players","Development record for every player.")
- +`<div class="toolbar noPrint"><button class="btn primary" onclick="newPlayer()">+ Add Player</button><button class="btn secondary" onclick="newPlayersBulk()">+ Add Multiple</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess</button><button class="btn secondary iconBtn" title="Print Roster" onclick="playerRosterReport()">${icon("print",17)}</button></div>
+ +`<div class="toolbar noPrint" style="flex-wrap:wrap"><button class="btn primary" onclick="newPlayer()">+ Add Player</button><button class="btn secondary" onclick="newPlayersBulk()">+ Add Multiple</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess</button><button class="btn secondary" onclick="squadSelectSheet()">Select squad</button><button class="btn secondary iconBtn" title="Print Roster" onclick="playerRosterReport()">${icon("print",17)}</button></div>
+ ${stageChipsHtml()}
  ${filterBarHtml("players",`<input id="playerSearch" value="${esc(playerQuery)}" oninput="playerQuery=this.value;players()" onfocus="playerSearchFocused=true" onblur="playerSearchFocused=false" placeholder="Search players, teams, notes...">`,`<label>Role<select onchange="playerRoleFilter=this.value;players()"><option value="">All roles</option>${PLAYER_ROLES.map(r=>`<option value="${r}" ${playerRoleFilter===r?"selected":""}>${r}</option>`).join("")}</select></label>
  <label>Team<select onchange="playerTeamFilter=this.value;players()"><option value="">All teams</option>${playerTeams().map(t=>`<option value="${esc(t)}" ${playerTeamFilter===t?"selected":""}>${esc(t)}</option>`).join("")}</select></label>`,(playerRoleFilter?1:0)+(playerTeamFilter?1:0))}
  <h2 class="section">Player database (${list.length})</h2>
@@ -2617,6 +2710,7 @@ function playerViewBody(p,forPrint){
  ${playerGoalsHtml(p)}
  ${forPrint?playerProgressPrintHtml(playerAssessments(p)):playerProgressChartHtml(p)}
  ${fitnessTestsHtml(p,forPrint)}
+ ${forPrint?"":playerStageHtml(p)}
  ${p.strengths?`<h2 class="section">Strengths</h2><div class="card">${esc(p.strengths)}</div>`:""}
  ${p.areas?`<h2 class="section">Development areas</h2><div class="card">${esc(p.areas)}</div>`:""}
  ${p.notes?`<h2 class="section">Coach notes</h2><div class="card">${esc(p.notes)}</div>`:""}
@@ -2829,7 +2923,7 @@ function openBulkAssessment(){
  <div id="bulkFormatPick"></div>
  <div id="bulkAssessmentBody"></div>`);
 }
-function bulkPlayers(){return activePlayers().filter(p=>!bulkAssessmentDraft.team||p.team===bulkAssessmentDraft.team)}
+function bulkPlayers(){return activePlayers().filter(p=>!isReleased(p)).filter(p=>!bulkAssessmentDraft.team||p.team===bulkAssessmentDraft.team)}
 function bulkSkillsList(){
  let d=bulkAssessmentDraft.discipline,f=bulkAssessmentDraft.format;
  if(!d)return [];
