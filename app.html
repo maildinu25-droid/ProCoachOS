@@ -215,6 +215,25 @@ p{orphans:3;widows:3}
    auto-zooms, so its original compact sizing is untouched); !important is
    needed because those fields set their smaller size inline.*/
 @media(max-width:850px){input,textarea,select{font-size:16px!important}}
+
+/* ---- UI polish: compact filters, row menus, avatars, Today card ---- */
+.fbar{display:flex;gap:8px;margin:14px 0}.fbar input{flex:1;min-width:0}.fbar .btn{flex:0 0 auto;white-space:nowrap}.fpanel{margin:-4px 0 14px}
+.kebabWrap{position:relative;flex:0 0 auto}.kebabWrap>.btn{font-size:20px;line-height:1;letter-spacing:1px}
+.kebabMenu{display:none;position:absolute;right:0;top:44px;z-index:40;min-width:190px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.35);padding:6px}
+.kebabMenu.up{top:auto;bottom:44px}.kebabMenu.open{display:block}
+.kebabMenu button{display:flex;gap:10px;align-items:center;width:100%;text-align:left;background:none;border:0;color:var(--ink);padding:11px 12px;border-radius:8px;font-size:var(--fs-3);font-weight:600;cursor:pointer}
+.kebabMenu button:hover{background:var(--surface)}.kebabMenu button.danger{color:var(--red)}
+.item>.avatar{flex:0 0 42px}.avatar{width:42px;height:42px;border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--mint);color:var(--g);font-weight:800;font-family:'Sora',sans-serif;font-size:15px}
+.item>.sessThumb{flex:0 0 76px}.sessThumb .fieldStepPreviewWrap{margin:0!important}
+.todayHero{background:linear-gradient(135deg,rgba(16,185,129,.2),rgba(59,130,246,.1)),var(--surface);border:1px solid var(--line);border-radius:20px;padding:18px;margin-bottom:14px}
+.todayHero .thLabel{font-size:var(--fs-2);font-weight:800;letter-spacing:1.2px;text-transform:uppercase;color:var(--g)}
+.todayHero .thTitle{font-family:'Sora',sans-serif;font-size:var(--fs-6);font-weight:800;color:var(--ink);margin:4px 0 2px}
+.todayHero .thMeta{color:var(--muted);font-size:var(--fs-3);margin-bottom:12px}
+.todayHero .thBtns{display:flex;gap:8px;flex-wrap:wrap}.todayHero .thBtns .btn{flex:1 1 130px}
+.todayHero .thMore{margin-top:12px;border-top:1px solid var(--line);padding-top:6px}
+#profileBadge{width:38px;height:38px;padding:0!important;border-radius:50%!important;max-width:none;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
+.muted{color:color-mix(in srgb,var(--muted) 82%,var(--ink) 18%)}
+main .card .card{background:transparent}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
@@ -1188,6 +1207,14 @@ function dashboard(){
  let homeScreenDismissed=localStorage.getItem("coachbook_homescreen_notice_dismissed")==="1";
  let showHomeScreenNotice=!isStandaloneMode()&&!homeScreenDismissed&&window.innerWidth<=850;
 
+ let todayRows=(skipId)=>todaySessions.filter(x=>x.id!==skipId).map(x=>`<div class="taskItem" style="cursor:pointer" onclick="editSession('${x.id}')"><div class="taskDot done"></div><div class="taskText"><b>${esc(sessionLabel(x))}</b><span>${x.duration?esc(x.duration)+" min":""}</span></div></div>`).join("")+todayMatches.map(m=>`<div class="taskItem" style="cursor:pointer" onclick="editMatch('${m.id}')"><div class="taskDot done"></div><div class="taskText"><b>vs ${esc(m.opp||"Opposition")}</b><span>Match day</span></div></div>`).join("")+todayEvents.map(e=>`<div class="taskItem" style="cursor:pointer" onclick="editCalEvent('${e.id}')"><div class="taskDot done"></div><div class="taskText"><b>${esc(e.title)}</b><span>${esc(e.time||e.type||"Event")}</span></div></div>`).join("");
+ let heroSession=todaySessions.slice().sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b)))[0]||null;
+ let nextSession=(!heroSession&&!todayMatches.length&&!todayEvents.length)?activeSessions().filter(x=>x.date>today()).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b)))[0]||null:null;
+ let heroMeta=x=>[x.time||"",x.duration?x.duration+" min":"",x.squad||"",((x.mainDrillIds||[]).length+(x.gameDrillIds||[]).length)?((x.mainDrillIds||[]).length+(x.gameDrillIds||[]).length)+" drills":""].filter(Boolean).join(" · ");
+ let todayHeroHtml=isNewUser?"":(heroSession?`<div class="todayHero"><div class="thLabel">Today</div><div class="thTitle">${esc(sessionLabel(heroSession))}</div><div class="thMeta">${esc(heroMeta(heroSession))}</div><div class="thBtns"><button class="btn primary" onclick="printSessionPlan('${heroSession.id}')">Open plan</button><button class="btn secondary" onclick="editSession('${heroSession.id}')">Edit</button></div>${todayCount>1?`<div class="thMore">${todayRows(heroSession.id)}</div>`:""}</div>`
+  :(todayCount?`<div class="todayHero"><div class="thLabel">Today</div><div class="thTitle">${todayMatches.length?"Match day":"On today"}</div><div class="thMore" style="border:0;margin-top:8px;padding:0">${todayRows("")}</div></div>`
+  :(nextSession?`<div class="todayHero"><div class="thLabel">Nothing today · next up</div><div class="thTitle">${esc(sessionLabel(nextSession))}</div><div class="thMeta">${esc(fmtDate(nextSession.date))}${heroMeta(nextSession)?" · "+esc(heroMeta(nextSession)):""}</div><div class="thBtns"><button class="btn primary" onclick="printSessionPlan('${nextSession.id}')">Open plan</button><button class="btn secondary" onclick="editSession('${nextSession.id}')">Edit</button></div></div>`
+  :`<div class="todayHero"><div class="thLabel">Today</div><div class="thTitle">Nothing planned</div><div class="thMeta">Plan your next session in a couple of minutes.</div><div class="thBtns"><button class="btn primary" onclick="go('sessions');newSession()">Plan a session</button></div></div>`)));
  dashboardEl.innerHTML=`
  ${showBackupNotice?`<div class="card" style="border-color:var(--blue2);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
  <div><b>Your data lives on this device only</b><div class="muted" style="font-size:var(--fs-2);margin-top:2px">Nothing syncs to the cloud automatically. Export a backup so you can move to a new phone or browser without losing anything.</div></div>
@@ -1209,7 +1236,7 @@ function dashboard(){
  <button class="btn secondary" style="flex-shrink:0" onclick="localStorage.setItem('coachbook_homescreen_notice_dismissed','1');dashboard()">Got it</button>
  </div>`):""}
  <div class="homeHeader">
- <div><div class="homeGreeting">${greetingWord()}, <b>${esc(profile.name||"Coach")}</b> 👋</div><div class="homeSub">${esc(fmtCalDate(today()))}</div></div>
+ <div><div class="homeGreeting">${greetingWord()}, <b>${esc(coachDisplayName().split(" ")[0])}</b> 👋</div><div class="homeSub">${esc(fmtCalDate(today()))}</div>${(!db.settings.coachName&&coachDisplayName()==="Coach")?`<div class="homeSub"><a style="color:var(--g);cursor:pointer;font-weight:700" onclick="setCoachName()">Set your name</a></div>`:""}</div>
  <div style="display:flex;gap:8px;align-items:center">
  <button class="bellBtn" onclick="openNotifications()" aria-label="Pending items">${icon("bell",17)}${pendingCount?`<span class="badge">${pendingCount}</span>`:""}</button>
  <button class="searchIconBtn" onclick="openGlobalSearch()" aria-label="Search">${icon("search",16)}</button>
@@ -1219,10 +1246,12 @@ function dashboard(){
  ${(daysSinceActivity!==null&&daysSinceActivity>=5)?`<div class="card" style="margin-top:12px;border:1px solid var(--red);background:var(--redTint)"><b style="color:var(--red)">It's been ${daysSinceActivity} days since anything was logged</b><div class="muted" style="margin-top:4px">No sessions, reflections, assessments or matches recorded since ${esc(fmtDate(lastActivityDate))}. A quick log now keeps your trends and reports meaningful.</div></div>`:""}
 
  <div class="homeScroll">
+ ${todayHeroHtml}
  ${isNewUser?`<div class="homeSection">
  <div class="card glass">
  <div class="homeGreeting" style="font-size:var(--fs-5)">Welcome to ProCoach OS 👋</div>
  <div class="homeSub" style="margin-bottom:10px">A few quick steps to get set up.</div>
+ <div class="taskItem" style="cursor:pointer" onclick="setCoachName()"><div class="taskDot ${db.settings.coachName?"done":""}"></div><div class="taskText"><b>Tell us your name</b><span>${db.settings.coachName?esc(db.settings.coachName):"So we can greet you properly"}</span></div></div>
  <div class="taskItem" style="cursor:pointer" onclick="go('players');newPlayer()"><div class="taskDot"></div><div class="taskText"><b>Add your first player</b><span>Build your roster</span></div></div>
  <div class="taskItem" style="cursor:pointer" onclick="go('organisation')"><div class="taskDot"></div><div class="taskText"><b>Create a team</b><span>Optional — group players together</span></div></div>
  <div class="taskItem" style="cursor:pointer" onclick="go('sessions');newSession()"><div class="taskDot"></div><div class="taskText"><b>Plan your first session</b><span>Objectives, drills, attendance</span></div></div>
@@ -1245,11 +1274,6 @@ function dashboard(){
  <div class="bentoTile bento-sm tap" onclick="go('calendar')"><div class="bIcon">${icon("sessions",20)}</div><div><div class="bNum">${todayCount}</div><div class="bLabel">today</div></div></div>
 
  <div class="bentoTile bento-sm tap" onclick="assessPendingPlayers()"><div class="bIcon">${icon("trophy",20)}</div><div><div class="bNum">${unassessedCount}</div><div class="bLabel">awaiting assessment</div></div></div>
-
- <div class="bentoTile bento-wide">
- <div class="homeSectionTitle">Today <a onclick="go('calendar')">View all</a></div>
- ${todayCount?`${todaySessions.map(s=>`<div class="taskItem" style="cursor:pointer" onclick="editSession('${s.id}')"><div class="taskDot done"></div><div class="taskText"><b>${esc(sessionLabel(s))}</b><span>${s.duration?esc(s.duration)+" min":""}</span></div></div>`).join("")}${todayMatches.map(m=>`<div class="taskItem" style="cursor:pointer" onclick="editMatch('${m.id}')"><div class="taskDot done"></div><div class="taskText"><b>vs ${esc(m.opp||"Opposition")}</b><span>Match day</span></div></div>`).join("")}${todayEvents.map(e=>`<div class="taskItem" style="cursor:pointer" onclick="editCalEvent('${e.id}')"><div class="taskDot done"></div><div class="taskText"><b>${esc(e.title)}</b><span>${esc(e.time||e.type||"Event")}</span></div></div>`).join("")}`:empty("Nothing scheduled today.")}
- </div>
 
  <div class="bentoTile bento-wide" id="todayFocusCard">
  <div class="homeSectionTitle">Pending</div>
@@ -1305,17 +1329,15 @@ function sessions(){
  document.getElementById("sessions").innerHTML=head("Session Plans","Plan, document and review every coaching session.")
  +`<button class="btn primary noPrint" onclick="newSession()">+ New Session</button>
  <button class="btn secondary noPrint" style="margin-left:8px" onclick="manageSessionTemplates()">Templates</button>
- <div class="card" style="margin:15px 0"><div class="formgrid">
- <label>Search<input id="sessionSearch" value="${esc(sessionQuery)}" oninput="sessionQuery=this.value;sessions()" onfocus="sessionSearchFocused=true" onblur="sessionSearchFocused=false" placeholder="Title, squad, objectives, venue..."></label>
- <label>Squad / Team<select onchange="sessionSquadFilter=this.value;sessions()"><option value="">All</option>${squadOptions.map(sq=>`<option value="${esc(sq)}" ${sessionSquadFilter===sq?"selected":""}>${esc(sq)}</option>`).join("")}</select></label>
- </div></div>
+ ${filterBarHtml("sessions",`<input id="sessionSearch" value="${esc(sessionQuery)}" oninput="sessionQuery=this.value;sessions()" onfocus="sessionSearchFocused=true" onblur="sessionSearchFocused=false" placeholder="Search sessions, squads, venues...">`,`<label>Squad / Team<select onchange="sessionSquadFilter=this.value;sessions()"><option value="">All</option>${squadOptions.map(sq=>`<option value="${esc(sq)}" ${sessionSquadFilter===sq?"selected":""}>${esc(sq)}</option>`).join("")}</select></label>`,sessionSquadFilter?1:0)}
  <h2 class="section">Sessions (${list.length})</h2>
  <div class="card">${list.length?`<div class="list">${list.map(s=>{
   let mainDrills=(s.mainDrillIds||[]).map(id=>db.drills.find(d=>d.id===id)).filter(Boolean);
   let gameDrills=(s.gameDrillIds||[]).map(id=>db.drills.find(d=>d.id===id)).filter(Boolean);
   let linkedReflection=db.reflections.find(r=>r.sessionId===s.id);
   let showReflectionStatus=s.date<=today();
-  return `<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.concat(gameDrills).map(d=>`<span class="tag" style="cursor:pointer" onclick="viewDrill('${d.id}')">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px"><a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar wrap3"><button class="btn secondary iconBtn" title="Share via WhatsApp" onclick="shareSessionSummary('${s.id}')">${icon("share",17)}</button><button class="btn secondary iconBtn" title="Copy Text" onclick="copySessionSummary('${s.id}')">${icon("copy",17)}</button><button class="btn secondary iconBtn" title="Print Plan" onclick="printSessionPlan('${s.id}')">${icon("print",17)}</button><button class="btn secondary iconBtn" title="Edit" onclick="editSession('${s.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delSession('${s.id}')">${icon("trash",17)}</button></div></div>`;
+  let thumbDrill=mainDrills.concat(gameDrills).find(d=>d.fieldSteps&&d.fieldSteps.length);
+  return `<div class="item">${thumbDrill?`<div class="sessThumb">${fieldStepsPreviewHtml(thumbDrill.fieldSteps.slice(0,1),76)}</div>`:""}<div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.concat(gameDrills).map(d=>`<span class="tag" style="cursor:pointer" onclick="viewDrill('${d.id}')">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px"><a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="printSessionPlan('${s.id}')">View</button>${kebabMenu("s"+s.id,[{label:"Edit",icon:"edit",fn:`editSession('${s.id}')`},{label:"Share on WhatsApp",icon:"share",fn:`shareSessionSummary('${s.id}')`},{label:"Copy text",icon:"copy",fn:`copySessionSummary('${s.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delSession('${s.id}')`}])}</div></div>`;
  }).join("")}</div>`:empty("No sessions match your search.")}</div>`;
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -2390,7 +2412,19 @@ function savePlayer(e){
 function delPlayer(id){if(confirm("Delete this player? You can restore them later from Account & Backup. Their assessments and match entries will remain but be unlinked.")){let p=db.players.find(x=>x.id===id);if(p){p.deletedAt=Date.now();save();players()}}}
 function restorePlayer(id){let p=db.players.find(x=>x.id===id);if(p){delete p.deletedAt;save();accountPage()}}
 function permanentlyDeletePlayer(id){if(confirm("Permanently delete this player? This cannot be undone.")){db.players=db.players.filter(x=>x.id!==id);save();accountPage()}}
-function playerCardHtml(p){return `<div class="item"><div><b>${esc(p.name)}</b>${p.available==="no"?` <span class="tag" style="background:var(--redTint);color:var(--red)">Unavailable</span>`:""}<div class="muted">${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}${p.group?" · "+esc(p.group):""}</div></div><div class="toolbar"><button class="btn secondary" onclick="playerView('${p.id}')">Profile</button><button class="btn secondary iconBtn" title="Edit" onclick="editPlayer('${p.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delPlayer('${p.id}')">${icon("trash",17)}</button></div></div>`}
+
+function initials(n){let p=String(n||"?").trim().split(/\s+/);return((p[0]||"?")[0]+(p.length>1?p[p.length-1][0]:"")).toUpperCase()}
+function coachDisplayName(){let n=(db.settings&&db.settings.coachName)||"";if(n)return n;let pn=(getActiveProfile().name||"").trim();return(pn&&pn!=="My Coaching Profile")?pn:"Coach"}
+function refreshProfileBadge(){let b=document.getElementById("profileBadge");if(b){b.textContent=initials(coachDisplayName());b.title=coachDisplayName()+" · "+(getActiveProfile().name||"");b.setAttribute("aria-label","Account and profile")}}
+function setCoachName(){let v=prompt("What should we call you?",(db.settings.coachName||""));if(v===null)return;v=v.trim();if(!v)return;db.settings.coachName=v;save()}
+const filtersOpen={players:false,sessions:false,drills:false};
+function toggleFilters(k){filtersOpen[k]=!filtersOpen[k];({players:players,sessions:sessions,drills:drills})[k]()}
+function filterBarHtml(k,searchHtml,panelHtml,activeCount){return `<div class="fbar noPrint">${searchHtml}<button type="button" class="btn secondary" onclick="toggleFilters('${k}')">Filters${activeCount?` · ${activeCount}`:""}</button></div>${filtersOpen[k]?`<div class="card fpanel"><div class="formgrid">${panelHtml}</div></div>`:""}`}
+function kebabMenu(id,items){return `<div class="kebabWrap"><button type="button" class="btn secondary iconBtn" aria-label="More actions" onclick="toggleKebab('${id}',event)">⋯</button><div class="kebabMenu" id="kb-${id}">${items.map(i=>`<button type="button" class="${i.danger?"danger":""}" onclick="closeKebabs();${i.fn}">${i.icon?icon(i.icon,16):""}<span>${i.label}</span></button>`).join("")}</div></div>`}
+function closeKebabs(){document.querySelectorAll(".kebabMenu.open").forEach(m=>m.classList.remove("open"))}
+function toggleKebab(id,ev){ev.stopPropagation();let m=document.getElementById("kb-"+id);if(!m)return;let was=m.classList.contains("open");closeKebabs();if(was)return;m.classList.remove("up");m.classList.add("open");let r=m.getBoundingClientRect();if(r.bottom>window.innerHeight-80)m.classList.add("up")}
+document.addEventListener("click",function(e){if(!e.target.closest(".kebabWrap"))closeKebabs()});
+function playerCardHtml(p){return `<div class="item"><div class="avatar">${esc(initials(p.name))}</div><div><b>${esc(p.name)}</b>${p.available==="no"?` <span class="tag" style="background:var(--redTint);color:var(--red)">Unavailable</span>`:""}<div class="muted">${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}${p.group?" · "+esc(p.group):""}</div></div><div class="toolbar"><button class="btn secondary" onclick="playerView('${p.id}')">Profile</button>${kebabMenu("p"+p.id,[{label:"Edit",icon:"edit",fn:`editPlayer('${p.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delPlayer('${p.id}')`}])}</div></div>`}
 function players(){
  let list=db.players.filter(p=>!p.deletedAt).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
  if(playerQuery){let q=playerQuery.toLowerCase();list=list.filter(p=>[p.name,p.team,p.group,p.strengths,p.areas,p.focus,p.notes].some(v=>String(v||"").toLowerCase().includes(q)))}
@@ -2398,11 +2432,8 @@ function players(){
  if(playerTeamFilter)list=list.filter(p=>p.team===playerTeamFilter);
  document.getElementById("players").innerHTML=head("Players","Development record for every player.")
  +`<div class="toolbar noPrint"><button class="btn primary" onclick="newPlayer()">+ Add Player</button><button class="btn secondary" onclick="newPlayersBulk()">+ Add Multiple</button><button class="btn secondary iconBtn" title="Print Roster" onclick="playerRosterReport()">${icon("print",17)}</button></div>
- <div class="card" style="margin:15px 0"><div class="formgrid">
- <label>Search<input id="playerSearch" value="${esc(playerQuery)}" oninput="playerQuery=this.value;players()" onfocus="playerSearchFocused=true" onblur="playerSearchFocused=false" placeholder="Name, team, notes..."></label>
- <label>Role<select onchange="playerRoleFilter=this.value;players()"><option value="">All roles</option>${PLAYER_ROLES.map(r=>`<option value="${r}" ${playerRoleFilter===r?"selected":""}>${r}</option>`).join("")}</select></label>
- <label>Team<select onchange="playerTeamFilter=this.value;players()"><option value="">All teams</option>${playerTeams().map(t=>`<option value="${esc(t)}" ${playerTeamFilter===t?"selected":""}>${esc(t)}</option>`).join("")}</select></label>
- </div></div>
+ ${filterBarHtml("players",`<input id="playerSearch" value="${esc(playerQuery)}" oninput="playerQuery=this.value;players()" onfocus="playerSearchFocused=true" onblur="playerSearchFocused=false" placeholder="Search players, teams, notes...">`,`<label>Role<select onchange="playerRoleFilter=this.value;players()"><option value="">All roles</option>${PLAYER_ROLES.map(r=>`<option value="${r}" ${playerRoleFilter===r?"selected":""}>${r}</option>`).join("")}</select></label>
+ <label>Team<select onchange="playerTeamFilter=this.value;players()"><option value="">All teams</option>${playerTeams().map(t=>`<option value="${esc(t)}" ${playerTeamFilter===t?"selected":""}>${esc(t)}</option>`).join("")}</select></label>`,(playerRoleFilter?1:0)+(playerTeamFilter?1:0))}
  <h2 class="section">Player database (${list.length})</h2>
  <div class="list">${list.length?list.map(playerCardHtml).join(""):empty("Add players to begin.")}</div>`;
  let sEl=document.getElementById("playerSearch");if(sEl&&playerSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
@@ -4191,7 +4222,7 @@ function fieldStepsPreviewHtml(fieldSteps,size){
  let steps=fieldSteps.map(normalizeFieldStep);
  return `<div class="fieldStepPreviewWrap" style="display:flex;gap:${size>=200?16:8}px;flex-wrap:wrap;margin:10px 0">${steps.map(st=>{let shape=curFieldShape(st);let view={shape:shape,items:curFieldItems(st)};return `<div class="fieldStepBlock" style="width:${size}px"><div style="font-size:${size>=200?"var(--fs-2)":"var(--fs-1)"};color:var(--muted);margin-bottom:3px;text-align:center">${esc(st.label||"")}</div>${fieldDiagramSvg(view,{interactive:false})}${fieldLegendHtml(view.items,true)}</div>`}).join("")}</div>`;
 }
-function drillCardHtml(d){return `<div class="card"><span class="tag">${esc(d.cat||"General")}</span><h3>${esc(d.name)}</h3><div class="muted">${esc(d.players||"")}${d.duration?" · "+esc(d.duration):""}${d.equipment?" · "+esc(d.equipment):""}</div>${d.diagram?`<img src="${d.diagram}" style="max-width:100%;border-radius:10px;margin:10px 0">`:""}${fieldStepsPreviewHtml(d.fieldSteps)}<p>${esc(d.points||"")}</p>${d.progressions?`<div class="muted"><b>Progression:</b> ${esc(d.progressions)}</div>`:""}${d.regressions?`<div class="muted"><b>Regression:</b> ${esc(d.regressions)}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary iconBtn" title="Edit" onclick="editDrill('${d.id}')">${icon("edit",17)}</button><button class="btn secondary iconBtn" title="Duplicate Drill" onclick="duplicateDrill('${d.id}')">${icon("copy",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delDrill('${d.id}')">${icon("trash",17)}</button></div></div>`}
+function drillCardHtml(d){return `<div class="card"><span class="tag">${esc(d.cat||"General")}</span><h3>${esc(d.name)}</h3><div class="muted">${esc(d.players||"")}${d.duration?" · "+esc(d.duration):""}${d.equipment?" · "+esc(d.equipment):""}</div>${d.diagram?`<img src="${d.diagram}" style="max-width:100%;border-radius:10px;margin:10px 0">`:""}${fieldStepsPreviewHtml(d.fieldSteps)}<p>${esc(d.points||"")}</p>${d.progressions?`<div class="muted"><b>Progression:</b> ${esc(d.progressions)}</div>`:""}${d.regressions?`<div class="muted"><b>Regression:</b> ${esc(d.regressions)}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary" onclick="viewDrill('${d.id}')">View</button><button class="btn secondary" onclick="editDrill('${d.id}')">Edit</button>${kebabMenu("d"+d.id,[{label:"Duplicate",icon:"copy",fn:`duplicateDrill('${d.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delDrill('${d.id}')`}])}</div></div>`}
 function drillLibraryReport(){
  let list=db.drills.slice().sort((a,b)=>String(a.cat||"").localeCompare(String(b.cat||""))||String(a.name||"").localeCompare(String(b.name||"")));
  reportShell("Drill Library",`${list.length} drills`,
@@ -4203,10 +4234,7 @@ function drills(){
  if(drillCatFilter)list=list.filter(d=>d.cat===drillCatFilter);
  document.getElementById("drills").innerHTML=head("Drill Library","Keep your best coaching practices organised and reusable.")
  +`<div class="toolbar noPrint"><button class="btn primary" onclick="newDrill()">+ Add Drill</button><button class="btn secondary iconBtn" title="Print Library" onclick="drillLibraryReport()">${icon("print",17)}</button></div>
- <div class="card" style="margin:15px 0"><div class="formgrid">
- <label>Search<input id="drillSearch" value="${esc(drillQuery)}" oninput="drillQuery=this.value;drills()" onfocus="drillSearchFocused=true" onblur="drillSearchFocused=false" placeholder="Name, equipment, coaching points..."></label>
- <label>Skill category<select onchange="drillCatFilter=this.value;drills()"><option value="">All categories</option>${DRILL_CATS.map(c=>`<option value="${c}" ${drillCatFilter===c?"selected":""}>${c}</option>`).join("")}</select></label>
- </div></div>
+ ${filterBarHtml("drills",`<input id="drillSearch" value="${esc(drillQuery)}" oninput="drillQuery=this.value;drills()" onfocus="drillSearchFocused=true" onblur="drillSearchFocused=false" placeholder="Search drills, equipment, points...">`,`<label>Skill category<select onchange="drillCatFilter=this.value;drills()"><option value="">All categories</option>${DRILL_CATS.map(c=>`<option value="${c}" ${drillCatFilter===c?"selected":""}>${c}</option>`).join("")}</select></label>`,drillCatFilter?1:0)}
  <h2 class="section">Drills (${list.length})</h2>
  <div class="grid g2">${list.length?list.map(drillCardHtml).join(""):empty("No drills match your search.")}</div>`;
  let sEl=document.getElementById("drillSearch");if(sEl&&drillSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
@@ -6719,7 +6747,7 @@ function accountPage(){
  let active=getActiveProfile();
  let lastBackup=localStorage.getItem("coachbook_last_backup");
  let daysSince=lastBackup?Math.floor((new Date(today())-new Date(lastBackup))/86400000):null;
- let badge=document.getElementById("profileBadge");if(badge)badge.textContent=active.name;
+ let badge=document.getElementById("profileBadge");if(badge)badge.textContent=initials(coachDisplayName());
  let usedBytes=storageUsageBytes();
  let usedMB=usedBytes/1024/1024;
  let estLimitMB=500;
@@ -6836,7 +6864,7 @@ function globalSearchResultsHtml(){
 /* ===== End Global Search ===== */
 
 function quick(){modal(`<div class="sheetHead"><h2>Create</h2><button class="x" onclick="closeM()">×</button></div><div class="grid g2"><button class="btn secondary" onclick="closeM();newSession()">Session Plan</button><button class="btn secondary" onclick="closeM();newReflection()">Self Reflection</button><button class="btn secondary" onclick="closeM();newPlayer()">Player</button><button class="btn secondary" onclick="closeM();newAssessment()">Assessment</button><button class="btn secondary" onclick="closeM();newDrill()">Drill</button><button class="btn secondary" onclick="closeM();newMatch()">Match</button><button class="btn secondary" onclick="closeM();newCalEvent()">Reminder / Event</button><button class="btn secondary" onclick="closeM();go('analysisTools')">Analysis Tools</button></div>`)}
-function renderAll(){dashboard();sessions();reflections();players();assessments();drills();matches();analysisTools();reports();booking();calendar();organisation();accountPage()}initApp();
+function renderAll(){refreshProfileBadge();dashboard();sessions();reflections();players();assessments();drills();matches();analysisTools();reports();booking();calendar();organisation();accountPage()}initApp();
 if("serviceWorker" in navigator && /(^|\/)app\.html$/.test(location.pathname)){
  window.addEventListener("load",()=>{
   navigator.serviceWorker.register("sw.js").catch(()=>{});
