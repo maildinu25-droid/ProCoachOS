@@ -2466,7 +2466,7 @@ function stageChipsHtml(){
 }
 function stageLogHtml(p){
  let L=stagesList(),nm=id=>(L.find(s=>s.id===id)||{name:"?"}).name,log=Array.isArray(p.stageLog)?p.stageLog:[];
- return log.length?log.map(e=>`<div class="item"><div><b>${esc(nm(e.from))} → ${esc(nm(e.to))}</b><div class="muted">${esc(fmtDate(e.date))}${e.reason?" · "+esc(e.reason):""}</div></div></div>`).join(""):`<div class="muted">Still in ${esc(stageOf(p).name)} — no moves yet.</div>`;
+ return log.length?log.map((e,i)=>`<div class="item"><div><b>${esc(nm(e.from))} → ${esc(nm(e.to))}</b><div class="muted">${esc(fmtDate(e.date))}${e.reason?" · "+esc(e.reason):""}</div></div><div class="toolbar"><button class="btn danger iconBtn" title="Delete this move" onclick="deleteStageLogEntry('${p.id}',${i})">${icon("trash",16)}</button></div></div>`).join(""):`<div class="muted">Still in ${esc(stageOf(p).name)} — no moves yet.</div>`;
 }
 function playerStageHtml(p){
  let L=stagesList();
@@ -2479,6 +2479,14 @@ function setPlayerStage(id,to){
  let p=db.players.find(x=>x.id===id);if(!p||stageOf(p).id===to)return;
  if(!Array.isArray(p.stageLog))p.stageLog=[];
  p.stageLog.push({date:today(),from:stageOf(p).id,to,reason:""});p.stage=to;db.settings.lastSelection=null;save();playerView(id);
+}
+function deleteStageLogEntry(id,i){
+ if(!requireWriteAccess())return;
+ let p=db.players.find(x=>x.id===id);if(!p||!Array.isArray(p.stageLog)||!p.stageLog[i])return;
+ let L=stagesList(),nm=x=>(L.find(s=>s.id===x)||{name:"?"}).name,e=p.stageLog[i],isLast=i===p.stageLog.length-1;
+ if(!confirm(`Delete the move "${nm(e.from)} → ${nm(e.to)}"?`+(isLast?`\n\n${p.name} goes back to ${nm(e.from)}.`:"\n\nTheir current stage stays the same."))) return;
+ p.stageLog.splice(i,1);if(isLast&&L.some(s=>s.id===e.from))p.stage=e.from;
+ db.settings.lastSelection=null;save();playerView(id);
 }
 function setPlayerStageNote(id,v){let p=db.players.find(x=>x.id===id);if(!p)return;p.stageNote=v;save()}
 function squadSelectSheet(fromId){
