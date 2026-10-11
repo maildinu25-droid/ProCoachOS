@@ -234,6 +234,13 @@ p{orphans:3;widows:3}
 #profileBadge{width:38px;height:38px;padding:0!important;border-radius:50%!important;max-width:none;display:inline-flex;align-items:center;justify-content:center;font-weight:800;font-size:13px}
 .muted{color:color-mix(in srgb,var(--muted) 82%,var(--ink) 18%)}
 main .card .card{background:transparent}
+
+.emptyRich{text-align:center;padding:26px 18px;border:1px dashed var(--line);border-radius:14px;color:var(--muted)}.emptyRich b{display:block;color:var(--text);font-size:var(--fs-5,16px);margin-bottom:4px}.emptyRich p{margin:0 0 12px;font-size:var(--fs-3)}.emptyRich .btn{display:inline-block}
+.pHead{display:flex;gap:14px;align-items:center;margin-bottom:12px}.pHead .avatar{width:60px;height:60px;font-size:22px;flex:0 0 60px}.pHead h3{margin:0;font-family:'Sora',sans-serif}
+.pStats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:6px}.pStats div{background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:10px 6px;text-align:center}.pStats b{display:block;font-size:18px;color:var(--g);font-family:'Sora',sans-serif}.pStats span{font-size:11px;color:var(--muted)}
+.actionRow{display:grid;grid-template-columns:1fr 1fr;gap:8px}.actionRow .btn{text-align:center}
+.licRow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.linkDanger{background:none;border:0;color:var(--muted);font-size:var(--fs-2);text-decoration:underline;cursor:pointer;padding:6px 0}.linkDanger:hover{color:var(--red)}
+.calCount{display:inline-flex;align-items:center;gap:2px;font-size:10px;font-weight:700;color:var(--muted);margin-right:4px}.calToday .calDayNum{background:var(--g);color:#04130d;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}.calLegend{flex-wrap:wrap;margin-bottom:6px}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
@@ -878,7 +885,7 @@ function initApp(){
  });
 }
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));const today=()=>new Date().toISOString().slice(0,10);
-function save(){idbSet(DB_KEY,db).catch(err=>console.warn("IndexedDB save failed",err));try{localStorage.setItem(DB_KEY,JSON.stringify(db))}catch(e){}renderAll()}function head(t,s){return `<button class="backBtn noPrint" onclick="goBack()">${icon("chevronLeft",13)} Back</button><div class="hero"><h1>${t}</h1><div class="muted">${s}</div></div>`}function empty(t){return `<div class="empty">${t}</div>`}
+function save(){idbSet(DB_KEY,db).catch(err=>console.warn("IndexedDB save failed",err));try{localStorage.setItem(DB_KEY,JSON.stringify(db))}catch(e){}renderAll()}function head(t,s){return `<button class="backBtn noPrint" onclick="goBack()">${icon("chevronLeft",13)} Back</button><div class="hero"><h1>${t}</h1><div class="muted">${s}</div></div>`}function emptyRich(title,text,btn,fn){return `<div class="emptyRich"><b>${title}</b><p>${text}</p>${btn?`<button class="btn primary" onclick="${fn}">${btn}</button>`:""}</div>`}function empty(t){return `<div class="empty">${t}</div>`}
 function cssVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()||"#10b981"}
 function icon(name,size){
  size=size||18;
@@ -1998,12 +2005,9 @@ function reflections(){
  if(reflectionTypeFilter)list=list.filter(x=>(x.type==="match"?"match":"session")===reflectionTypeFilter);
  document.getElementById("reflections").innerHTML=head("Self Reflections","Turn experience into deliberate coaching improvement — from practice sessions and matches alike.")
  +`<button class="btn primary" onclick="newReflection()">+ New Reflection</button>
- <div class="card" style="margin:15px 0"><div class="formgrid">
- <label>Search<input id="reflectionSearch" value="${esc(reflectionQuery)}" oninput="reflectionQuery=this.value;reflections()" onfocus="reflectionSearchFocused=true" onblur="reflectionSearchFocused=false" placeholder="Session, notes, learning..."></label>
- <label>Type<select onchange="reflectionTypeFilter=this.value;reflections()"><option value="">All</option><option value="session" ${reflectionTypeFilter==="session"?"selected":""}>Practice Session</option><option value="match" ${reflectionTypeFilter==="match"?"selected":""}>Match</option></select></label>
- </div></div>
+ ${filterBarHtml("reflections",`<input id="reflectionSearch" value="${esc(reflectionQuery)}" oninput="reflectionQuery=this.value;reflections()" onfocus="reflectionSearchFocused=true" onblur="reflectionSearchFocused=false" placeholder="Search reflections...">`,`<label>Type<select onchange="reflectionTypeFilter=this.value;reflections()"><option value="">All</option><option value="session" ${reflectionTypeFilter==="session"?"selected":""}>Practice Session</option><option value="match" ${reflectionTypeFilter==="match"?"selected":""}>Match</option></select></label>`,reflectionTypeFilter?1:0)}
  <h2 class="section">Reflection history (${list.length})</h2>
- <div class="card">${list.length?list.map(x=>`<div class="item"><div><b>${esc(x.date)} · ${esc(x.session||"Reflection")}</b> <span class="tag">${x.type==="match"?"Match":"Session"}</span><div class="muted">Rating ${esc(x.rating)}/5</div><small>${esc(reflectionWentWellText(x))}</small></div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editReflection('${x.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delReflection('${x.id}')">${icon("trash",17)}</button></div></div>`).join(""):empty("No reflections match your search.")}</div>
+ <div class="card">${list.length?list.map(x=>`<div class="item"><div><b>${esc(x.date)} · ${esc(x.session||"Reflection")}</b> <span class="tag">${x.type==="match"?"Match":"Session"}</span><div class="muted">Rating ${esc(x.rating)}/5</div><small>${esc(reflectionWentWellText(x))}</small></div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editReflection('${x.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delReflection('${x.id}')">${icon("trash",17)}</button></div></div>`).join(""):(db.reflections.length?empty("No reflections match your filters."):emptyRich("No reflections yet","A two-minute note after each session or match is how coaches improve fastest.","+ New Reflection","newReflection()"))}</div>
  ${recurringThemesCardHtml()}`;
  let sEl=document.getElementById("reflectionSearch");if(sEl&&reflectionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -2218,7 +2222,7 @@ function playerAssessmentSeries(p,mode,discipline,skill){
 let playerProgressState={mode:"overall",discipline:"Batting",skill:""};
 function playerProgressChartHtml(p){
  let assessments=playerAssessments(p);
- if(assessments.length<2)return `<h2 class="section">Progress over time</h2><div class="card muted">Needs at least 2 assessments (with real ratings) to show a trend.</div>`;
+ if(assessments.length<2)return `<h2 class="section">Progress over time</h2>${emptyRich("Progress chart unlocks soon","Add at least 2 assessments to see a trend line for this player.","")}`;
  let allDisciplines=[...new Set(assessments.flatMap(a=>assessmentDisciplines(a)))];
  if(!allDisciplines.includes(playerProgressState.discipline))playerProgressState.discipline=allDisciplines[0]||"Batting";
  let skillOptions=allSkillsFor(playerProgressState.discipline);
@@ -2433,7 +2437,7 @@ function players(){
  if(playerRoleFilter)list=list.filter(p=>p.role===playerRoleFilter);
  if(playerTeamFilter)list=list.filter(p=>p.team===playerTeamFilter);
  document.getElementById("players").innerHTML=head("Players","Development record for every player.")
- +`<div class="toolbar noPrint"><button class="btn primary" onclick="newPlayer()">+ Add Player</button><button class="btn secondary" onclick="newPlayersBulk()">+ Add Multiple</button><button class="btn secondary iconBtn" title="Print Roster" onclick="playerRosterReport()">${icon("print",17)}</button></div>
+ +`<div class="toolbar noPrint"><button class="btn primary" onclick="newPlayer()">+ Add Player</button><button class="btn secondary" onclick="newPlayersBulk()">+ Add Multiple</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess</button><button class="btn secondary iconBtn" title="Print Roster" onclick="playerRosterReport()">${icon("print",17)}</button></div>
  ${filterBarHtml("players",`<input id="playerSearch" value="${esc(playerQuery)}" oninput="playerQuery=this.value;players()" onfocus="playerSearchFocused=true" onblur="playerSearchFocused=false" placeholder="Search players, teams, notes...">`,`<label>Role<select onchange="playerRoleFilter=this.value;players()"><option value="">All roles</option>${PLAYER_ROLES.map(r=>`<option value="${r}" ${playerRoleFilter===r?"selected":""}>${r}</option>`).join("")}</select></label>
  <label>Team<select onchange="playerTeamFilter=this.value;players()"><option value="">All teams</option>${playerTeams().map(t=>`<option value="${esc(t)}" ${playerTeamFilter===t?"selected":""}>${esc(t)}</option>`).join("")}</select></label>`,(playerRoleFilter?1:0)+(playerTeamFilter?1:0))}
  <h2 class="section">Player database (${list.length})</h2>
@@ -2509,10 +2513,10 @@ function deleteFitnessTest(playerId,testId){
 function playerGoalsHtml(p){
  let goals=(p.goals||[]).slice().sort((a,b)=>String(a.achieved).localeCompare(String(b.achieved))||String(a.targetDate||"").localeCompare(String(b.targetDate||"")));
  return `<h2 class="section">Goals</h2><div class="card">
- ${goals.length?goals.map(g=>{let st=goalStatusInfo(g);return `<div class="item"><div><b style="${g.achieved?"text-decoration:line-through;opacity:.7":""}">${esc(g.text)}</b><div style="color:${st.color};font-size:var(--fs-2);font-weight:600">${esc(st.text)}</div></div><div class="toolbar"><button class="btn secondary" onclick="togglePlayerGoal('${p.id}','${g.id}')">${g.achieved?"Reopen":"Mark done"}</button><button class="btn danger iconBtn" title="Delete" onclick="deletePlayerGoal('${p.id}','${g.id}')">${icon("trash",17)}</button></div></div>`}).join(""):`<div class="muted" style="margin-bottom:10px">No goals set yet.</div>`}
+ ${goals.length?goals.map(g=>{let st=goalStatusInfo(g);return `<div class="item"><div><b style="${g.achieved?"text-decoration:line-through;opacity:.7":""}">${esc(g.text)}</b><div style="color:${st.color};font-size:var(--fs-2);font-weight:600">${esc(st.text)}</div></div><div class="toolbar"><button class="btn secondary" onclick="togglePlayerGoal('${p.id}','${g.id}')">${g.achieved?"Reopen":"Mark done"}</button><button class="btn danger iconBtn" title="Delete" onclick="deletePlayerGoal('${p.id}','${g.id}')">${icon("trash",17)}</button></div></div>`}).join(""):`<div class="muted" style="margin-bottom:10px">No goals yet — add one below, e.g. a skill to improve by a date.</div>`}
  <form onsubmit="addPlayerGoal(event,'${p.id}')" class="formgrid" style="margin-top:10px;padding:0">
  <input name="text" placeholder="e.g. Improve off-side batting" required>
- <input type="date" name="targetDate" title="Target date (optional)">
+ <label>Target date (optional)<input type="date" name="targetDate"></label>
  <button class="btn primary full" style="margin-top:4px">+ Add Goal</button>
  </form></div>`;
 }
@@ -2596,9 +2600,9 @@ function playerViewBody(p,forPrint){
  let latest=assessments.slice(-1)[0];
  let sessions=playerSessions(p);
  let matches=playerMatches(p);
- return `<div class="grid g2"><div class="card"><b>Role</b><div>${esc(p.role||"—")}${playingStyleLabel(p)?`<div class="muted" style="margin-top:2px">${esc(playingStyleLabel(p))}</div>`:""}</div></div><div class="card"><b>Team / Squad</b><div>${esc(p.team||"—")}${p.group?" · "+esc(p.group):""}</div></div></div>
- ${p.age?`<div class="muted" style="margin-top:8px">Age: ${esc(p.age)}</div>`:""}
- <h2 class="section">Current goal</h2><div class="card">${esc(p.focus||"—")}</div>
+ return `<div class="pHead"><div class="avatar">${esc(initials(p.name))}</div><div><h3>${esc(p.role||"Player")}</h3><div class="muted">${esc(playingStyleLabel(p)||"")}</div><div class="muted">${esc(p.team||"No team")}${p.group?" · "+esc(p.group):""}${p.age?" · Age "+esc(p.age):""}</div></div></div>
+ <div class="pStats"><div><b>${sessions.length}</b><span>Sessions</span></div><div><b>${assessments.length}</b><span>Assessments</span></div><div><b>${latest?assessmentAvg(latest):"—"}</b><span>Latest /10</span></div><div><b>${matches.length}</b><span>Matches</span></div></div>
+ ${p.focus?`<h2 class="section">Current goal</h2><div class="card">${esc(p.focus)}</div>`:""}
  ${playerGoalsHtml(p)}
  ${forPrint?playerProgressPrintHtml(playerAssessments(p)):playerProgressChartHtml(p)}
  ${fitnessTestsHtml(p,forPrint)}
@@ -2919,7 +2923,7 @@ function saveBulkAssessment(){
  closeM();
  assessments();
 }
-function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" onclick="newAssessment()">+ New Assessment</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess Squad</button></div><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(a.date)} · Overall ${assessmentAvg(a)}/10</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}${assessmentFormatTagsHtml(a)}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editAssessment('${a.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delAssessment('${a.id}')">${icon("trash",17)}</button></div></div>`).join(""):empty("No assessments yet.")}</div>`}
+function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<div class="actionRow"><button class="btn primary" onclick="newAssessment()">+ New Assessment</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess Squad</button></div><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(a.date)} · Overall ${assessmentAvg(a)}/10</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}${assessmentFormatTagsHtml(a)}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editAssessment('${a.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delAssessment('${a.id}')">${icon("trash",17)}</button></div></div>`).join(""):emptyRich("No assessments yet","Rate batting, bowling and fielding to track each player's progress over time.","+ New Assessment","newAssessment()")}</div>`}
 function assessmentFormHtml(a,mode){
  a=a||{};
  return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Assessment":"Player Assessment"}</h2><button class="x" onclick="closeM()">×</button></div>
@@ -4265,13 +4269,9 @@ function matches(){
  if(matchFormatFilter)list=list.filter(m=>m.format===matchFormatFilter);
  if(matchResultFilter)list=list.filter(m=>matchResultOutcome(m)===matchResultFilter);
  document.getElementById("matches").innerHTML=head("Match Centre","Match details, foundation, team & individual reviews, and automatic reports.")+`<div class="toolbar noPrint"><button class="btn primary" onclick="newMatch()">+ New Match</button><button class="btn secondary iconBtn" title="Print Report" onclick="matchReport()">${icon("print",17)}</button><button class="btn secondary" onclick="exportExcel()">Export Excel</button></div>
- <div class="card" style="margin:15px 0"><div class="formgrid">
- <label>Search<input id="matchSearch" value="${esc(matchQuery)}" oninput="matchQuery=this.value;matches()" onfocus="matchSearchFocused=true" onblur="matchSearchFocused=false" placeholder="Team, opposition, venue, notes..."></label>
- <label>Format<select onchange="matchFormatFilter=this.value;matches()"><option value="">All formats</option>${MATCH_FORMATS.map(f=>`<option value="${f}" ${matchFormatFilter===f?"selected":""}>${f}</option>`).join("")}</select></label>
- <label>Result<select onchange="matchResultFilter=this.value;matches()"><option value="">All results</option>${["Win","Loss","Draw","NR","Other"].map(f=>`<option value="${f}" ${matchResultFilter===f?"selected":""}>${f}</option>`).join("")}</select></label>
- </div></div>
+ ${filterBarHtml("matches",`<input id="matchSearch" value="${esc(matchQuery)}" oninput="matchQuery=this.value;matches()" onfocus="matchSearchFocused=true" onblur="matchSearchFocused=false" placeholder="Search team, opposition, venue...">`,`<label>Format<select onchange="matchFormatFilter=this.value;matches()"><option value="">All formats</option>${MATCH_FORMATS.map(f=>`<option value="${f}" ${matchFormatFilter===f?"selected":""}>${f}</option>`).join("")}</select></label><label>Result<select onchange="matchResultFilter=this.value;matches()"><option value="">All results</option>${["Win","Loss","Draw","NR","Other"].map(f=>`<option value="${f}" ${matchResultFilter===f?"selected":""}>${f}</option>`).join("")}</select></label>`,(matchFormatFilter?1:0)+(matchResultFilter?1:0))}
  <div id="scorerImportBox"></div>
- <h2 class="section">Match History (${list.length})</h2><div class="grid g2">${list.length?list.map(matchCardHtml).join(""):empty("No matches recorded yet.")}</div>`;
+ <h2 class="section">Match History (${list.length})</h2><div class="grid g2">${list.length?list.map(matchCardHtml).join(""):(db.matches.length?empty("No matches match your filters."):emptyRich("No matches yet","Record a match to get scorecards, reviews and player match history.","+ New Match","newMatch()"))}</div>`;
  refreshScorerImportBox();
  let sEl=document.getElementById("matchSearch");if(sEl&&matchSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -6020,9 +6020,8 @@ function calendar(){
   let ds=`${calYear}-${String(calMonth+1).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
   let items=calItemsForDate(ds);
   let dots="";
-  if(items.sessions.length)dots+=`<span class="calDot calDotS" title="${items.sessions.length} session(s)"></span>`;
-  if(items.matches.length)dots+=`<span class="calDot calDotM" title="${items.matches.length} match(es)"></span>`;
-  if(items.events.length)dots+=`<span class="calDot calDotE" title="${items.events.length} reminder(s)/event(s)"></span>`;
+  const dd=(n,c,t)=>n?`<span class="calCount" title="${n} ${t}"><span class="calDot ${c}"></span>${n>1?n:""}</span>`:"";
+  dots=dd(items.sessions.length,"calDotS","session(s)")+dd(items.matches.length,"calDotM","match(es)")+dd(items.events.length,"calDotE","reminder(s)/event(s)");
   cells+=`<div class="calCell${ds===today()?" calToday":""}" onclick="openCalDay('${ds}')"><div class="calDayNum">${d}</div><div class="calDots">${dots}</div></div>`;
  }
  let upcoming=db.events.slice().filter(e=>e.date>=today()).sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
@@ -6033,7 +6032,7 @@ function calendar(){
  <div class="card"><div class="calGrid calHead">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<div class="calCell calHeadCell">${d}</div>`).join("")}</div><div class="calGrid">${cells}</div><div class="calLegend"><span class="calDot calDotS"></span> Session<span class="calDot calDotM"></span> Match<span class="calDot calDotE"></span> Reminder / Event</div></div>
  <h2 class="section">Upcoming Reminders &amp; Events</h2>
  <div class="card" style="margin-bottom:15px"><label>Search<input id="calSearch" value="${esc(calEventQuery)}" oninput="calEventQuery=this.value;calendar()" onfocus="calSearchFocused=true" onblur="calSearchFocused=false" placeholder="Search reminders and events..."></label></div>
- <div class="card">${upcoming.length?upcoming.map(e=>`<div class="item"><div><b>${esc(e.title)}</b><div class="muted">${esc(e.date)}${e.time?" · "+esc(e.time):""} · ${esc(e.type||"Event")}</div><small>${esc(e.notes||"")}</small></div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editCalEvent('${e.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delCalEvent('${e.id}')">${icon("trash",17)}</button></div></div>`).join(""):empty("No upcoming reminders or events.")}</div>`;
+ <div class="card">${upcoming.length?upcoming.map(e=>`<div class="item"><div><b>${esc(e.title)}</b><div class="muted">${esc(e.date)}${e.time?" · "+esc(e.time):""} · ${esc(e.type||"Event")}</div><small>${esc(e.notes||"")}</small></div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editCalEvent('${e.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delCalEvent('${e.id}')">${icon("trash",17)}</button></div></div>`).join(""):emptyRich("Nothing coming up","Add reminders for fixtures, fitness tests or parent meetings.","+ Add Reminder / Event","newCalEvent()")}</div>`;
  let sEl=document.getElementById("calSearch");if(sEl&&calSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
 function openCalDay(ds){
@@ -6757,17 +6756,17 @@ function accountPage(){
  let usageColor=usagePct>=90?"var(--red)":usagePct>=70?"var(--gold)":"var(--g)";
  let lic=getLicenseState();
  let daysLeft=trialDaysLeft();
- let emailLine=lic.email?`<div class="muted" style="margin-top:8px;font-size:var(--fs-2)">Trial started with ${esc(lic.email)}</div>`:"";
+ let emailLine=lic.email&&String(lic.email).length>3?`<div class="muted" style="margin-top:8px;font-size:var(--fs-2)">Licensed to ${esc(lic.email)}</div>`:"";
  let licenseKeyField=`<div class="formgrid" style="margin-top:12px"><label class="full">License key<input id="licenseKeyInput" placeholder="Paste your license key"></label></div><button class="btn primary" style="margin-top:6px" onclick="activateLicense()">Activate</button>`;
  let buyBasicBtn=`<a href="${BASIC_CHECKOUT_URL}" target="_blank" rel="noopener" class="btn secondary full" style="margin-top:6px;display:block;text-align:center;box-sizing:border-box">Buy Basic — ₹299/mo</a>`;
  let buyPremiumBtn=`<a href="${PREMIUM_CHECKOUT_URL}" target="_blank" rel="noopener" class="btn primary full" style="margin-top:6px;display:block;text-align:center;box-sizing:border-box">Buy Premium — ₹599/mo</a>`;
  let licenseBody=lic.status==="premium"
-  ?`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px"><div><b>ProCoach OS Premium</b><div class="muted">Active — all features unlocked</div></div><button class="btn danger" onclick="deactivateLicense()">Remove License</button></div>${emailLine}`
+  ?`<div class="licRow"><div><b>ProCoach OS Premium</b> <span class="tag">Active</span><div class="muted">All features unlocked</div>${emailLine}</div></div><button class="linkDanger" onclick="deactivateLicense()">Remove license from this device</button>`
   :lic.status==="basic"
-  ?`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px"><div><b>ProCoach OS Basic</b><div class="muted">Reports, Bulk Add, Tournament &amp; Season Planning and Excel Export are Premium features. Teams and Coach Profiles are capped at ${BASIC_TEAM_CAP} each.</div></div><button class="btn danger" onclick="deactivateLicense()">Remove License</button></div>
+  ?`<div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px"><div><b>ProCoach OS Basic</b><div class="muted">Reports, Bulk Add, Tournament &amp; Season Planning and Excel Export are Premium features. Teams and Coach Profiles are capped at ${BASIC_TEAM_CAP} each.</div></div></div>
    ${buyPremiumBtn}
    <div class="muted" style="margin:10px 0 -4px;font-size:var(--fs-2)">Already bought a Premium key? Enter it below instead.</div>
-   ${licenseKeyField.replace("Activate","Upgrade to Premium")}${emailLine}`
+   ${licenseKeyField.replace("Activate","Upgrade to Premium")}<div><button class="linkDanger" onclick="deactivateLicense()">Remove license from this device</button></div>${emailLine}`
   :lic.status==="expired"
   ?`<div><b>Trial Ended</b> <span class="tag" style="background:var(--redTint);color:var(--red)">Locked</span><div class="muted">Everything you've logged is still here and exportable, but adding or editing anything new needs a paid plan — Basic or Premium.</div></div>
    ${buyBasicBtn}${buyPremiumBtn}
