@@ -1236,7 +1236,7 @@ function dashboard(){
  <button class="btn secondary" style="flex-shrink:0" onclick="localStorage.setItem('coachbook_homescreen_notice_dismissed','1');dashboard()">Got it</button>
  </div>`):""}
  <div class="homeHeader">
- <div><div class="homeGreeting">${greetingWord()}, <b>${esc(coachDisplayName().split(" ")[0])}</b> 👋</div><div class="homeSub">${esc(fmtCalDate(today()))}</div>${(!db.settings.coachName&&coachDisplayName()==="Coach")?`<div class="homeSub"><a style="color:var(--g);cursor:pointer;font-weight:700" onclick="setCoachName()">Set your name</a></div>`:""}</div>
+ <div><div class="homeGreeting">${greetingWord()}, <b>${esc(coachFirstName())}</b> 👋</div><div class="homeSub">${esc(fmtCalDate(today()))}</div>${(!coachHasName())?`<div class="homeSub"><a style="color:var(--g);cursor:pointer;font-weight:700" onclick="setCoachName()">Set your name</a></div>`:""}</div>
  <div style="display:flex;gap:8px;align-items:center">
  <button class="bellBtn" onclick="openNotifications()" aria-label="Pending items">${icon("bell",17)}${pendingCount?`<span class="badge">${pendingCount}</span>`:""}</button>
  <button class="searchIconBtn" onclick="openGlobalSearch()" aria-label="Search">${icon("search",16)}</button>
@@ -1251,7 +1251,7 @@ function dashboard(){
  <div class="card glass">
  <div class="homeGreeting" style="font-size:var(--fs-5)">Welcome to ProCoach OS 👋</div>
  <div class="homeSub" style="margin-bottom:10px">A few quick steps to get set up.</div>
- <div class="taskItem" style="cursor:pointer" onclick="setCoachName()"><div class="taskDot ${db.settings.coachName?"done":""}"></div><div class="taskText"><b>Tell us your name</b><span>${db.settings.coachName?esc(db.settings.coachName):"So we can greet you properly"}</span></div></div>
+ <div class="taskItem" style="cursor:pointer" onclick="setCoachName()"><div class="taskDot ${coachHasName()?"done":""}"></div><div class="taskText"><b>Tell us your name</b><span>${coachHasName()?esc(coachDisplayName()):"So we can greet you properly"}</span></div></div>
  <div class="taskItem" style="cursor:pointer" onclick="go('players');newPlayer()"><div class="taskDot"></div><div class="taskText"><b>Add your first player</b><span>Build your roster</span></div></div>
  <div class="taskItem" style="cursor:pointer" onclick="go('organisation')"><div class="taskDot"></div><div class="taskText"><b>Create a team</b><span>Optional — group players together</span></div></div>
  <div class="taskItem" style="cursor:pointer" onclick="go('sessions');newSession()"><div class="taskDot"></div><div class="taskText"><b>Plan your first session</b><span>Objectives, drills, attendance</span></div></div>
@@ -2413,10 +2413,12 @@ function delPlayer(id){if(confirm("Delete this player? You can restore them late
 function restorePlayer(id){let p=db.players.find(x=>x.id===id);if(p){delete p.deletedAt;save();accountPage()}}
 function permanentlyDeletePlayer(id){if(confirm("Permanently delete this player? This cannot be undone.")){db.players=db.players.filter(x=>x.id!==id);save();accountPage()}}
 
-function initials(n){let p=String(n||"?").trim().split(/\s+/);return((p[0]||"?")[0]+(p.length>1?p[p.length-1][0]:"")).toUpperCase()}
-function coachDisplayName(){let n=(db.settings&&db.settings.coachName)||"";if(n)return n;let pn=(getActiveProfile().name||"").trim();return(pn&&pn!=="My Coaching Profile")?pn:"Coach"}
+function initials(n){let p=String(n||"?").trim().split(/\s+/).filter(Boolean);return((p[0]||"?")[0]+(p.length>1?p[p.length-1][0]:"")).toUpperCase()}
+function coachDisplayName(){let d=((db.settings&&db.settings.displayName)||"").trim();if(d)return d;let pn=(getActiveProfile().name||"").trim();if(pn&&pn!=="My Coaching Profile")return pn;let n=((db.settings&&db.settings.coachName)||"").trim();return n||"Coach"}
+function coachFirstName(){let parts=coachDisplayName().split(/\s+/).filter(Boolean);let real=parts.find(w=>w.replace(/[.]/g,"").length>2);return real||parts[0]||"Coach"}
+function coachHasName(){return coachDisplayName()!=="Coach"}
 function refreshProfileBadge(){let b=document.getElementById("profileBadge");if(b){b.textContent=initials(coachDisplayName());b.title=coachDisplayName()+" · "+(getActiveProfile().name||"");b.setAttribute("aria-label","Account and profile")}}
-function setCoachName(){let v=prompt("What should we call you?",(db.settings.coachName||""));if(v===null)return;v=v.trim();if(!v)return;db.settings.coachName=v;save()}
+function setCoachName(){let v=prompt("What should we call you?",(db.settings.displayName||(coachHasName()?coachDisplayName():"")));if(v===null)return;v=v.trim();if(!v)return;db.settings.displayName=v;save()}
 const filtersOpen={players:false,sessions:false,drills:false};
 function toggleFilters(k){filtersOpen[k]=!filtersOpen[k];({players:players,sessions:sessions,drills:drills})[k]()}
 function filterBarHtml(k,searchHtml,panelHtml,activeCount){return `<div class="fbar noPrint">${searchHtml}<button type="button" class="btn secondary" onclick="toggleFilters('${k}')">Filters${activeCount?` · ${activeCount}`:""}</button></div>${filtersOpen[k]?`<div class="card fpanel"><div class="formgrid">${panelHtml}</div></div>`:""}`}
