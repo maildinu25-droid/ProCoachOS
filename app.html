@@ -16,7 +16,7 @@
 <style>
 :root{--g:#10b981;--g2:#34d399;--blue:#3b82f6;--blue2:#60a5fa;--mint:rgba(16,185,129,.15);--ink:#eef2f7;--muted:#8a95ab;--line:rgba(255,255,255,.08);--lineHover:rgba(255,255,255,.18);--label:#c3d0c9;--bg:#08121e;--surface:#0f1a2b;--surface2:#16233a;--red:#ef5350;--redTint:rgba(239,83,80,.16);--redGlow:rgba(239,83,80,.5);--shadow:0 20px 50px rgba(0,0,0,.5);--gold:#f59e0b;--goldTint:rgba(245,158,11,.16);--glassBg:rgba(255,255,255,.045);--glassBorder:rgba(255,255,255,.09)}
 html.light{--g:#0e9968;--g2:#0c7d55;--blue:#2f6fe0;--blue2:#1d54b3;--mint:rgba(14,153,104,.12);--ink:#12201a;--muted:#5c6d64;--line:rgba(10,30,20,.11);--lineHover:rgba(10,30,20,.24);--label:#33423b;--bg:#f4f6f5;--surface:#ffffff;--surface2:#eef1ef;--red:#d64540;--redTint:rgba(214,69,64,.14);--redGlow:rgba(214,69,64,.5);--shadow:0 10px 28px rgba(20,40,30,.10);--gold:#b9790c;--goldTint:rgba(185,121,12,.14);--glassBg:rgba(255,255,255,.6);--glassBorder:rgba(10,30,20,.08)}
-:root{--fs-1:9px;--fs-2:10.5px;--fs-3:12.5px;--fs-4:14px;--fs-5:15.5px;--fs-6:19px;--fs-7:24px;--fs-8:28px}
+:root{--fs-1:10px;--fs-2:11.5px;--fs-3:12.5px;--fs-4:14px;--fs-5:15.5px;--fs-6:19px;--fs-7:24px;--fs-8:28px}
 *{box-sizing:border-box}body{margin:0;font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Arial,sans-serif;background:var(--bg);color:var(--ink)}
 .bgArt{position:fixed;inset:0;z-index:0;pointer-events:none;overflow:hidden;opacity:1;transition:opacity .2s}
 html.light .bgArt{opacity:.45}
@@ -241,6 +241,8 @@ main .card .card{background:transparent}
 .actionRow{display:grid;grid-template-columns:1fr 1fr;gap:8px}.actionRow .btn{text-align:center}
 .licRow{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap}.linkDanger{background:none;border:0;color:var(--muted);font-size:var(--fs-2);text-decoration:underline;cursor:pointer;padding:6px 0}.linkDanger:hover{color:var(--red)}
 .calCount{display:inline-flex;align-items:center;gap:2px;font-size:10px;font-weight:700;color:var(--muted);margin-right:4px}.calToday .calDayNum{background:var(--g);color:#04130d;border-radius:50%;width:22px;height:22px;display:inline-flex;align-items:center;justify-content:center}.calLegend{flex-wrap:wrap;margin-bottom:6px}
+
+main h3{font-family:'Sora',sans-serif;font-size:16px;font-weight:700;line-height:1.3}label.btn{font-size:16px}.emptyRich b{font-size:16px}.reportCard b,.quick b{font-size:var(--fs-6)}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
@@ -1224,22 +1226,22 @@ function dashboard(){
   :`<div class="todayHero"><div class="thLabel">Today</div><div class="thTitle">Nothing planned</div><div class="thMeta">Plan your next session in a couple of minutes.</div><div class="thBtns"><button class="btn primary" onclick="go('sessions');newSession()">Plan a session</button></div></div>`)));
  dashboardEl.innerHTML=`
  ${showBackupNotice?`<div class="card" style="border-color:var(--blue2);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
- <div><b>Your data lives on this device only</b><div class="muted" style="font-size:var(--fs-2);margin-top:2px">Nothing syncs to the cloud automatically. Export a backup so you can move to a new phone or browser without losing anything.</div></div>
+ <div><b>Your data lives on this device only</b><div class="muted" style="font-size:var(--fs-2);margin-top:2px">Export a backup before switching phone or browser.</div></div>
  <div style="display:flex;gap:8px;flex-shrink:0">
  <button class="btn secondary" onclick="localStorage.setItem('coachbook_backup_notice_dismissed_at',Date.now());dashboard()">Later</button>
  <button class="btn primary" onclick="exportBackup()">Export Backup</button>
  </div>
  </div>`:""}
- ${showHomeScreenNotice?(hasRealData?`<div class="card" style="border-color:var(--blue2);margin-bottom:14px">
+ ${(showHomeScreenNotice&&!showBackupNotice)?(hasRealData?`<div class="card" style="border-color:var(--blue2);margin-bottom:14px">
  <b>Add ProCoach OS to your Home Screen</b>
- <div class="muted" style="font-size:var(--fs-2);margin-top:2px">It opens faster and works without signal at the ground. One thing first — Home Screen installs use separate storage from your browser, so back up your data before switching, then restore it on the new icon.</div>
- <div class="muted" style="font-size:var(--fs-2);margin-top:8px">1. Export a backup below &nbsp;·&nbsp; 2. Share → Add to Home Screen &nbsp;·&nbsp; 3. Open the new icon and restore from Account &amp; Backup</div>
+ <div class="muted" style="font-size:var(--fs-2);margin-top:2px">Opens faster and works offline. Back up first — the Home Screen icon uses separate storage.</div>
+ <div class="muted" style="font-size:var(--fs-2);margin-top:6px">Export → Share → Add to Home Screen → restore from Account &amp; Backup</div>
  <div style="display:flex;gap:8px;margin-top:10px">
  <button class="btn secondary" onclick="localStorage.setItem('coachbook_homescreen_notice_dismissed','1');dashboard()">Later</button>
  <button class="btn primary" onclick="exportBackup()">Export Backup</button>
  </div>
  </div>`:`<div class="card" style="border-color:var(--blue2);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
- <div><b>Add ProCoach OS to your Home Screen</b><div class="muted" style="font-size:var(--fs-2);margin-top:2px">It opens instantly and works without signal at the ground — tap Share, then Add to Home Screen.</div></div>
+ <div><b>Add ProCoach OS to your Home Screen</b><div class="muted" style="font-size:var(--fs-2);margin-top:2px">Tap Share, then Add to Home Screen.</div></div>
  <button class="btn secondary" style="flex-shrink:0" onclick="localStorage.setItem('coachbook_homescreen_notice_dismissed','1');dashboard()">Got it</button>
  </div>`):""}
  <div class="homeHeader">
@@ -1295,7 +1297,7 @@ function dashboard(){
 
  <div class="bentoTile bento-wide">
  <div class="homeSectionTitle">Recent Activity <a onclick="go('reports')">Full analytics & insights ${icon("chevronRight",10)}</a></div>
- ${activity.length?activity.map(a=>`<div class="activityRow"><div class="activityIc">${a.icon}</div><div style="flex:1;min-width:0"><b>${esc(a.text)}</b><span>${esc(a.date)}</span></div></div>`).join(""):empty("No records yet — start by adding a session or player.")}
+ ${activity.length?activity.map(a=>`<div class="activityRow"><div class="activityIc">${a.icon}</div><div style="flex:1;min-width:0"><b>${esc(a.text)}</b><span>${esc(fmtDate(a.date))}</span></div></div>`).join(""):empty("No records yet — start by adding a session or player.")}
  </div>
 
  </div>
@@ -2007,7 +2009,7 @@ function reflections(){
  +`<button class="btn primary" onclick="newReflection()">+ New Reflection</button>
  ${filterBarHtml("reflections",`<input id="reflectionSearch" value="${esc(reflectionQuery)}" oninput="reflectionQuery=this.value;reflections()" onfocus="reflectionSearchFocused=true" onblur="reflectionSearchFocused=false" placeholder="Search reflections...">`,`<label>Type<select onchange="reflectionTypeFilter=this.value;reflections()"><option value="">All</option><option value="session" ${reflectionTypeFilter==="session"?"selected":""}>Practice Session</option><option value="match" ${reflectionTypeFilter==="match"?"selected":""}>Match</option></select></label>`,reflectionTypeFilter?1:0)}
  <h2 class="section">Reflection history (${list.length})</h2>
- <div class="card">${list.length?list.map(x=>`<div class="item"><div><b>${esc(x.date)} · ${esc(x.session||"Reflection")}</b> <span class="tag">${x.type==="match"?"Match":"Session"}</span><div class="muted">Rating ${esc(x.rating)}/5</div><small>${esc(reflectionWentWellText(x))}</small></div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editReflection('${x.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delReflection('${x.id}')">${icon("trash",17)}</button></div></div>`).join(""):(db.reflections.length?empty("No reflections match your filters."):emptyRich("No reflections yet","A two-minute note after each session or match is how coaches improve fastest.","+ New Reflection","newReflection()"))}</div>
+ <div class="card">${list.length?list.map(x=>`<div class="item"><div><b>${esc(fmtDate(x.date))} · ${esc(x.session||"Reflection")}</b> <span class="tag">${x.type==="match"?"Match":"Session"}</span><div class="muted">Rating ${esc(x.rating)}/5</div><small>${esc(reflectionWentWellText(x))}</small></div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editReflection('${x.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delReflection('${x.id}')">${icon("trash",17)}</button></div></div>`).join(""):(db.reflections.length?empty("No reflections match your filters."):emptyRich("No reflections yet","A two-minute note after each session or match is how coaches improve fastest.","+ New Reflection","newReflection()"))}</div>
  ${recurringThemesCardHtml()}`;
  let sEl=document.getElementById("reflectionSearch");if(sEl&&reflectionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -2923,7 +2925,7 @@ function saveBulkAssessment(){
  closeM();
  assessments();
 }
-function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<div class="actionRow"><button class="btn primary" onclick="newAssessment()">+ New Assessment</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess Squad</button></div><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(a.date)} · Overall ${assessmentAvg(a)}/10</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}${assessmentFormatTagsHtml(a)}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editAssessment('${a.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delAssessment('${a.id}')">${icon("trash",17)}</button></div></div>`).join(""):emptyRich("No assessments yet","Rate batting, bowling and fielding to track each player's progress over time.","+ New Assessment","newAssessment()")}</div>`}
+function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<div class="actionRow"><button class="btn primary" onclick="newAssessment()">+ New Assessment</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess Squad</button></div><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(fmtDate(a.date))} · Overall ${assessmentAvg(a)}/10</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}${assessmentFormatTagsHtml(a)}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editAssessment('${a.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delAssessment('${a.id}')">${icon("trash",17)}</button></div></div>`).join(""):emptyRich("No assessments yet","Rate batting, bowling and fielding to track each player's progress over time.","+ New Assessment","newAssessment()")}</div>`}
 function assessmentFormHtml(a,mode){
  a=a||{};
  return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Assessment":"Player Assessment"}</h2><button class="x" onclick="closeM()">×</button></div>
@@ -5085,7 +5087,7 @@ function reports(){
  let chartData={hours:{values:hrsTrend6,color:cssVar("--g")},ratings:{values:ratingTrend6,color:cssVar("--blue")},development:{values:devTrend6,color:cssVar("--gold")},attendance:{values:attendTrend6,color:cssVar("--blue2")}}[dashChartTab];
  let insights=buildInsights(months6,hrsTrend6,ratingTrend6,assessTrend6,sessTrend6);
  document.getElementById("reports").innerHTML=head("Professional Reports","Generate polished reports from the information you already enter in ProCoach OS.")
- +`<h2 class="section" style="margin-top:0">Daily Overview — ${esc(fmtCalDate(today()))}</h2>
+ +`<h2 class="section" style="margin-top:0">Today · ${esc(fmtDate(today()))}</h2>
  <div class="card">${(todaySessions.length+todayMatches.length+todayEvents.length)?`
  ${todaySessions.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${s.duration?esc(s.duration)+" min":""}</div></div><span class="tag">Session</span></div>`).join("")}
  ${todayMatches.map(m=>`<div class="item"><div><b>vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.result||"Match day")}</div></div><span class="tag">Match</span></div>`).join("")}
@@ -6032,7 +6034,7 @@ function calendar(){
  <div class="card"><div class="calGrid calHead">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<div class="calCell calHeadCell">${d}</div>`).join("")}</div><div class="calGrid">${cells}</div><div class="calLegend"><span class="calDot calDotS"></span> Session<span class="calDot calDotM"></span> Match<span class="calDot calDotE"></span> Reminder / Event</div></div>
  <h2 class="section">Upcoming Reminders &amp; Events</h2>
  <div class="card" style="margin-bottom:15px"><label>Search<input id="calSearch" value="${esc(calEventQuery)}" oninput="calEventQuery=this.value;calendar()" onfocus="calSearchFocused=true" onblur="calSearchFocused=false" placeholder="Search reminders and events..."></label></div>
- <div class="card">${upcoming.length?upcoming.map(e=>`<div class="item"><div><b>${esc(e.title)}</b><div class="muted">${esc(e.date)}${e.time?" · "+esc(e.time):""} · ${esc(e.type||"Event")}</div><small>${esc(e.notes||"")}</small></div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editCalEvent('${e.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delCalEvent('${e.id}')">${icon("trash",17)}</button></div></div>`).join(""):emptyRich("Nothing coming up","Add reminders for fixtures, fitness tests or parent meetings.","+ Add Reminder / Event","newCalEvent()")}</div>`;
+ <div class="card">${upcoming.length?upcoming.map(e=>`<div class="item"><div><b>${esc(e.title)}</b><div class="muted">${esc(fmtDate(e.date))}${e.time?" · "+esc(e.time):""} · ${esc(e.type||"Event")}</div><small>${esc(e.notes||"")}</small></div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editCalEvent('${e.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delCalEvent('${e.id}')">${icon("trash",17)}</button></div></div>`).join(""):emptyRich("Nothing coming up","Add reminders for fixtures, fitness tests or parent meetings.","+ Add Reminder / Event","newCalEvent()")}</div>`;
  let sEl=document.getElementById("calSearch");if(sEl&&calSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
 function openCalDay(ds){
