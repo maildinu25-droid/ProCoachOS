@@ -259,6 +259,8 @@ h3{font-family:'Sora',sans-serif;font-size:16px;font-weight:700;line-height:1.3}
 
 .stageChips{width:100%;max-width:100%;box-sizing:border-box;min-width:0;contain:inline-size}
 #players{min-width:0;overflow-x:hidden}
+
+#focusPicker .fpLabel{display:block;font-weight:650;font-size:var(--fs-4);color:var(--label);margin-bottom:8px}.fpChips{display:flex;flex-wrap:wrap;gap:8px}.fpChip{background:var(--surface2);border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:9px 14px;font-size:var(--fs-3);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}.fpChip.on{background:var(--g);border-color:var(--g);color:#04130d}.fpX{opacity:.7;font-size:15px;line-height:1;padding:0 2px}.fpSel{margin-top:10px;font-size:var(--fs-3)}.fpMini{background:none;border:1px solid var(--line);color:var(--g);border-radius:999px;padding:3px 9px;font-size:var(--fs-3);cursor:pointer}.fpAdd{display:flex;gap:8px;margin-top:10px}.fpAdd input{flex:1;min-width:0}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
@@ -806,6 +808,70 @@ function isStandaloneMode(){
  // query instead — checking both covers every real device this matters for.
  return window.navigator.standalone===true||window.matchMedia("(display-mode: standalone)").matches;
 }
+/* ===== Session focus picker ===== */
+const FOCUS_BASE=["Batting","Bowling","Fielding","Wicketkeeping","Team","Fitness","Nets","Match simulation","Practice match","Tactics / strategy","Mental skills","Recovery","Mixed"];
+function focusCustomList(){let c=db.settings&&db.settings.customFocus;return Array.isArray(c)?c:[]}
+function focusSelected(){let el=document.querySelector('#focusPicker input[name="focus"]');return el&&el.value?el.value.split(" + ").map(x=>x.trim()).filter(Boolean):[]}
+function focusSetSelected(arr){let el=document.querySelector('#focusPicker input[name="focus"]');if(el)el.value=arr.join(" + ");let b=document.getElementById("focusPickerBody");if(b)b.innerHTML=focusPickerInner(el?el.value:"")}
+function focusPickerInner(val){
+ let sel=val?String(val).split(" + ").map(x=>x.trim()).filter(Boolean):[];
+ let custom=focusCustomList(),all=FOCUS_BASE.concat(custom),extra=sel.filter(x=>!all.includes(x));all=all.concat(extra);
+ const chip=o=>{let on=sel.includes(o),isC=custom.includes(o);return `<button type="button" class="fpChip${on?" on":""}" data-f="${esc(o)}" onclick="focusToggle(this.dataset.f)">${esc(o)}${isC&&!on?`<span class="fpX" data-f="${esc(o)}" onclick="event.stopPropagation();focusRemoveCustom(this.dataset.f)">×</span>`:""}</button>`};
+ return `<div class="fpChips">${all.map(chip).join("")}</div>
+ ${sel.length>1?`<div class="fpSel muted">Primary: <b>${esc(sel[0])}</b> · tap to make primary: ${sel.slice(1).map(x=>`<button type="button" class="fpMini" data-f="${esc(x)}" onclick="focusMakePrimary(this.dataset.f)">${esc(x)}</button>`).join(" ")}</div>`:""}
+ <div class="fpAdd"><input id="fpNew" maxlength="24" placeholder="Add your own, e.g. Death overs" onkeydown="if(event.key==='Enter'){event.preventDefault();focusAddCustom()}"><button type="button" class="btn secondary" onclick="focusAddCustom()">Add</button></div>`;
+}
+function focusToggle(o){let a=focusSelected(),i=a.indexOf(o);if(i>=0)a.splice(i,1);else a.push(o);focusSetSelected(a)}
+function focusMakePrimary(o){let a=focusSelected().filter(x=>x!==o);a.unshift(o);focusSetSelected(a)}
+function focusAddCustom(){
+ let i=document.getElementById("fpNew");if(!i)return;let v=i.value.replace(/\s*\+\s*/g," ").trim();if(!v)return;
+ let all=FOCUS_BASE.concat(focusCustomList());let ex=all.find(x=>x.toLowerCase()===v.toLowerCase());
+ if(!ex){if(!Array.isArray(db.settings.customFocus))db.settings.customFocus=[];db.settings.customFocus.push(v);ex=v;save()}
+ let a=focusSelected();if(!a.includes(ex))a.push(ex);focusSetSelected(a);
+}
+function focusRemoveCustom(o){if(!confirm('Remove "'+o+'" from your focus options? Past sessions keep it.'))return;db.settings.customFocus=focusCustomList().filter(x=>x!==o);save();focusSetSelected(focusSelected())}
+/* ===== end session focus picker ===== */
+/* ===== Calendar reminders (.ics) ===== */
+function remindLeads(){let d=[60,120];try{let v=JSON.parse(localStorage.getItem("coachbook_remind_leads"));if(Array.isArray(v))d=v}catch(e){}return d}
+function icsEsc(t){return String(t||"").replace(/\\/g,"\\\\").replace(/\r?\n/g,"\\n").replace(/;/g,"\;").replace(/,/g,"\\,")}
+function icsFold(l){let o=[];while(l.length>72){o.push(l.slice(0,72));l=" "+l.slice(72)}o.push(l);return o.join("\r\n")}
+function icsLocal(date,mins){let [y,m,d]=date.split("-").map(Number);let dt=new Date(y,m-1,d,Math.floor(mins/60),mins%60);let p=n=>String(n).padStart(2,"0");return `${dt.getFullYear()}${p(dt.getMonth()+1)}${p(dt.getDate())}T${p(dt.getHours())}${p(dt.getMinutes())}00`}
+function sessionIcsEvent(s,leads){
+ let m=String(s.time||"").match(/^(\d{1,2}):(\d{2})/);if(!m||!s.date)return "";
+ let start=(+m[1])*60+(+m[2]),dur=parseInt(s.duration,10)||60,p=n=>String(n).padStart(2,"0"),n=new Date();
+ let stamp=`${n.getUTCFullYear()}${p(n.getUTCMonth()+1)}${p(n.getUTCDate())}T${p(n.getUTCHours())}${p(n.getUTCMinutes())}00Z`;
+ let desc=[s.squad?"Squad: "+s.squad:"",s.focus?"Focus: "+s.focus:"",s.objectives?s.objectives:""].filter(Boolean).join("\n");
+ let lines=["BEGIN:VEVENT","UID:"+s.id+"@procoachos.in","DTSTAMP:"+stamp,"DTSTART:"+icsLocal(s.date,start),"DTEND:"+icsLocal(s.date,start+dur),"SUMMARY:"+icsEsc("Coaching: "+sessionLabel(s).replace(/^\d{1,2}:\d{2}\s?(AM|PM)?\s·\s/,"")),];
+ if(s.venue)lines.push("LOCATION:"+icsEsc(s.venue));if(desc)lines.push("DESCRIPTION:"+icsEsc(desc));
+ leads.forEach(L=>{lines.push("BEGIN:VALARM","ACTION:DISPLAY","DESCRIPTION:"+icsEsc("Session in "+(L>=60?(L/60)+" hr":L+" min")),"TRIGGER:-PT"+L+"M","END:VALARM")});
+ lines.push("END:VEVENT");return lines.map(icsFold).join("\r\n");
+}
+function buildIcs(sessions,leads){return "BEGIN:VCALENDAR\r\nVERSION:2.0\r\nPRODID:-//ProCoach OS//Sessions//EN\r\nCALSCALE:GREGORIAN\r\nMETHOD:PUBLISH\r\n"+sessions.map(s=>sessionIcsEvent(s,leads)).filter(Boolean).join("\r\n")+"\r\nEND:VCALENDAR\r\n"}
+async function deliverIcs(text,name){
+ let file=new File([text],name,{type:"text/calendar"});
+ try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:"Session reminders"});return}}catch(e){if(e&&e.name==="AbortError")return}
+ let a=document.createElement("a");a.href=URL.createObjectURL(file);a.download=name;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},1500);
+}
+function remindSheet(id){
+ let s=db.sessions.find(x=>x.id===id);if(!s)return;
+ let leads=remindLeads(),hasTime=/^\d{1,2}:\d{2}/.test(s.time||"");
+ let upcoming=activeSessions().filter(x=>x.date>=today()&&/^\d{1,2}:\d{2}/.test(x.time||"")&&(x.date>today()||new Date(x.date+"T"+x.time)>new Date()));
+ modal(`<div class="sheetHead"><h2>Remind me</h2><button class="x" onclick="closeM()">×</button></div>
+ <p class="muted">Adds the session to your phone's calendar with alerts before it starts. This works even when the app is closed.</p>
+ <div class="card"><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${hasTime?" · "+esc(fmtTime(s.time)):""}</div></div>
+ ${hasTime?`<h2 class="section">Alert me</h2><div class="card" style="display:grid;gap:10px">${[[30,"30 minutes before"],[60,"1 hour before"],[120,"2 hours before"],[180,"3 hours before"]].map(([m,l])=>`<label style="display:flex;gap:10px;align-items:center;margin:0"><input type="checkbox" class="rmChk" value="${m}" ${leads.includes(m)?"checked":""} style="width:20px;height:20px;accent-color:var(--g)"> ${l}</label>`).join("")}</div>
+ <div style="display:grid;gap:8px;margin-top:14px"><button class="btn primary" onclick="addSessionReminder('${id}')">Add to calendar</button>${upcoming.length>1?`<button class="btn secondary" onclick="addSessionReminder('')">Add all upcoming sessions (${upcoming.length})</button>`:""}</div>
+ <p class="muted" style="margin-top:10px;font-size:var(--fs-3)">If you edit the session time later, add it again — it updates the same calendar entry.</p>`
+ :`<div class="card" style="margin-top:12px">This session has no start time, so a reminder can't be set. Add a time first.</div><button class="btn primary" style="margin-top:12px" onclick="closeM();editSession('${id}')">Edit session</button>`}`);
+}
+function addSessionReminder(id){
+ let leads=[...document.querySelectorAll(".rmChk:checked")].map(c=>+c.value).sort((a,b)=>b-a);
+ if(!leads.length){alert("Pick at least one reminder time.");return}
+ try{localStorage.setItem("coachbook_remind_leads",JSON.stringify(leads))}catch(e){}
+ let list=id?[db.sessions.find(x=>x.id===id)].filter(Boolean):activeSessions().filter(x=>x.date>=today()&&/^\d{1,2}:\d{2}/.test(x.time||"")&&(x.date>today()||new Date(x.date+"T"+x.time)>new Date()));
+ deliverIcs(buildIcs(list,leads),id?"session-reminder.ics":"upcoming-sessions.ics");closeM();
+}
+/* ===== end calendar reminders ===== */
 async function checkTodaysSessionReminder(){
  // This is a LOCAL notification — shown directly by this device when the
  // app happens to be open, not a server push. Session-plan data never
@@ -1242,7 +1308,7 @@ function dashboard(){
  if(heroSession&&_sortedToday.length>1){let t=_tm(heroSession),e=_endMin(heroSession);heroLabel=(t===null||e===null)?"Today":(_nowMin<t?"Up next · "+heroSession.time:(_nowMin<e?"In progress":"Today · done"))}
  let nextSession=(!heroSession&&!todayMatches.length&&!todayEvents.length)?activeSessions().filter(x=>x.date>today()).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b)))[0]||null:null;
  let heroMeta=x=>[x.time||"",x.duration?x.duration+" min":"",x.squad||"",((x.mainDrillIds||[]).length+(x.gameDrillIds||[]).length)?((x.mainDrillIds||[]).length+(x.gameDrillIds||[]).length)+" drills":""].filter(Boolean).join(" · ");
- let todayHeroHtml=isNewUser?"":(heroSession?`<div class="todayHero"><div class="thLabel">${esc(heroLabel)}</div><div class="thTitle">${esc(sessionLabel(heroSession))}</div><div class="thMeta">${esc(heroMeta(heroSession))}</div><div class="thBtns"><button class="btn primary" onclick="printSessionPlan('${heroSession.id}')">Open plan</button><button class="btn secondary" onclick="editSession('${heroSession.id}')">Edit</button></div>${todayCount>1?`<div class="thMore">${todayRows(heroSession.id)}</div>`:""}</div>`
+ let todayHeroHtml=isNewUser?"":(heroSession?`<div class="todayHero"><div class="thLabel">${esc(heroLabel)}</div><div class="thTitle">${esc(sessionLabel(heroSession))}</div><div class="thMeta">${esc(heroMeta(heroSession))}</div><div class="thBtns"><button class="btn primary" onclick="printSessionPlan('${heroSession.id}')">Open plan</button><button class="btn secondary" onclick="editSession('${heroSession.id}')">Edit</button><button class="btn secondary" onclick="remindSheet('${heroSession.id}')">Remind</button></div>${todayCount>1?`<div class="thMore">${todayRows(heroSession.id)}</div>`:""}</div>`
   :(todayCount?`<div class="todayHero"><div class="thLabel">Today</div><div class="thTitle">${todayMatches.length?"Match day":"On today"}</div><div class="thMore" style="border:0;margin-top:8px;padding:0">${todayRows("")}</div></div>`
   :(nextSession?`<div class="todayHero"><div class="thLabel">Nothing today · next up</div><div class="thTitle">${esc(sessionLabel(nextSession))}</div><div class="thMeta">${esc(fmtDate(nextSession.date))}${heroMeta(nextSession)?" · "+esc(heroMeta(nextSession)):""}</div><div class="thBtns"><button class="btn primary" onclick="printSessionPlan('${nextSession.id}')">Open plan</button><button class="btn secondary" onclick="editSession('${nextSession.id}')">Edit</button></div></div>`
   :`<div class="todayHero"><div class="thLabel">Today</div><div class="thTitle">Nothing planned</div><div class="thMeta">Plan your next session in a couple of minutes.</div><div class="thBtns"><button class="btn primary" onclick="go('sessions');newSession()">Plan a session</button></div></div>`)));
@@ -1368,7 +1434,7 @@ function sessions(){
   let linkedReflection=db.reflections.find(r=>r.sessionId===s.id);
   let showReflectionStatus=s.date<=today();
   let thumbDrill=mainDrills.concat(gameDrills).find(d=>d.fieldSteps&&d.fieldSteps.length);
-  return `<div class="item">${thumbDrill?`<div class="sessThumb">${fieldStepsPreviewHtml(thumbDrill.fieldSteps.slice(0,1),76)}</div>`:""}<div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.concat(gameDrills).map(d=>`<span class="tag" style="cursor:pointer" onclick="viewDrill('${d.id}')">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px"><a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="printSessionPlan('${s.id}')">View</button>${kebabMenu("s"+s.id,[{label:"Edit",icon:"edit",fn:`editSession('${s.id}')`},{label:"Share on WhatsApp",icon:"share",fn:`shareSessionSummary('${s.id}')`},{label:"Copy text",icon:"copy",fn:`copySessionSummary('${s.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delSession('${s.id}')`}])}</div></div>`;
+  return `<div class="item">${thumbDrill?`<div class="sessThumb">${fieldStepsPreviewHtml(thumbDrill.fieldSteps.slice(0,1),76)}</div>`:""}<div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.concat(gameDrills).map(d=>`<span class="tag" style="cursor:pointer" onclick="viewDrill('${d.id}')">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px"><a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="printSessionPlan('${s.id}')">View</button>${kebabMenu("s"+s.id,[{label:"Edit",icon:"edit",fn:`editSession('${s.id}')`},{label:"Remind me (calendar)",icon:"bell",fn:`remindSheet('${s.id}')`},{label:"Share on WhatsApp",icon:"share",fn:`shareSessionSummary('${s.id}')`},{label:"Copy text",icon:"copy",fn:`copySessionSummary('${s.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delSession('${s.id}')`}])}</div></div>`;
  }).join("")}</div>`:empty("No sessions match your search.")}</div>`;
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -1427,7 +1493,7 @@ function sessionFormHtml(s,mode){
  <div class="full" id="sessionTypePlayerWrap" style="${sType==="player"?"":"display:none"}"><label>Player<select name="sessionPlayerId">${activePlayers().length?activePlayers().map(p=>`<option value="${p.id}" ${s.sessionPlayerId===p.id?"selected":""}>${esc(p.name)}</option>`).join(""):`<option value="">No players yet — add one in Players</option>`}</select></label></div>
  <div class="full" id="sessionTypeCustomWrap" style="${sType==="custom"?"":"display:none"}"><label>Group name<input name="squadCustom" value="${esc(squadCustomVal)}" placeholder="e.g. Weekend intensive group"></label></div>
  <label>Duration (minutes)<input type="number" name="duration" value="${esc(s.duration||90)}"></label>
- <label>Primary focus<select name="focus">${["Batting","Bowling","Fielding","Wicketkeeping","Team","Fitness"].map(f=>`<option ${s.focus===f?"selected":""}>${f}</option>`).join("")}</select></label>
+ <div class="full" id="focusPicker"><input type="hidden" name="focus" value="${esc(s.focus||"")}"><span class="fpLabel">Session focus <span class="muted" style="font-weight:400">(tick one or more — the first is primary)</span></span><div id="focusPickerBody">${focusPickerInner(s.focus||"")}</div></div>
  <label>Venue<input name="venue" list="venueDatalist" value="${esc(s.venue||"")}"><datalist id="venueDatalist">${venueOptions()}</datalist></label>
  <div class="full" id="sessionAttendanceWrap" style="${sType==="player"?"display:none":""}">${formSectionHead("attendance","Attendance",false)}
  <div id="formSec-attendance" style="display:none;margin-top:10px"><div id="attendanceListInner">${attendanceOptionsHtml(s,sType==="team"?(s.squad||(db.teams[0]&&db.teams[0].name)||""):"",null,mode==="new")}</div></div>
@@ -1963,7 +2029,7 @@ function copyLastSessionPlan(){
  } else if(lastType==="player"){
   setVal("sessionPlayerId",last.sessionPlayerId);
  }
- setVal("duration",last.duration);setVal("focus",last.focus);setVal("venue",last.venue);
+ setVal("duration",last.duration);setVal("focus",last.focus);focusSetSelected(focusSelected());setVal("venue",last.venue);
  setVal("objectives",last.objectives);setVal("warmup",last.warmup);setVal("main",last.main);
  setVal("game",last.game);setVal("cues",last.cues);setVal("success",last.success);
  form.querySelectorAll('input[name="objectiveTags"]').forEach(cb=>{cb.checked=(last.objectiveTags||[]).includes(cb.value)});
@@ -1981,7 +2047,7 @@ function applySessionTemplate(templateId){
  let form=document.querySelector('form[onsubmit*="saveSession"]');
  if(!form)return;
  let setVal=(name,val)=>{let el=form.querySelector(`[name="${name}"]`);if(el)el.value=val||""};
- setVal("duration",t.duration);setVal("focus",t.focus);setVal("venue",t.venue);
+ setVal("duration",t.duration);setVal("focus",t.focus);focusSetSelected(focusSelected());setVal("venue",t.venue);
  setVal("objectives",t.objectives);setVal("warmup",t.warmup);setVal("main",t.main);
  setVal("game",t.game);setVal("cues",t.cues);setVal("success",t.success);
  form.querySelectorAll('input[name="objectiveTags"]').forEach(cb=>{cb.checked=(t.objectiveTags||[]).includes(cb.value)});
