@@ -814,7 +814,16 @@ function isStandaloneMode(){
 const FOCUS_BASE=["Batting","Bowling","Fielding","Wicketkeeping","Team","Fitness","Nets","Match simulation","Practice match","Tactics / strategy","Mental skills","Recovery","Mixed"];
 function focusCustomList(){let c=db.settings&&db.settings.customFocus;return Array.isArray(c)?c:[]}
 function focusSelected(){let el=document.querySelector('#focusPicker input[name="focus"]');return el&&el.value?el.value.split(" + ").map(x=>x.trim()).filter(Boolean):[]}
-function focusSetSelected(arr){let el=document.querySelector('#focusPicker input[name="focus"]');if(el)el.value=arr.join(" + ");let b=document.getElementById("focusPickerBody");if(b)b.innerHTML=focusPickerInner(el?el.value:"")}
+function focusSetSelected(arr){
+ let el=document.querySelector('#focusPicker input[name="focus"]'),b=document.getElementById("focusPickerBody");
+ if(el)el.value=arr.join(" + ");if(!b)return;
+ let sc=document.getElementById("sheet"),outer=sc?sc.scrollTop:0,pn=b.querySelector(".fpPanel"),inner=pn?pn.scrollTop:0;
+ b.style.minHeight=b.offsetHeight+"px";
+ b.innerHTML=focusPickerInner(el?el.value:"");
+ let np=b.querySelector(".fpPanel");if(np)np.scrollTop=inner;
+ if(sc)sc.scrollTop=outer;
+ b.style.minHeight="";
+}
 let focusPanelOpen=false;
 function focusTogglePanel(){focusPanelOpen=!focusPanelOpen;let el=document.querySelector('#focusPicker input[name="focus"]');focusSetSelected(focusSelected())}
 function focusPickerInner(val){
