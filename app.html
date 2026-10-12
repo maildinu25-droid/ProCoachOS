@@ -261,6 +261,8 @@ h3{font-family:'Sora',sans-serif;font-size:16px;font-weight:700;line-height:1.3}
 #players{min-width:0;overflow-x:hidden}
 
 #focusPicker .fpLabel{display:block;font-weight:650;font-size:var(--fs-4);color:var(--label);margin-bottom:8px}.fpChips{display:flex;flex-wrap:wrap;gap:8px}.fpChip{background:var(--surface2);border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:9px 14px;font-size:var(--fs-3);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}.fpChip.on{background:var(--g);border-color:var(--g);color:#04130d}.fpX{opacity:.7;font-size:15px;line-height:1;padding:0 2px}.fpSel{margin-top:10px;font-size:var(--fs-3)}.fpMini{background:none;border:1px solid var(--line);color:var(--g);border-radius:999px;padding:3px 9px;font-size:var(--fs-3);cursor:pointer}.fpAdd{display:flex;gap:8px;margin-top:10px}.fpAdd input{flex:1;min-width:0}
+
+.fpTrigger{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;background:var(--surface2);border:1px solid var(--line);color:var(--ink);border-radius:12px;padding:12px 14px;font-size:16px;font-weight:500;cursor:pointer}.fpChev{color:var(--muted)}.fpPanel{margin-top:6px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:6px;max-height:340px;overflow-y:auto}.fpRow{display:flex;align-items:center;gap:12px;padding:11px 10px;border-radius:10px;cursor:pointer}.fpRow:hover{background:var(--mint)}.fpBox{flex:0 0 22px;width:22px;height:22px;border:2px solid var(--lineHover);border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#04130d}.fpRow.on .fpBox{background:var(--g);border-color:var(--g)}.fpName{flex:1 1 auto;font-weight:500}.fpTag{font-size:var(--fs-2);color:var(--g);font-weight:700}.fpDone{width:100%;margin-top:8px}.fpPanel .fpAdd{padding:6px 4px 0}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
@@ -813,13 +815,15 @@ const FOCUS_BASE=["Batting","Bowling","Fielding","Wicketkeeping","Team","Fitness
 function focusCustomList(){let c=db.settings&&db.settings.customFocus;return Array.isArray(c)?c:[]}
 function focusSelected(){let el=document.querySelector('#focusPicker input[name="focus"]');return el&&el.value?el.value.split(" + ").map(x=>x.trim()).filter(Boolean):[]}
 function focusSetSelected(arr){let el=document.querySelector('#focusPicker input[name="focus"]');if(el)el.value=arr.join(" + ");let b=document.getElementById("focusPickerBody");if(b)b.innerHTML=focusPickerInner(el?el.value:"")}
+let focusPanelOpen=false;
+function focusTogglePanel(){focusPanelOpen=!focusPanelOpen;let el=document.querySelector('#focusPicker input[name="focus"]');focusSetSelected(focusSelected())}
 function focusPickerInner(val){
  let sel=val?String(val).split(" + ").map(x=>x.trim()).filter(Boolean):[];
  let custom=focusCustomList(),all=FOCUS_BASE.concat(custom),extra=sel.filter(x=>!all.includes(x));all=all.concat(extra);
- const chip=o=>{let on=sel.includes(o),isC=custom.includes(o);return `<button type="button" class="fpChip${on?" on":""}" data-f="${esc(o)}" onclick="focusToggle(this.dataset.f)">${esc(o)}${isC&&!on?`<span class="fpX" data-f="${esc(o)}" onclick="event.stopPropagation();focusRemoveCustom(this.dataset.f)">×</span>`:""}</button>`};
- return `<div class="fpChips">${all.map(chip).join("")}</div>
- ${sel.length>1?`<div class="fpSel muted">Primary: <b>${esc(sel[0])}</b> · tap to make primary: ${sel.slice(1).map(x=>`<button type="button" class="fpMini" data-f="${esc(x)}" onclick="focusMakePrimary(this.dataset.f)">${esc(x)}</button>`).join(" ")}</div>`:""}
- <div class="fpAdd"><input id="fpNew" maxlength="24" placeholder="Add your own, e.g. Death overs" onkeydown="if(event.key==='Enter'){event.preventDefault();focusAddCustom()}"><button type="button" class="btn secondary" onclick="focusAddCustom()">Add</button></div>`;
+ const row=o=>{let on=sel.includes(o),isC=custom.includes(o),prim=on&&sel[0]===o;
+  return `<div class="fpRow${on?" on":""}" data-f="${esc(o)}" onclick="focusToggle(this.dataset.f)"><span class="fpBox">${on?"✓":""}</span><span class="fpName">${esc(o)}</span>${prim&&sel.length>1?`<span class="fpTag">Primary</span>`:""}${on&&!prim?`<button type="button" class="fpMini" data-f="${esc(o)}" onclick="event.stopPropagation();focusMakePrimary(this.dataset.f)">Make primary</button>`:""}${isC&&!on?`<span class="fpX" data-f="${esc(o)}" onclick="event.stopPropagation();focusRemoveCustom(this.dataset.f)">×</span>`:""}</div>`};
+ return `<button type="button" class="fpTrigger" onclick="focusTogglePanel()"><span class="${sel.length?"":"muted"}">${sel.length?esc(sel.join(" + ")):"Select focus"}</span><span class="fpChev">${focusPanelOpen?"▴":"▾"}</span></button>
+ ${focusPanelOpen?`<div class="fpPanel">${all.map(row).join("")}<div class="fpAdd"><input id="fpNew" maxlength="24" placeholder="Add your own, e.g. Death overs" onkeydown="if(event.key==='Enter'){event.preventDefault();focusAddCustom()}"><button type="button" class="btn secondary" onclick="focusAddCustom()">Add</button></div><button type="button" class="btn primary fpDone" onclick="focusTogglePanel()">Done</button></div>`:""}`;
 }
 function focusToggle(o){let a=focusSelected(),i=a.indexOf(o);if(i>=0)a.splice(i,1);else a.push(o);focusSetSelected(a)}
 function focusMakePrimary(o){let a=focusSelected().filter(x=>x!==o);a.unshift(o);focusSetSelected(a)}
