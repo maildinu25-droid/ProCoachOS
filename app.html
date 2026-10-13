@@ -1173,7 +1173,7 @@ function storageArchiveSheet(){
  modal(`<div class="sheetHead"><h2>Archive old attachments</h2><button class="x" onclick="storageSheet()">×</button></div><p class="muted">Saves attachments from older sessions into a file on your phone, then removes them from the app. The sessions themselves stay. Keep the file safe — it's the only copy.</p><label>Older than<select id="arcAge"><option value="3">3 months</option><option value="6" selected>6 months</option><option value="12">12 months</option></select></label><button class="btn primary" style="width:100%;margin-top:12px" onclick="storageArchiveDo()">Save to file &amp; remove</button>`);
 }
 function storageArchiveDo(){
- let m=+document.getElementById("arcAge").value,d=new Date();d.setMonth(d.getMonth()-m);let cut=d.toISOString().slice(0,10);
+ let m=+document.getElementById("arcAge").value,d=new Date();d.setMonth(d.getMonth()-m);let cut=localISO(d);
  let items=storageAttachments().filter(x=>x.s.date&&x.s.date<cut);
  if(!items.length){storageSheet("No attachments older than "+m+" months.");return}
  if(!confirm("Save "+items.length+" attachment"+(items.length===1?"":"s")+" ("+fmtBytes(items.reduce((a,x)=>a+x.size,0))+") to a file and remove them from the app?"))return;
@@ -1288,7 +1288,7 @@ function initApp(){
   }
  });
 }
-const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));const today=()=>new Date().toISOString().slice(0,10);
+const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));const localISO=d=>new Date(d.getTime()-d.getTimezoneOffset()*60000).toISOString().slice(0,10);const today=()=>localISO(new Date());
 function save(){try{syncTournamentSquads()}catch(e){}idbSet(DB_KEY,db).catch(err=>console.warn("IndexedDB save failed",err));try{localStorage.setItem(DB_KEY,JSON.stringify(db))}catch(e){}renderAll()}function head(t,s){return `<button class="backBtn noPrint" onclick="goBack()">${icon("chevronLeft",13)} Back</button><div class="hero"><h1>${t}</h1><div class="muted">${s}</div></div>`}function emptyRich(title,text,btn,fn){return `<div class="emptyRich"><b>${title}</b><p>${text}</p>${btn?`<button class="btn primary" onclick="${fn}">${btn}</button>`:""}</div>`}function empty(t){return `<div class="empty">${t}</div>`}
 function cssVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()||"#10b981"}
 function icon(name,size){
@@ -1455,7 +1455,7 @@ function reflectionStreak(){let dates=[...new Set(db.reflections.map(r=>r.date).
 
 function greetingWord(){let h=new Date().getHours();return h<12?"Good Morning":h<17?"Good Afternoon":"Good Evening"}
 function initials(name){return String(name||"C").trim().split(/\s+/).slice(0,2).map(w=>w[0]).join("").toUpperCase()}
-function monthsBack(n){let out=[];for(let i=n-1;i>=0;i--){let d=new Date();d.setMonth(d.getMonth()-i);out.push({mk:d.toISOString().slice(0,7),label:d.toLocaleDateString(undefined,{month:"short"})})}return out}
+function monthsBack(n){let out=[];for(let i=n-1;i>=0;i--){let d=new Date();d.setMonth(d.getMonth()-i);out.push({mk:localISO(d).slice(0,7),label:d.toLocaleDateString(undefined,{month:"short"})})}return out}
 function recentActivity(){
  let items=[
   ...activeSessions().filter(s=>s.date).map(s=>({date:s.date,text:`Session added: ${sessionLabel(s)}`,icon:icon("sessions",13)})),
@@ -1516,7 +1516,7 @@ function coachingActivityScore(){
  // 3. Assessment coverage: share of active players with at least one assessment.
  let coverage=players.length?players.filter(p=>db.assessments.some(a=>a.player===p.name)).length/players.length*100:0;
  // 4. Reflection consistency: of sessions and matches held in the last 30 days, how many have a reflection.
- let cut=new Date();cut.setDate(cut.getDate()-30);let cutKey=cut.toISOString().slice(0,10);
+ let cut=new Date();cut.setDate(cut.getDate()-30);let cutKey=localISO(cut);
  let held=activeSessions().filter(s=>s.date>=cutKey&&s.date<=t0).map(s=>({k:"sessionId",id:s.id})).concat(db.matches.filter(m=>m.date>=cutKey&&m.date<=t0).map(m=>({k:"matchId",id:m.id})));
  let reflected=held.filter(h=>db.reflections.some(r=>r[h.k]===h.id)).length;
  let reflectionConsistency=held.length?reflected/held.length*100:null;
@@ -1530,8 +1530,8 @@ function scoreRingSvg(score,size){size=size||100;let r=44,c=2*Math.PI*r,offset=c
 function areaChartSvg(values,color){let max=Math.max(...values,1);let pts=values.map((v,i)=>`${(i/(values.length-1||1)*100).toFixed(1)},${(100-(v/max*88)).toFixed(1)}`).join(" ");let area=`0,100 ${pts} 100,100`;return `<svg viewBox="0 0 100 100" preserveAspectRatio="none" width="100%" height="88" style="display:block"><defs><linearGradient id="chFill" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stop-color="${color}" stop-opacity="0.35"/><stop offset="100%" stop-color="${color}" stop-opacity="0"/></linearGradient></defs><polygon points="${area}" fill="url(#chFill)"/><polyline points="${pts}" fill="none" stroke="${color}" stroke-width="2" vector-effect="non-scaling-stroke"/></svg>`}
 function setHoursGoal(){let cur=db.settings.hoursGoal||"";let v=prompt("Set your coaching hours goal for this season:",cur);if(v===null)return;let n=Number(v);if(!Number.isFinite(n)||n<=0){alert("Enter a valid number of hours.");return}db.settings.hoursGoal=n;save()}
 function setWeeklyGoal(){let cur=db.settings.weeklySessionGoal||"";let v=prompt("Set your weekly session goal:",cur);if(v===null)return;let n=Number(v);if(!Number.isFinite(n)||n<=0){alert("Enter a valid number of sessions.");return}db.settings.weeklySessionGoal=n;save()}
-function weekStart(offsetWeeks){let d=new Date();let day=d.getDay();let diff=d.getDate()-day+(day===0?-6:1)-(offsetWeeks*7);let s=new Date(d);s.setDate(diff);return s.toISOString().slice(0,10)}
-function weekEnd(offsetWeeks){let s=new Date(weekStart(offsetWeeks));s.setDate(s.getDate()+6);return s.toISOString().slice(0,10)}
+function weekStart(offsetWeeks){let d=new Date();let day=d.getDay();let diff=d.getDate()-day+(day===0?-6:1)-(offsetWeeks*7);let s=new Date(d);s.setDate(diff);return localISO(s)}
+function weekEnd(offsetWeeks){let s=new Date(weekStart(offsetWeeks)+"T12:00:00");s.setDate(s.getDate()+6);return localISO(s)}
 function attendanceTotal(){return activeSessions().reduce((a,s)=>a+((s.attendees&&s.attendees.length)||0),0)}
 function avgSessionRating(){let vals=db.reflections.map(r=>Number(r.rating)).filter(Number.isFinite);return vals.length?(vals.reduce((a,b)=>a+b,0)/vals.length):0}
 function buildInsights(months,hrsTrend,ratingTrend,assessTrend,sessTrend){
@@ -1587,7 +1587,7 @@ function dashboard(){
  let workloadCount=workloadFlagPlayerNames().length;
  let thisMonthKey=today().slice(0,7);
  let lastMonthDateObj=new Date();lastMonthDateObj.setMonth(lastMonthDateObj.getMonth()-1);
- let lastMonthKey=lastMonthDateObj.toISOString().slice(0,7);
+ let lastMonthKey=localISO(lastMonthDateObj).slice(0,7);
  let thisMonthRatings=db.reflections.filter(r=>monthKey(r.date)===thisMonthKey).map(r=>Number(r.rating)).filter(Number.isFinite);
  let lastMonthRatings=db.reflections.filter(r=>monthKey(r.date)===lastMonthKey).map(r=>Number(r.rating)).filter(Number.isFinite);
  let thisMonthAvgRating=thisMonthRatings.length?thisMonthRatings.reduce((a,b)=>a+b,0)/thisMonthRatings.length:null;
@@ -5584,7 +5584,7 @@ function reports(){
  }
  let hrs=activeSessions().reduce((a,s)=>a+(+s.duration||0),0)/60,nums=db.assessments.map(a=>Number(assessmentAvg(a))).filter(Number.isFinite),avg=nums.length?(nums.reduce((a,b)=>a+b,0)/nums.length).toFixed(1):"—";
  let mk=today().slice(0,7);
- let lastMonthDate=new Date();lastMonthDate.setMonth(lastMonthDate.getMonth()-1);let lastMk=lastMonthDate.toISOString().slice(0,7);
+ let lastMonthDate=new Date();lastMonthDate.setMonth(lastMonthDate.getMonth()-1);let lastMk=localISO(lastMonthDate).slice(0,7);
  let ssMonth=activeSessions().filter(s=>monthKey(s.date)===mk);
  let mmMonth=db.matches.filter(m=>monthKey(m.date)===mk);
  let rrMonth=db.reflections.filter(r=>monthKey(r.date)===mk);
