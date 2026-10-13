@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<script>try{if(localStorage.getItem("coachbook_theme")==="light")document.documentElement.classList.add("light")}catch(e){}</script>
+<script>try{if(localStorage.getItem("coachbook_theme")==="light")document.documentElement.classList.add("light")}catch(e){}try{if(localStorage.getItem("procoach_lock_v1"))document.documentElement.classList.add("appLocked")}catch(e){}</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#08121e">
@@ -263,6 +263,33 @@ h3{font-family:'Sora',sans-serif;font-size:16px;font-weight:700;line-height:1.3}
 #focusPicker .fpLabel{display:block;font-weight:650;font-size:var(--fs-4);color:var(--label);margin-bottom:8px}.fpChips{display:flex;flex-wrap:wrap;gap:8px}.fpChip{background:var(--surface2);border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:9px 14px;font-size:var(--fs-3);font-weight:600;cursor:pointer;display:inline-flex;align-items:center;gap:6px}.fpChip.on{background:var(--g);border-color:var(--g);color:#04130d}.fpX{opacity:.7;font-size:15px;line-height:1;padding:0 2px}.fpSel{margin-top:10px;font-size:var(--fs-3)}.fpMini{background:none;border:1px solid var(--line);color:var(--g);border-radius:999px;padding:3px 9px;font-size:var(--fs-3);cursor:pointer}.fpAdd{display:flex;gap:8px;margin-top:10px}.fpAdd input{flex:1;min-width:0}
 
 .fpTrigger{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;text-align:left;background:var(--surface2);border:1px solid var(--line);color:var(--ink);border-radius:12px;padding:12px 14px;font-size:16px;font-weight:500;cursor:pointer}.fpChev{color:var(--muted)}.fpPanel{margin-top:6px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;padding:6px;max-height:340px;overflow-y:auto}.fpRow{display:flex;align-items:center;gap:12px;padding:11px 10px;border-radius:10px;cursor:pointer}.fpRow:hover{background:var(--mint)}.fpBox{flex:0 0 22px;width:22px;height:22px;border:2px solid var(--lineHover);border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#04130d}.fpRow.on .fpBox{background:var(--g);border-color:var(--g)}.fpName{flex:1 1 auto;font-weight:500}.fpTag{font-size:var(--fs-2);color:var(--g);font-weight:700}.fpDone{width:100%;margin-top:8px}.fpPanel .fpAdd{padding:6px 4px 0}
+
+/* timer + lock */
+#timerOverlay{display:none;position:fixed;inset:0;z-index:9000;background:var(--bg);overflow:auto}
+#timerOverlay.open{display:block}
+.tmWrap{min-height:100%;display:flex;flex-direction:column;padding:max(16px,env(safe-area-inset-top)) 18px max(18px,env(safe-area-inset-bottom));max-width:560px;margin:0 auto}
+.tmTop{display:flex;justify-content:space-between;align-items:center;gap:10px}
+.tmMid{flex:1;display:flex;flex-direction:column;justify-content:center;text-align:center;gap:10px;padding:20px 0}
+.tmName{font-family:'Sora',sans-serif;font-size:var(--fs-6);margin:0;color:var(--ink)}
+.tmClock{font-family:'Sora',sans-serif;font-size:76px;font-weight:800;letter-spacing:2px;color:var(--g);font-variant-numeric:tabular-nums;line-height:1.1}
+.tmClock.paused{opacity:.45}
+.tmBar{height:8px;border-radius:99px;background:var(--line);overflow:hidden}.tmBar #tmFill{height:100%;width:0;background:var(--g);transition:width .5s linear}
+.tmBtns{display:flex;gap:8px;align-items:center}.tmBtns .btn{flex:0 0 auto;min-height:52px}.tmBtns .tmBig{flex:1;font-size:var(--fs-5)}
+.tmDone{margin:auto;text-align:center}
+.item.tmRow{display:flex;flex-wrap:wrap;gap:8px;align-items:center}.item.tmRow>input{flex:1 1 100%;min-width:0}.tmStep{display:flex;gap:8px;align-items:center;flex:1}.tmStep b{min-width:24px;text-align:center}.item.tmRow>.btn.danger{flex:0 0 auto}
+#lockScreen{display:none;position:fixed;inset:0;z-index:99999;background:var(--bg);align-items:center;justify-content:center;padding:20px}
+html.appLocked #lockScreen{display:flex}
+html.appLocked body>*:not(#lockScreen):not(script){visibility:hidden}
+.lkBox{width:100%;max-width:320px;text-align:center}
+.lkBox h2{font-family:'Sora',sans-serif;margin:0 0 6px;color:var(--ink)}
+#lkMsg{min-height:22px;color:var(--muted);font-size:var(--fs-3);margin-bottom:12px}#lkMsg.bad{color:var(--red)}
+#lkDots{display:flex;justify-content:center;gap:14px;margin:8px 0 20px}
+#lkDots span{width:14px;height:14px;border-radius:50%;border:2px solid var(--muted)}#lkDots span.on{background:var(--g);border-color:var(--g)}
+#lkPad{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+.lkKey{height:64px;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--ink);font-size:24px;font-weight:700;font-family:inherit}
+.lkKey:active{background:var(--g);color:#04130c}
+.lkBox.shake{animation:lkShake .4s}@keyframes lkShake{25%{transform:translateX(-10px)}75%{transform:translateX(10px)}}
+.lkLink{background:none;border:0;color:var(--muted);margin-top:16px;font-size:var(--fs-3);text-decoration:underline;font-family:inherit}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
@@ -285,7 +312,10 @@ h3{font-family:'Sora',sans-serif;font-size:16px;font-weight:700;line-height:1.3}
 <section id="dashboard" class="page active"></section><section id="sessions" class="page"></section><section id="reflections" class="page"></section><section id="players" class="page"></section><section id="assessments" class="page"></section><section id="drills" class="page"></section><section id="matches" class="page"></section><section id="analysisTools" class="page"></section><section id="reports" class="page"></section><section id="booking" class="page"></section><section id="calendar" class="page"></section><section id="organisation" class="page"></section><section id="account" class="page"></section>
 </main></div>
 <div class="bottomNav" id="bottomNav"></div>
-<button class="fab" onclick="quick()">+</button><div class="modal" id="modal"><div class="sheet" id="sheet"></div></div>
+<button class="fab" onclick="quick()">+</button><div class="modal" id="modal"><div class="sheet" id="sheet"></div></div><div id="timerOverlay"></div>
+<div id="lockScreen"><div class="lkBox"><h2>ProCoach OS</h2><div id="lkMsg">Enter PIN</div>
+<div id="lkPadWrap"><div id="lkDots"></div><div id="lkPad"></div><button class="lkLink" id="lkBio" style="display:none" onclick="lockBioTry()">Use fingerprint / face</button><br><button class="lkLink" onclick="lockForgot()">Forgot PIN?</button></div>
+<div id="lkRecover" style="display:none"><input id="lkCode" placeholder="Recovery code" autocapitalize="characters" autocomplete="off" style="width:100%;text-align:center;letter-spacing:2px"><button class="btn primary" style="width:100%;margin-top:12px" onclick="lockRecover()">Unlock</button><button class="lkLink" onclick="lockForgotCancel()">Back</button></div></div></div>
 <script>
 /* =====================================================================
  FILE MAP — search for these exact anchor comments/function names.
@@ -885,6 +915,283 @@ function addSessionReminder(id){
  deliverIcs(buildIcs(list,leads),id?"session-reminder.ics":"upcoming-sessions.ics");closeM();
 }
 /* ===== end calendar reminders ===== */
+/* ===== Session timer ===== */
+let timerDraft=null,timerRun=null,timerTick=null,timerWake=null,timerAudio=null,timerPaintedIdx=-1;
+const TIMER_KEY="coachbook_timer";
+function timerBuildSteps(s){
+ let dur=parseInt(s.duration,10)||60,steps=[];
+ let md=(s.mainDrillIds||[]).map(id=>db.drills.find(d=>d.id===id)).filter(Boolean),gd=(s.gameDrillIds||[]).map(id=>db.drills.find(d=>d.id===id)).filter(Boolean);
+ const dm=d=>{let m=parseInt(d.duration,10);return m>0?m:null};
+ if(s.warmup)steps.push({n:"Warm-up",m:Math.min(20,Math.max(5,Math.round(dur*0.15)))});
+ if(md.length)md.forEach(d=>steps.push({n:d.name,m:dm(d)}));else if(s.main)steps.push({n:"Main skill block",m:null});
+ if(gd.length)gd.forEach(d=>steps.push({n:d.name,m:dm(d)}));else if(s.game)steps.push({n:"Game block",m:null});
+ if(!steps.length&&Array.isArray(s.netPlan)&&s.netPlan.length)s.netPlan.forEach((set,i)=>steps.push({n:"Net set "+(i+1)+(set.focus?" — "+set.focus:""),m:null}));
+ let fixed=steps.reduce((a,x)=>a+(x.m||0),0),open=steps.filter(x=>!x.m);
+ if(open.length){let each=Math.max(5,Math.round(Math.max(0,dur-fixed)/open.length));open.forEach(x=>x.m=each)}
+ if(!steps.length)steps.push({n:s.focus||"Session",m:dur});
+ return steps;
+}
+function timerSetup(id){
+ let s=db.sessions.find(x=>x.id===id);if(!s)return;
+ if(timerRun&&!timerRun.done){timerShow();return}
+ timerDraft={id,title:sessionLabel(s),planned:parseInt(s.duration,10)||0,steps:timerBuildSteps(s)};
+ timerSetupRender();
+}
+function timerSetupRender(){
+ let d=timerDraft,total=d.steps.reduce((a,x)=>a+(+x.m||0),0);
+ modal(`<div class="sheetHead"><h2>Session timer</h2><button class="x" onclick="closeM()">×</button></div>
+ <p class="muted">${esc(d.title)} — adjust the blocks, then start. The screen stays on, and you get a beep and vibration at each change.</p>
+ <div class="list">${d.steps.map((x,i)=>`<div class="item tmRow"><input value="${esc(x.n)}" onchange="timerDraft.steps[${i}].n=this.value" aria-label="Block name"><div class="tmStep"><button type="button" class="btn secondary iconBtn" onclick="timerAdj(${i},-1)">−</button><b>${x.m}</b><span class="muted">min</span><button type="button" class="btn secondary iconBtn" onclick="timerAdj(${i},1)">+</button></div><button type="button" class="btn danger iconBtn" onclick="timerDel(${i})" title="Remove">${icon("trash",16)}</button></div>`).join("")}</div>
+ <button type="button" class="btn secondary" style="margin-top:10px" onclick="timerDraft.steps.push({n:'New block',m:10});timerSetupRender()">+ Add block</button>
+ <div class="muted" style="margin:12px 0">Total ${total} min${d.planned?` · session planned for ${d.planned} min`:""}</div>
+ <button type="button" class="btn primary" style="width:100%" onclick="timerStart()" ${d.steps.length?"":"disabled"}>▶ Start session</button>`);
+}
+function timerAdj(i,dir){let x=timerDraft.steps[i];x.m=Math.max(1,Math.min(180,(+x.m||0)+dir*(dir>0&&x.m>=20?5:dir<0&&x.m>20?5:1)));timerSetupRender()}
+function timerDel(i){timerDraft.steps.splice(i,1);timerSetupRender()}
+function timerSave(){try{localStorage.setItem(TIMER_KEY,JSON.stringify(timerRun))}catch(e){}}
+function timerStart(){
+ if(!timerDraft||!timerDraft.steps.length)return;
+ try{timerAudio=timerAudio||new (window.AudioContext||window.webkitAudioContext)();if(timerAudio.state==="suspended")timerAudio.resume()}catch(e){}
+ let st=timerDraft.steps.map(x=>({n:String(x.n||"Block").trim()||"Block",m:Math.max(1,+x.m||1)}));
+ timerRun={title:timerDraft.title,steps:st,idx:0,endAt:Date.now()+st[0].m*60000,paused:false,remaining:0,startedAt:Date.now(),done:false};
+ closeM();timerSave();timerWakeOn();timerBegin();
+}
+function timerBegin(){timerPaintedIdx=-1;timerShow();clearInterval(timerTick);timerTick=setInterval(timerStep,250);timerStep()}
+function timerShow(){let el=document.getElementById("timerOverlay");if(el)el.classList.add("open");timerPaint(true)}
+function timerStep(){
+ let r=timerRun;if(!r||r.done||r.paused){timerClock();return}
+ let guard=0;
+ while(!r.done&&!r.paused&&Date.now()>=r.endAt&&guard++<50){
+  let late=Date.now()-r.endAt;
+  if(r.idx>=r.steps.length-1){timerFinish();return}
+  r.idx++;r.endAt=r.endAt+r.steps[r.idx].m*60000;timerSave();
+  if(late<5000)timerAlert();
+ }
+ timerPaint(false);timerClock();
+}
+function timerRemaining(){let r=timerRun;return r.paused?r.remaining:Math.max(0,r.endAt-Date.now())}
+function timerClock(){
+ let r=timerRun;if(!r||r.done)return;
+ let ms=timerRemaining(),sec=Math.ceil(ms/1000),c=document.getElementById("tmClock"),f=document.getElementById("tmFill");
+ if(c)c.textContent=String(Math.floor(sec/60)).padStart(2,"0")+":"+String(sec%60).padStart(2,"0");
+ let total=r.steps[r.idx].m*60000;if(f)f.style.width=Math.max(0,Math.min(100,100-ms/total*100))+"%";
+}
+function timerPaint(force){
+ let el=document.getElementById("timerOverlay"),r=timerRun;if(!el||!r)return;
+ if(r.done){el.innerHTML=`<div class="tmWrap"><div class="tmDone"><div style="font-size:54px">✅</div><h1>Session complete</h1><p class="muted">${esc(r.title)} · ${Math.max(1,Math.round((r.finishedAt-r.startedAt)/60000))} min</p><button class="btn primary" onclick="timerClose()">Close</button></div></div>`;timerPaintedIdx=-2;return}
+ if(!force&&timerPaintedIdx===r.idx&&el.dataset.paused===String(r.paused))return;
+ timerPaintedIdx=r.idx;el.dataset.paused=String(r.paused);
+ let nx=r.steps[r.idx+1];
+ el.innerHTML=`<div class="tmWrap"><div class="tmTop"><span class="muted">${esc(r.title)}</span><button class="btn secondary" onclick="timerEnd()">End</button></div>
+ <div class="tmMid"><div class="tmSteps muted">Block ${r.idx+1} of ${r.steps.length}</div><h1 class="tmName">${esc(r.steps[r.idx].n)}</h1><div class="tmClock${r.paused?" paused":""}" id="tmClock">00:00</div><div class="tmBar"><div id="tmFill"></div></div><div class="tmNext muted">${nx?"Next: "+esc(nx.n)+" · "+nx.m+" min":"Last block"}</div></div>
+ <div class="tmBtns"><button class="btn secondary" onclick="timerPrev()" aria-label="Previous block">⏮</button><button class="btn primary tmBig" onclick="timerPause()">${r.paused?"▶ Resume":"⏸ Pause"}</button><button class="btn secondary" onclick="timerAddMin()">+1 min</button><button class="btn secondary" onclick="timerSkip()" aria-label="Next block">⏭</button></div></div>`;
+ timerClock();
+}
+function timerPause(){let r=timerRun;if(!r||r.done)return;if(r.paused){r.endAt=Date.now()+r.remaining;r.paused=false}else{r.remaining=Math.max(0,r.endAt-Date.now());r.paused=true}timerSave();timerPaint(true)}
+function timerAddMin(){let r=timerRun;if(!r||r.done)return;if(r.paused)r.remaining+=60000;else r.endAt+=60000;timerSave();timerClock()}
+function timerSkip(){let r=timerRun;if(!r||r.done)return;if(r.idx>=r.steps.length-1){timerFinish();return}r.idx++;r.endAt=Date.now()+r.steps[r.idx].m*60000;r.paused=false;timerSave();timerPaint(true)}
+function timerPrev(){let r=timerRun;if(!r||r.done)return;if(r.idx>0)r.idx--;r.endAt=Date.now()+r.steps[r.idx].m*60000;r.paused=false;timerSave();timerPaint(true)}
+function timerFinish(){let r=timerRun;if(!r)return;r.done=true;r.finishedAt=Date.now();clearInterval(timerTick);try{localStorage.removeItem(TIMER_KEY)}catch(e){}timerWakeOff();timerAlert();timerPaint(true)}
+function timerEnd(){if(!confirm("End the session timer?"))return;timerClose()}
+function timerClose(){clearInterval(timerTick);timerRun=null;try{localStorage.removeItem(TIMER_KEY)}catch(e){}timerWakeOff();let el=document.getElementById("timerOverlay");if(el){el.classList.remove("open");el.innerHTML=""}}
+function timerAlert(){
+ try{if(navigator.vibrate)navigator.vibrate([350,120,350,120,350])}catch(e){}
+ try{let a=timerAudio;if(!a)return;if(a.state==="suspended")a.resume();[0,0.28,0.56].forEach(t=>{let o=a.createOscillator(),g=a.createGain();o.type="sine";o.frequency.value=880;g.gain.setValueAtTime(0.0001,a.currentTime+t);g.gain.exponentialRampToValueAtTime(0.5,a.currentTime+t+0.02);g.gain.exponentialRampToValueAtTime(0.0001,a.currentTime+t+0.22);o.connect(g);g.connect(a.destination);o.start(a.currentTime+t);o.stop(a.currentTime+t+0.25)})}catch(e){}
+}
+async function timerWakeOn(){try{if("wakeLock" in navigator){timerWake=await navigator.wakeLock.request("screen")}}catch(e){}}
+function timerWakeOff(){try{if(timerWake){timerWake.release();timerWake=null}}catch(e){}}
+document.addEventListener("visibilitychange",()=>{if(!document.hidden&&timerRun&&!timerRun.done){timerWakeOn();timerStep()}});
+function timerResume(){
+ try{let raw=localStorage.getItem(TIMER_KEY);if(!raw)return;let r=JSON.parse(raw);
+  if(!r||!Array.isArray(r.steps)||!r.steps.length||r.done)return;
+  if(!r.paused&&Date.now()-r.endAt>6*3600*1000){localStorage.removeItem(TIMER_KEY);return}
+  timerRun=r;timerBegin();timerWakeOn();
+ }catch(e){}
+}
+/* ===== end session timer ===== */
+
+/* ===== App lock ===== */
+const LOCK_KEY="procoach_lock_v1",LOCK_FAIL_KEY="procoach_lock_fail";
+let lkEntry="",lkHiddenAt=0,lkBusy=false;
+function lockCfg(){try{return JSON.parse(localStorage.getItem(LOCK_KEY))}catch(e){return null}}
+function lockSave(c){localStorage.setItem(LOCK_KEY,JSON.stringify(c))}
+function lkB64(buf){let b=new Uint8Array(buf),s="";for(let i=0;i<b.length;i++)s+=String.fromCharCode(b[i]);return btoa(s)}
+function lkUnB64(s){return Uint8Array.from(atob(s),c=>c.charCodeAt(0))}
+function lkRand(n){let a=new Uint8Array(n);crypto.getRandomValues(a);return a}
+async function lockHash(secret,saltB64){
+ let key=await crypto.subtle.importKey("raw",new TextEncoder().encode(secret),"PBKDF2",false,["deriveBits"]);
+ let bits=await crypto.subtle.deriveBits({name:"PBKDF2",hash:"SHA-256",salt:lkUnB64(saltB64),iterations:120000},key,256);
+ return lkB64(bits);
+}
+function lockSupported(){return !!(window.crypto&&crypto.subtle)}
+function lockFail(){try{return JSON.parse(localStorage.getItem(LOCK_FAIL_KEY))||{n:0,until:0}}catch(e){return{n:0,until:0}}}
+function lockPadBuild(){
+ let pad=document.getElementById("lkPad");if(!pad||pad.dataset.built)return;pad.dataset.built="1";
+ pad.innerHTML=["1","2","3","4","5","6","7","8","9","","0","⌫"].map(k=>k===""?`<span></span>`:`<button type="button" class="lkKey" onclick="lockKey('${k}')" aria-label="${k==="⌫"?"Delete":k}">${k}</button>`).join("");
+}
+function lockDots(){let c=lockCfg(),n=c?c.len:4,el=document.getElementById("lkDots");if(el)el.innerHTML=Array.from({length:n},(_,i)=>`<span class="${i<lkEntry.length?"on":""}"></span>`).join("")}
+function lockMsg(t,bad){let m=document.getElementById("lkMsg");if(m){m.textContent=t;m.classList.toggle("bad",!!bad)}}
+function lockShow(){
+ let c=lockCfg();if(!c)return;
+ document.documentElement.classList.add("appLocked");lkEntry="";lockPadBuild();lockDots();lockMsg("Enter PIN");
+ let rf=document.getElementById("lkRecover");if(rf)rf.style.display="none";let pd=document.getElementById("lkPadWrap");if(pd)pd.style.display="";
+ let bb=document.getElementById("lkBio");if(bb)bb.style.display=c.bio?"":"none";
+ if(c.bio)setTimeout(lockBioTry,350);
+}
+function lockUnlock(){document.documentElement.classList.remove("appLocked");lkEntry="";try{localStorage.removeItem(LOCK_FAIL_KEY)}catch(e){}}
+async function lockKey(k){
+ if(lkBusy)return;let c=lockCfg();if(!c)return;
+ let f=lockFail();if(Date.now()<f.until){lockMsg("Too many tries. Wait "+Math.ceil((f.until-Date.now())/1000)+"s",true);return}
+ if(k==="⌫"){lkEntry=lkEntry.slice(0,-1);lockDots();return}
+ if(lkEntry.length>=c.len)return;lkEntry+=k;lockDots();
+ if(lkEntry.length<c.len)return;
+ lkBusy=true;let ok=false;try{ok=(await lockHash(lkEntry,c.salt))===c.hash}catch(e){}lkBusy=false;
+ if(ok){lockUnlock();return}
+ let n=f.n+1,until=n>=5?Date.now()+30000*Math.pow(2,Math.min(4,n-5)):0;
+ try{localStorage.setItem(LOCK_FAIL_KEY,JSON.stringify({n,until}))}catch(e){}
+ lkEntry="";lockDots();lockMsg(until?"Too many tries. Wait "+Math.ceil((until-Date.now())/1000)+"s":"Wrong PIN",true);
+ let box=document.querySelector(".lkBox");if(box){box.classList.remove("shake");void box.offsetWidth;box.classList.add("shake")}
+}
+function lockForgot(){let pd=document.getElementById("lkPadWrap"),rf=document.getElementById("lkRecover");if(pd)pd.style.display="none";if(rf){rf.style.display="block";let i=document.getElementById("lkCode");if(i){i.value="";i.focus()}}lockMsg("Enter your recovery code")}
+function lockForgotCancel(){lockShow()}
+async function lockRecover(){
+ let c=lockCfg();if(!c||!c.recHash)return;let v=(document.getElementById("lkCode").value||"").toUpperCase().replace(/[^A-Z0-9]/g,"");
+ let ok=false;try{ok=(await lockHash(v,c.recSalt))===c.recHash}catch(e){}
+ if(!ok){lockMsg("That code doesn't match",true);return}
+ localStorage.removeItem(LOCK_KEY);lockUnlock();alert("App lock removed. You can set a new PIN under Account & Backup → App lock.");if(typeof accountPage==="function")try{accountPage()}catch(e){}
+}
+async function lockBioTry(){
+ let c=lockCfg();if(!c||!c.bio||!document.documentElement.classList.contains("appLocked"))return;
+ try{await navigator.credentials.get({publicKey:{challenge:lkRand(32),allowCredentials:[{id:lkUnB64(c.bio),type:"public-key"}],userVerification:"required",timeout:60000}});lockUnlock()}catch(e){}
+}
+document.addEventListener("visibilitychange",()=>{
+ let c=lockCfg();if(!c)return;
+ if(document.hidden){lkHiddenAt=Date.now();return}
+ if(timerRun&&!timerRun.done)return;
+ if(lkHiddenAt&&Date.now()-lkHiddenAt>=(c.autoMin||0)*60000)lockShow();
+});
+function lockCardHtml(){
+ let c=lockCfg();
+ if(!lockSupported())return `<div class="card"><div class="muted">App lock needs a secure (https) connection and isn't available here.</div></div>`;
+ if(!c)return `<div class="card"><div class="licRow"><div><b>App lock</b><div class="muted">Ask for a PIN to open the app. Good for a shared or lost phone — it keeps casual snoopers out of your players' details.</div></div></div><button class="btn primary" style="margin-top:12px" onclick="lockSetupSheet()">Turn on app lock</button></div>`;
+ return `<div class="card"><div class="licRow"><div><b>App lock</b> <span class="tag">On</span><div class="muted">PIN · ${c.bio?"fingerprint / Face ID on":"PIN only"}</div></div><button class="btn secondary" onclick="lockShow()">Lock now</button></div>
+ <div class="formgrid" style="margin-top:12px"><label class="full">Lock the app<select onchange="lockSetAuto(this.value)">${[[0,"As soon as I leave it"],[1,"After 1 minute away"],[5,"After 5 minutes away"],[15,"After 15 minutes away"]].map(([m,l])=>`<option value="${m}" ${(c.autoMin||0)===m?"selected":""}>${l}</option>`).join("")}</select></label></div>
+ <div class="actionRow" style="margin-top:10px"><button class="btn secondary" onclick="lockChangeSheet()">Change PIN</button><button class="btn secondary" onclick="lockBioToggle()">${c.bio?"Turn off fingerprint":"Use fingerprint / Face ID"}</button></div>
+ <div class="actionRow" style="margin-top:8px"><button class="btn secondary" onclick="lockNewCodeSheet()">New recovery code</button><button class="linkDanger" onclick="lockOffSheet()">Turn off app lock</button></div></div>`;
+}
+function lockSetAuto(v){let c=lockCfg();if(!c)return;c.autoMin=+v;lockSave(c)}
+function lockPinFields(ids){return ids.map(([id,l])=>`<label class="full">${l}<input id="${id}" type="password" inputmode="numeric" pattern="[0-9]*" maxlength="6" autocomplete="off" placeholder="4–6 digits"></label>`).join("")}
+function lockSetupSheet(){
+ modal(`<div class="sheetHead"><h2>Turn on app lock</h2><button class="x" onclick="closeM()">×</button></div><p class="muted">Choose a 4–6 digit PIN. You'll get a recovery code next — keep it safe, because there's no other way back in if you forget the PIN.</p><div class="formgrid">${lockPinFields([["lkP1","New PIN"],["lkP2","Repeat PIN"]])}</div><div id="lkErr" class="muted" style="color:var(--red);margin-top:8px"></div><button class="btn primary" style="width:100%;margin-top:12px" onclick="lockSetupDo()">Continue</button>`);
+}
+function lockErr(t){let e=document.getElementById("lkErr");if(e)e.textContent=t}
+function lockCode(){const A="ABCDEFGHJKMNPQRSTUVWXYZ23456789";let r=lkRand(12),s="";for(let i=0;i<12;i++)s+=A[r[i]%A.length];return s}
+async function lockMakeCfg(pin,old){
+ let salt=lkB64(lkRand(16)),code=lockCode(),rs=lkB64(lkRand(16));
+ let cfg={v:1,len:pin.length,salt,hash:await lockHash(pin,salt),recSalt:rs,recHash:await lockHash(code,rs),autoMin:old?old.autoMin:1,bio:old?old.bio:null};
+ return {cfg,code};
+}
+function lockShowCode(code,title){
+ modal(`<div class="sheetHead"><h2>${title}</h2></div><p class="muted">Write this down or save it somewhere safe. It's the only way to reset the lock if you forget your PIN. It won't be shown again.</p><div class="card" style="text-align:center;font-size:24px;font-weight:800;letter-spacing:2px;font-family:'Sora',sans-serif">${code.slice(0,4)}-${code.slice(4,8)}-${code.slice(8,12)}</div><label style="display:flex;gap:10px;align-items:center;margin:14px 0"><input type="checkbox" id="lkSaved" style="width:20px;height:20px"> I've saved my recovery code</label><button class="btn primary" style="width:100%" onclick="if(!document.getElementById('lkSaved').checked){alert('Please save the code first, then tick the box.');return}closeM();accountPage()">Done</button>`);
+}
+async function lockSetupDo(){
+ let a=document.getElementById("lkP1").value,b=document.getElementById("lkP2").value;
+ if(!/^\d{4,6}$/.test(a)){lockErr("PIN must be 4 to 6 digits.");return}
+ if(a!==b){lockErr("The two PINs don't match.");return}
+ let {cfg,code}=await lockMakeCfg(a,null);lockSave(cfg);lockShowCode(code,"Your recovery code");
+}
+async function lockCheckPin(pin){let c=lockCfg();if(!c)return false;try{return (await lockHash(pin,c.salt))===c.hash}catch(e){return false}}
+function lockChangeSheet(){modal(`<div class="sheetHead"><h2>Change PIN</h2><button class="x" onclick="closeM()">×</button></div><div class="formgrid">${lockPinFields([["lkP0","Current PIN"],["lkP1","New PIN"],["lkP2","Repeat new PIN"]])}</div><div id="lkErr" class="muted" style="color:var(--red);margin-top:8px"></div><button class="btn primary" style="width:100%;margin-top:12px" onclick="lockChangeDo()">Change PIN</button>`)}
+async function lockChangeDo(){
+ let o=document.getElementById("lkP0").value,a=document.getElementById("lkP1").value,b=document.getElementById("lkP2").value;
+ if(!(await lockCheckPin(o))){lockErr("Current PIN is wrong.");return}
+ if(!/^\d{4,6}$/.test(a)){lockErr("New PIN must be 4 to 6 digits.");return}
+ if(a!==b){lockErr("The new PINs don't match.");return}
+ let c=lockCfg(),salt=lkB64(lkRand(16));c.salt=salt;c.len=a.length;c.hash=await lockHash(a,salt);lockSave(c);closeM();accountPage();alert("PIN changed.");
+}
+function lockNewCodeSheet(){modal(`<div class="sheetHead"><h2>New recovery code</h2><button class="x" onclick="closeM()">×</button></div><p class="muted">The old code stops working.</p><div class="formgrid">${lockPinFields([["lkP0","Enter your PIN"]])}</div><div id="lkErr" class="muted" style="color:var(--red);margin-top:8px"></div><button class="btn primary" style="width:100%;margin-top:12px" onclick="lockNewCodeDo()">Create new code</button>`)}
+async function lockNewCodeDo(){
+ if(!(await lockCheckPin(document.getElementById("lkP0").value))){lockErr("PIN is wrong.");return}
+ let c=lockCfg(),code=lockCode(),rs=lkB64(lkRand(16));c.recSalt=rs;c.recHash=await lockHash(code,rs);lockSave(c);lockShowCode(code,"Your new recovery code");
+}
+function lockOffSheet(){modal(`<div class="sheetHead"><h2>Turn off app lock</h2><button class="x" onclick="closeM()">×</button></div><div class="formgrid">${lockPinFields([["lkP0","Enter your PIN"]])}</div><div id="lkErr" class="muted" style="color:var(--red);margin-top:8px"></div><button class="btn danger" style="width:100%;margin-top:12px" onclick="lockOffDo()">Turn off</button>`)}
+async function lockOffDo(){if(!(await lockCheckPin(document.getElementById("lkP0").value))){lockErr("PIN is wrong.");return}localStorage.removeItem(LOCK_KEY);closeM();accountPage()}
+async function lockBioToggle(){
+ let c=lockCfg();if(!c)return;
+ if(c.bio){c.bio=null;lockSave(c);accountPage();return}
+ try{
+  if(!window.PublicKeyCredential||!(await PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable())){alert("This device doesn't offer fingerprint or Face ID for web apps.");return}
+  let cred=await navigator.credentials.create({publicKey:{challenge:lkRand(32),rp:{name:"ProCoach OS"},user:{id:lkRand(16),name:"coach",displayName:"Coach"},pubKeyCredParams:[{type:"public-key",alg:-7},{type:"public-key",alg:-257}],authenticatorSelection:{authenticatorAttachment:"platform",userVerification:"required",residentKey:"discouraged"},timeout:60000}});
+  c.bio=lkB64(cred.rawId);lockSave(c);accountPage();
+ }catch(e){alert("Couldn't set up fingerprint / Face ID. Your PIN still works.")}
+}
+/* ===== end app lock ===== */
+
+/* ===== Storage manager ===== */
+function fmtBytes(n){return n>=1048576?(n/1048576).toFixed(n>=10485760?0:1)+" MB":n>=1024?Math.round(n/1024)+" KB":n+" B"}
+function storageBreakdown(){
+ const sz=o=>{try{return JSON.stringify(o).length}catch(e){return 0}};
+ let att=0;db.sessions.forEach(s=>{if(s.attachment&&s.attachment.dataUrl)att+=s.attachment.dataUrl.length});
+ let total=sz(db),sess=Math.max(0,sz(db.sessions)-att),mt=sz(db.matches),dr=sz(db.drills),pe=sz(db.players)+sz(db.assessments)+sz(db.reflections);
+ return {total,rows:[["Session attachments",att],["Matches & scoring",mt],["Sessions (text & plans)",sess],["Drills & diagrams",dr],["Players, assessments, reflections",pe],["Everything else",Math.max(0,total-att-sess-mt-dr-pe)]]};
+}
+function storageAttachments(){return db.sessions.filter(s=>s.attachment&&s.attachment.dataUrl).map(s=>({s,size:s.attachment.dataUrl.length})).sort((a,b)=>b.size-a.size)}
+async function storageSheet(msg){
+ let b=storageBreakdown(),atts=storageAttachments(),est=null;
+ try{if(navigator.storage&&navigator.storage.estimate)est=await navigator.storage.estimate()}catch(e){}
+ let archived=db.sessions.filter(s=>s.attachment&&s.attachment.archived).length;
+ modal(`<div class="sheetHead"><h2>Manage storage</h2><button class="x" onclick="closeM()">×</button></div>
+ ${msg?`<div class="card" style="border-color:var(--g);margin-bottom:12px">${esc(msg)}</div>`:""}
+ <div class="card"><div style="display:flex;justify-content:space-between"><span class="muted">Your coaching data</span><b>${fmtBytes(b.total)}</b></div>
+ ${est&&est.quota?`<div class="muted" style="font-size:var(--fs-3);margin-top:4px">This browser has set aside ${fmtBytes(est.quota)} for the app; ${fmtBytes(est.usage||0)} is in use (data, app files and caches).</div>`:""}
+ <div style="margin-top:12px;display:grid;gap:10px">${b.rows.map(([n,v])=>`<div><div style="display:flex;justify-content:space-between;font-size:var(--fs-3)"><span>${esc(n)}</span><span class="muted">${fmtBytes(v)}</span></div><div class="goalBar"><div class="goalBarFill" style="width:${b.total?Math.max(v?2:0,Math.round(v/b.total*100)):0}%"></div></div></div>`).join("")}</div></div>
+ <h2 class="section">Free up space</h2>
+ <div class="card"><div class="actionRow"><button class="btn secondary" onclick="storageCompressAll()">Shrink all photos</button><button class="btn secondary" onclick="storageArchiveSheet()">Archive old attachments</button></div>
+ <p class="muted" style="font-size:var(--fs-3);margin:10px 0 0">Shrinking keeps photos readable but smaller. Archiving saves attachments to a file on your phone and removes them from the app; you can restore them any time${archived?` (${archived} archived now)`:""}.</p>
+ <label class="btn secondary" style="display:block;text-align:center;margin-top:10px;cursor:pointer">Restore attachments from an archive file<input type="file" accept="application/json" style="display:none" onchange="storageRestoreFile(this)"></label></div>
+ <h2 class="section">Largest attachments</h2>
+ ${atts.length?`<div class="list">${atts.slice(0,8).map(({s,size})=>`<div class="item"><div><b>${esc(s.attachment.name)}</b><div class="muted">${esc(sessionLabel(s))} · ${esc(fmtDate(s.date))} · ${fmtBytes(size)}</div></div><div class="toolbar"><button class="btn danger iconBtn" title="Remove attachment" onclick="storageRemoveAtt('${s.id}')">${icon("trash",16)}</button></div></div>`).join("")}</div>`:emptyRich("No attachments","Files you add to sessions will show up here.","")}`);
+}
+function storageRemoveAtt(id){let s=db.sessions.find(x=>x.id===id);if(!s||!confirm("Remove this attachment from the session? This can't be undone."))return;s.attachment=null;save();storageSheet("Attachment removed.")}
+function storageLoadImg(url){return new Promise((res,rej)=>{let i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=url})}
+async function storageShrink(url,type){
+ if(!/^data:image\/(jpeg|png|webp)/.test(url))return null;
+ let img=await storageLoadImg(url),M=1600,sc=Math.min(1,M/Math.max(img.width,img.height)),w=Math.round(img.width*sc),h=Math.round(img.height*sc);
+ let c=document.createElement("canvas");c.width=w;c.height=h;let x=c.getContext("2d");x.fillStyle="#fff";x.fillRect(0,0,w,h);x.drawImage(img,0,0,w,h);
+ let out=c.toDataURL("image/jpeg",0.72);return out.length<url.length*0.85?out:null;
+}
+async function storageCompressAll(){
+ let saved=0,n=0;
+ for(let {s,size} of storageAttachments()){
+  if(size<150000)continue;
+  try{let out=await storageShrink(s.attachment.dataUrl);if(out){saved+=s.attachment.dataUrl.length-out.length;s.attachment.dataUrl=out;s.attachment.type="image/jpeg";s.attachment.name=s.attachment.name.replace(/\.[a-z0-9]+$/i,"")+".jpg";n++}}catch(e){}
+ }
+ if(n)save();
+ storageSheet(n?`Shrunk ${n} photo${n===1?"":"s"} and saved ${fmtBytes(saved)}.`:"Nothing to shrink — your photos are already small, or the files aren't images.");
+}
+function storageArchiveSheet(){
+ modal(`<div class="sheetHead"><h2>Archive old attachments</h2><button class="x" onclick="storageSheet()">×</button></div><p class="muted">Saves attachments from older sessions into a file on your phone, then removes them from the app. The sessions themselves stay. Keep the file safe — it's the only copy.</p><label>Older than<select id="arcAge"><option value="3">3 months</option><option value="6" selected>6 months</option><option value="12">12 months</option></select></label><button class="btn primary" style="width:100%;margin-top:12px" onclick="storageArchiveDo()">Save to file &amp; remove</button>`);
+}
+function storageArchiveDo(){
+ let m=+document.getElementById("arcAge").value,d=new Date();d.setMonth(d.getMonth()-m);let cut=d.toISOString().slice(0,10);
+ let items=storageAttachments().filter(x=>x.s.date&&x.s.date<cut);
+ if(!items.length){storageSheet("No attachments older than "+m+" months.");return}
+ if(!confirm("Save "+items.length+" attachment"+(items.length===1?"":"s")+" ("+fmtBytes(items.reduce((a,x)=>a+x.size,0))+") to a file and remove them from the app?"))return;
+ let payload={app:"ProCoach OS attachments archive",version:1,created:new Date().toISOString(),items:items.map(({s})=>({sessionId:s.id,title:sessionLabel(s),date:s.date,attachment:s.attachment}))};
+ let blob=new Blob([JSON.stringify(payload)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="procoachos-attachments-"+today()+".json";document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},2000);
+ items.forEach(({s,size})=>{s.attachment={name:s.attachment.name,type:s.attachment.type,archived:true,size}});
+ save();storageSheet("Archived "+items.length+" attachment"+(items.length===1?"":"s")+". Your file is in your downloads.");
+}
+function storageRestoreFile(input){
+ let f=input.files&&input.files[0];if(!f)return;let r=new FileReader();
+ r.onload=()=>{try{let p=JSON.parse(r.result);if(!p||!Array.isArray(p.items))throw 0;let n=0;
+  p.items.forEach(it=>{let s=db.sessions.find(x=>x.id===it.sessionId);if(s&&it.attachment&&it.attachment.dataUrl&&(!s.attachment||s.attachment.archived)){s.attachment=it.attachment;n++}});
+  if(n)save();storageSheet(n?"Restored "+n+" attachment"+(n===1?"":"s")+".":"Nothing to restore from that file.")
+ }catch(e){alert("That doesn't look like a ProCoach OS attachments archive.")}};
+ r.readAsText(f);input.value="";
+}
+/* ===== end storage manager ===== */
+
 async function checkTodaysSessionReminder(){
  // This is a LOCAL notification — shown directly by this device when the
  // app happens to be open, not a server push. Session-plan data never
@@ -971,7 +1278,7 @@ function initApp(){
   if(needsEmailGate()){showEmailGate()}
   else{
    nav();renderAll();applyTheme(document.documentElement.classList.contains("light")?"light":"dark");checkPlanTransition();revalidateLicenseIfNeeded();checkTrialStatusIfNeeded();
-   checkTodaysSessionReminder();
+   checkTodaysSessionReminder();lockShow();timerResume();
    // Restore whichever page was open before this load — iOS can fully
    // reload a standalone Home Screen app when returning from a
    // window.open() tool (e.g. opening an Analysis Tool and closing it),
@@ -982,7 +1289,7 @@ function initApp(){
  });
 }
 const esc=s=>String(s??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));const today=()=>new Date().toISOString().slice(0,10);
-function save(){idbSet(DB_KEY,db).catch(err=>console.warn("IndexedDB save failed",err));try{localStorage.setItem(DB_KEY,JSON.stringify(db))}catch(e){}renderAll()}function head(t,s){return `<button class="backBtn noPrint" onclick="goBack()">${icon("chevronLeft",13)} Back</button><div class="hero"><h1>${t}</h1><div class="muted">${s}</div></div>`}function emptyRich(title,text,btn,fn){return `<div class="emptyRich"><b>${title}</b><p>${text}</p>${btn?`<button class="btn primary" onclick="${fn}">${btn}</button>`:""}</div>`}function empty(t){return `<div class="empty">${t}</div>`}
+function save(){try{syncTournamentSquads()}catch(e){}idbSet(DB_KEY,db).catch(err=>console.warn("IndexedDB save failed",err));try{localStorage.setItem(DB_KEY,JSON.stringify(db))}catch(e){}renderAll()}function head(t,s){return `<button class="backBtn noPrint" onclick="goBack()">${icon("chevronLeft",13)} Back</button><div class="hero"><h1>${t}</h1><div class="muted">${s}</div></div>`}function emptyRich(title,text,btn,fn){return `<div class="emptyRich"><b>${title}</b><p>${text}</p>${btn?`<button class="btn primary" onclick="${fn}">${btn}</button>`:""}</div>`}function empty(t){return `<div class="empty">${t}</div>`}
 function cssVar(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()||"#10b981"}
 function icon(name,size){
  size=size||18;
@@ -1321,7 +1628,7 @@ function dashboard(){
  if(heroSession&&_sortedToday.length>1){let t=_tm(heroSession),e=_endMin(heroSession);heroLabel=(t===null||e===null)?"Today":(_nowMin<t?"Up next · "+heroSession.time:(_nowMin<e?"In progress":"Today · done"))}
  let nextSession=(!heroSession&&!todayMatches.length&&!todayEvents.length)?activeSessions().filter(x=>x.date>today()).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b)))[0]||null:null;
  let heroMeta=x=>[x.time||"",x.duration?x.duration+" min":"",x.squad||"",((x.mainDrillIds||[]).length+(x.gameDrillIds||[]).length)?((x.mainDrillIds||[]).length+(x.gameDrillIds||[]).length)+" drills":""].filter(Boolean).join(" · ");
- let todayHeroHtml=isNewUser?"":(heroSession?`<div class="todayHero"><div class="thLabel">${esc(heroLabel)}</div><div class="thTitle">${esc(sessionLabel(heroSession))}</div><div class="thMeta">${esc(heroMeta(heroSession))}</div><div class="thBtns"><button class="btn primary" onclick="printSessionPlan('${heroSession.id}')">Open plan</button><button class="btn secondary" onclick="editSession('${heroSession.id}')">Edit</button><button class="btn secondary" onclick="remindSheet('${heroSession.id}')">Remind</button></div>${todayCount>1?`<div class="thMore">${todayRows(heroSession.id)}</div>`:""}</div>`
+ let todayHeroHtml=isNewUser?"":(heroSession?`<div class="todayHero"><div class="thLabel">${esc(heroLabel)}</div><div class="thTitle">${esc(sessionLabel(heroSession))}</div><div class="thMeta">${esc(heroMeta(heroSession))}</div><div class="thBtns"><button class="btn primary" onclick="printSessionPlan('${heroSession.id}')">Open plan</button><button class="btn secondary" onclick="timerSetup('${heroSession.id}')">Start timer</button><button class="btn secondary" onclick="editSession('${heroSession.id}')">Edit</button><button class="btn secondary" onclick="remindSheet('${heroSession.id}')">Remind</button></div>${todayCount>1?`<div class="thMore">${todayRows(heroSession.id)}</div>`:""}</div>`
   :((todayMatches.length||todayEvents.length)?`<div class="todayHero"><div class="thLabel">Today</div><div class="thTitle">${todayMatches.length?"Match day":"On today"}</div><div class="thMore" style="border:0;margin-top:8px;padding:0">${todayRows("")}</div></div>`
   :(nextSession?`<div class="todayHero"><div class="thLabel">${todaySessions.length?"All done today · next up":"Nothing today · next up"}</div><div class="thTitle">${esc(sessionLabel(nextSession))}</div><div class="thMeta">${esc(fmtDate(nextSession.date))}${heroMeta(nextSession)?" · "+esc(heroMeta(nextSession)):""}</div><div class="thBtns"><button class="btn primary" onclick="printSessionPlan('${nextSession.id}')">Open plan</button><button class="btn secondary" onclick="editSession('${nextSession.id}')">Edit</button></div></div>`
   :`<div class="todayHero"><div class="thLabel">Today</div><div class="thTitle">Nothing planned</div><div class="thMeta">Plan your next session in a couple of minutes.</div><div class="thBtns"><button class="btn primary" onclick="go('sessions');newSession()">Plan a session</button></div></div>`)));
@@ -1447,7 +1754,7 @@ function sessions(){
   let linkedReflection=db.reflections.find(r=>r.sessionId===s.id);
   let showReflectionStatus=s.date<=today();
   let thumbDrill=mainDrills.concat(gameDrills).find(d=>d.fieldSteps&&d.fieldSteps.length);
-  return `<div class="item">${thumbDrill?`<div class="sessThumb">${fieldStepsPreviewHtml(thumbDrill.fieldSteps.slice(0,1),76)}</div>`:""}<div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.concat(gameDrills).map(d=>`<span class="tag" style="cursor:pointer" onclick="viewDrill('${d.id}')">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px"><a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="printSessionPlan('${s.id}')">View</button>${kebabMenu("s"+s.id,[{label:"Edit",icon:"edit",fn:`editSession('${s.id}')`},{label:"Remind me (calendar)",icon:"bell",fn:`remindSheet('${s.id}')`},{label:"Share on WhatsApp",icon:"share",fn:`shareSessionSummary('${s.id}')`},{label:"Copy text",icon:"copy",fn:`copySessionSummary('${s.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delSession('${s.id}')`}])}</div></div>`;
+  return `<div class="item">${thumbDrill?`<div class="sessThumb">${fieldStepsPreviewHtml(thumbDrill.fieldSteps.slice(0,1),76)}</div>`:""}<div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.concat(gameDrills).map(d=>`<span class="tag" style="cursor:pointer" onclick="viewDrill('${d.id}')">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px">${s.attachment.dataUrl?`<a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a>`:`<span class="muted" style="font-size:var(--fs-3)">📎 ${esc(s.attachment.name)} (archived)</span>`}</div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="printSessionPlan('${s.id}')">View</button>${kebabMenu("s"+s.id,[{label:"Edit",icon:"edit",fn:`editSession('${s.id}')`},{label:"Start timer",icon:"clock",fn:`timerSetup('${s.id}')`},{label:"Remind me (calendar)",icon:"bell",fn:`remindSheet('${s.id}')`},{label:"Share on WhatsApp",icon:"share",fn:`shareSessionSummary('${s.id}')`},{label:"Copy text",icon:"copy",fn:`copySessionSummary('${s.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delSession('${s.id}')`}])}</div></div>`;
  }).join("")}</div>`:empty("No sessions match your search.")}</div>`;
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -2542,12 +2849,13 @@ function stageOf(p){let L=stagesList();return L.find(s=>s.id===p.stage)||L[0]}
 function isReleased(p){return !!stageOf(p).released}
 function stagesInUse(){let first=stagesList()[0].id;return db.players.some(p=>!p.deletedAt&&p.stage&&p.stage!==first)}
 function stageBadge(p){if(!stagesInUse())return "";let st=stageOf(p);return ` <span class="tag" style="${st.released?"background:var(--redTint);color:var(--red)":""}">${esc(st.name)}</span>`}
-function stagePlayers(id){return activePlayers().filter(p=>stageOf(p).id===id).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")))}
+let squadTeam="";
+function stagePlayers(id,team){return activePlayers().filter(p=>stageOf(p).id===id&&(!team||p.team===team)).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")))}
 function stageChipsHtml(){
  if(!stagesInUse())return "";
- let L=stagesList(),all=activePlayers().length;
+ let L=stagesList(),all=activePlayers().filter(p=>!playerTeamFilter||p.team===playerTeamFilter).length;
  const chip=(id,label,n)=>`<button type="button" class="stageChip${stageFilter===id?" on":""}" onclick="stageFilter='${id}';players()">${esc(label)} <b>${n}</b></button>`;
- return `<div class="stageChips noPrint">${chip("","All",all)}${L.map(s=>chip(s.id,s.name,stagePlayers(s.id).length)).join("")}${stageFilter?`<button type="button" class="stageChip" onclick="stageListReport('${stageFilter}')">${icon("print",14)} Print</button>`:""}</div>`;
+ return `<div class="stageChips noPrint">${chip("","All",all)}${L.map(s=>chip(s.id,s.name,stagePlayers(s.id,playerTeamFilter).length)).join("")}${stageFilter?`<button type="button" class="stageChip" onclick="stageListReport('${stageFilter}',playerTeamFilter)">${icon("print",14)} Print</button>`:""}</div>`;
 }
 function stageLogHtml(p){
  let L=stagesList(),nm=id=>(L.find(s=>s.id===id)||{name:"?"}).name,log=Array.isArray(p.stageLog)?p.stageLog:[];
@@ -2574,20 +2882,23 @@ function deleteStageLogEntry(id,i){
  db.settings.lastSelection=null;save();playerView(id);
 }
 function setPlayerStageNote(id,v){let p=db.players.find(x=>x.id===id);if(!p)return;p.stageNote=v;save()}
-function squadSelectSheet(fromId){
+function squadSelectSheet(fromId,team){
+ if(team!==undefined)squadTeam=team;
+ let teams=playerTeams();if(squadTeam&&!teams.includes(squadTeam))squadTeam="";
  let L=stagesList(),open=L.filter(s=>!s.released);
- if(!fromId||!L.find(s=>s.id===fromId))fromId=(open.find(s=>stagePlayers(s.id).length)||open[0]).id;
+ if(!fromId||!L.find(s=>s.id===fromId))fromId=(open.find(s=>stagePlayers(s.id,squadTeam).length)||open[0]).id;
  let fi=L.findIndex(s=>s.id===fromId),toDefault=(L[fi+1]&&!L[fi+1].released)?L[fi+1].id:(open[fi+1]||L[fi]).id;
- let rel=L.find(s=>s.released),players=stagePlayers(fromId),last=db.settings.lastSelection;
+ let rel=L.find(s=>s.released),players=stagePlayers(fromId,squadTeam),last=db.settings.lastSelection;
  modal(`<div class="sheetHead"><h2>Select squad</h2><button class="x" onclick="closeM()">×</button></div>
- <p class="muted">Tick the players who move on. Nobody is deleted — everyone keeps all sessions, assessments and match history.</p>
- <div class="formgrid"><label>Choose from<select id="ssFrom" onchange="squadSelectSheet(this.value)">${open.map(s=>`<option value="${s.id}" ${s.id===fromId?"selected":""}>${esc(s.name)} (${stagePlayers(s.id).length})</option>`).join("")}</select></label>
+ <p class="muted">Tick the players who move on. Nobody is deleted — everyone keeps all sessions, assessments and match history.${squadTeam?` Showing <b>${esc(squadTeam)}</b> only.`:""}</p>
+${(()=>{let lt=db.tournaments.filter(t=>t.syncStage&&L.some(x=>x.id===t.syncStage));return lt.length?`<p class="muted" style="font-size:var(--fs-3)">Linked tournaments update automatically: ${lt.map(t=>esc(t.name)+" ← "+esc(L.find(x=>x.id===t.syncStage).name)).join(", ")}.</p>`:""})()}
+ <div class="formgrid">${teams.length>1?`<label class="full">Team<select id="ssTeam" onchange="squadSelectSheet(document.getElementById('ssFrom').value,this.value)"><option value="">All teams</option>${teams.map(t=>`<option value="${esc(t)}" ${t===squadTeam?"selected":""}>${esc(t)}</option>`).join("")}</select></label>`:""}<label>Choose from<select id="ssFrom" onchange="squadSelectSheet(this.value)">${open.map(s=>`<option value="${s.id}" ${s.id===fromId?"selected":""}>${esc(s.name)} (${stagePlayers(s.id,squadTeam).length})</option>`).join("")}</select></label>
  <label>Ticked players move to<select id="ssTo">${L.filter(s=>s.id!==fromId&&!s.released).map(s=>`<option value="${s.id}" ${s.id===toDefault?"selected":""}>${esc(s.name)}</option>`).join("")}</select></label>
  <label class="full">Players not ticked<select id="ssMode"><option value="release">Move to ${esc(rel.name)}</option><option value="stay">Leave in ${esc(L[fi].name)}</option></select></label></div>
  <div style="display:flex;gap:8px;margin:10px 0"><button class="btn secondary" onclick="document.querySelectorAll('.ssChk').forEach(c=>c.checked=true)">Tick all</button><button class="btn secondary" onclick="document.querySelectorAll('.ssChk').forEach(c=>c.checked=false)">Clear</button><span class="muted" style="align-self:center" id="ssCount"></span></div>
  <div class="list">${players.length?players.map(p=>`<div class="item ssRow"><input type="checkbox" class="ssChk" data-id="${p.id}" checked onchange="ssUpdateCount()"><div class="ssMain"><div class="ssName"><b>${esc(p.name)}</b> <span class="muted">${esc(p.role||"Player")}</span></div><input class="ssNote" data-id="${p.id}" placeholder="Note (optional)"></div></div>`).join(""):empty("No players in this stage.")}</div>
  <div style="display:grid;gap:8px;margin-top:14px"><button class="btn primary" onclick="applySquadSelection('${fromId}')">Apply selection</button>
- <div class="actionRow"><button class="btn secondary" onclick="stageListReport('${fromId}')">Print this list</button><button class="btn secondary" onclick="stagesSettingsSheet()">Edit stages</button></div>
+ <div class="actionRow"><button class="btn secondary" onclick="stageListReport('${fromId}',squadTeam)">Print this list</button><button class="btn secondary" onclick="stagesSettingsSheet()">Edit stages</button></div>
  ${last?`<button class="btn danger" onclick="undoSquadSelection()">Undo last selection (${esc(fmtDate(last.date))}, ${last.moves.length} moved)</button>`:""}</div>`);
  ssUpdateCount();
 }
@@ -2596,9 +2907,9 @@ function applySquadSelection(fromId){
  if(!requireWriteAccess())return;
  let L=stagesList(),to=document.getElementById("ssTo").value,mode=document.getElementById("ssMode").value,rel=L.find(s=>s.released).id;
  let checked=new Set([...document.querySelectorAll('.ssChk:checked')].map(c=>c.dataset.id)),notes={};document.querySelectorAll('.ssNote').forEach(i=>notes[i.dataset.id]=i.value.trim());
- let ps=stagePlayers(fromId),promote=ps.filter(p=>checked.has(p.id)).length,drop=mode==="release"?ps.length-promote:0;
+ let ps=stagePlayers(fromId,squadTeam),promote=ps.filter(p=>checked.has(p.id)).length,drop=mode==="release"?ps.length-promote:0;
  if(!ps.length)return;
- if(!confirm(`Move ${promote} player${promote===1?"":"s"} to ${L.find(s=>s.id===to).name}`+(drop?` and ${drop} to ${L.find(s=>s.id===rel).name}`:"")+"?\n\nNo data is deleted. You can undo this right after."))return;
+ if(!confirm((squadTeam?squadTeam+": ":"")+`Move ${promote} player${promote===1?"":"s"} to ${L.find(s=>s.id===to).name}`+(drop?` and ${drop} to ${L.find(s=>s.id===rel).name}`:"")+"?\n\nNo data is deleted. You can undo this right after."))return;
  let moves=[];
  ps.forEach(p=>{let target=checked.has(p.id)?to:(mode==="release"?rel:fromId);if(target===fromId)return;
   if(!Array.isArray(p.stageLog))p.stageLog=[];p.stageLog.push({date:today(),from:fromId,to:target,reason:notes[p.id]||""});p.stage=target;moves.push({id:p.id,from:fromId})});
@@ -2609,9 +2920,9 @@ function undoSquadSelection(){
  last.moves.forEach(m=>{let p=db.players.find(x=>x.id===m.id);if(p){p.stage=m.from;if(Array.isArray(p.stageLog))p.stageLog.pop()}});
  db.settings.lastSelection=null;save();closeM();players();
 }
-function stageListReport(id){
- let st=stagesList().find(s=>s.id===id)||stagesList()[0],ps=stagePlayers(st.id);
- reportShell(esc(st.name),`${ps.length} players · ${esc(fmtDate(today()))}`,ps.length?ps.map((p,i)=>`<div class="card"><b>${i+1}. ${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span>${playingStyleLabel(p)?`<p class="muted">${esc(playingStyleLabel(p))}</p>`:""}</div>`).join(""):empty("No players in this stage."));
+function stageListReport(id,team){
+ let st=stagesList().find(s=>s.id===id)||stagesList()[0],ps=stagePlayers(st.id,team||"");
+ reportShell(esc(st.name)+(team?" · "+esc(team):""),`${ps.length} players · ${esc(fmtDate(today()))}`,ps.length?ps.map((p,i)=>`<div class="card"><b>${i+1}. ${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span>${playingStyleLabel(p)?`<p class="muted">${esc(playingStyleLabel(p))}</p>`:""}</div>`).join(""):empty("No players in this stage."));
 }
 function stagesSettingsSheet(){
  let L=stagesList();
@@ -2633,7 +2944,7 @@ function players(){
  if(stageFilter&&!stagesList().some(x=>x.id===stageFilter))stageFilter="";
  if(stageFilter)list=list.filter(p=>stageOf(p).id===stageFilter);
  document.getElementById("players").innerHTML=head("Players","Development record for every player.")
- +`<div class="toolbar noPrint" style="flex-wrap:wrap"><button class="btn primary" onclick="newPlayer()">+ Add Player</button><button class="btn secondary" onclick="newPlayersBulk()">+ Add Multiple</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess</button><button class="btn secondary" onclick="squadSelectSheet()">Select squad</button><button class="btn secondary iconBtn" title="Print Roster" onclick="playerRosterReport()">${icon("print",17)}</button></div>
+ +`<div class="toolbar noPrint" style="flex-wrap:wrap"><button class="btn primary" onclick="newPlayer()">+ Add Player</button><button class="btn secondary" onclick="newPlayersBulk()">+ Add Multiple</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess</button><button class="btn secondary" onclick="squadSelectSheet(undefined,playerTeamFilter)">Select squad</button><button class="btn secondary iconBtn" title="Print Roster" onclick="playerRosterReport()">${icon("print",17)}</button></div>
  ${stageChipsHtml()}
  ${filterBarHtml("players",`<input id="playerSearch" value="${esc(playerQuery)}" oninput="playerQuery=this.value;players()" onfocus="playerSearchFocused=true" onblur="playerSearchFocused=false" placeholder="Search players, teams, notes...">`,`<label>Role<select onchange="playerRoleFilter=this.value;players()"><option value="">All roles</option>${PLAYER_ROLES.map(r=>`<option value="${r}" ${playerRoleFilter===r?"selected":""}>${r}</option>`).join("")}</select></label>
  <label>Team<select onchange="playerTeamFilter=this.value;players()"><option value="">All teams</option>${playerTeams().map(t=>`<option value="${esc(t)}" ${playerTeamFilter===t?"selected":""}>${esc(t)}</option>`).join("")}</select></label>`,(playerRoleFilter?1:0)+(playerTeamFilter?1:0))}
@@ -4842,7 +5153,7 @@ function organisation(){
   let squad=(t.squadPlayerIds||[]).map(id=>db.players.find(p=>p.id===id)).filter(Boolean);
   return `<div class="card">
   <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:10px">
-  <div><b>${esc(t.name)}</b><div class="muted">${t.startDate||"?"} → ${t.endDate||"?"}</div><div class="muted" style="margin-top:6px">${matchCount} match${matchCount!==1?"es":""} · ${squad.length} in squad</div></div>
+  <div><b>${esc(t.name)}</b><div class="muted">${t.startDate||"?"} → ${t.endDate||"?"}</div><div class="muted" style="margin-top:6px">${matchCount} match${matchCount!==1?"es":""} · ${squad.length} in squad${(t.syncStage&&stagesList().some(x=>x.id===t.syncStage))?` · <span class="tag">Linked: ${esc(stagesList().find(x=>x.id===t.syncStage).name)}</span>`:""}</div></div>
   <div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editOrgEntity('tournament','${t.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delOrgEntity('tournament','${t.id}')">${icon("trash",17)}</button></div>
   </div>
   ${t.notes?`<p style="margin-top:8px">${esc(t.notes)}</p>`:""}
@@ -4924,13 +5235,37 @@ function delFixture(tournamentId,fixtureId){
  t.fixtures=(t.fixtures||[]).filter(x=>x.id!==fixtureId);
  save();
 }
+function syncTournamentSquads(){
+ if(!db||!Array.isArray(db.tournaments))return;
+ let L=stagesList();
+ db.tournaments.forEach(t=>{if(t.syncStage&&L.some(x=>x.id===t.syncStage))t.squadPlayerIds=stagePlayers(t.syncStage,t.syncTeam||"").map(p=>p.id)});
+}
+function setTournamentLink(id,stage){
+ if(!requireWriteAccess())return;
+ let t=db.tournaments.find(x=>x.id===id);if(!t)return;
+ if(stage&&!t.syncStage&&(t.squadPlayerIds||[]).length&&!confirm("Linking replaces the current squad ("+t.squadPlayerIds.length+" players) with whoever is in that stage. You can unlink later, but the old list won't come back. Continue?")){manageTournamentSquad(id);return}
+ t.syncStage=stage||"";if(!stage)t.syncTeam="";
+ save();manageTournamentSquad(id);
+}
+function setTournamentLinkTeam(id,team){let t=db.tournaments.find(x=>x.id===id);if(!t)return;t.syncTeam=team||"";save();manageTournamentSquad(id)}
 function manageTournamentSquad(tournamentId){
  let t=db.tournaments.find(x=>x.id===tournamentId);if(!t)return;
- modal(`<div class="sheetHead"><h2>Select Squad — ${esc(t.name)}</h2><button class="x" onclick="closeM()">×</button></div>
- <form onsubmit="saveTournamentSquad(event,'${tournamentId}')">
+ syncTournamentSquads();
+ let L=stagesList().filter(x=>!x.released),teams=playerTeams(),linked=!!(t.syncStage&&L.some(x=>x.id===t.syncStage));
+ let stName=linked?L.find(x=>x.id===t.syncStage).name:"";
+ let linkCard=`<div class="card" style="margin-bottom:12px"><b>Link to a squad stage</b><div class="muted" style="margin:2px 0 10px">The tournament squad then follows everyone in that stage automatically — no need to enter anyone twice.</div>
+ <div class="formgrid"><label class="full">Stage<select onchange="setTournamentLink('${tournamentId}',this.value)"><option value="">Not linked — pick players manually</option>${L.map(x=>`<option value="${x.id}" ${x.id===t.syncStage?"selected":""}>${esc(x.name)} (${stagePlayers(x.id).length})</option>`).join("")}</select></label>
+ ${linked&&teams.length>1?`<label class="full">Team<select onchange="setTournamentLinkTeam('${tournamentId}',this.value)"><option value="">All teams</option>${teams.map(x=>`<option value="${esc(x)}" ${x===t.syncTeam?"selected":""}>${esc(x)}</option>`).join("")}</select></label>`:""}</div></div>`;
+ let squad=(t.squadPlayerIds||[]).map(id=>db.players.find(p=>p.id===id)).filter(Boolean);
+ let body=linked
+  ?`<h2 class="section" style="margin-top:6px">Squad (${squad.length})</h2>${squad.length?`<div class="list">${squad.map(p=>`<div class="item"><div class="avatar">${esc(initials(p.name))}</div><div><b>${esc(p.name)}</b><div class="muted">${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}</div></div></div>`).join("")}</div>`:emptyRich("No players in "+esc(stName)+" yet","Use Players → Select squad to move players into this stage.","")}
+   <div class="actionRow" style="margin-top:12px"><button class="btn secondary" onclick="stageListReport('${t.syncStage}','${esc(t.syncTeam||"")}')">Print squad list</button><button class="btn secondary" onclick="closeM()">Close</button></div>
+   <p class="muted" style="margin-top:10px;font-size:var(--fs-3)">To pick players by hand instead, set the stage above to "Not linked" — the current squad is kept.</p>`
+  :`<form onsubmit="saveTournamentSquad(event,'${tournamentId}')">
  ${activePlayers().length?`<div class="skillPick">${activePlayers().map(p=>`<label><input type="checkbox" name="squad" value="${p.id}" ${(t.squadPlayerIds||[]).includes(p.id)?"checked":""}> ${esc(p.name)}</label>`).join("")}</div>`:empty("No players yet — add players first.")}
  <button class="btn primary" style="margin-top:16px">Save Squad</button>
- </form>`);
+ </form>`;
+ modal(`<div class="sheetHead"><h2>Select Squad — ${esc(t.name)}</h2><button class="x" onclick="closeM()">×</button></div>${linkCard}${body}`);
 }
 function saveTournamentSquad(e,tournamentId){
  e.preventDefault();
@@ -6982,11 +7317,15 @@ function accountPage(){
  <div class="card">${profiles.map(p=>`<div class="item"><div><b>${esc(p.name)}</b>${p.id===active.id?` <span class="tag">Active</span>`:""}<div class="muted">${esc(p.club||"")}</div></div><div class="toolbar">${p.id!==active.id?`<button class="btn secondary" onclick="switchProfile('${p.id}')">Switch</button>`:""}<button class="btn secondary iconBtn" title="Rename" onclick="renameProfile('${p.id}')">${icon("edit",17)}</button>${profiles.length>1?`<button class="btn danger iconBtn" title="Delete" onclick="deleteProfile('${p.id}')">${icon("trash",17)}</button>`:""}</div></div>`).join("")}</div>
  <button class="btn primary" style="margin-top:12px" onclick="newProfile()">+ Add Coach Profile</button>
 
+ <h2 class="section">App lock</h2>
+ ${lockCardHtml()}
+
  <h2 class="section">Storage</h2>
  <div class="card">
  <div style="display:flex;justify-content:space-between;font-size:var(--fs-3)"><span class="muted">Approximate space used on this device</span><b>${usedMB.toFixed(2)} MB</b></div>
  <div class="goalBar" style="margin-top:8px"><div class="goalBarFill" style="width:${usagePct}%;background:${usageColor}"></div></div>
  <div class="muted" style="font-size:var(--fs-2);margin-top:6px">Your coaching data is stored using IndexedDB, which offers far more room than older browser storage — typically hundreds of MB or more, tied to your device's available space rather than a small fixed cap. Attachments, drill diagrams and photos are still the biggest contributors. Export a backup periodically regardless, as good practice.</div>
+ <button class="btn secondary" style="margin-top:12px" onclick="storageSheet()">Manage storage</button>
  </div>
 
  <h2 class="section">Backup &amp; Restore</h2>
