@@ -1623,7 +1623,9 @@ function dashboard(){
  let _nowMin=new Date().getHours()*60+new Date().getMinutes();
  let _tm=x=>{let m=String(x.time||"").match(/^(\d{1,2}):(\d{2})/);return m?(+m[1])*60+(+m[2]):null};
  let _endMin=x=>{let t=_tm(x);return t===null?null:t+(parseInt(x.duration,10)||60)};
- let heroSession=_sortedToday.find(x=>{let e=_endMin(x);return e===null||e>_nowMin})||null;
+ let _reflected=x=>db.reflections.some(r=>r.sessionId===x.id);
+ let _live=_sortedToday.filter(x=>!_reflected(x));
+ let heroSession=_live.find(x=>{let e=_endMin(x);return e!==null&&e>_nowMin})||_live.find(x=>_tm(x)===null&&_nowMin<20*60)||null;
  let heroLabel="Today";
  if(heroSession&&_sortedToday.length>1){let t=_tm(heroSession),e=_endMin(heroSession);heroLabel=(t===null||e===null)?"Today":(_nowMin<t?"Up next · "+heroSession.time:(_nowMin<e?"In progress":"Today · done"))}
  let nextSession=(!heroSession&&!todayMatches.length&&!todayEvents.length)?activeSessions().filter(x=>x.date>today()).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b)))[0]||null:null;
