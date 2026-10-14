@@ -88,7 +88,23 @@ function vid(){return "vm_"+Math.random().toString(36).slice(2,9)+Date.now().toS
 var VDB="procoachos_video";
 function dbOpen(){return new Promise(function(res,rej){var r=indexedDB.open(VDB,1);r.onupgradeneeded=function(e){var d=e.target.result;if(!d.objectStoreNames.contains("moments"))d.createObjectStore("moments",{keyPath:"id"})};r.onsuccess=function(e){res(e.target.result)};r.onerror=function(){rej(r.error)}})}
 function dbAll(){return dbOpen().then(function(d){return new Promise(function(res,rej){var q=d.transaction("moments","readonly").objectStore("moments").getAll();q.onsuccess=function(){res(q.result||[])};q.onerror=function(){rej(q.error)}})})}
-function dbPut(m){return dbOpen().then(function(d){return new Promise(function(res,rej){var t=d.transaction("moments","readwrite");t.objectStore("moments").put(m);t.oncomplete=function(){res()};t.onerror=function(){rej(t.error)}})})}
+function cloneBlob(b){
+  if(!(b instanceof Blob))return Promise.resolve(b);
+  return new Promise(function(res){var r=new FileReader();r.onload=function(){res(new Blob([r.result],{type:b.type}))};r.onerror=function(){res(b)};r.readAsArrayBuffer(b)});
+}
+// Blobs read back from IndexedDB are file-backed on some phones (notably iOS Safari); writing the same
+// object straight back can leave the image unreadable. Always store fresh in-memory copies.
+function dbPut(m){
+  var keys=["base","thumb","composite"];
+  return Promise.all(keys.map(function(k){return cloneBlob(m[k])})).then(function(r){
+    var c=Object.assign({},m);keys.forEach(function(k,i){if(m[k]!==undefined)c[k]=r[i]});
+    return dbOpen().then(function(d){return new Promise(function(res,rej){var t=d.transaction("moments","readwrite");t.objectStore("moments").put(c);t.oncomplete=function(){res()};t.onerror=function(){rej(t.error)}})})
+  });
+}
+function imgFail(el){
+  var id=el.dataset.m||(S.cur&&S.cur.id);if(!id||el.dataset.r)return;el.dataset.r="1";
+  dbAll().then(function(all){var m=all.find(function(x){return x.id===id});if(!m)throw 0;return composite(asBlob(m.base),m.shapes||[],.85)}).then(function(b){el.src=URL.createObjectURL(b)}).catch(function(){el.alt="This frame could not be read. Open it from Saved moments and re-save, or restore from a backup."})
+}
 function dbDel(id){return dbOpen().then(function(d){return new Promise(function(res,rej){var t=d.transaction("moments","readwrite");t.objectStore("moments").delete(id);t.oncomplete=function(){res()};t.onerror=function(){rej(t.error)}})})}
 
 /* ---------- roster (read-only from the main app's active profile) ---------- */
@@ -509,7 +525,7 @@ function renderViewer(app){
   var m=S.cur;if(!m){setView("home");return}
   composite(m.base,m.shapes||[],.85).then(function(b){var i=document.getElementById("vImg");if(i)i.src=urlOf(m.id+"v"+(m.edited||""),b)});
   app.innerHTML=hdr(m.player,"setView('"+(S.fromReview&&S.rev?"clip":"home")+"')")+'<main>'+
-   '<div class="edWrap"><img id="vImg" src="'+thumbSrc(m)+'" style="width:100%;display:block;min-height:120px" alt=""></div>'+
+   '<div class="edWrap"><img id="vImg" data-m="'+m.id+'" onerror="imgFail(this)" src="'+thumbSrc(m)+'" style="width:100%;display:block;min-height:120px" alt=""></div>'+
    '<div class="card" style="margin-top:12px"><div class="muted small">'+fmtDate(m.date)+' · '+esc(m.clipName||"")+' · '+fmtT(m.timeSec)+' · frame '+Math.round(m.timeSec*(m.fps||30))+' · '+fmtB(momBytes(m))+'</div>'+
    (m.phase||(m.tags&&m.tags.length)?'<div class="chips" style="margin-top:8px">'+(m.phase?'<span class="chip on">'+esc(m.phase)+'</span>':'')+(m.tags||[]).map(function(t){return '<span class="chip">'+esc(t)+'</span>'}).join("")+'</div>':'')+
    (m.comment?'<p style="margin:10px 0 0">'+esc(m.comment)+'</p>':'')+
@@ -675,7 +691,7 @@ function renderClip(app){
    '<div class="card"><b>'+esc(f.player)+'</b><div class="muted small">'+fmtDate(f.date)+' · '+esc(f.clipName||"")+' · '+list.length+' frames</div></div>'+
    '<div class="row"><button class="btn grow" onclick="shareReview()">Share as one image</button><button class="btn grow'+(inRep?" on":"")+'" onclick="toggleSeq()">'+(inRep?"✓ In player reports":"Add to player reports")+'</button></div>'+
    list.map(function(m,i){return '<div class="card" style="margin-top:12px"><div class="row" style="margin-bottom:8px"><b class="grow">'+(i+1)+'. '+esc(m.phase||"Frame")+'</b><span class="muted small">'+fmtT(m.timeSec)+'</span></div>'+
-    '<img id="rv'+i+'" src="'+thumbSrc(m)+'" style="width:100%;border-radius:10px;display:block" alt="">'+
+    '<img id="rv'+i+'" data-m="'+m.id+'" onerror="imgFail(this)" src="'+thumbSrc(m)+'" style="width:100%;border-radius:10px;display:block" alt="">'+
     (shortTags(m)?'<div class="muted small" style="margin-top:6px">'+esc(shortTags(m))+'</div>':'')+(m.comment?'<p style="margin:6px 0 0">'+esc(m.comment)+'</p>':'')+
     '<button class="btn sm" style="margin-top:8px" onclick="S.cur=S.moments.find(function(x){return x.id===\''+m.id+'\'});S.fromReview=true;setView(\'viewer\')">Open frame</button></div>'}).join("")+'</main>';
   list.forEach(function(m,i){composite(asBlob(m.base),m.shapes||[],.82).then(function(b){var im=document.getElementById("rv"+i);if(im)im.src=urlOf(m.id+"r"+(m.edited||""),b)})});

@@ -317,7 +317,7 @@ html.hc .lkKey{border:2px solid var(--ink)}
 .tb{width:40px;height:38px;border-radius:9px;border:1.5px solid var(--line);background:transparent;color:var(--muted);font-weight:800;font-size:15px;padding:0}
 .tbG{border-color:rgba(47,166,106,.6)}.tbM{border-color:rgba(224,161,0,.7)}.tbA{border-color:rgba(229,72,77,.65)}
 .tbG.on{background:#2fa66a;border-color:#2fa66a;color:#fff}.tbM.on{background:#e0a100;border-color:#e0a100;color:#1a1200}.tbA.on{background:#e5484d;border-color:#e5484d;color:#fff}
-.techChk{cursor:pointer}.techChk input{width:22px;height:22px;flex:none;margin:0;accent-color:#067a56}.techChk .techLbl{font-weight:400}
+.gameOff{opacity:.38;filter:grayscale(1);pointer-events:none;user-select:none}.techChk{cursor:pointer}.techChk input{width:22px;height:22px;flex:none;margin:0;accent-color:#067a56}.techChk .techLbl{font-weight:400}
 .techGrade{display:flex;gap:6px}.techGrade button{flex:1;padding:10px 4px;border-radius:10px;border:1.5px solid var(--line);background:transparent;color:var(--ink);font-weight:700;font-size:var(--fs-1)}
 .techGrade .tgG{border-color:rgba(47,166,106,.7)}.techGrade .tgM{border-color:rgba(224,161,0,.8)}.techGrade .tgA{border-color:rgba(229,72,77,.75)}
 .techGrade .tgG.on{background:#2fa66a;color:#fff}.techGrade .tgM.on{background:#e0a100;color:#1a1200}.techGrade .tgA.on{background:#e5484d;color:#fff}
@@ -3637,11 +3637,13 @@ function assessmentFormHtml(a,mode){
  <div class="skillPick">${Object.keys(skillSets).map(k=>`<label><input type="checkbox" name="disciplines" value="${k}" ${(a.disciplines||[]).includes(k)?"checked":""} onchange="renderAssessmentSkills()"> ${k}</label>`).join("")}</div>
  <div class="techTabs"><button type="button" class="btn primary" data-t="game" onclick="techTabSet('game')">Game skills</button><button type="button" class="btn secondary" data-t="tech" onclick="techTabSet('tech')">Technique</button></div>
  <div id="tabGame">
+ <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:8px 0"><input type="checkbox" name="skipGame" style="width:auto" ${a.technique&&!hasAnyGameRating(a)?"checked":""} onchange="techOnlyToggle(this.checked)"> <span>Technique-only assessment — don't record game-skill ratings</span></label>
+ <div id="gameBody">
  <label style="margin-bottom:6px">Format Focus <span class="muted" style="font-weight:400">(Batting/Bowling — pick one or more; Game skills is the core skill set)</span></label>
  <div class="muted">Select as many as required.</div>
  <div class="skillPick">${ASSESSMENT_FORMATS.map(f=>`<label><input type="checkbox" name="formats" value="${f}" ${(Array.isArray(a.formats)&&a.formats.length?a.formats:["General"]).includes(f)?"checked":""} onchange="renderAssessmentSkills()"> ${fmtLabel(f)}</label>`).join("")}</div>
- <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:8px 0"><input type="checkbox" name="skipGame" style="width:auto" ${a.technique&&!hasAnyGameRating(a)?"checked":""}> <span>Technique-only assessment — don't record game-skill ratings</span></label>
  <div id="assessmentSkills">${empty("Select at least one skill area.")}</div>
+ </div>
  </div>
  <div id="tabTech" style="display:none"><div id="assessmentTech"></div></div>
  <h3 style="margin:18px 0 4px">Overall</h3>
@@ -3794,6 +3796,7 @@ function renderAssessmentSkills(){
  }).join("")||empty("Select at least one skill area.");
  enhanceTextareasWithVoice(box);
  renderAssessmentTech();
+ let so=document.querySelector('input[name="skipGame"]');if(so&&so.checked)techOnlyToggle(true);
 }
 function addCustomSkill(d){
  let input=document.getElementById(`newSkill_${d}`);
@@ -3870,6 +3873,12 @@ function techPrev(d,cn,k){
  let pid=editingAssessmentId,sel=document.querySelector('select[name="player"]'),pl=sel&&sel.value;if(!pl)return false;
  let a=db.assessments.filter(a=>a.player===pl&&a.id!==pid&&a.technique&&a.technique[d]&&a.technique[d][cn]).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))[0];
  return !!(a&&a.technique[d][cn].obs&&a.technique[d][cn].obs[k]);
+}
+function techOnlyToggle(on){
+ let g=document.getElementById("gameBody");if(!g)return;
+ g.classList.toggle("gameOff",!!on);
+ g.querySelectorAll("input,button,textarea,select").forEach(e=>{e.disabled=!!on});
+ if(on)techTabSet("tech");
 }
 function techTabSet(t){
  techTab=t;let g=document.getElementById("tabGame"),x=document.getElementById("tabTech");if(!g||!x)return;
@@ -4012,13 +4021,38 @@ function techParentHtml(p){
  })});
  return lines.length?`<h2>Technique</h2><div class="card">${lines.join("")}</div>`:"";
 }
+// Compact technique summary for one assessment, for logs and history lists.
+function techAssessHtml(a){
+ if(!a.technique)return"";
+ let rows=[];
+ TECH_DISC.forEach(d=>{let dd=a.technique[d];if(!dd)return;
+  TECH[d].map(c=>c.n).concat(d==="Batting"?["RBW"]:[]).forEach(cn=>{
+   let c=dd[cn];if(!c)return;
+   if(cn==="RBW"){rows.push(`<div><b>RBW</b> ${esc(c.overall||"")}</div>`);return}
+   let g=techGradeOf(c),keys=Object.keys(c.obs||{}).filter(k=>c.obs[k]);
+   rows.push(`<div style="margin-top:3px"><b>${esc(d)} · ${esc(cn)}</b> ${g?`<span class="techChip" style="background:${TS[g].c};border-color:${TS[g].c};color:${g==="M"?"#1a1200":"#fff"}">${TS[g].l}</span>`:""}${keys.length?` ${esc(keys.join(", "))}`:""}${c.comment?` — ${esc(c.comment)}`:""}${c.adjust?` <span class="muted">Adjust: ${esc(c.adjust)}</span>`:""}</div>`);
+  });
+ });
+ return rows.length?`<div style="margin-top:8px"><b>Technique</b>${rows.join("")}</div>`:"";
+}
+// Squad view: who currently has a component graded Attention / Monitor (from each player's latest entry).
+function techFocusHtml(roster){
+ let by={};
+ roster.forEach(p=>{let h=techHistory(p);TECH_DISC.forEach(d=>{if(!h[d])return;Object.keys(h[d]).forEach(cn=>{
+  if(cn==="RBW")return;let list=h[d][cn],c=list[list.length-1].c,g=techGradeOf(c);if(g!=="A"&&g!=="M")return;
+  let k=d+" · "+cn;(by[k]=by[k]||[]).push({p,g,obs:Object.keys(c.obs||{}).filter(x=>c.obs[x])});
+ })})});
+ let keys=Object.keys(by).sort((a,b)=>by[b].filter(x=>x.g==="A").length-by[a].filter(x=>x.g==="A").length||by[b].length-by[a].length);
+ if(!keys.length)return"";
+ return `<h2>Technique Focus</h2><p class="muted">Latest technique grade per player. Attention first.</p>`+keys.map(k=>`<div class="card"><b>${esc(k)}</b>${by[k].sort((x,y)=>TRANK[y.g]-TRANK[x.g]).map(x=>`<div style="margin-top:4px"><span class="techChip" style="background:${TS[x.g].c};border-color:${TS[x.g].c};color:${x.g==="M"?"#1a1200":"#fff"}">${TS[x.g].l}</span> ${esc(x.p.name)}${x.obs.length?` <span class="muted">— ${esc(x.obs.slice(0,3).join(", "))}${x.obs.length>3?"…":""}</span>`:""}</div>`).join("")}</div>`).join("");
+}
 
 function saveAssessment(e){
  e.preventDefault();
  if(!requireWriteAccess())return;
  let fd=new FormData(e.target),sel=fd.getAll("disciplines");
  if(!sel.length){alert("Select at least one skill area.");return}
- let formats=fd.getAll("formats");
+ let formats=fd.getAll("formats");if(!formats.length)formats=["General"];
  let a={player:fd.get("player"),date:fd.get("date"),disciplines:sel,priority:fd.get("priority"),comments:fd.get("comments"),ratings:{},disciplineNotes:{},formats,formatRatings:{}};
  a.mediaLinks=(fd.get("mediaLinks")||"").split("\n").map(s=>s.trim()).filter(Boolean);
  let skipGame=fd.get("skipGame")!==null;
@@ -5865,8 +5899,9 @@ function buildAssessmentReport(){
  reportShell(`Assessment Report — ${esc(scopeLabel(scope))}`,rangeLabel(from,to),
  `${assessmentCoverageHeatmapHtml(roster)}
  ${skillTrendsHtml(roster,assessments)}
- <h2>Player Summary</h2>${byPlayer.length?byPlayer.map(({p,count,latest})=>`<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span><p>${count} assessment${count!==1?"s":""} logged${latest?" · Latest: "+assessmentAvg(latest)+"/10 on "+esc(fmtDate(latest.date)):""}</p></div>`).join(""):empty("No players in this scope.")}
- <h2>Full Assessment Log</h2>${assessments.length?assessments.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).map(a=>`<div class="card"><b>${esc(a.player)} · ${esc(fmtDate(a.date))}</b>${assessmentFormatTagsHtml(a)}<div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d} ${disciplineAvg(a,d)}/10</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div>`).join(""):empty("No assessments recorded in this scope.")}`);
+ ${techFocusHtml(roster)}
+ <h2>Player Summary</h2>${byPlayer.length?byPlayer.map(({p,count,latest})=>`<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span><p>${count} assessment${count!==1?"s":""} logged${latest?" · Latest: "+(assessmentAvg(latest)==="—"?"technique only":assessmentAvg(latest)+"/10")+" on "+esc(fmtDate(latest.date)):""}</p></div>`).join(""):empty("No players in this scope.")}
+ <h2>Full Assessment Log</h2>${assessments.length?assessments.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).map(a=>`<div class="card"><b>${esc(a.player)} · ${esc(fmtDate(a.date))}</b>${assessmentFormatTagsHtml(a)}<div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d}${disciplineAvg(a,d)==="—"?"":" "+disciplineAvg(a,d)+"/10"}</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${techAssessHtml(a)}${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div>`).join(""):empty("No assessments recorded in this scope.")}`);
 }
 function attendanceReport(){scopeAndRangeModal("Attendance Report","buildAttendanceReport")}
 function buildAttendanceReport(){
@@ -6749,7 +6784,7 @@ function buildPlayerReport(){
  reportShell("Player Development Report",`${p.name} · ${p.role||"Player"}${(from||to)?" · "+rangeLabel(from,to):""}`,
  `<div class="grid g4">
  <div class="card stat"><span>Assessments</span><b>${aa.length}</b></div>
- <div class="card stat"><span>Latest Overall</span><b>${latest?assessmentAvg(latest)+"/10":"—"}</b></div>
+ <div class="card stat"><span>Latest Overall</span><b>${latest?(assessmentAvg(latest)==="—"?"Technique only":assessmentAvg(latest)+"/10"):"—"}</b></div>
  <div class="card stat"><span>Matches</span><b>${matches.length}</b></div>
  <div class="card stat"><span>Attendance</span><b>${attendanceRate!==null?attendanceRate+"%":"—"}</b></div>
  </div>
@@ -6760,7 +6795,7 @@ function buildPlayerReport(){
  ${playerProgressPrintHtml(aa)}
  ${matches.length?`<h2>Match Performance</h2><div class="card"><p>${battingEntries.length?`Batting: ${totalRuns} run${totalRuns!==1?"s":""} across ${battingEntries.length} innings`:""}${battingEntries.length&&bowlingEntries.length?" · ":""}${bowlingEntries.length?`Bowling: ${totalWickets} wicket${totalWickets!==1?"s":""} across ${bowlingEntries.length} match${bowlingEntries.length!==1?"es":""}`:""}${!battingEntries.length&&!bowlingEntries.length?`Played in ${matches.length} match${matches.length!==1?"es":""}, no batting or bowling entries logged.`:""}</p>${backToBackCount>0?`<p style="margin-top:8px;color:var(--gold)"><b>⚠ Workload note:</b> ${backToBackCount} match${backToBackCount!==1?"es":""} played with a day or less rest before the next one.</p>`:""}</div>`:""}
  ${matchTrendHtml}
- <h2>Assessment History</h2>${aa.length?aa.slice().reverse().map(a=>`<div class="card"><b>${esc(fmtDate(a.date))} · ${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</b><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d} ${disciplineAvg(a,d)}/10</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${assessmentDetailHTML(a)}</div>`).join(""):empty("No assessments for this player.")}`)}
+ <h2>Assessment History</h2>${aa.length?aa.slice().reverse().map(a=>`<div class="card"><b>${esc(fmtDate(a.date))} · ${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</b><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d}${disciplineAvg(a,d)==="—"?"":" "+disciplineAvg(a,d)+"/10"}</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${assessmentDetailHTML(a)}${techAssessHtml(a)}</div>`).join(""):empty("No assessments for this player.")}`)}
 function seasonReport(){scopeAndRangeModal("Season / Full Report","buildSeasonReport")}
 function buildSeasonReport(){
  let scope=scopeValues();
