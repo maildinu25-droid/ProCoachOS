@@ -153,9 +153,26 @@ function drawShapes(ctx,w,h,shapes,preview){
   });
 }
 function loadImg(src){return new Promise(function(res,rej){var i=new Image();i.onload=function(){res(i)};i.onerror=rej;i.src=src})}
-function composite(base,shapes,quality){
-  return loadImg(base).then(function(img){var c=document.createElement("canvas");c.width=img.naturalWidth;c.height=img.naturalHeight;var x=c.getContext("2d");x.drawImage(img,0,0);drawShapes(x,c.width,c.height,shapes);return c.toDataURL("image/jpeg",quality||.88)});
+/* images are stored as Blobs (no base64 overhead), webp where the browser can encode it, jpeg otherwise */
+var QUAL={small:{max:800,q:.62,label:"Small (~50 KB)"},balanced:{max:1000,q:.72,label:"Balanced (~100 KB)"},high:{max:1280,q:.82,label:"High (~250 KB)"}};
+function qualKey(){var k=null;try{k=localStorage.getItem("video_quality")}catch(e){}return QUAL[k]?k:"balanced"}
+function dataToBlob(u){var a=u.split(","),mime=a[0].match(/:(.*?);/)[1],b=atob(a[1]),n=b.length,u8=new Uint8Array(n);while(n--)u8[n]=b.charCodeAt(n);return new Blob([u8],{type:mime})}
+function asBlob(x){return typeof x==="string"?dataToBlob(x):x}
+function blobToData(b){return new Promise(function(res){var r=new FileReader();r.onload=function(){res(r.result)};r.readAsDataURL(b)})}
+function canvasBlob(c,q){return new Promise(function(res){c.toBlob(function(b){if(b&&b.type==="image/webp")return res(b);c.toBlob(function(j){res(j)},"image/jpeg",q)},"image/webp",q)})}
+function imgOf(x){if(typeof x==="string")return loadImg(x);var u=URL.createObjectURL(x);return loadImg(u).then(function(i){URL.revokeObjectURL(u);return i},function(e){URL.revokeObjectURL(u);throw e})}
+function scaled(img,max){var sc=Math.min(1,max/Math.max(img.naturalWidth||img.width,img.naturalHeight||img.height)),c=document.createElement("canvas");c.width=Math.round((img.naturalWidth||img.width)*sc);c.height=Math.round((img.naturalHeight||img.height)*sc);c.getContext("2d").drawImage(img,0,0,c.width,c.height);return c}
+function makeBase(img){var Q=QUAL[qualKey()];return canvasBlob(scaled(img,Q.max),Q.q)}
+function makeThumb(img){return canvasBlob(scaled(img,360),.6)}
+function composite(base,shapes,q){
+  return imgOf(base).then(function(img){var c=document.createElement("canvas");c.width=img.naturalWidth;c.height=img.naturalHeight;var x=c.getContext("2d");x.drawImage(img,0,0);drawShapes(x,c.width,c.height,shapes);return canvasBlob(c,q||.8)});
 }
+function bytesOf(x){return !x?0:(typeof x==="string"?Math.round(x.length*.75):x.size||0)}
+function momBytes(m){return bytesOf(m.base)+bytesOf(m.thumb)+bytesOf(m.composite)}
+function fmtB(n){return n>=1048576?(n/1048576).toFixed(1)+" MB":Math.max(1,Math.round(n/1024))+" KB"}
+var URLS={};
+function urlOf(key,x){if(!x)return"";if(typeof x==="string")return x;if(!URLS[key]||URLS[key].b!==x)URLS[key]={b:x,u:URL.createObjectURL(x)};return URLS[key].u}
+function thumbSrc(m){return urlOf(m.id+"t",m.thumb||m.composite||m.base)}
 
 /* ---------- views ---------- */
 function setView(v){S.view=v;render()}
@@ -174,15 +191,18 @@ function renderHome(app){
   var players=S.roster;
   var opts='<option value="">Choose a player…</option>'+players.map(function(p){return '<option value="'+esc(p.name)+'"'+(S.player===p.name?" selected":"")+'>'+esc(p.name)+(p.team?" · "+esc(p.team):"")+'</option>'}).join("")+'<option value="__other"'+(S.player&&!players.some(function(p){return p.name===S.player})?" selected":"")+'>Someone else (type a name)…</option>';
   var mine=S.moments.filter(function(m){return !S.player||m.player===S.player});
-  var mb=0;S.moments.forEach(function(m){mb+=(m.base||"").length+(m.composite||"").length});
+  var mb=0;S.moments.forEach(function(m){mb+=momBytes(m)});
   app.innerHTML=hdr("Video Review Studio")+'<main>'+
    '<div class="card"><b>Review a clip</b><div class="muted small" style="margin:4px 0 8px">Pick a video from your phone. It plays here and is never uploaded or copied.</div>'+
    '<label style="margin-top:0">Player</label><select id="plSel" onchange="pickPlayer(this.value)">'+opts+'</select>'+
    '<label class="vlabelOther" style="display:none">Name</label><input type="text" id="plOther" placeholder="Player name" style="display:none" oninput="S.player=this.value.trim()">'+
    '<div style="margin-top:12px"><label class="btn primary full" style="text-align:center;margin:0;cursor:pointer">🎬 Choose video<input type="file" accept="video/*" style="display:none" onchange="openClip(this)"></label></div>'+
    '<div class="tip">Film side-on for drives and cuts, front-on for bowling actions, with the camera still and the player in full view. Angles you measure are on-screen angles, not exact body angles.</div></div>'+
-   '<div class="row" style="margin:6px 0 8px"><b class="grow">Saved moments'+(S.player&&S.player!=="__other"?' — '+esc(S.player):'')+'</b><span class="muted small">'+mine.length+' · '+(mb/1048576).toFixed(1)+' MB total</span></div>'+
-   (mine.length?'<div class="grid">'+mine.map(function(m){return '<div class="mom" onclick="openMoment(\''+m.id+'\')"><img src="'+(m.composite||m.base)+'" alt=""><div><b>'+esc(m.player)+'</b><br><span class="muted">'+fmtDate(m.date)+' · '+esc((m.tags||[]).slice(0,2).join(", ")||"no tags")+'</span></div></div>'}).join("")+'</div>':'<div class="card muted">No saved moments yet. Choose a video, freeze a frame, draw, and save.</div>')+
+   '<div class="row" style="margin:6px 0 8px"><b class="grow">Saved moments'+(S.player&&S.player!=="__other"?' — '+esc(S.player):'')+'</b><span class="muted small">'+mine.length+' · '+fmtB(mb)+' total</span></div>'+
+   (mine.length?'<div class="grid">'+mine.map(function(m){return '<div class="mom" onclick="openMoment(\''+m.id+'\')"><img src="'+thumbSrc(m)+'" alt=""><div><b>'+esc(m.player)+'</b><br><span class="muted">'+fmtDate(m.date)+' · '+fmtB(momBytes(m))+'</span></div></div>'}).join("")+'</div>':'<div class="card muted">No saved moments yet. Choose a video, freeze a frame, draw, and save.</div>')+
+   '<div class="card" style="margin-top:14px"><b>Storage</b><div class="muted small" style="margin:4px 0 8px">Each saved moment is a small compressed image plus the drawing instructions — the video itself is never stored. Lower quality keeps your phone light.</div>'+
+   '<label style="margin-top:0">Frame quality for new saves</label><select onchange="try{localStorage.setItem(\'video_quality\',this.value)}catch(e){}">'+Object.keys(QUAL).map(function(k){return '<option value="'+k+'"'+(qualKey()===k?' selected':'')+'>'+QUAL[k].label+'</option>'}).join("")+'</select>'+
+   '<button class="btn full" style="margin-top:10px" onclick="compressAll()">Compress saved moments to this quality</button><div class="muted small" id="cmpMsg" style="margin-top:6px"></div></div>'+
    '<div class="row" style="margin-top:14px"><button class="btn sm" onclick="exportAll()">Export moments (.json)</button><label class="btn sm" style="cursor:pointer;margin:0">Import<input type="file" accept="application/json" style="display:none" onchange="importAll(this)"></label></div>'+
    '</main>';
   if(S.player==="__other"||(S.player&&!players.some(function(p){return p.name===S.player}))){var o=document.getElementById("plOther");o.style.display="";document.querySelector(".vlabelOther").style.display="";if(S.player!=="__other")o.value=S.player}
@@ -269,16 +289,15 @@ function detect(){
 
 /* ---------- freeze -> editor ---------- */
 function captureFrame(v){
-  var w=v.videoWidth,h=v.videoHeight,max=1280,sc=Math.min(1,max/Math.max(w,h));
+  var w=v.videoWidth,h=v.videoHeight,Q=QUAL[qualKey()],sc=Math.min(1,Q.max/Math.max(w,h));
   var c=document.createElement("canvas");c.width=Math.round(w*sc);c.height=Math.round(h*sc);c.getContext("2d").drawImage(v,0,0,c.width,c.height);
-  return c.toDataURL("image/jpeg",.86);
+  return canvasBlob(c,Q.q);
 }
 function freeze(){
   var v=VEL;v.pause();
   if(!v.videoWidth){alert("The video isn't ready yet.");return}
-  var base=captureFrame(v);
-  ED={base:base,shapes:[],tool:"line",color:COLORS[0],pts:[],drag:null,timeSec:v.currentTime,existing:null};
-  setView("editor");
+  var t=v.currentTime;
+  captureFrame(v).then(function(base){ED={base:base,shapes:[],tool:"line",color:COLORS[0],pts:[],drag:null,timeSec:t,existing:null};setView("editor")});
 }
 var TOOLS=[["line","Line"],["angle","Angle"],["vguide","Vertical"],["hguide","Horizontal"],["circle","Circle"],["arrow","Arrow"],["text","Text"],["spot","Spotlight"]];
 var TOOL_HELP={line:"Drag to draw a line.",angle:"Tap three points: first arm, the joint, second arm.",vguide:"Tap to place a vertical guide line.",hguide:"Tap to place a horizontal guide line.",circle:"Drag from the centre outwards.",arrow:"Drag from the tail to the point.",text:"Tap where the label should go.",spot:"Drag a box — everything outside is darkened."};
@@ -290,7 +309,7 @@ function renderEditor(app){
    '<div class="tip" id="toolHelp"></div>'+
    '<button class="btn primary full" onclick="saveSheet()">'+(ED.existing?"Save changes":"Save moment…")+'</button></main>';
   var cv=document.getElementById("cv");
-  loadImg(ED.base).then(function(img){ED.img=img;cv.width=img.naturalWidth;cv.height=img.naturalHeight;redraw()});
+  imgOf(ED.base).then(function(img){ED.img=img;cv.width=img.naturalWidth;cv.height=img.naturalHeight;redraw()});
   cv.addEventListener("pointerdown",edDown);cv.addEventListener("pointermove",edMove);cv.addEventListener("pointerup",edUp);cv.addEventListener("pointercancel",edUp);
   document.getElementById("toolHelp").textContent=TOOL_HELP[ED.tool];
 }
@@ -344,8 +363,8 @@ function setRating(n){ED.rating=ED.rating===n?0:n;[].forEach.call(document.query
 function saveMoment(){
   var ex=ED.existing,cm=document.getElementById("cm").value.trim();
   var rec=ex?Object.assign({},ex):{id:vid(),player:S.player,date:todayStr(),clipName:S.clip&&S.clip.name,clipSize:S.clip&&S.clip.size,clipKey:S.clip&&S.clip.key,timeSec:ED.timeSec,fps:S.fps,created:new Date().toISOString()};
-  rec.base=ED.base;rec.shapes=ED.shapes;rec.tags=ED.tags;rec.comment=cm;rec.rating=ED.rating||0;rec.edited=new Date().toISOString();
-  (ED.shapes.length?composite(ED.base,ED.shapes):Promise.resolve(null)).then(function(c){rec.composite=c;return dbPut(rec)}).then(refresh).then(function(){
+  rec.base=ED.base;rec.shapes=ED.shapes;rec.tags=ED.tags;rec.comment=cm;rec.rating=ED.rating||0;rec.edited=new Date().toISOString();delete rec.composite;
+  composite(ED.base,ED.shapes,.7).then(function(full){return imgOf(full)}).then(makeThumb).catch(function(){return null}).then(function(th){rec.thumb=th||null;return dbPut(rec)}).then(refresh).then(function(){
     closeSheet();if(ex){ED=null;S.cur=rec;setView("viewer")}else{ED=null;setView("studio")}
   }).catch(function(e){alert("Couldn't save: "+(e&&e.message||e)+". Your device may be low on space.")});
 }
@@ -354,35 +373,52 @@ function saveMoment(){
 function openMoment(id){S.cur=S.moments.find(function(m){return m.id===id});if(S.cur)setView("viewer")}
 function renderViewer(app){
   var m=S.cur;if(!m){setView("home");return}
+  composite(m.base,m.shapes||[],.85).then(function(b){var i=document.getElementById("vImg");if(i)i.src=urlOf(m.id+"v"+(m.edited||""),b)});
   app.innerHTML=hdr(m.player,"setView('"+(S.clip&&false?"studio":"home")+"')")+'<main>'+
-   '<div class="edWrap"><img src="'+(m.composite||m.base)+'" style="width:100%;display:block" alt=""></div>'+
-   '<div class="card" style="margin-top:12px"><div class="muted small">'+fmtDate(m.date)+' · '+esc(m.clipName||"")+' · '+fmtT(m.timeSec)+' · frame '+Math.round(m.timeSec*(m.fps||30))+'</div>'+
+   '<div class="edWrap"><img id="vImg" src="'+thumbSrc(m)+'" style="width:100%;display:block;min-height:120px" alt=""></div>'+
+   '<div class="card" style="margin-top:12px"><div class="muted small">'+fmtDate(m.date)+' · '+esc(m.clipName||"")+' · '+fmtT(m.timeSec)+' · frame '+Math.round(m.timeSec*(m.fps||30))+' · '+fmtB(momBytes(m))+'</div>'+
    (m.tags&&m.tags.length?'<div class="chips" style="margin-top:8px">'+m.tags.map(function(t){return '<span class="chip">'+esc(t)+'</span>'}).join("")+'</div>':'')+
    (m.comment?'<p style="margin:10px 0 0">'+esc(m.comment)+'</p>':'')+
    (m.rating?'<div style="color:var(--gold);font-size:20px;margin-top:6px">'+"★".repeat(m.rating)+'<span class="muted">'+"★".repeat(5-m.rating)+'</span></div>':'')+'</div>'+
    '<div class="row"><button class="btn grow" onclick="editMoment()">Edit drawings &amp; notes</button><button class="btn grow" onclick="shareMoment()">Share image</button></div>'+
    '<button class="btn danger full" style="margin-top:10px" onclick="delMoment()">Delete this moment</button></main>';
 }
-function editMoment(){var m=S.cur;ED={base:m.base,shapes:(m.shapes||[]).slice(),tool:"line",color:COLORS[0],pts:[],drag:null,timeSec:m.timeSec,existing:m};setView("editor")}
+function editMoment(){var m=S.cur;ED={base:asBlob(m.base),shapes:(m.shapes||[]).slice(),tool:"line",color:COLORS[0],pts:[],drag:null,timeSec:m.timeSec,existing:m};setView("editor")}
 function delMoment(){if(!confirm("Delete this saved moment? This can't be undone."))return;dbDel(S.cur.id).then(refresh).then(function(){S.cur=null;setView("home")})}
-function dataToBlob(u){var a=u.split(","),mime=a[0].match(/:(.*?);/)[1],b=atob(a[1]),n=b.length,u8=new Uint8Array(n);while(n--)u8[n]=b.charCodeAt(n);return new Blob([u8],{type:mime})}
 function shareMoment(){
-  var m=S.cur,blob=dataToBlob(m.composite||m.base),file=new File([blob],(m.player+"-"+m.date+".jpg").replace(/\s+/g,"-"),{type:"image/jpeg"});
-  if(navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file],title:m.player+" — technique review",text:m.comment||""}).catch(function(){});return}
-  var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=file.name;document.body.appendChild(a);a.click();a.remove();
+  var m=S.cur;
+  imgOf(asBlob(m.base)).then(function(img){var c=document.createElement("canvas");c.width=img.naturalWidth;c.height=img.naturalHeight;var x=c.getContext("2d");x.drawImage(img,0,0);drawShapes(x,c.width,c.height,m.shapes||[]);return new Promise(function(res){c.toBlob(res,"image/jpeg",.9)})}).then(function(blob){
+    var file=new File([blob],(m.player+"-"+m.date+".jpg").replace(/\s+/g,"-"),{type:"image/jpeg"});
+    if(navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file],title:m.player+" — technique review",text:m.comment||""}).catch(function(){});return}
+    var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=file.name;document.body.appendChild(a);a.click();a.remove();
+  });
+}
+/* shrink everything already saved: drops stored composites, re-encodes at the chosen quality, builds small thumbnails */
+function compressAll(){
+  var list=S.moments.slice(),msg=document.getElementById("cmpMsg"),before=0,after=0,i=0;
+  if(!list.length){if(msg)msg.textContent="Nothing saved yet.";return}
+  function next(){
+    if(i>=list.length){refresh().then(function(){render();var m2=document.getElementById("cmpMsg");if(m2)m2.textContent="Done: "+fmtB(before)+" → "+fmtB(after)+".";});return}
+    var m=Object.assign({},list[i++]);if(msg)msg.textContent="Compressing "+i+" of "+list.length+"…";
+    before+=momBytes(m);
+    imgOf(asBlob(m.base)).then(function(img){return makeBase(img).then(function(nb){var keep=asBlob(m.base);m.base=nb.size<keep.size?nb:keep;return composite(m.base,m.shapes||[],.7)})})
+      .then(function(full){return imgOf(full)}).then(makeThumb).then(function(th){m.thumb=th;delete m.composite;after+=momBytes(m);return dbPut(m)}).then(next).catch(function(){after+=momBytes(m);next()});
+  }
+  next();
 }
 
 /* ---------- backup of moments ---------- */
 function exportAll(){
   if(!S.moments.length){alert("Nothing to export yet.");return}
-  var blob=new Blob([JSON.stringify({app:"ProCoach OS video moments",version:1,created:new Date().toISOString(),moments:S.moments})],{type:"application/json"});
-  var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="procoachos-video-moments-"+todayStr()+".json";document.body.appendChild(a);a.click();a.remove();
+  Promise.all(S.moments.map(function(m){var c=Object.assign({},m);delete c.composite;delete c.thumb;return(typeof m.base==="string"?Promise.resolve(m.base):blobToData(m.base)).then(function(d){c.base=d;return c})})).then(function(ms){
+    var blob=new Blob([JSON.stringify({app:"ProCoach OS video moments",version:2,created:new Date().toISOString(),moments:ms})],{type:"application/json"});
+    var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="procoachos-video-moments-"+todayStr()+".json";document.body.appendChild(a);a.click();a.remove()});
 }
 function importAll(inp){
   var f=inp.files&&inp.files[0];if(!f)return;var r=new FileReader();
   r.onload=function(){try{var d=JSON.parse(r.result);if(!d||!Array.isArray(d.moments))throw 0;
     var have={};S.moments.forEach(function(m){have[m.id]=1});var add=d.moments.filter(function(m){return m&&m.id&&m.base&&!have[m.id]});
-    Promise.all(add.map(dbPut)).then(refresh).then(function(){alert("Imported "+add.length+" moment"+(add.length===1?"":"s")+".");render()})}catch(e){alert("That file isn't a valid moments backup.")}};
+    Promise.all(add.map(function(m){var c=Object.assign({},m);c.base=asBlob(m.base);delete c.composite;return imgOf(c.base).then(makeThumb).catch(function(){return null}).then(function(th){c.thumb=th;return dbPut(c)})})).then(refresh).then(function(){alert("Imported "+add.length+" moment"+(add.length===1?"":"s")+".");render()})}catch(e){alert("That file isn't a valid moments backup.")}};
   r.readAsText(f);inp.value="";
 }
 
