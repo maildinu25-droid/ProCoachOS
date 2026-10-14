@@ -317,6 +317,10 @@ html.hc .lkKey{border:2px solid var(--ink)}
 .tb{width:40px;height:38px;border-radius:9px;border:1.5px solid var(--line);background:transparent;color:var(--muted);font-weight:800;font-size:15px;padding:0}
 .tbG{border-color:rgba(47,166,106,.6)}.tbM{border-color:rgba(224,161,0,.7)}.tbA{border-color:rgba(229,72,77,.65)}
 .tbG.on{background:#2fa66a;border-color:#2fa66a;color:#fff}.tbM.on{background:#e0a100;border-color:#e0a100;color:#1a1200}.tbA.on{background:#e5484d;border-color:#e5484d;color:#fff}
+.techChk{cursor:pointer}.techChk input{width:22px;height:22px;flex:none;margin:0;accent-color:#067a56}.techChk .techLbl{font-weight:400}
+.techGrade{display:flex;gap:6px}.techGrade button{flex:1;padding:10px 4px;border-radius:10px;border:1.5px solid var(--line);background:transparent;color:var(--ink);font-weight:700;font-size:var(--fs-1)}
+.techGrade .tgG{border-color:rgba(47,166,106,.7)}.techGrade .tgM{border-color:rgba(224,161,0,.8)}.techGrade .tgA{border-color:rgba(229,72,77,.75)}
+.techGrade .tgG.on{background:#2fa66a;color:#fff}.techGrade .tgM.on{background:#e0a100;color:#1a1200}.techGrade .tgA.on{background:#e5484d;color:#fff}
 .techGrp{font-weight:700;font-size:var(--fs-1);text-transform:uppercase;letter-spacing:.3px;color:var(--muted);margin:12px 0 2px}.techHid{opacity:.55}
 .techRbw{display:flex;gap:6px;margin-top:8px}.techRbw button{flex:1;padding:10px 4px;border-radius:10px;border:1.5px solid var(--line);background:transparent;color:var(--ink);font-weight:700;font-size:var(--fs-1)}.techRbw button.on{background:#067a56;border-color:#067a56;color:#fff}
 .techMedia{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.techImg{position:relative}.techImg img{width:84px;height:84px;object-fit:cover;border-radius:8px;display:block}.techImg button{position:absolute;top:-6px;right:-6px;width:24px;height:24px;border-radius:50%;border:0;background:#e5484d;color:#fff;font-size:16px;line-height:1;padding:0}
@@ -3647,7 +3651,7 @@ function assessmentFormHtml(a,mode){
 }
 function openAssessmentForm(existing,mode){
  editingAssessmentId=mode==="edit"?existing.id:null;
- techDraft=(mode==="edit"&&existing&&existing.technique)?JSON.parse(JSON.stringify(existing.technique)):{};techOpen={};techManage={};techTab="game";window._techPick=null;
+ techDraft=(mode==="edit"&&existing&&existing.technique)?JSON.parse(JSON.stringify(existing.technique)):{};Object.keys(techDraft).forEach(d=>Object.keys(techDraft[d]).forEach(cn=>{let c=techDraft[d][cn];if(c&&cn!=="RBW"&&!c.grade)c.grade=techGradeOf(c)}));techOpen={};techManage={};techTab="game";window._techPick=null;
  modal(assessmentFormHtml(existing,mode));
  renderAssessmentSkills();
 }
@@ -3846,22 +3850,24 @@ function techObsFull(d,ci){
  return out;
 }
 function techHidden(d,ci){return(db.techHidden&&db.techHidden[d]&&db.techHidden[d][TECH[d][ci].n])||[]}
-function techCount(d,cn){let c=(techDraft[d]||{})[cn];let n={G:0,M:0,A:0};if(c&&c.obs)Object.values(c.obs).forEach(v=>{if(n[v]!==undefined)n[v]++});return n}
-function techSummaryText(d,cn){let n=techCount(d,cn),p=[];if(n.G)p.push(n.G+" Good");if(n.M)p.push(n.M+" Monitor");if(n.A)p.push(n.A+" Attention");return p.join(" · ")}
+function techCount(d,cn){let c=(techDraft[d]||{})[cn];return c&&c.obs?Object.keys(c.obs).filter(k=>c.obs[k]).length:0}
+function techSummaryText(d,cn){let c=(techDraft[d]||{})[cn],n=techCount(d,cn),p=[];if(c&&c.grade&&TS[c.grade])p.push(TS[c.grade].l);if(n)p.push(n+" noted");return p.join(" · ")}
 function techComp(d,cn){techDraft[d]=techDraft[d]||{};return techDraft[d][cn]=techDraft[d][cn]||{obs:{},comment:"",adjust:"",link:"",imgs:[],frames:[]}}
-function techSet(d,ci,oi,v){
+function techChk(d,ci,oi,on){
  let cn=TECH[d][ci].n,o=techObsFull(d,ci)[oi];if(!o)return;let c=techComp(d,cn);
- if(c.obs[o.k]===v)delete c.obs[o.k];else c.obs[o.k]=v;
- techRowPaint(d,ci,oi);let s=document.getElementById(`ts_${d}_${ci}`);if(s)s.textContent=techSummaryText(d,cn);
+ if(on)c.obs[o.k]=true;else delete c.obs[o.k];
+ let s=document.getElementById(`ts_${d}_${ci}`);if(s)s.textContent=techSummaryText(d,cn);
 }
-function techRowPaint(d,ci,oi){
- let cn=TECH[d][ci].n,o=techObsFull(d,ci)[oi],cur=(techComp(d,cn).obs||{})[o.k]||"";
- ["G","M","A"].forEach(v=>{let b=document.getElementById(`tb_${d}_${ci}_${oi}_${v}`);if(b){b.classList.toggle("on",cur===v);b.setAttribute("aria-pressed",cur===v?"true":"false")}});
+function techGradeSet(d,ci,v){
+ let cn=TECH[d][ci].n,c=techComp(d,cn);c.grade=c.grade===v?"":v;
+ ["G","M","A"].forEach(x=>{let b=document.getElementById(`tg_${d}_${ci}_${x}`);if(b){b.classList.toggle("on",c.grade===x);b.setAttribute("aria-pressed",c.grade===x?"true":"false")}});
+ let s=document.getElementById(`ts_${d}_${ci}`);if(s)s.textContent=techSummaryText(d,cn);
 }
+function techRowPaint(){}
 function techPrev(d,cn,k){
- let pid=editingAssessmentId,sel=document.querySelector('select[name="player"]'),pl=sel&&sel.value;if(!pl)return"";
- let list=db.assessments.filter(a=>a.player===pl&&a.id!==pid&&a.technique&&a.technique[d]&&a.technique[d][cn]&&a.technique[d][cn].obs&&a.technique[d][cn].obs[k]).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
- let a=list[0];return a?a.technique[d][cn].obs[k]:"";
+ let pid=editingAssessmentId,sel=document.querySelector('select[name="player"]'),pl=sel&&sel.value;if(!pl)return false;
+ let a=db.assessments.filter(a=>a.player===pl&&a.id!==pid&&a.technique&&a.technique[d]&&a.technique[d][cn]).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))[0];
+ return !!(a&&a.technique[d][cn].obs&&a.technique[d][cn].obs[k]);
 }
 function techTabSet(t){
  techTab=t;let g=document.getElementById("tabGame"),x=document.getElementById("tabTech");if(!g||!x)return;
@@ -3872,7 +3878,7 @@ function renderAssessmentTech(){
  let box=document.getElementById("assessmentTech");if(!box)return;
  let sel=[...document.querySelectorAll('input[name="disciplines"]:checked')].map(x=>x.value).filter(d=>TECH[d]);
  if(!sel.length){box.innerHTML=empty("Select Batting, Bowling, Wicketkeeping or Fielding above to record technique.");return}
- box.innerHTML=`<div class="muted" style="margin:4px 0 8px;font-size:var(--fs-1)">Tap <b style="color:${TS.G.c}">G</b> Good · <b style="color:${TS.M.c}">M</b> Monitor · <b style="color:${TS.A.c}">A</b> Attention needed. Leave a line blank for NA. Only components you open are saved.</div>`+sel.map(d=>{
+ box.innerHTML=`<div class="muted" style="margin:4px 0 8px;font-size:var(--fs-1)">Open a component, grade it <b style="color:${TS.G.c}">Good</b> / <b style="color:${TS.M.c}">Monitor</b> / <b style="color:${TS.A.c}">Attention</b>, then tick the observations behind that grade. Components you leave untouched aren't saved.</div>`+sel.map(d=>{
   let rbw=d==="Batting"?`<div class="card" style="margin-bottom:8px"><b>RBW</b><div class="techRbw">${RBW_OPTS.map(o=>`<button type="button" class="${((techDraft.Batting||{}).RBW||{}).overall===o?"on":""}" onclick="techRbwSet('${o}')">${o}</button>`).join("")}</div></div>`:"";
   return `<h3 style="margin:12px 0 6px">${esc(d)} technique</h3>`+TECH[d].map((comp,ci)=>techCompHtml(d,ci)).join("")+rbw;
  }).join("");
@@ -3885,11 +3891,13 @@ function techCompHtml(d,ci){
  obs.forEach((o,oi)=>{
   let isHid=hid.includes(o.k);if(isHid&&!man)return;
   if(o.g!==lastG){if(o.g)rows+=`<div class="techGrp">${esc(o.g)}</div>`;lastG=o.g}
-  let cur=c.obs[o.k]||"",prev=techPrev(d,cn,o.k);
-  rows+=`<div class="techRow${isHid?" techHid":""}"><div class="techLbl">${esc(o.l)}${prev?`<small class="muted"> · last: ${TS[prev]?TS[prev].l:""}</small>`:""}</div>`+(man?(isHid?`<button type="button" class="btn secondary sm" onclick="techHide('${d}',${ci},${oi},false)">Restore</button>`:`<button type="button" class="btn secondary sm" onclick="${o.custom?`techDelCustom('${d}',${ci},${oi})`:`techHide('${d}',${ci},${oi},true)`}">${o.custom?"Delete":"Hide"}</button>`):`<div class="techBtns">${["G","M","A"].map(v=>`<button type="button" id="tb_${d}_${ci}_${oi}_${v}" class="tb tb${v}${cur===v?" on":""}" aria-pressed="${cur===v}" aria-label="${TS[v].l}" onclick="techSet('${d}',${ci},${oi},'${v}')">${v}</button>`).join("")}</div>`)+`</div>`;
+  let cur=!!c.obs[o.k],prev=techPrev(d,cn,o.k);
+  rows+=man?`<div class="techRow${isHid?" techHid":""}"><div class="techLbl">${esc(o.l)}</div><button type="button" class="btn secondary sm" onclick="${isHid?`techHide('${d}',${ci},${oi},false)`:(o.custom?`techDelCustom('${d}',${ci},${oi})`:`techHide('${d}',${ci},${oi},true)`)}">${isHid?"Restore":(o.custom?"Delete":"Hide")}</button></div>`
+   :`<label class="techRow techChk"><input type="checkbox" ${cur?"checked":""} onchange="techChk('${d}',${ci},${oi},this.checked)"><span class="techLbl">${esc(o.l)}${prev?`<small class="muted"> · noted last time</small>`:""}</span></label>`;
  });
  let frames=(c.frames||[]);
- let body=`${rows}
+ let gradeHtml=`<div class="muted" style="font-size:var(--fs-1);margin:2px 0 6px">Overall ${esc(cn.split(" — ")[0].toLowerCase())}</div><div class="techGrade">${["G","M","A"].map(v=>`<button type="button" id="tg_${d}_${ci}_${v}" class="tg${v}${c.grade===v?" on":""}" aria-pressed="${c.grade===v}" onclick="techGradeSet('${d}',${ci},'${v}')">${TS[v].l}</button>`).join("")}</div><div class="muted" style="font-size:var(--fs-1);margin:12px 0 2px">Tick what you observed — these justify the grade</div>`;
+ let body=`${gradeHtml}${rows}
   <div class="formgrid" style="margin-top:8px"><input type="text" id="tadd_${key}" placeholder="Add another observation…" onkeydown="if(event.key==='Enter'){event.preventDefault();techAddCustom('${d}',${ci})}"><button type="button" class="btn secondary" onclick="techAddCustom('${d}',${ci})">+ Add</button></div>
   <label>Comment<textarea oninput="techComp('${d}','${esc(cn)}').comment=this.value">${esc(c.comment||"")}</textarea></label>
   <label>Suggested adjustments<textarea oninput="techComp('${d}','${esc(cn)}').adjust=this.value">${esc(c.adjust||"")}</textarea></label>
@@ -3945,12 +3953,15 @@ function techCollect(sel){
   Object.keys(dd).forEach(cn=>{
    let c=dd[cn];if(!c)return;
    if(cn==="RBW"){if(c.overall)(out[d]=out[d]||{})[cn]={overall:c.overall};return}
-   let obs={};Object.keys(c.obs||{}).forEach(k=>{if(c.obs[k])obs[k]=c.obs[k]});
-   if(Object.keys(obs).length||c.comment||c.adjust||c.link||(c.imgs||[]).length||(c.frames||[]).length)(out[d]=out[d]||{})[cn]={obs,comment:c.comment||"",adjust:c.adjust||"",link:c.link||"",imgs:c.imgs||[],frames:c.frames||[]};
+   let obs={};Object.keys(c.obs||{}).forEach(k=>{if(c.obs[k])obs[k]=true});
+   let grade=c.grade||techGradeOf({obs:c.obs});
+   if(grade||Object.keys(obs).length||c.comment||c.adjust||c.link||(c.imgs||[]).length||(c.frames||[]).length)(out[d]=out[d]||{})[cn]={grade:c.grade||"",obs,comment:c.comment||"",adjust:c.adjust||"",link:c.link||"",imgs:c.imgs||[],frames:c.frames||[]};
   });
  });
  return out;
 }
+// Legacy entries (first Technique version) stored a G/M/A per observation; derive a component grade from the worst one.
+function techGradeOf(c){if(c.grade&&TS[c.grade])return c.grade;let r=0;Object.values(c.obs||{}).forEach(v=>{if(TRANK[v]>r)r=TRANK[v]});return r?["","G","M","A"][r]:""}
 // Latest entry per component (and the one before it) across a player's assessments.
 function techHistory(p){
  let res={};
@@ -3972,11 +3983,13 @@ function techViewHtml(p,forPrint){
   let cards=order.filter(cn=>h[d][cn]).map(cn=>{
    let list=h[d][cn],cur=list[list.length-1],prev=list.length>1?list[list.length-2]:null,c=cur.c;
    if(cn==="RBW")return `<div class="item"><div><b>RBW</b> <span class="muted">${esc(fmtDate(cur.date))}</span><div>${esc(c.overall)}${prev&&prev.c.overall&&prev.c.overall!==c.overall?` <span class="muted">(was ${esc(prev.c.overall)})</span>`:""}</div></div></div>`;
-   let keys=Object.keys(c.obs||{}),pv=(prev&&prev.c.obs)||{};
-   let flagged=keys.filter(k=>c.obs[k]!=="G").sort((a,b)=>TRANK[c.obs[b]]-TRANK[c.obs[a]]);
-   let good=keys.filter(k=>c.obs[k]==="G");
-   let chips=flagged.map(k=>{let note=pv[k]?(TRANK[pv[k]]>TRANK[c.obs[k]]?"improved":TRANK[pv[k]]<TRANK[c.obs[k]]?"worse":""):"";return techChip(k,c.obs[k],note)}).join("")+(good.length?`<span class="muted" style="font-size:var(--fs-1)"> ${good.length} good: ${esc(good.slice(0,4).join(", "))}${good.length>4?"…":""}</span>`:"");
-   return `<div class="item" style="display:block"><b>${esc(cn)}</b> <span class="muted">${esc(fmtDate(cur.date))}</span><div style="margin-top:4px">${chips||'<span class="muted">No observations</span>'}</div>${c.comment?`<div style="margin-top:4px">${esc(c.comment)}</div>`:""}${c.adjust?`<div style="margin-top:4px"><b>Adjustments:</b> ${esc(c.adjust)}</div>`:""}${c.link&&!forPrint?`<div style="margin-top:4px"><a href="${esc(c.link)}" target="_blank" rel="noopener" class="tag">🎬 Video</a></div>`:""}${(c.imgs||[]).length?`<div class="techMedia">${c.imgs.map(u=>`<img src="${u}" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:8px">`).join("")}</div>`:""}${(!forPrint&&(c.frames||[]).length)?`<div class="vmThumbs" data-ids="${esc(c.frames.join(","))}"></div>`:""}</div>`;
+   let g=techGradeOf(c),pg=prev?techGradeOf(prev.c):"";
+   let note=g&&pg&&g!==pg?(TRANK[pg]>TRANK[g]?"improved":"worse"):"";
+   let keys=Object.keys(c.obs||{}).filter(k=>c.obs[k]),pk=prev?Object.keys(prev.c.obs||{}).filter(k=>prev.c.obs[k]):[];
+   let cleared=pk.filter(k=>!keys.includes(k));
+   let colr=g?TS[g].c:"var(--muted)";
+   let chips=keys.map(k=>`<span class="techChip" style="border-color:${colr};color:${colr}">${esc(k)}</span>`).join("");
+   return `<div class="item" style="display:block"><b>${esc(cn)}</b> ${g?`<span class="techChip" style="background:${TS[g].c};border-color:${TS[g].c};color:${g==="M"?"#1a1200":"#fff"}">${TS[g].l}</span>`:""}${note?`<span class="muted" style="font-size:var(--fs-1)"> ${note} · was ${TS[pg].l}</span>`:""} <span class="muted" style="font-size:var(--fs-1)">${esc(fmtDate(cur.date))}</span><div style="margin-top:4px">${chips}</div>${cleared.length?`<div class="muted" style="font-size:var(--fs-1);margin-top:2px">No longer noted: ${esc(cleared.slice(0,4).join(", "))}${cleared.length>4?"…":""}</div>`:""}${c.comment?`<div style="margin-top:4px">${esc(c.comment)}</div>`:""}${c.adjust?`<div style="margin-top:4px"><b>Adjustments:</b> ${esc(c.adjust)}</div>`:""}${c.link&&!forPrint?`<div style="margin-top:4px"><a href="${esc(c.link)}" target="_blank" rel="noopener" class="tag">🎬 Video</a></div>`:""}${(c.imgs||[]).length?`<div class="techMedia">${c.imgs.map(u=>`<img src="${u}" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:8px">`).join("")}</div>`:""}${(!forPrint&&(c.frames||[]).length)?`<div class="vmThumbs" data-ids="${esc(c.frames.join(","))}"></div>`:""}</div>`;
   }).join("");
   return `<div class="card"><b>${esc(d)}</b>${cards}</div>`;
  }).join("");
@@ -3985,10 +3998,11 @@ function techViewHtml(p,forPrint){
 function techParentHtml(p){
  let h=techHistory(p),lines=[];
  TECH_DISC.forEach(d=>{if(!h[d])return;Object.keys(h[d]).forEach(cn=>{
-  if(cn==="RBW")return;let list=h[d][cn],c=list[list.length-1].c,keys=Object.keys(c.obs||{});
-  let work=keys.filter(k=>c.obs[k]!=="G"),good=keys.filter(k=>c.obs[k]==="G");
-  if(!work.length&&!good.length&&!c.adjust)return;
-  lines.push(`<p><b>${esc(cn)}</b>${good.length?` — going well: ${esc(good.slice(0,3).join(", "))}.`:""}${work.length?` Working on: ${esc(work.slice(0,3).join(", "))}.`:""}${c.adjust?` Next: ${esc(c.adjust)}`:""}</p>`);
+  if(cn==="RBW")return;let list=h[d][cn],c=list[list.length-1].c,g=techGradeOf(c),keys=Object.keys(c.obs||{}).filter(k=>c.obs[k]);
+  if(!g&&!c.adjust)return;
+  let nm=cn.split(" — ")[0];
+  let txt=g==="G"?`${esc(nm)} — going well.`:`${esc(nm)} — ${g==="A"?"main focus":"keep an eye on"}${keys.length?`: ${esc(keys.slice(0,3).join(", "))}`:""}.`;
+  lines.push(`<p>${txt}${c.adjust?` Next: ${esc(c.adjust)}`:""}</p>`);
  })});
  return lines.length?`<h2>Technique</h2><div class="card">${lines.join("")}</div>`:"";
 }
