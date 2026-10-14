@@ -309,9 +309,9 @@ html.hc .lkKey{border:2px solid var(--ink)}
 .btn.sm{padding:6px 10px;font-size:var(--fs-1)}
 .techTabs{display:flex;gap:8px;margin:14px 0 6px}.techTabs .btn{flex:1;margin:0}
 .techComp{border:1px solid var(--line);border-radius:12px;margin:8px 0;background:var(--surface2)}
-.techComp summary{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px;cursor:pointer;list-style:none}
-.techComp summary::-webkit-details-marker{display:none}
-.techComp summary::after{content:"▾";margin-left:6px;color:var(--muted)}.techComp[open] summary::after{content:"▴"}
+.techComp>summary{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px;cursor:pointer;list-style:none}
+.techComp>summary::-webkit-details-marker{display:none}
+.techComp>summary::after{content:"▾";margin-left:6px;color:var(--muted)}.techComp[open]>summary::after{content:"▴"}
 .techSum{flex:1;text-align:right;font-size:var(--fs-1)}.techBody{padding:0 12px 12px}
 .techRow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}.techLbl{flex:1;min-width:0}.techBtns{display:flex;gap:6px}
 .tb{width:40px;height:38px;border-radius:9px;border:1.5px solid var(--line);background:transparent;color:var(--muted);font-weight:800;font-size:15px;padding:0}
@@ -321,6 +321,7 @@ html.hc .lkKey{border:2px solid var(--ink)}
 .techGrade{display:flex;gap:6px}.techGrade button{flex:1;padding:10px 4px;border-radius:10px;border:1.5px solid var(--line);background:transparent;color:var(--ink);font-weight:700;font-size:var(--fs-1)}
 .techGrade .tgG{border-color:rgba(47,166,106,.7)}.techGrade .tgM{border-color:rgba(224,161,0,.8)}.techGrade .tgA{border-color:rgba(229,72,77,.75)}
 .techGrade .tgG.on{background:#2fa66a;color:#fff}.techGrade .tgM.on{background:#e0a100;color:#1a1200}.techGrade .tgA.on{background:#e5484d;color:#fff}
+.techExtra{margin-top:10px;border-top:1px dashed var(--line);padding-top:6px}.techExtra summary{cursor:pointer;color:#067a56;font-weight:600;padding:8px 0;list-style:none;display:flex;align-items:center;gap:8px}.techExtra summary::-webkit-details-marker{display:none}.techDot{width:8px;height:8px;border-radius:50%;background:#2fa66a;display:inline-block}
 .techGrp{font-weight:700;font-size:var(--fs-1);text-transform:uppercase;letter-spacing:.3px;color:var(--muted);margin:12px 0 2px}.techHid{opacity:.55}
 .techRbw{display:flex;gap:6px;margin-top:8px}.techRbw button{flex:1;padding:10px 4px;border-radius:10px;border:1.5px solid var(--line);background:transparent;color:var(--ink);font-weight:700;font-size:var(--fs-1)}.techRbw button.on{background:#067a56;border-color:#067a56;color:#fff}
 .techMedia{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.techImg{position:relative}.techImg img{width:84px;height:84px;object-fit:cover;border-radius:8px;display:block}.techImg button{position:absolute;top:-6px;right:-6px;width:24px;height:24px;border-radius:50%;border:0;background:#e5484d;color:#fff;font-size:16px;line-height:1;padding:0}
@@ -3643,6 +3644,7 @@ function assessmentFormHtml(a,mode){
  <div id="assessmentSkills">${empty("Select at least one skill area.")}</div>
  </div>
  <div id="tabTech" style="display:none"><div id="assessmentTech"></div></div>
+ <h3 style="margin:18px 0 4px">Overall</h3>
  <label>Key development priority<textarea name="priority">${esc(a.priority||"")}</textarea></label>
  <label>Coach comments<textarea name="comments">${esc(a.comments||"")}</textarea></label>
  <label class="full">Video / Photo Links <span class="muted" style="font-weight:400">(optional — one per line, e.g. YouTube, Google Drive, Dropbox)</span><textarea name="mediaLinks" placeholder="https://...">${esc((a.mediaLinks||[]).join("\n"))}</textarea></label>
@@ -3651,7 +3653,7 @@ function assessmentFormHtml(a,mode){
 }
 function openAssessmentForm(existing,mode){
  editingAssessmentId=mode==="edit"?existing.id:null;
- techDraft=(mode==="edit"&&existing&&existing.technique)?JSON.parse(JSON.stringify(existing.technique)):{};Object.keys(techDraft).forEach(d=>Object.keys(techDraft[d]).forEach(cn=>{let c=techDraft[d][cn];if(c&&cn!=="RBW"&&!c.grade)c.grade=techGradeOf(c)}));techOpen={};techManage={};techTab="game";window._techPick=null;
+ techDraft=(mode==="edit"&&existing&&existing.technique)?JSON.parse(JSON.stringify(existing.technique)):{};Object.keys(techDraft).forEach(d=>Object.keys(techDraft[d]).forEach(cn=>{let c=techDraft[d][cn];if(c&&cn!=="RBW"&&!c.grade)c.grade=techGradeOf(c)}));techOpen={};techExtraOpen={};techManage={};techTab="game";window._techPick=null;
  modal(assessmentFormHtml(existing,mode));
  renderAssessmentSkills();
 }
@@ -3788,7 +3790,7 @@ function renderAssessmentSkills(){
   }).join("");
   let customAddHtml=`<div class="formgrid" style="margin-top:8px"><input type="text" id="newSkill_${d}" placeholder="Add a custom metric for ${d}..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomSkill('${d}')}"><button type="button" class="btn primary" onclick="addCustomSkill('${d}')">+ Add metric</button></div>${(()=>{let unused=unusedUnarchivedSkills(d);return unused.length?`<button type="button" class="btn secondary" style="margin-top:6px" onclick="bulkArchiveUnused('${d}')">Archive ${unused.length} never-used metric${unused.length===1?"":"s"}</button>`:""})()}${archivedList.length?`<div style="margin-top:8px"><a href="#" onclick="event.preventDefault();toggleArchivedSkillsPanel('${d}')" class="muted">Archived metrics (${archivedList.length})</a><div id="archivedSkillsPanel_${d}" style="display:none;margin-top:6px">${archivedList.map(s=>`<div class="item"><span class="muted">${esc(s)}</span><button type="button" class="btn secondary" onclick="unarchiveSkill('${d}','${esc(s).replace(/'/g,"\\'")}')">Unarchive</button></div>`).join("")}</div></div>`:""}`;
   let bodyHtml=(showGeneral?coreRowsHtml:"")+formatBlocksHtml+(showGeneral?customAddHtml:"")+(!showGeneral&&!activeFormats.length?`<div class="muted">Pick a Format Focus above (Game skills, T20, ODI or Test) to rate ${esc(d)}.</div>`:"");
-  return `<label style="margin-bottom:6px">${d}${showGeneral?" · Rate 1–10":""}</label><div class="card">${bodyHtml}<label>${d} development notes<textarea name="${d}_notes">${esc((existing&&existing.disciplineNotes&&existing.disciplineNotes[d])||"")}</textarea></label></div>`;
+  return `<label style="margin-bottom:6px">${d}${showGeneral?" · Rate 1–10":""}</label><div class="card">${bodyHtml}${(editingAssessmentId&&existing&&existing.disciplineNotes&&existing.disciplineNotes[d])?`<label>${d} development notes <span class="muted" style="font-weight:400">(older note — new ones go in Coach comments below)</span><textarea name="${d}_notes">${esc(existing.disciplineNotes[d])}</textarea></label>`:""}</div>`;
  }).join("")||empty("Select at least one skill area.");
  enhanceTextareasWithVoice(box);
  renderAssessmentTech();
@@ -3841,7 +3843,7 @@ const TECH={
 const TECH_DISC=["Batting","Bowling","Wicketkeeping","Fielding"];
 const RBW_OPTS=["Excellent","Satisfactory","Needs attention"];
 const TS={G:{l:"Good",c:"#2fa66a"},M:{l:"Monitor",c:"#e0a100"},A:{l:"Attention",c:"#e5484d"}};
-let techDraft={},techOpen={},techManage={},techTab="game";
+let techDraft={},techOpen={},techExtraOpen={},techManage={},techTab="game";
 function techObsFull(d,ci){
  let comp=TECH[d][ci],out=[];
  comp.o.forEach(x=>{if(Array.isArray(x))x[1].forEach(it=>out.push({k:x[0]+" — "+it,l:it,g:x[0]}));else out.push({k:x,l:x,g:""})});
@@ -3897,14 +3899,18 @@ function techCompHtml(d,ci){
  });
  let frames=(c.frames||[]);
  let gradeHtml=`<div class="muted" style="font-size:var(--fs-1);margin:2px 0 6px">Overall ${esc(cn.split(" — ")[0].toLowerCase())}</div><div class="techGrade">${["G","M","A"].map(v=>`<button type="button" id="tg_${d}_${ci}_${v}" class="tg${v}${c.grade===v?" on":""}" aria-pressed="${c.grade===v}" onclick="techGradeSet('${d}',${ci},'${v}')">${TS[v].l}</button>`).join("")}</div><div class="muted" style="font-size:var(--fs-1);margin:12px 0 2px">Tick what you observed — these justify the grade</div>`;
+ let hasExtra=!!(c.comment||c.adjust||c.link||(c.imgs||[]).length||frames.length);
  let body=`${gradeHtml}${rows}
   <div class="formgrid" style="margin-top:8px"><input type="text" id="tadd_${key}" placeholder="Add another observation…" onkeydown="if(event.key==='Enter'){event.preventDefault();techAddCustom('${d}',${ci})}"><button type="button" class="btn secondary" onclick="techAddCustom('${d}',${ci})">+ Add</button></div>
+  <details class="techExtra"${(hasExtra||techExtraOpen[key])?" open":""} ontoggle="techExtraOpen['${key}']=this.open"><summary>${hasExtra?"Note, adjustment & media":"+ Note, adjustment or media"}${hasExtra?`<span class="techDot"></span>`:""}</summary>
   <label>Comment<textarea oninput="techComp('${d}','${esc(cn)}').comment=this.value">${esc(c.comment||"")}</textarea></label>
   <label>Suggested adjustments<textarea oninput="techComp('${d}','${esc(cn)}').adjust=this.value">${esc(c.adjust||"")}</textarea></label>
   <label>Video link <span class="muted" style="font-weight:400">(e.g. OnForm)</span><input type="url" placeholder="https://…" value="${esc(c.link||"")}" oninput="techComp('${d}','${esc(cn)}').link=this.value"></label>
   <div class="techMedia">${(c.imgs||[]).map((u,i)=>`<span class="techImg"><img src="${u}" alt=""><button type="button" onclick="techImgDel('${d}','${esc(cn)}',${i})" aria-label="Remove photo">×</button></span>`).join("")}</div>
   <div class="vmThumbs techFrames" data-ids="${esc(frames.join(","))}"></div>${techPickHtml(d,cn)}
-  <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:6px"><label class="btn secondary sm" style="cursor:pointer;margin:0">📷 Add photo<input type="file" accept="image/*" style="display:none" onchange="techImgAdd('${d}','${esc(cn)}',this)"></label><button type="button" class="btn secondary sm" onclick="techPickFrames('${d}','${esc(cn)}')">🎬 Frames from Video Review${frames.length?" ("+frames.length+")":""}</button><button type="button" class="btn secondary sm" onclick="techManageToggle('${key}')">${man?"Done":"Manage list"}</button></div>`;
+  <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:6px"><label class="btn secondary sm" style="cursor:pointer;margin:0">📷 Add photo<input type="file" accept="image/*" style="display:none" onchange="techImgAdd('${d}','${esc(cn)}',this)"></label><button type="button" class="btn secondary sm" onclick="techPickFrames('${d}','${esc(cn)}')">🎬 Frames from Video Review${frames.length?" ("+frames.length+")":""}</button></div>
+  </details>
+  <div class="row" style="margin-top:8px"><button type="button" class="btn secondary sm" onclick="techManageToggle('${key}')">${man?"Done":"Manage list"}</button></div>`;
  let open=techOpen[key]?" open":"";
  return `<details class="techComp"${open} ontoggle="techOpen['${key}']=this.open"><summary><b>${esc(cn)}</b><span class="muted techSum" id="ts_${d}_${ci}">${esc(techSummaryText(d,cn))}</span></summary><div class="techBody">${body}</div></details>`;
 }
