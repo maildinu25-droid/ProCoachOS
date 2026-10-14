@@ -305,6 +305,14 @@ html.hc .tag{border:1.5px solid var(--ink)}
 html.hc :focus-visible{outline:3px solid var(--gold)!important;outline-offset:2px}
 html.hc .lkKey{border:2px solid var(--ink)}
 .hcRow{display:flex;justify-content:space-between;align-items:center;gap:12px}
+
+.vmGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
+.vmCell{position:relative;border:2px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;background:var(--surface2)}
+.vmCell img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block}
+.vmCell span{display:block;font-size:var(--fs-1);padding:3px 5px;color:var(--muted)}
+.vmCell.on{border-color:var(--g);box-shadow:0 0 0 2px var(--g)}
+.vmThumbs{display:flex;gap:6px;margin-top:6px;flex-wrap:wrap}
+.vmThumbs img{width:64px;height:40px;object-fit:cover;border-radius:6px;border:1px solid var(--line);cursor:pointer}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
@@ -1207,6 +1215,111 @@ function storageRestoreFile(input){
 }
 /* ===== end storage manager ===== */
 
+/* ===== Video moments (saved in Video Review Studio) ===== */
+const VM_DB="procoachos_video",VMPAIRS={};
+function vmOpen(){return new Promise((res,rej)=>{let r=indexedDB.open(VM_DB,1);r.onupgradeneeded=e=>{let d=e.target.result;if(!d.objectStoreNames.contains("moments"))d.createObjectStore("moments",{keyPath:"id"})};r.onsuccess=e=>res(e.target.result);r.onerror=()=>rej(r.error)})}
+async function vmAll(){try{let d=await vmOpen();return await new Promise((res,rej)=>{let q=d.transaction("moments","readonly").objectStore("moments").getAll();q.onsuccess=()=>res(q.result||[]);q.onerror=()=>rej(q.error)})}catch(e){return[]}}
+const vmSrc=x=>!x?"":(typeof x==="string"?x:URL.createObjectURL(x));
+const vmByNew=(a,b)=>String(b.created||"").localeCompare(String(a.created||"")),vmByOld=(a,b)=>String(a.created||"").localeCompare(String(b.created||""));
+function vmDrawShapes(ctx,w,h,shapes,preview){
+  var lw=Math.max(2.5,w/260);
+  var all=preview?shapes.concat([preview]):shapes;
+  all.forEach(function(s){
+    ctx.save();ctx.strokeStyle=s.c;ctx.fillStyle=s.c;ctx.lineWidth=lw;ctx.lineCap="round";ctx.lineJoin="round";
+    var P=function(p){return[p[0]*w,p[1]*h]};
+    if(s.t==="spot"){
+      var a=P(s.p[0]),b=P(s.p[1]),cx=(a[0]+b[0])/2,cy=(a[1]+b[1])/2,rx=Math.abs(b[0]-a[0])/2,ry=Math.abs(b[1]-a[1])/2;
+      ctx.beginPath();ctx.rect(0,0,w,h);ctx.ellipse(cx,cy,Math.max(rx,1),Math.max(ry,1),0,0,Math.PI*2);
+      ctx.fillStyle="rgba(0,0,0,.62)";ctx.fill("evenodd");ctx.beginPath();ctx.ellipse(cx,cy,Math.max(rx,1),Math.max(ry,1),0,0,Math.PI*2);ctx.strokeStyle="#fff";ctx.setLineDash([lw*2,lw*2]);ctx.stroke();
+    }else if(s.t==="line"||s.t==="arrow"){
+      var p=P(s.p[0]),q=P(s.p[1]);ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(q[0],q[1]);ctx.stroke();
+      if(s.t==="arrow"){var ang=Math.atan2(q[1]-p[1],q[0]-p[0]),hl=lw*6;ctx.beginPath();ctx.moveTo(q[0],q[1]);ctx.lineTo(q[0]-hl*Math.cos(ang-.45),q[1]-hl*Math.sin(ang-.45));ctx.lineTo(q[0]-hl*Math.cos(ang+.45),q[1]-hl*Math.sin(ang+.45));ctx.closePath();ctx.fill()}
+    }else if(s.t==="circle"){
+      var a2=P(s.p[0]),b2=P(s.p[1]);var r=Math.hypot(b2[0]-a2[0],b2[1]-a2[1]);ctx.beginPath();ctx.arc(a2[0],a2[1],Math.max(r,1),0,Math.PI*2);ctx.stroke();
+    }else if(s.t==="vguide"){ctx.setLineDash([lw*3,lw*2]);ctx.beginPath();ctx.moveTo(s.p[0][0]*w,0);ctx.lineTo(s.p[0][0]*w,h);ctx.stroke()}
+    else if(s.t==="hguide"){ctx.setLineDash([lw*3,lw*2]);ctx.beginPath();ctx.moveTo(0,s.p[0][1]*h);ctx.lineTo(w,s.p[0][1]*h);ctx.stroke()}
+    else if(s.t==="angle"){
+      var pts=s.p.map(P);ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);if(pts[1])ctx.lineTo(pts[1][0],pts[1][1]);if(pts[2])ctx.lineTo(pts[2][0],pts[2][1]);ctx.stroke();
+      pts.forEach(function(q){ctx.beginPath();ctx.arc(q[0],q[1],lw*1.6,0,Math.PI*2);ctx.fill()});
+      if(pts[2]){
+        var v=pts[1],a1=Math.atan2(pts[0][1]-v[1],pts[0][0]-v[0]),a3=Math.atan2(pts[2][1]-v[1],pts[2][0]-v[0]);
+        var d=a3-a1;while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;
+        var deg=Math.round(Math.abs(d)*180/Math.PI);ctx.beginPath();ctx.arc(v[0],v[1],lw*9,a1,a1+d,d<0);ctx.stroke();
+        var mid=a1+d/2,fs=Math.max(16,w/28);ctx.font="700 "+fs+"px Arial";ctx.lineWidth=lw*1.4;ctx.strokeStyle="rgba(0,0,0,.8)";var tx=v[0]+Math.cos(mid)*lw*17,ty=v[1]+Math.sin(mid)*lw*17;
+        ctx.textAlign="center";ctx.textBaseline="middle";ctx.strokeText(deg+"°",tx,ty);ctx.fillText(deg+"°",tx,ty);
+      }
+    }else if(s.t==="text"){
+      var fs2=Math.max(16,w/26);ctx.font="700 "+fs2+"px Arial";var t=P(s.p[0]);ctx.textBaseline="middle";ctx.lineWidth=lw*1.4;ctx.strokeStyle="rgba(0,0,0,.85)";ctx.strokeText(s.txt,t[0],t[1]);ctx.fillText(s.txt,t[0],t[1]);
+    }
+    ctx.restore();
+  });
+}
+
+async function vmComposite(m,maxW){
+ let img=await new Promise((res,rej)=>{let i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=vmSrc(m.base)});
+ let sc=Math.min(1,maxW/img.naturalWidth),c=document.createElement("canvas");c.width=Math.round(img.naturalWidth*sc);c.height=Math.round(img.naturalHeight*sc);
+ let x=c.getContext("2d");x.drawImage(img,0,0,c.width,c.height);vmDrawShapes(x,c.width,c.height,m.shapes||[]);return c.toDataURL("image/jpeg",.82);
+}
+function vmStudio(el){if(typeof openAnalysisTool!=="function")return;let h=el.dataset.m?"#m="+el.dataset.m:"#p="+encodeURIComponent(el.dataset.p||"");openAnalysisTool("video.html"+h)}
+async function vmFillSection(){
+ let el=document.getElementById("vmSec");if(!el)return;let name=el.dataset.p;
+ let list=(await vmAll()).filter(m=>m.player===name).sort(vmByNew);
+ el.innerHTML=`<h2 class="section">Video &amp; Frames${list.length?` (${list.length})`:""}</h2>`+(list.length?`<div class="vmGrid">${list.map(m=>`<div class="vmCell" data-m="${m.id}" onclick="vmStudio(this)"><img src="${vmSrc(m.thumb||m.base)}" alt=""><span>${esc(fmtDate(m.date))}${m.report?" ★":""}${(m.tags&&m.tags[0])?" · "+esc(m.tags[0].split(" / ").pop()):""}</span></div>`).join("")}</div>`:`<div class="card muted">No saved video frames yet.</div>`)+`<button class="btn secondary" style="margin-top:8px" data-p="${esc(name)}" onclick="vmStudio(this)">Review a video for ${esc(name)}</button>`;
+}
+async function vmPrep(p){
+ VMPAIRS[p.id]="";
+ let list=(await vmAll()).filter(m=>m.player===p.name&&m.report&&m.base).sort(vmByOld);
+ if(list.length<2)return;
+ let groups={};list.forEach(m=>{let k=(m.tags&&m.tags[0])?m.tags[0].split(" / ").pop():"Technique";(groups[k]=groups[k]||[]).push(m)});
+ let pairs=Object.entries(groups).filter(([,a])=>a.length>=2).map(([k,a])=>[k,a[0],a[a.length-1]]);
+ if(!pairs.length)pairs=[["Technique",list[0],list[list.length-1]]];
+ pairs=pairs.slice(0,3);
+ let out=[];
+ for(let [k,a,b] of pairs){
+  let [ia,ib]=await Promise.all([vmComposite(a,700),vmComposite(b,700)]);
+  out.push(`<div class="card" style="break-inside:avoid"><b>${esc(k)}</b><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><figure style="margin:0"><img src="${ia}" style="width:100%;border-radius:8px" alt=""><figcaption class="muted">Before · ${esc(fmtDate(a.date))}</figcaption></figure><figure style="margin:0"><img src="${ib}" style="width:100%;border-radius:8px" alt=""><figcaption class="muted">Now · ${esc(fmtDate(b.date))}</figcaption></figure></div>${b.comment?`<p style="margin:8px 0 0">${esc(b.comment)}</p>`:""}</div>`);
+ }
+ VMPAIRS[p.id]=`<h2>Technique — before &amp; after</h2>${out.join("")}`;
+}
+const vmPairsHtml=p=>VMPAIRS[p.id]||"";
+const _vmPPR=playerProfileReport,_vmPSR=parentSummaryReport;
+playerProfileReport=function(id){let p=db.players.find(x=>x.id===id);if(!p)return;vmPrep(p).catch(()=>{VMPAIRS[p.id]=""}).then(()=>_vmPPR(id))};
+parentSummaryReport=function(id){let p=db.players.find(x=>x.id===id);if(!p)return;vmPrep(p).catch(()=>{VMPAIRS[p.id]=""}).then(()=>_vmPSR(id))};
+async function vmReflInit(){
+ let box=document.getElementById("reflMoments");if(!box)return;
+ let all=(await vmAll()).sort(vmByNew);
+ if(!all.length){box.textContent="No saved video frames yet — save some in Video Review Studio first.";return}
+ let sel=new Set((document.getElementById("reflMomIds").value||"").split(",").filter(Boolean));
+ let list=all.slice(0,30);all.forEach(m=>{if(sel.has(m.id)&&!list.includes(m))list.push(m)});
+ box.innerHTML=`<div class="vmGrid">${list.map(m=>`<div class="vmCell${sel.has(m.id)?" on":""}" data-id="${m.id}" onclick="vmReflToggle(this)"><img src="${vmSrc(m.thumb||m.base)}" alt=""><span>${esc(m.player)} · ${esc(fmtDate(m.date))}</span></div>`).join("")}</div>`;
+}
+function vmReflToggle(el){el.classList.toggle("on");document.getElementById("reflMomIds").value=[...document.querySelectorAll("#reflMoments .vmCell.on")].map(c=>c.dataset.id).join(",")}
+async function vmFillThumbs(){
+ let boxes=[...document.querySelectorAll(".vmThumbs")];if(!boxes.length)return;let all=await vmAll();
+ boxes.forEach(b=>{let ids=(b.dataset.ids||"").split(",").filter(Boolean);b.innerHTML=ids.map(id=>all.find(m=>m.id===id)).filter(Boolean).map(m=>`<img src="${vmSrc(m.thumb||m.base)}" alt="" data-m="${m.id}" onclick="vmStudio(this)" title="${esc(m.player)}">`).join("")});
+}
+
+
+async function vmExportAll(){
+ let all=await vmAll(),toData=b=>!b?Promise.resolve(null):(typeof b==="string"?Promise.resolve(b):new Promise(res=>{let r=new FileReader();r.onload=()=>res(r.result);r.readAsDataURL(b)}));
+ let out=[];for(const m of all){let c=Object.assign({},m);delete c.composite;c.base=await toData(m.base);c.thumb=await toData(m.thumb);out.push(c)}return out;
+}
+async function vmImport(list){
+ if(!list||!list.length)return 0;
+ let d=await vmOpen(),have=new Set((await vmAll()).map(m=>m.id)),n=0,toBlob=async u=>typeof u==="string"?await (await fetch(u)).blob():u;
+ for(const m of list){
+  if(!m||!m.id||!m.base||have.has(m.id))continue;
+  let c=Object.assign({},m);c.base=await toBlob(m.base);c.thumb=m.thumb?await toBlob(m.thumb):null;delete c.composite;
+  await new Promise((res,rej)=>{let t=d.transaction("moments","readwrite");t.objectStore("moments").put(c);t.oncomplete=()=>res();t.onerror=()=>rej(t.error)});n++;
+ }
+ return n;
+}
+const vmBytes=m=>{let s=x=>!x?0:(typeof x==="string"?Math.round(x.length*.75):(x.size||0));return s(m.base)+s(m.thumb)+s(m.composite)};
+async function vmFillUsage(){
+ let el=document.getElementById("vmUsage");if(!el)return;let all=await vmAll();
+ el.textContent=all.length?`Video frames (Video Review Studio): ${all.length} saved · ${(all.reduce((a,m)=>a+vmBytes(m),0)/1048576).toFixed(1)} MB. Included in Export Backup.`:"";
+}
+const _vmAP=accountPage;accountPage=function(){_vmAP.apply(this,arguments);vmFillUsage()};
 async function checkTodaysSessionReminder(){
  // This is a LOCAL notification — shown directly by this device when the
  // app happens to be open, not a server push. Session-plan data never
@@ -2437,12 +2550,13 @@ function reflections(){
  +`<button class="btn primary" onclick="newReflection()">+ New Reflection</button>
  ${filterBarHtml("reflections",`<input id="reflectionSearch" value="${esc(reflectionQuery)}" oninput="reflectionQuery=this.value;reflections()" onfocus="reflectionSearchFocused=true" onblur="reflectionSearchFocused=false" placeholder="Search reflections...">`,`<label>Type<select onchange="reflectionTypeFilter=this.value;reflections()"><option value="">All</option><option value="session" ${reflectionTypeFilter==="session"?"selected":""}>Practice Session</option><option value="match" ${reflectionTypeFilter==="match"?"selected":""}>Match</option></select></label>`,reflectionTypeFilter?1:0)}
  <h2 class="section">Reflection history (${list.length})</h2>
- <div class="card">${list.length?list.map(x=>`<div class="item"><div><b>${esc(fmtDate(x.date))} · ${esc(x.session||"Reflection")}</b> <span class="tag">${x.type==="match"?"Match":"Session"}</span><div class="muted">Rating ${esc(x.rating)}/5</div><small>${esc(reflectionWentWellText(x))}</small></div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editReflection('${x.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delReflection('${x.id}')">${icon("trash",17)}</button></div></div>`).join(""):(db.reflections.length?empty("No reflections match your filters."):emptyRich("No reflections yet","A two-minute note after each session or match is how coaches improve fastest.","+ New Reflection","newReflection()"))}</div>
+ <div class="card">${list.length?list.map(x=>`<div class="item"><div><b>${esc(fmtDate(x.date))} · ${esc(x.session||"Reflection")}</b> <span class="tag">${x.type==="match"?"Match":"Session"}</span><div class="muted">Rating ${esc(x.rating)}/5</div><small>${esc(reflectionWentWellText(x))}</small>${x.momentIds&&x.momentIds.length?`<div class="vmThumbs" data-ids="${esc(x.momentIds.join(","))}"></div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editReflection('${x.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delReflection('${x.id}')">${icon("trash",17)}</button></div></div>`).join(""):(db.reflections.length?empty("No reflections match your filters."):emptyRich("No reflections yet","A two-minute note after each session or match is how coaches improve fastest.","+ New Reflection","newReflection()"))}</div>
  ${recurringThemesCardHtml()}`;
+ vmFillThumbs();
  let sEl=document.getElementById("reflectionSearch");if(sEl&&reflectionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
 function reflectionFormHtml(x,mode){
- x=x||{};
+ x=x||{};setTimeout(vmReflInit,0);
  let type=x.type==="match"?"match":"session";
  let recentSessions=activeSessions().slice().sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a))).slice(0,60);
  let recentMatches=db.matches.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).slice(0,60);
@@ -2465,6 +2579,7 @@ function reflectionFormHtml(x,mode){
   ${ratingSelectRow("playerManagement","Player management / rotation calls",x.playerManagement)}
  </div>
  ${ratingSelectRow("rating","Overall rating",x.rating)}
+ <div class="full"><label>Video moments <span class="muted" style="font-weight:400">(optional — tap to attach)</span></label><input type="hidden" name="momentIds" id="reflMomIds" value="${esc((x.momentIds||[]).join(","))}"><div id="reflMoments" class="muted small">Loading…</div></div>
  <div class="full">${formSectionHead("wentWell","What went well?",false)}
  <div id="formSec-wentWell" style="display:none;margin-top:10px">
  <div class="chipGrid2" id="reflWentWellSession" style="${type==="match"?"display:none":""}">${COACH_WENT_WELL_SESSION.map(r=>`<label><input type="checkbox" name="wentWellThemes" value="${esc(r)}" ${(x.wentWellThemes||[]).includes(r)?"checked":""} onchange="updateFormSectionCount('wentWell','selected')"> ${esc(r)}</label>`).join("")}</div>
@@ -2575,6 +2690,7 @@ function saveReflection(e){
  let fd=new FormData(e.target);
  let x=Object.fromEntries(fd);
  x.type=x.type==="match"?"match":"session";
+ x.momentIds=(x.momentIds||"").split(",").filter(Boolean);if(!x.momentIds.length)delete x.momentIds;
  x.betterReasons=fd.getAll("betterReasons");
  x.wentWellThemes=fd.getAll("wentWellThemes");
  x.takeawayThemes=fd.getAll("takeawayThemes");
@@ -3135,6 +3251,7 @@ function playerViewBody(p,forPrint){
  ${forPrint?playerProgressPrintHtml(playerAssessments(p)):playerProgressChartHtml(p)}
  ${fitnessTestsHtml(p,forPrint)}
  ${forPrint?"":playerStageHtml(p)}
+ ${forPrint?vmPairsHtml(p):`<div id="vmSec" data-p="${esc(p.name)}"></div>`}
  ${p.strengths?`<h2 class="section">Strengths</h2><div class="card">${esc(p.strengths)}</div>`:""}
  ${p.areas?`<h2 class="section">Development areas</h2><div class="card">${esc(p.areas)}</div>`:""}
  ${p.notes?`<h2 class="section">Coach notes</h2><div class="card">${esc(p.notes)}</div>`:""}
@@ -3147,7 +3264,7 @@ function playerViewBody(p,forPrint){
 function playerView(id){let p=db.players.find(x=>x.id===id);if(!p)return;modal(`<div class="sheetHead"><h2>${esc(p.name)}</h2><button class="x" onclick="closeM()">×</button></div>${playerViewBody(p)}<button class="btn secondary" style="margin-top:14px" onclick="playerProfileReport('${p.id}')">Print Profile</button>
  <button class="btn secondary" style="margin-top:8px" onclick="parentSummaryReport('${p.id}')">Parent / Player Summary</button>
  <button class="btn secondary" style="margin-top:8px" onclick="compareVideos('${p.id}')">Compare Videos (Before / After)</button>
- ${p.sessionRate?`<button class="btn secondary" style="margin-top:8px" onclick="closeM();invoiceReturnTo=null;newInvoice('${p.id}')">Create Invoice</button>`:""}`)}
+ ${p.sessionRate?`<button class="btn secondary" style="margin-top:8px" onclick="closeM();invoiceReturnTo=null;newInvoice('${p.id}')">Create Invoice</button>`:""}`);vmFillSection()}
 function compareVideos(playerId){
  let p=db.players.find(x=>x.id===playerId);if(!p)return;
  let allLinks=[];
@@ -3207,6 +3324,7 @@ function parentSummaryReport(id){
  ${activeGoals.length?`<h2>Current Goals</h2><div class="card">${activeGoals.map(g=>`<p><b>${esc(g.text)}</b>${g.targetDate?" — target "+esc(fmtDate(g.targetDate)):""}</p>`).join("")}</div>`:""}
  ${trendLines.length?`<h2>Recent Progress</h2><div class="card">${trendLines.map(l=>`<p>${esc(l)}</p>`).join("")}</div>`:""}
  ${playerProgressPrintHtml(aa)}
+ ${vmPairsHtml(p)}
  ${attendanceRate!==null?`<h2>Attendance</h2><div class="card"><p>${attended} of ${teamSessions.length} sessions attended (${attendanceRate}%).</p></div>`:""}
  ${p.focus?`<h2>Next Focus</h2><div class="card"><p>${esc(p.focus)}</p></div>`:""}`);
 }
@@ -6659,6 +6777,7 @@ function deleteProfile(id){
 async function exportBackup(){
  let exportData={...db,_license:getLicenseState()};
  try{let sm=await scorerDbAll();if(sm.length)exportData._scorerMatches=sm}catch(e){}
+ try{let vm=await vmExportAll();if(vm.length)exportData._videoMoments=vm}catch(e){}
  let blob=new Blob([JSON.stringify(exportData,null,2)],{type:"application/json"});
  let url=URL.createObjectURL(blob);
  let a=document.createElement("a");a.href=url;a.download="ProCoach-OS-Backup-"+today()+".json";
@@ -6680,6 +6799,8 @@ function handleRestoreFile(input){
   delete parsed._license;
   let scorerFromBackup=Array.isArray(parsed._scorerMatches)?parsed._scorerMatches:[];
   delete parsed._scorerMatches;
+  let videoFromBackup=Array.isArray(parsed._videoMoments)?parsed._videoMoments:[];
+  delete parsed._videoMoments;
   ["sessions","reflections","players","assessments","matches","drills","events"].forEach(k=>{parsed[k]=Array.isArray(parsed[k])?parsed[k]:[]});
   parsed.matches.forEach(m=>{if(!m.id)m.id=uid("m")});
   parsed.drills.forEach(d=>{if(!d.id)d.id=uid("drill")});
@@ -6693,8 +6814,9 @@ function handleRestoreFile(input){
   }
   idbSet(DB_KEY,db).catch(err=>console.warn("IndexedDB save failed",err)).then(async()=>{
    for(const sm of scorerFromBackup){if(sm&&typeof sm.id==="string")await scorerDbPut(sm)}
+   let vmAdded=0;try{vmAdded=await vmImport(videoFromBackup)}catch(e){}
    try{localStorage.setItem(DB_KEY,JSON.stringify(db))}catch(e){}
-   alert("Backup restored successfully."+(scorerFromBackup.length?" Includes "+scorerFromBackup.length+" scored match"+(scorerFromBackup.length===1?"":"es")+".":""));
+   alert("Backup restored successfully."+(scorerFromBackup.length?" Includes "+scorerFromBackup.length+" scored match"+(scorerFromBackup.length===1?"":"es")+".":"")+(vmAdded?" Added "+vmAdded+" video frame"+(vmAdded===1?"":"s")+".":""));
    location.reload();
   });
  };
@@ -7347,6 +7469,7 @@ function accountPage(){
  <h2 class="section">Storage</h2>
  <div class="card">
  <div style="display:flex;justify-content:space-between;font-size:var(--fs-3)"><span class="muted">Approximate space used on this device</span><b>${usedMB.toFixed(2)} MB</b></div>
+ <div id="vmUsage" class="muted" style="font-size:var(--fs-2);margin-top:4px"></div>
  <div class="goalBar" style="margin-top:8px"><div class="goalBarFill" style="width:${usagePct}%;background:${usageColor}"></div></div>
  <div class="muted" style="font-size:var(--fs-2);margin-top:6px">Your coaching data is stored using IndexedDB, which offers far more room than older browser storage — typically hundreds of MB or more, tied to your device's available space rather than a small fixed cap. Attachments, drill diagrams and photos are still the biggest contributors. Export a backup periodically regardless, as good practice.</div>
  <button class="btn secondary" style="margin-top:12px" onclick="storageSheet()">Manage storage</button>

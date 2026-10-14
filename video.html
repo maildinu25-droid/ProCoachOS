@@ -46,6 +46,7 @@ label{display:block;font-weight:700;font-size:13px;margin:12px 0 6px}
 .ctrl .btn{min-width:48px}
 .edWrap{background:#000;border-radius:14px;overflow:hidden;touch-action:none;position:relative}
 .edWrap canvas{width:100%;display:block;touch-action:none}
+.zoomBtns{position:absolute;top:8px;right:8px;display:flex;gap:6px;z-index:2}.zoomBtns button{width:36px;height:36px;border-radius:10px;border:1px solid var(--line);background:rgba(0,0,0,.6);color:#fff;font-size:18px;font-weight:700}
 .tools{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
 .sw{width:30px;height:30px;border-radius:50%;border:3px solid transparent;cursor:pointer;padding:0}.sw.on{border-color:var(--ink)}
 .sheet{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:20;display:flex;align-items:flex-end;justify-content:center}
@@ -177,12 +178,15 @@ function thumbSrc(m){return urlOf(m.id+"t",m.thumb||m.composite||m.base)}
 /* ---------- views ---------- */
 function setView(v){S.view=v;render()}
 function render(){
-  stopLoop();
+  stopLoop();cancelAnimationFrame(C.raf);
   var app=document.getElementById("app");
   if(S.view==="home")return renderHome(app);
   if(S.view==="studio")return renderStudio(app);
   if(S.view==="editor")return renderEditor(app);
   if(S.view==="viewer")return renderViewer(app);
+  if(S.view==="comparePick")return renderComparePick(app);
+  if(S.view==="compare"&&C.a&&C.b)return renderCompare(app);
+  S.view="home";renderHome(app);
 }
 function hdr(title,back){return '<header>'+(back?'<button class="btn sm" onclick="'+back+'">← Back</button>':'<a class="btn sm" href="app.html" style="text-decoration:none">← App</a>')+'<h1>'+esc(title)+'</h1></header>'}
 function refresh(){return dbAll().then(function(m){S.moments=m.sort(function(a,b){return String(b.created).localeCompare(String(a.created))})})}
@@ -197,7 +201,7 @@ function renderHome(app){
    '<label style="margin-top:0">Player</label><select id="plSel" onchange="pickPlayer(this.value)">'+opts+'</select>'+
    '<label class="vlabelOther" style="display:none">Name</label><input type="text" id="plOther" placeholder="Player name" style="display:none" oninput="S.player=this.value.trim()">'+
    '<div style="margin-top:12px"><label class="btn primary full" style="text-align:center;margin:0;cursor:pointer">🎬 Choose video<input type="file" accept="video/*" style="display:none" onchange="openClip(this)"></label></div>'+
-   '<div class="tip">Film side-on for drives and cuts, front-on for bowling actions, with the camera still and the player in full view. Angles you measure are on-screen angles, not exact body angles.</div></div>'+
+   '<button class="btn full" style="margin-top:10px" onclick="setView(\'comparePick\')">⇆ Compare two clips</button><div class="tip">Film side-on for drives and cuts, front-on for bowling actions, with the camera still and the player in full view. Angles you measure are on-screen angles, not exact body angles.</div></div>'+
    '<div class="row" style="margin:6px 0 8px"><b class="grow">Saved moments'+(S.player&&S.player!=="__other"?' — '+esc(S.player):'')+'</b><span class="muted small">'+mine.length+' · '+fmtB(mb)+' total</span></div>'+
    (mine.length?'<div class="grid">'+mine.map(function(m){return '<div class="mom" onclick="openMoment(\''+m.id+'\')"><img src="'+thumbSrc(m)+'" alt=""><div><b>'+esc(m.player)+'</b><br><span class="muted">'+fmtDate(m.date)+' · '+fmtB(momBytes(m))+'</span></div></div>'}).join("")+'</div>':'<div class="card muted">No saved moments yet. Choose a video, freeze a frame, draw, and save.</div>')+
    '<div class="card" style="margin-top:14px"><b>Storage</b><div class="muted small" style="margin:4px 0 8px">Each saved moment is a small compressed image plus the drawing instructions — the video itself is never stored. Lower quality keeps your phone light.</div>'+
@@ -299,51 +303,137 @@ function freeze(){
   var t=v.currentTime;
   captureFrame(v).then(function(base){ED={base:base,shapes:[],tool:"line",color:COLORS[0],pts:[],drag:null,timeSec:t,existing:null};setView("editor")});
 }
-var TOOLS=[["line","Line"],["angle","Angle"],["vguide","Vertical"],["hguide","Horizontal"],["circle","Circle"],["arrow","Arrow"],["text","Text"],["spot","Spotlight"]];
-var TOOL_HELP={line:"Drag to draw a line.",angle:"Tap three points: first arm, the joint, second arm.",vguide:"Tap to place a vertical guide line.",hguide:"Tap to place a horizontal guide line.",circle:"Drag from the centre outwards.",arrow:"Drag from the tail to the point.",text:"Tap where the label should go.",spot:"Drag a box — everything outside is darkened."};
+var TOOLS=[["edit","Edit"],["line","Line"],["angle","Angle"],["vguide","Vertical"],["hguide","Horizontal"],["circle","Circle"],["arrow","Arrow"],["text","Text"],["spot","Spotlight"],["pan","Pan"]];
+var TOOL_HELP={edit:"Tap a drawing to select it. Drag it to move, or drag a white dot to reshape it. Pinch to zoom, two fingers to pan.",line:"Drag to draw a line. Pinch to zoom for precision.",angle:"Tap three points: first arm, the joint, second arm.",vguide:"Tap to place a vertical guide line.",hguide:"Tap to place a horizontal guide line.",circle:"Drag from the centre outwards.",arrow:"Drag from the tail to the point.",text:"Tap where the label should go.",spot:"Drag a box — everything outside is darkened.",pan:"Drag to move the zoomed frame."};
 function renderEditor(app){
+  ED.hist=ED.hist||[];ED.sel=null;ED.z={s:1,x:0,y:0};ED.ptrs={};ED.gesture=null;ED.mv=null;ED.tap=null;
   app.innerHTML=hdr("Draw on frame",ED.existing?"setView('viewer')":"setView('studio')")+'<main>'+
-   '<div class="edWrap"><canvas id="cv"></canvas></div>'+
+   '<div class="edWrap" id="edWrap"><div id="edInner" style="transform-origin:0 0"><canvas id="cv"></canvas></div><div class="zoomBtns"><button onclick="zoomBy(1.5)" aria-label="Zoom in">+</button><button onclick="zoomBy(1/1.5)" aria-label="Zoom out">−</button><button onclick="zoomFit()" aria-label="Fit">⤢</button></div></div>'+
    '<div class="tools" id="tools">'+TOOLS.map(function(t){return '<button class="chip'+(ED.tool===t[0]?" on":"")+'" data-t="'+t[0]+'" onclick="setTool(\''+t[0]+'\')">'+t[1]+'</button>'}).join("")+'</div>'+
-   '<div class="row"><div class="row" id="cols">'+COLORS.map(function(c){return '<button class="sw'+(ED.color===c?" on":"")+'" style="background:'+c+'" onclick="setColor(\''+c+'\')" aria-label="Colour"></button>'}).join("")+'</div><span class="grow"></span><button class="btn sm" onclick="edUndo()">Undo</button><button class="btn sm danger" onclick="edClear()">Clear all</button></div>'+
+   '<div class="row"><div class="row" id="cols">'+COLORS.map(function(c){return '<button class="sw'+(ED.color===c?" on":"")+'" style="background:'+c+'" onclick="setColor(\''+c+'\')" aria-label="Colour"></button>'}).join("")+'</div><span class="grow"></span><button class="btn sm" onclick="edUndo()">Undo</button><button class="btn sm" id="delSel" onclick="edDelSel()" disabled>Delete</button><button class="btn sm danger" onclick="edClear()">Clear all</button></div>'+
    '<div class="tip" id="toolHelp"></div>'+
    '<button class="btn primary full" onclick="saveSheet()">'+(ED.existing?"Save changes":"Save moment…")+'</button></main>';
-  var cv=document.getElementById("cv");
+  var cv=document.getElementById("cv"),wr=document.getElementById("edWrap");
   imgOf(ED.base).then(function(img){ED.img=img;cv.width=img.naturalWidth;cv.height=img.naturalHeight;redraw()});
-  cv.addEventListener("pointerdown",edDown);cv.addEventListener("pointermove",edMove);cv.addEventListener("pointerup",edUp);cv.addEventListener("pointercancel",edUp);
+  wr.addEventListener("pointerdown",edDown);wr.addEventListener("pointermove",edMove);wr.addEventListener("pointerup",edUp);wr.addEventListener("pointercancel",edUp);
+  wr.addEventListener("wheel",function(e){e.preventDefault();zoomAt(e.clientX,e.clientY,e.deltaY<0?1.2:1/1.2)},{passive:false});
   document.getElementById("toolHelp").textContent=TOOL_HELP[ED.tool];
 }
-function setTool(t){ED.tool=t;ED.pts=[];ED.drag=null;document.querySelectorAll("#tools .chip").forEach(function(c){c.classList.toggle("on",c.dataset.t===t)});document.getElementById("toolHelp").textContent=TOOL_HELP[t];redraw()}
-function setColor(c){ED.color=c;document.querySelectorAll("#cols .sw").forEach(function(s){s.classList.toggle("on",s.style.background.replace(/\s/g,"")===hexToRgb(c))})}
+function selUI(){var d=document.getElementById("delSel");if(d)d.disabled=ED.sel==null}
+function setTool(t){ED.tool=t;ED.pts=[];ED.drag=null;ED.sel=null;ED.mv=null;document.querySelectorAll("#tools .chip").forEach(function(c){c.classList.toggle("on",c.dataset.t===t)});document.getElementById("toolHelp").textContent=TOOL_HELP[t];selUI();redraw()}
+function snap(){ED.hist.push(JSON.stringify(ED.shapes));if(ED.hist.length>60)ED.hist.shift()}
+function setColor(c){
+  ED.color=c;document.querySelectorAll("#cols .sw").forEach(function(s){s.classList.toggle("on",s.style.background.replace(/\s/g,"")===hexToRgb(c))});
+  if(ED.tool==="edit"&&ED.sel!=null&&ED.shapes[ED.sel]){snap();ED.shapes[ED.sel].c=c;redraw()}
+}
 function hexToRgb(h){var n=parseInt(h.slice(1),16);return"rgb("+(n>>16)+","+((n>>8)&255)+","+(n&255)+")"}
+/* zoom / pan */
+function zApply(){
+  var wr=document.getElementById("edWrap"),inn=document.getElementById("edInner");if(!wr||!inn)return;var z=ED.z;
+  z.s=Math.max(1,Math.min(6,z.s));var W=wr.clientWidth,H=wr.clientHeight;
+  z.x=Math.min(0,Math.max(W*(1-z.s),z.x));z.y=Math.min(0,Math.max(H*(1-z.s),z.y));
+  inn.style.transform="translate("+z.x+"px,"+z.y+"px) scale("+z.s+")";
+}
+function zoomAt(cx,cy,f){
+  var wr=document.getElementById("edWrap"),r=wr.getBoundingClientRect(),z=ED.z,px=cx-r.left,py=cy-r.top,cpx=(px-z.x)/z.s,cpy=(py-z.y)/z.s;
+  z.s=Math.max(1,Math.min(6,z.s*f));z.x=px-cpx*z.s;z.y=py-cpy*z.s;zApply();
+}
+function zoomBy(f){var wr=document.getElementById("edWrap"),r=wr.getBoundingClientRect();zoomAt(r.left+r.width/2,r.top+r.height/2,f)}
+function zoomFit(){ED.z={s:1,x:0,y:0};zApply()}
+/* geometry helpers (normalised coords; x scaled by aspect so distances are isotropic) */
+function AR(){var c=document.getElementById("cv");return c.width/c.height}
+function nd(a,b){return Math.hypot((a[0]-b[0])*AR(),a[1]-b[1])}
+function distSeg(p,a,b){var ar=AR(),ax=a[0]*ar,ay=a[1],bx=b[0]*ar,by=b[1],px=p[0]*ar,py=p[1],dx=bx-ax,dy=by-ay,l=dx*dx+dy*dy,t=l?Math.max(0,Math.min(1,((px-ax)*dx+(py-ay)*dy)/l)):0;return Math.hypot(px-(ax+t*dx),py-(ay+t*dy))}
+function shapePts(s){if(s.t==="vguide")return[[s.p[0][0],.5]];if(s.t==="hguide")return[[.5,s.p[0][1]]];return s.p}
+function shapeDist(s,p){
+  var q=s.p;
+  if(s.t==="line"||s.t==="arrow")return distSeg(p,q[0],q[1]);
+  if(s.t==="angle"){var d=distSeg(p,q[0],q[1]);if(q[2])d=Math.min(d,distSeg(p,q[1],q[2]));return d}
+  if(s.t==="circle")return Math.abs(nd(p,q[0])-nd(q[0],q[1]));
+  if(s.t==="vguide")return Math.abs(p[0]-q[0][0])*AR();
+  if(s.t==="hguide")return Math.abs(p[1]-q[0][1]);
+  if(s.t==="text")return Math.max(0,nd(p,q[0])-.03);
+  if(s.t==="spot"){var cx=(q[0][0]+q[1][0])/2,cy=(q[0][1]+q[1][1])/2,rx=Math.abs(q[1][0]-q[0][0])/2*AR(),ry=Math.abs(q[1][1]-q[0][1])/2;if(rx<.001||ry<.001)return 1;var dx=(p[0]-cx)*AR(),dy=p[1]-cy;return Math.abs(Math.hypot(dx/rx,dy/ry)-1)*Math.min(rx,ry)}
+  return 1;
+}
 function redraw(){
   var cv=document.getElementById("cv");if(!cv||!ED.img)return;var x=cv.getContext("2d");x.clearRect(0,0,cv.width,cv.height);x.drawImage(ED.img,0,0);
   var prev=null;
   if(ED.tool==="angle"&&ED.pts.length)prev={t:"angle",c:ED.color,p:ED.pts.concat(ED.cur&&ED.pts.length<3?[ED.cur]:[]).slice(0,3)};
-  else if(ED.drag)prev={t:ED.tool,c:ED.color,p:[ED.drag.a,ED.drag.b]};
+  else if(ED.drag&&ED.tool!=="edit"&&ED.tool!=="pan")prev={t:ED.tool,c:ED.color,p:[ED.drag.a,ED.drag.b]};
   drawShapes(x,cv.width,cv.height,ED.shapes,prev);
+  if(ED.tool==="edit"&&ED.sel!=null&&ED.shapes[ED.sel]){
+    var r=Math.max(9,cv.width/70)/ED.z.s;x.save();x.lineWidth=Math.max(2,r/4);
+    shapePts(ED.shapes[ED.sel]).forEach(function(q){x.beginPath();x.arc(q[0]*cv.width,q[1]*cv.height,r,0,Math.PI*2);x.fillStyle="#fff";x.fill();x.strokeStyle="#000";x.stroke()});x.restore();
+  }
 }
 function evPt(e){var cv=document.getElementById("cv"),r=cv.getBoundingClientRect();return[Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))]}
+function nPtr(){return Object.keys(ED.ptrs).length}
+function startGesture(){
+  var k=Object.keys(ED.ptrs),a=ED.ptrs[k[0]],b=ED.ptrs[k[1]],wr=document.getElementById("edWrap").getBoundingClientRect();
+  var cx=(a.x+b.x)/2,cy=(a.y+b.y)/2;
+  ED.gesture={d0:Math.hypot(a.x-b.x,a.y-b.y)||1,s0:ED.z.s,cpx:((cx-wr.left)-ED.z.x)/ED.z.s,cpy:((cy-wr.top)-ED.z.y)/ED.z.s};
+}
+function doGesture(){
+  var k=Object.keys(ED.ptrs),a=ED.ptrs[k[0]],b=ED.ptrs[k[1]],g=ED.gesture,wr=document.getElementById("edWrap").getBoundingClientRect();
+  var cx=(a.x+b.x)/2-wr.left,cy=(a.y+b.y)/2-wr.top,d=Math.hypot(a.x-b.x,a.y-b.y);
+  ED.z.s=Math.max(1,Math.min(6,g.s0*d/g.d0));ED.z.x=cx-g.cpx*ED.z.s;ED.z.y=cy-g.cpy*ED.z.s;zApply();
+}
 function edDown(e){
-  e.preventDefault();var p=evPt(e),t=ED.tool;
-  try{e.target.setPointerCapture(e.pointerId)}catch(x){}
-  if(t==="vguide"||t==="hguide"){ED.shapes.push({t:t,c:ED.color,p:[p]});redraw();return}
-  if(t==="text"){var txt=prompt("Label text");if(txt&&txt.trim()){ED.shapes.push({t:"text",c:ED.color,p:[p],txt:txt.trim().slice(0,40)});redraw()}return}
-  if(t==="angle"){ED.pts.push(p);if(ED.pts.length===3){ED.shapes.push({t:"angle",c:ED.color,p:ED.pts.slice()});ED.pts=[]}ED.cur=null;redraw();return}
+  if(e.target.closest&&e.target.closest(".zoomBtns"))return;
+  e.preventDefault();ED.ptrs[e.pointerId]={x:e.clientX,y:e.clientY};
+  try{document.getElementById("edWrap").setPointerCapture(e.pointerId)}catch(x){}
+  if(nPtr()===2){ED.drag=null;ED.mv=null;ED.tap=null;ED.noDraw=true;startGesture();return}
+  if(nPtr()>2)return;
+  ED.noDraw=false;var p=evPt(e),t=ED.tool;
+  if(t==="pan"){ED.pan={x:e.clientX,y:e.clientY,zx:ED.z.x,zy:ED.z.y};return}
+  if(t==="vguide"||t==="hguide"||t==="text"||t==="angle"){ED.tap={p:p,x:e.clientX,y:e.clientY};return}
+  if(t==="edit"){
+    var th=.05/ED.z.s;
+    if(ED.sel!=null&&ED.shapes[ED.sel]){var pts=shapePts(ED.shapes[ED.sel]);for(var i=0;i<pts.length;i++){if(nd(pts[i],p)<th*1.3){ED.mv={mode:"handle",i:i,start:p,moved:false};return}}}
+    var best=-1,bd=th;for(var j=ED.shapes.length-1;j>=0;j--){var d=shapeDist(ED.shapes[j],p);if(d<bd){bd=d;best=j}}
+    if(best>=0){ED.sel=best;ED.mv={mode:"body",start:p,orig:JSON.parse(JSON.stringify(ED.shapes[best].p)),moved:false}}else{ED.sel=null}
+    selUI();redraw();return;
+  }
   ED.drag={a:p,b:p};redraw();
 }
 function edMove(e){
+  if(ED.ptrs[e.pointerId]){ED.ptrs[e.pointerId]={x:e.clientX,y:e.clientY}}
+  if(ED.gesture&&nPtr()>=2){doGesture();return}
+  if(ED.noDraw)return;
   var p=evPt(e);
+  if(ED.pan&&nPtr()===1){ED.z.x=ED.pan.zx+(e.clientX-ED.pan.x);ED.z.y=ED.pan.zy+(e.clientY-ED.pan.y);zApply();return}
   if(ED.tool==="angle"&&ED.pts.length){ED.cur=p;redraw();return}
+  if(ED.mv&&ED.sel!=null){
+    var m=ED.mv,s=ED.shapes[ED.sel],dx=p[0]-m.start[0],dy=p[1]-m.start[1];
+    if(!m.moved){if(Math.hypot(dx*AR(),dy)<.006)return;snap();m.moved=true}
+    if(m.mode==="handle"){if(s.t==="vguide")s.p[0][0]=p[0];else if(s.t==="hguide")s.p[0][1]=p[1];else s.p[m.i]=p}
+    else s.p=m.orig.map(function(q){return[Math.max(0,Math.min(1,q[0]+dx)),Math.max(0,Math.min(1,q[1]+dy))]});
+    redraw();return;
+  }
   if(ED.drag){ED.drag.b=p;redraw()}
 }
 function edUp(e){
+  var wasGesture=!!ED.gesture;delete ED.ptrs[e.pointerId];
+  if(nPtr()<2)ED.gesture=null;
+  if(nPtr()>0){return}
+  if(wasGesture||ED.noDraw){ED.noDraw=false;ED.drag=null;ED.mv=null;ED.tap=null;ED.pan=null;return}
+  ED.pan=null;
+  if(ED.mv){ED.mv=null;redraw();return}
+  if(ED.tap){
+    var tp=ED.tap;ED.tap=null;if(Math.hypot(e.clientX-tp.x,e.clientY-tp.y)>10)return;var t=ED.tool,p=tp.p;
+    if(t==="vguide"||t==="hguide"){snap();ED.shapes.push({t:t,c:ED.color,p:[p]})}
+    else if(t==="text"){var txt=prompt("Label text");if(txt&&txt.trim()){snap();ED.shapes.push({t:"text",c:ED.color,p:[p],txt:txt.trim().slice(0,40)})}}
+    else if(t==="angle"){ED.pts.push(p);if(ED.pts.length===3){snap();ED.shapes.push({t:"angle",c:ED.color,p:ED.pts.slice()});ED.pts=[]}ED.cur=null}
+    redraw();return;
+  }
   if(!ED.drag)return;var d=ED.drag;ED.drag=null;
-  if(Math.hypot(d.b[0]-d.a[0],d.b[1]-d.a[1])>.01)ED.shapes.push({t:ED.tool,c:ED.color,p:[d.a,d.b]});
+  if(nd(d.a,d.b)>.012){snap();ED.shapes.push({t:ED.tool,c:ED.color,p:[d.a,d.b]})}
   redraw();
 }
-function edUndo(){if(ED.pts.length){ED.pts.pop()}else ED.shapes.pop();redraw()}
-function edClear(){if(ED.shapes.length&&!confirm("Remove all drawings from this frame?"))return;ED.shapes=[];ED.pts=[];redraw()}
+function edUndo(){if(ED.pts.length){ED.pts.pop()}else if(ED.hist.length){ED.shapes=JSON.parse(ED.hist.pop());ED.sel=null}redraw();selUI()}
+function edDelSel(){if(ED.sel==null)return;snap();ED.shapes.splice(ED.sel,1);ED.sel=null;redraw();selUI()}
+function edClear(){if(ED.shapes.length&&!confirm("Remove all drawings from this frame?"))return;snap();ED.shapes=[];ED.pts=[];ED.sel=null;redraw();selUI()}
 
 /* ---------- save sheet ---------- */
 function sheet(h){var host=document.getElementById("sheetHost");host.innerHTML='<div class="sheet" onclick="if(event.target===this)closeSheet()"><div>'+h+'</div></div>'}
@@ -356,6 +446,7 @@ function saveSheet(){
    '<label>Coaching cue</label><select onchange="if(this.value){var c=document.getElementById(\'cm\');c.value=(c.value?c.value+\'. \':\'\')+this.value;this.value=\'\'}"><option value="">Add a cue…</option>'+CUES.map(function(c){return '<option>'+esc(c)+'</option>'}).join("")+'</select>'+
    '<label>Comment</label><textarea id="cm" rows="2" placeholder="One line the player can act on">'+esc(ex.comment||"")+'</textarea>'+
    '<label>Rating of this moment (optional)</label><div class="stars" id="stars">'+[1,2,3,4,5].map(function(n){return '<button type="button" class="'+(n<=ED.rating?"on":"")+'" onclick="setRating('+n+')">★</button>'}).join("")+'</div>'+
+   '<label style="display:flex;gap:10px;align-items:center;font-weight:600;margin-top:14px"><input type="checkbox" id="rep" '+(ex.report?"checked":"")+' style="width:20px;height:20px"> Include in player reports &amp; parent summary</label>'+
    '<div class="row" style="margin-top:14px"><button class="btn grow" onclick="closeSheet()">Cancel</button><button class="btn primary grow" onclick="saveMoment()">Save</button></div>');
 }
 function toggleTag(b){var t=b.dataset.tag,i=ED.tags.indexOf(t);if(i>=0)ED.tags.splice(i,1);else ED.tags.push(t);b.classList.toggle("on",i<0)}
@@ -363,7 +454,7 @@ function setRating(n){ED.rating=ED.rating===n?0:n;[].forEach.call(document.query
 function saveMoment(){
   var ex=ED.existing,cm=document.getElementById("cm").value.trim();
   var rec=ex?Object.assign({},ex):{id:vid(),player:S.player,date:todayStr(),clipName:S.clip&&S.clip.name,clipSize:S.clip&&S.clip.size,clipKey:S.clip&&S.clip.key,timeSec:ED.timeSec,fps:S.fps,created:new Date().toISOString()};
-  rec.base=ED.base;rec.shapes=ED.shapes;rec.tags=ED.tags;rec.comment=cm;rec.rating=ED.rating||0;rec.edited=new Date().toISOString();delete rec.composite;
+  rec.base=ED.base;rec.shapes=ED.shapes;rec.tags=ED.tags;rec.comment=cm;rec.rating=ED.rating||0;rec.edited=new Date().toISOString();delete rec.composite;rec.report=!!(document.getElementById("rep")&&document.getElementById("rep").checked);
   composite(ED.base,ED.shapes,.7).then(function(full){return imgOf(full)}).then(makeThumb).catch(function(){return null}).then(function(th){rec.thumb=th||null;return dbPut(rec)}).then(refresh).then(function(){
     closeSheet();if(ex){ED=null;S.cur=rec;setView("viewer")}else{ED=null;setView("studio")}
   }).catch(function(e){alert("Couldn't save: "+(e&&e.message||e)+". Your device may be low on space.")});
@@ -381,9 +472,16 @@ function renderViewer(app){
    (m.comment?'<p style="margin:10px 0 0">'+esc(m.comment)+'</p>':'')+
    (m.rating?'<div style="color:var(--gold);font-size:20px;margin-top:6px">'+"★".repeat(m.rating)+'<span class="muted">'+"★".repeat(5-m.rating)+'</span></div>':'')+'</div>'+
    '<div class="row"><button class="btn grow" onclick="editMoment()">Edit drawings &amp; notes</button><button class="btn grow" onclick="shareMoment()">Share image</button></div>'+
+   '<div class="row" style="margin-top:10px"><button class="btn grow" onclick="pickOther()">⇆ Compare with another frame</button><button class="btn grow'+(m.report?" on":"")+'" onclick="toggleReport()">'+(m.report?"✓ In player reports":"Add to player reports")+'</button></div>'+
    '<button class="btn danger full" style="margin-top:10px" onclick="delMoment()">Delete this moment</button></main>';
 }
-function editMoment(){var m=S.cur;ED={base:asBlob(m.base),shapes:(m.shapes||[]).slice(),tool:"line",color:COLORS[0],pts:[],drag:null,timeSec:m.timeSec,existing:m};setView("editor")}
+function toggleReport(){var m=Object.assign({},S.cur);m.report=!m.report;dbPut(m).then(refresh).then(function(){S.cur=S.moments.find(function(x){return x.id===m.id});render()})}
+function pickOther(){
+  var others=S.moments.filter(function(x){return x.id!==S.cur.id&&x.player===S.cur.player});
+  if(!others.length){alert("No other saved frames for "+S.cur.player+" yet.");return}
+  sheet('<h2>Compare with…</h2><div class="muted small">Pick a second frame for '+esc(S.cur.player)+'. This frame is A.</div><div class="grid" style="margin-top:10px">'+others.map(function(x){return '<div class="mom" onclick="closeSheet();compareFrames(S.cur,S.moments.find(function(m){return m.id===\''+x.id+'\'}))"><img src="'+thumbSrc(x)+'" alt=""><div>'+fmtDate(x.date)+' · '+esc((x.tags||[]).slice(0,1).join(""))+'</div></div>'}).join("")+'</div><button class="btn full" style="margin-top:12px" onclick="closeSheet()">Cancel</button>');
+}
+function editMoment(){var m=S.cur;ED={base:asBlob(m.base),shapes:JSON.parse(JSON.stringify(m.shapes||[])),tool:"edit",color:COLORS[0],pts:[],drag:null,timeSec:m.timeSec,existing:m};setView("editor")}
 function delMoment(){if(!confirm("Delete this saved moment? This can't be undone."))return;dbDel(S.cur.id).then(refresh).then(function(){S.cur=null;setView("home")})}
 function shareMoment(){
   var m=S.cur;
@@ -422,11 +520,105 @@ function importAll(inp){
   r.readAsText(f);inp.value="";
 }
 
+/* ---------- compare (side by side + overlay, linked playback) ---------- */
+var C={mode:"side",a:null,b:null,speed:1,blend:50,raf:0,frames:false};
+function revoke(s){if(s&&s.url&&s.own)URL.revokeObjectURL(s.url)}
+function renderComparePick(app){
+  app.innerHTML=hdr("Compare two clips","setView('home')")+'<main><div class="card"><div class="muted small" style="margin-bottom:8px">Pick two videos from your phone — for example this month and last month, or a player and a model clip. Nothing is uploaded.</div>'+
+   '<label style="margin-top:0">Clip A (before)</label><label class="btn full" style="text-align:center;margin:0;cursor:pointer" id="pkA">'+(C.a?esc(C.a.name):'🎬 Choose clip A')+'<input type="file" accept="video/*" style="display:none" onchange="pickCmp(\'a\',this)"></label>'+
+   '<label>Clip B (after)</label><label class="btn full" style="text-align:center;margin:0;cursor:pointer" id="pkB">'+(C.b?esc(C.b.name):'🎬 Choose clip B')+'<input type="file" accept="video/*" style="display:none" onchange="pickCmp(\'b\',this)"></label>'+
+   '<button class="btn primary full" style="margin-top:14px" id="cmpGo" '+(C.a&&C.b?"":"disabled")+' onclick="startCompare()">Compare</button></div>'+
+   '<div class="tip">To compare two saved frames instead, open a saved moment and use “Compare with another frame”.</div></main>';
+}
+function pickCmp(w,inp){var f=inp.files&&inp.files[0];if(!f)return;revoke(C[w]);C[w]={kind:"video",name:f.name,url:URL.createObjectURL(f),own:true,fps:30};
+  document.getElementById(w==="a"?"pkA":"pkB").firstChild.textContent=f.name;if(C.a&&C.b)document.getElementById("cmpGo").disabled=false}
+function startCompare(){C.mode="side";C.speed=1;C.frames=false;setView("compare")}
+function compareFrames(m1,m2){revoke(C.a);revoke(C.b);
+  Promise.all([composite(asBlob(m1.base),m1.shapes||[],.85),composite(asBlob(m2.base),m2.shapes||[],.85)]).then(function(bl){
+    C.a={kind:"image",name:fmtDate(m1.date),url:URL.createObjectURL(bl[0]),own:true};C.b={kind:"image",name:fmtDate(m2.date),url:URL.createObjectURL(bl[1]),own:true};C.mode="side";C.frames=true;setView("compare")})}
+function mkMedia(s){
+  if(s.kind==="image"){var i=document.createElement("img");i.src=s.url;i.alt="";s.el=i;return i}
+  var v=document.createElement("video");v.src=s.url;v.muted=true;v.playsInline=true;v.preload="auto";v.setAttribute("playsinline","");s.el=v;
+  v.addEventListener("loadedmetadata",function(){updC();if(!s.detected){s.detected=true;detectFor(s)}});
+  v.addEventListener("seeked",updC);v.addEventListener("pause",updC);v.addEventListener("play",tickC);
+  return v;
+}
+function detectFor(s){
+  var v=s.el;if(!v.requestVideoFrameCallback)return;var last=null,min=1e9,n=0,done=false;
+  function fin(){if(done)return;done=true;v.pause();v.currentTime=0;if(n>=4&&min<1){s.fps=snapFps(1/min);var sel=document.getElementById("fps"+s.id);if(sel){if(![].some.call(sel.options,function(o){return +o.value===s.fps})){var o=document.createElement("option");o.textContent=s.fps;sel.appendChild(o)}sel.value=s.fps}}v.playbackRate=C.speed;updC()}
+  function cb(now,meta){if(last!==null){var d=meta.mediaTime-last;if(d>.0005&&d<min)min=d;n++}last=meta.mediaTime;if(n<14&&!done)v.requestVideoFrameCallback(cb);else fin()}
+  v.requestVideoFrameCallback(cb);v.playbackRate=1;v.play().catch(fin);setTimeout(fin,1800);
+}
+function paneCtl(s,id){
+  if(s.kind==="image")return'<div class="muted small" style="margin-top:4px">'+esc(s.name)+'</div>';
+  return '<div class="muted small" style="margin-top:4px;display:flex;justify-content:space-between"><span>'+esc(s.name.length>18?s.name.slice(0,16)+"…":s.name)+'</span><span id="tf'+id+'"></span></div>'+
+   '<input type="range" id="sk'+id+'" min="0" max="1000" value="0" style="width:100%;accent-color:var(--g)" oninput="seekC(\''+id+'\',this.value)">'+
+   '<div class="row" style="gap:6px"><button class="btn sm" onclick="stepC(\''+id+'\',-1)">◀|</button><button class="btn sm" onclick="stepC(\''+id+'\',1)">|▶</button><span class="grow"></span><select id="fps'+id+'" style="width:auto;padding:4px 6px;font-size:12px" onchange="C.'+id+'.fps=+this.value">'+FPS_LIST.map(function(f){return '<option'+(f===(s.fps||30)?" selected":"")+'>'+f+'</option>'}).join("")+'</select></div>'+
+   '<button class="btn sm full" style="margin-top:6px" id="sy'+id+'" onclick="markSync(\''+id+'\')">'+syncLabel(s)+'</button>';
+}
+function syncLabel(s){return s.sync!=null?"✓ Sync point "+fmtT(s.sync):"Mark sync point"}
+function markSync(id){var v=vOf(id);if(!v)return;v.pause();C[id].sync=v.currentTime;var b=document.getElementById("sy"+id);if(b)b.textContent=syncLabel(C[id]);syncBar()}
+function syncBar(){
+  var el=document.getElementById("syncBar");if(!el)return;
+  if(C.a.kind==="image"||C.frames){el.innerHTML="";return}
+  if(C.a.sync!=null&&C.b.sync!=null){
+    el.innerHTML='<div class="card" style="margin-top:10px"><b>Linked ✓</b> <span class="muted small">B is '+(Math.abs(C.a.sync-C.b.sync)).toFixed(2)+'s '+(C.b.sync>C.a.sync?"later":"earlier")+' than A at the sync moment</span>'+
+      '<input type="range" id="lockSeek" min="0" max="1000" value="0" style="width:100%;accent-color:var(--g);margin-top:8px" oninput="lockSeekC(this.value)"><div class="row"><button class="btn sm" onclick="goSync()">Both to sync point</button><span class="muted small grow">Drag to scrub both clips together.</span></div></div>';
+  }else el.innerHTML='<div class="tip">Mark the same moment (for example bat–ball contact) on both clips to link them. Then one slider moves both.</div>';
+}
+function goSync(){["a","b"].forEach(function(i){var v=vOf(i);if(v&&C[i].sync!=null){v.pause();v.currentTime=C[i].sync}})}
+function lockSeekC(val){
+  var va=vOf("a"),vb=vOf("b");if(!va||!vb||C.a.sync==null||C.b.sync==null)return;va.pause();vb.pause();
+  var ta=(val/1000)*(va.duration||0),tb=ta-(C.a.sync-C.b.sync);va.currentTime=ta;vb.currentTime=Math.max(0,Math.min(vb.duration||0,tb));
+}
+function renderCompare(app){
+  C.a.id="a";C.b.id="b";
+  var side=C.mode==="side";
+  app.innerHTML=hdr("Compare","leaveCompare()")+'<main>'+
+   '<div class="chips" style="margin-bottom:10px"><button class="chip'+(side?" on":"")+'" onclick="setCmpMode(\'side\')">Side by side</button><button class="chip'+(!side?" on":"")+'" onclick="setCmpMode(\'overlay\')">Overlay</button></div>'+
+   (side?'<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px"><div><div class="vwrap" id="slotA"></div>'+paneCtl(C.a,"a")+'</div><div><div class="vwrap" id="slotB"></div>'+paneCtl(C.b,"b")+'</div></div>'
+        :'<div class="vwrap" id="ovWrap" style="position:relative"><div id="slotA"></div><div id="slotB" style="position:absolute;inset:0"></div></div>'+
+         '<label>Blend: A ⟷ B</label><input type="range" min="0" max="100" value="'+C.blend+'" style="width:100%;accent-color:var(--g)" oninput="C.blend=+this.value;applyBlend()">'+
+         '<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:6px"><div><b class="small">A</b>'+paneCtl(C.a,"a")+'</div><div><b class="small">B</b>'+paneCtl(C.b,"b")+'</div></div>')+
+   (C.frames?'':'<div class="ctrl"><button class="btn" onclick="stepBoth(-1)" aria-label="Both back one frame">◀|</button><button class="btn primary" id="cpp" onclick="playBoth()" style="min-width:76px">▶ Both</button><button class="btn" onclick="stepBoth(1)" aria-label="Both forward one frame">|▶</button>'+
+     '<div class="chips" id="cspeeds">'+[["1×",1],["½",.5],["¼",.25],["⅒",.1]].map(function(s){return '<button class="chip'+(C.speed===s[1]?" on":"")+'" onclick="setSpeedC('+s[1]+')">'+s[0]+'</button>'}).join("")+'</div></div>'+
+     '<div class="ctrl"><button class="btn sm" onclick="bothStart()">Both to start</button></div><div id="syncBar"></div>'+
+     '<div class="tip">Line the two clips up on the same moment (for example both at bat–ball contact) using each clip\'s own slider and step buttons, then press “Both” to play them together.</div>')+
+   '</main>';
+  [["a","slotA"],["b","slotB"]].forEach(function(p){var s=C[p[0]],el=s.el||mkMedia(s),slot=document.getElementById(p[1]);slot.appendChild(el);
+    if(!side&&p[0]==="b"){el.style.cssText="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;max-height:none"}
+    else el.style.cssText="width:100%;max-height:"+(side?"34vh":"52vh")+";display:block;background:#000;"+(el.tagName==="IMG"?"object-fit:contain":"")});
+  applyBlend();syncBar();updC();
+}
+function applyBlend(){if(C.mode==="overlay"&&C.b&&C.b.el)C.b.el.style.opacity=C.blend/100}
+function setCmpMode(m){[C.a,C.b].forEach(function(s){if(s.el&&s.el.pause)s.el.pause()});C.mode=m;render()}
+function leaveCompare(){[C.a,C.b].forEach(function(s){if(s&&s.el&&s.el.pause)s.el.pause()});cancelAnimationFrame(C.raf);[C.a,C.b].forEach(function(s){revoke(s);if(s)s.el=null});C.a=C.b=null;setView(C.frames&&S.cur?"viewer":"home")}
+function vOf(id){return C[id]&&C[id].el&&C[id].el.tagName==="VIDEO"?C[id].el:null}
+function seekC(id,val){var v=vOf(id);if(!v)return;v.pause();v.currentTime=(val/1000)*(v.duration||0)}
+function stepC(id,n){var v=vOf(id);if(!v)return;v.pause();v.currentTime=Math.max(0,Math.min(v.duration||0,v.currentTime+n/(C[id].fps||30)))}
+function stepBoth(n){["a","b"].forEach(function(i){stepC(i,n)});}
+function bothStart(){["a","b"].forEach(function(i){var v=vOf(i);if(v){v.pause();v.currentTime=0}})}
+function setSpeedC(s){C.speed=s;["a","b"].forEach(function(i){var v=vOf(i);if(v)v.playbackRate=s});var vals=[1,.5,.25,.1];document.querySelectorAll("#cspeeds .chip").forEach(function(el,k){el.classList.toggle("on",vals[k]===s)})}
+function playBoth(){
+  var vs=["a","b"].map(vOf).filter(Boolean);if(!vs.length)return;var playing=vs.some(function(v){return !v.paused});
+  if(playing){vs.forEach(function(v){v.pause()})}else{vs.forEach(function(v){if(v.ended||v.currentTime>=(v.duration||0)-.05)v.currentTime=0;v.playbackRate=C.speed});vs.forEach(function(v){v.play()})}
+}
+function updC(){
+  ["a","b"].forEach(function(i){var v=vOf(i);if(!v)return;var sk=document.getElementById("sk"+i),tf=document.getElementById("tf"+i);
+    if(sk&&v.duration)sk.value=Math.round(v.currentTime/v.duration*1000);if(tf)tf.textContent=fmtT(v.currentTime)+" · fr "+Math.round(v.currentTime*(C[i].fps||30))});
+  var ls=document.getElementById("lockSeek"),va=vOf("a");if(ls&&va&&va.duration&&document.activeElement!==ls)ls.value=Math.round(va.currentTime/va.duration*1000);
+  var pb=document.getElementById("cpp");if(pb){var pl=["a","b"].some(function(i){var v=vOf(i);return v&&!v.paused});pb.textContent=pl?"⏸ Both":"▶ Both"}
+}
+function tickC(){cancelAnimationFrame(C.raf);(function loop(){updC();if(["a","b"].some(function(i){var v=vOf(i);return v&&!v.paused}))C.raf=requestAnimationFrame(loop)})()}
+
 /* ---------- boot ---------- */
 (function(){
   if(!isPremiumUser()){
     document.body.innerHTML='<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0a1420;color:#eef2f6;font-family:Inter,Arial,sans-serif;text-align:center;padding:24px"><div style="max-width:420px"><h2>Video Review Studio is a Premium tool</h2><p style="color:#9aa8b8">Open ProCoach OS and activate Premium on this device to use it.</p><a href="app.html" style="color:#34d399;font-weight:700">Back to ProCoach OS</a></div></div>';return}
-  Promise.all([loadRoster(),refresh()]).then(function(r){S.roster=r[0];render()}).catch(function(){render()});
+  Promise.all([loadRoster(),refresh()]).then(function(r){S.roster=r[0];
+    var hp=location.hash.match(/p=([^&]+)/);if(hp)S.player=decodeURIComponent(hp[1]);
+    var hm=location.hash.match(/m=([^&]+)/);if(hm){var mm=S.moments.find(function(x){return x.id===decodeURIComponent(hm[1])});if(mm){S.cur=mm;S.view="viewer"}}
+    render()}).catch(function(){render()});
 })();
 </script>
 </body>
