@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
-<script>try{if(localStorage.getItem("coachbook_theme")==="light")document.documentElement.classList.add("light")}catch(e){}try{if(localStorage.getItem("procoach_lock_v1"))document.documentElement.classList.add("appLocked")}catch(e){}</script>
+<script>try{if(localStorage.getItem("coachbook_theme")==="light")document.documentElement.classList.add("light")}catch(e){}try{if(localStorage.getItem("coachbook_hc")==="1")document.documentElement.classList.add("hc")}catch(e){}try{if(localStorage.getItem("procoach_lock_v1"))document.documentElement.classList.add("appLocked")}catch(e){}</script>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#08121e">
@@ -290,6 +290,21 @@ html.appLocked body>*:not(#lockScreen):not(script){visibility:hidden}
 .lkKey:active{background:var(--g);color:#04130c}
 .lkBox.shake{animation:lkShake .4s}@keyframes lkShake{25%{transform:translateX(-10px)}75%{transform:translateX(10px)}}
 .lkLink{background:none;border:0;color:var(--muted);margin-top:16px;font-size:var(--fs-3);text-decoration:underline;font-family:inherit}
+
+/* high contrast mode */
+html.hc{--ink:#ffffff;--muted:#d6dde8;--label:#ffffff;--bg:#000000;--surface:#0a0a0a;--surface2:#1a1a1a;--line:rgba(255,255,255,.55);--lineHover:#ffffff;--g:#00e08a;--g2:#4dffb5;--blue:#6db3ff;--blue2:#9ccbff;--red:#ff6b6b;--gold:#ffc233;--mint:rgba(0,224,138,.22);--shadow:none;--glassBg:#0a0a0a;--glassBorder:rgba(255,255,255,.55);--fs-1:12px;--fs-2:13.5px;--fs-3:14.5px;--fs-4:16px;--fs-5:17.5px;--fs-6:21px}
+html.hc.light{--ink:#000000;--muted:#262626;--label:#000000;--bg:#ffffff;--surface:#ffffff;--surface2:#f0f0f0;--line:rgba(0,0,0,.65);--lineHover:#000000;--g:#00693f;--g2:#004d2e;--blue:#0a3d99;--blue2:#062a6b;--red:#b00020;--gold:#7a4a00;--mint:rgba(0,105,63,.14);--glassBg:#ffffff;--glassBorder:rgba(0,0,0,.65)}
+html.hc body{font-weight:600}
+html.hc .muted,html.hc small{font-weight:600}
+html.hc .bgArt{display:none}
+html.hc .card,html.hc .item,html.hc input,html.hc select,html.hc textarea,html.hc .sheet,html.hc .todayHero{border:2px solid var(--line)!important}
+html.hc .btn{border:2px solid var(--ink)!important;font-weight:800}
+html.hc .btn.primary{background:var(--g);color:#000!important}
+html.hc.light .btn.primary{background:var(--g);color:#fff!important}
+html.hc .tag{border:1.5px solid var(--ink)}
+html.hc :focus-visible{outline:3px solid var(--gold)!important;outline-offset:2px}
+html.hc .lkKey{border:2px solid var(--ink)}
+.hcRow{display:flex;justify-content:space-between;align-items:center;gap:12px}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
 </head>
@@ -1401,6 +1416,9 @@ function applyTheme(t){
  let meta=document.querySelector('meta[name="theme-color"]');
  if(meta)meta.setAttribute("content",t==="light"?"#f4f6f5":"#08121e");
 }
+function hcOn(){return document.documentElement.classList.contains("hc")}
+function setHC(on){document.documentElement.classList.toggle("hc",!!on);try{localStorage.setItem("coachbook_hc",on?"1":"0")}catch(e){}let meta=document.querySelector('meta[name="theme-color"]');if(meta)meta.setAttribute("content",document.documentElement.classList.contains("light")?(on?"#ffffff":"#f4f6f5"):(on?"#000000":"#08121e"));if(typeof accountPage==="function"&&document.getElementById("account")&&document.getElementById("account").classList.contains("active"))try{accountPage()}catch(e){}}
+function hcCardHtml(){return `<div class="card"><div class="hcRow"><div><b>High contrast</b><div class="muted" style="font-size:var(--fs-3)">Pure black and white, bolder text, stronger outlines. Easier to read in bright sun. Works with light or dark theme.</div></div><button class="btn ${hcOn()?"primary":"secondary"}" onclick="setHC(${!hcOn()})" aria-pressed="${hcOn()}">${hcOn()?"On":"Off"}</button></div></div>`}
 function toggleTheme(){applyTheme(document.documentElement.classList.contains("light")?"dark":"light")}
 function modal(h){sheet.innerHTML=h;modalEl.classList.add("open");enhanceTextareasWithVoice(sheet)}function closeM(){modalEl.classList.remove("open");restorePrintTitle()}const modalEl=document.getElementById("modal"),sheet=document.getElementById("sheet"),side=document.getElementById("side");modalEl.onclick=e=>{if(e.target===modalEl)closeM()}
 // Browsers use document.title as the suggested print header / "Save as
@@ -7318,6 +7336,9 @@ function accountPage(){
  <div class="muted" style="margin-bottom:12px">Local profiles for organising data on this device — not secure logins. Real multi-device accounts with cloud sync are planned for a future update.</div>
  <div class="card">${profiles.map(p=>`<div class="item"><div><b>${esc(p.name)}</b>${p.id===active.id?` <span class="tag">Active</span>`:""}<div class="muted">${esc(p.club||"")}</div></div><div class="toolbar">${p.id!==active.id?`<button class="btn secondary" onclick="switchProfile('${p.id}')">Switch</button>`:""}<button class="btn secondary iconBtn" title="Rename" onclick="renameProfile('${p.id}')">${icon("edit",17)}</button>${profiles.length>1?`<button class="btn danger iconBtn" title="Delete" onclick="deleteProfile('${p.id}')">${icon("trash",17)}</button>`:""}</div></div>`).join("")}</div>
  <button class="btn primary" style="margin-top:12px" onclick="newProfile()">+ Add Coach Profile</button>
+
+ <h2 class="section">Display</h2>
+ ${hcCardHtml()}
 
  <h2 class="section">App lock</h2>
  ${lockCardHtml()}
