@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#08121e">
+<title>Video Review Studio — ProCoach OS</title>
+<script>try{var t=localStorage.getItem("coachbook_theme");if(t==="light")document.documentElement.classList.add("light");if(localStorage.getItem("coachbook_hc")==="1")document.documentElement.classList.add("hc")}catch(e){}</script>
+<style>
+:root{--g:#10b981;--g2:#34d399;--ink:#eef2f7;--muted:#8a95ab;--line:rgba(255,255,255,.12);--bg:#08121e;--surface:#0f1a2b;--surface2:#16233a;--red:#ef5350;--gold:#f59e0b;--blue:#3b82f6}
+html.light{--g:#0e9968;--g2:#0c7d55;--ink:#12201a;--muted:#5c6d64;--line:rgba(10,30,20,.16);--bg:#f4f6f5;--surface:#fff;--surface2:#eef1ef;--red:#d64540;--gold:#b9790c;--blue:#2f6fe0}
+html.hc{--ink:#fff;--muted:#d6dde8;--line:rgba(255,255,255,.6);--bg:#000;--surface:#0a0a0a;--surface2:#1a1a1a;--g:#00e08a}
+html.hc.light{--ink:#000;--muted:#262626;--line:rgba(0,0,0,.65);--bg:#fff;--surface:#fff;--surface2:#f0f0f0;--g:#00693f}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,system-ui,-apple-system,Segoe UI,Roboto,sans-serif;font-size:15px;line-height:1.4;padding-bottom:env(safe-area-inset-bottom)}
+header{display:flex;align-items:center;gap:10px;padding:max(12px,env(safe-area-inset-top)) 14px 12px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--bg);z-index:5}
+header h1{font-size:17px;margin:0;flex:1}
+main{max-width:760px;margin:0 auto;padding:14px}
+.muted{color:var(--muted)}.small{font-size:12.5px}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:14px;margin-bottom:12px}
+.btn{font:inherit;font-weight:700;border-radius:12px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);padding:11px 14px;min-height:44px;cursor:pointer}
+.btn.primary{background:var(--g);border-color:var(--g);color:#04130c}
+html.light .btn.primary{color:#fff}
+.btn.danger{color:var(--red)}.btn.sm{min-height:36px;padding:6px 10px;font-size:13px}.btn.full{width:100%}
+.btn.on{background:var(--g);color:#04130c;border-color:var(--g)}html.light .btn.on{color:#fff}
+.btn:disabled{opacity:.4}
+select,input[type=text],textarea{font:inherit;width:100%;background:var(--surface2);color:var(--ink);border:1px solid var(--line);border-radius:12px;padding:11px}
+label{display:block;font-weight:700;font-size:13px;margin:12px 0 6px}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}.grow{flex:1}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface2);color:var(--ink);border-radius:99px;padding:7px 12px;font:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.chip.on{background:var(--g);border-color:var(--g);color:#04130c}html.light .chip.on{color:#fff}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.mom{border:1px solid var(--line);border-radius:14px;overflow:hidden;background:var(--surface);cursor:pointer}
+.mom img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block;background:#000}
+.mom div{padding:8px 10px;font-size:12.5px}
+.vwrap{background:#000;border-radius:14px;overflow:hidden;position:relative}
+.vwrap video{width:100%;max-height:52vh;display:block;background:#000}
+.seekRow{position:relative;margin:10px 0 2px}
+.seekRow input{width:100%;accent-color:var(--g);height:28px}
+.marks{position:absolute;left:0;right:0;top:-2px;height:6px;pointer-events:none}
+.marks i{position:absolute;width:3px;height:12px;background:var(--gold);border-radius:2px;top:0}
+.loopZone{position:absolute;top:10px;height:8px;background:rgba(245,158,11,.5);border-radius:4px;pointer-events:none}
+.tinfo{display:flex;justify-content:space-between;font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ctrl{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.ctrl .btn{min-width:48px}
+.edWrap{background:#000;border-radius:14px;overflow:hidden;touch-action:none;position:relative}
+.edWrap canvas{width:100%;display:block;touch-action:none}
+.tools{display:flex;gap:6px;flex-wrap:wrap;margin:10px 0}
+.sw{width:30px;height:30px;border-radius:50%;border:3px solid transparent;cursor:pointer;padding:0}.sw.on{border-color:var(--ink)}
+.sheet{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:20;display:flex;align-items:flex-end;justify-content:center}
+.sheet>div{background:var(--surface);width:100%;max-width:560px;max-height:92vh;overflow:auto;border-radius:20px 20px 0 0;padding:16px;border:1px solid var(--line)}
+.sheet h2{margin:0 0 6px;font-size:18px}
+.tip{font-size:12.5px;color:var(--muted);background:var(--surface2);border-radius:10px;padding:8px 10px;margin:8px 0}
+.stars button{font-size:22px;background:none;border:0;color:var(--muted);padding:2px 4px;cursor:pointer}.stars button.on{color:var(--gold)}
+html.hc .card,html.hc .btn,html.hc .chip,html.hc select,html.hc input,html.hc textarea{border:2px solid var(--line)}
+</style>
+<script>
+function isPremiumUser(){try{var raw=JSON.parse(localStorage.getItem("coachbook_license"));if(raw&&(raw.status==="premium"||raw.status==="trial"))return true}catch(e){}return false}
+</script>
+</head>
+<body>
+<div id="app"></div>
+<div id="sheetHost"></div>
+<script>
+"use strict";
+/* ProCoach OS — Video Review Studio.
+   Videos are NEVER copied or uploaded. Only saved frames, drawings, notes and the clip file name are kept,
+   in this tool's own database ("procoachos_video") so the main app's data is never touched. */
+var esc=function(s){return String(s==null?"":s).replace(/[&<>"']/g,function(c){return{"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})};
+function todayStr(){var d=new Date();return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0")}
+function fmtDate(d){var p=String(d||"").split("-");return p.length===3?p[2]+"-"+p[1]+"-"+p[0]:d||""}
+function vid(){return "vm_"+Math.random().toString(36).slice(2,9)+Date.now().toString(36).slice(-4)}
+
+/* ---------- storage ---------- */
+var VDB="procoachos_video";
+function dbOpen(){return new Promise(function(res,rej){var r=indexedDB.open(VDB,1);r.onupgradeneeded=function(e){var d=e.target.result;if(!d.objectStoreNames.contains("moments"))d.createObjectStore("moments",{keyPath:"id"})};r.onsuccess=function(e){res(e.target.result)};r.onerror=function(){rej(r.error)}})}
+function dbAll(){return dbOpen().then(function(d){return new Promise(function(res,rej){var q=d.transaction("moments","readonly").objectStore("moments").getAll();q.onsuccess=function(){res(q.result||[])};q.onerror=function(){rej(q.error)}})})}
+function dbPut(m){return dbOpen().then(function(d){return new Promise(function(res,rej){var t=d.transaction("moments","readwrite");t.objectStore("moments").put(m);t.oncomplete=function(){res()};t.onerror=function(){rej(t.error)}})})}
+function dbDel(id){return dbOpen().then(function(d){return new Promise(function(res,rej){var t=d.transaction("moments","readwrite");t.objectStore("moments").delete(id);t.oncomplete=function(){res()};t.onerror=function(){rej(t.error)}})})}
+
+/* ---------- roster (read-only from the main app's active profile) ---------- */
+function loadRoster(){
+  return new Promise(function(resolve){
+    var empty=[];
+    try{
+      var profiles=JSON.parse(localStorage.getItem("coachbook_profiles"));
+      if(!Array.isArray(profiles)||!profiles.length){resolve(empty);return}
+      var activeId=localStorage.getItem("coachbook_active_profile")||"default";
+      var prof=profiles.find(function(p){return p.id===activeId})||profiles[0];
+      if(!prof||!prof.key){resolve(empty);return}
+      var req=indexedDB.open("coachbook_idb");
+      req.onerror=function(){resolve(empty)};
+      req.onsuccess=function(){try{
+        var idb=req.result;if(!idb.objectStoreNames.contains("profiles")){resolve(empty);return}
+        var g=idb.transaction("profiles","readonly").objectStore("profiles").get(prof.key);
+        g.onerror=function(){resolve(empty)};
+        g.onsuccess=function(){var d=g.result||{};
+          var pl=(d.players||[]).filter(function(p){return p&&p.name&&!p.deletedAt}).map(function(p){return{name:p.name,team:p.team||""}});
+          pl.sort(function(a,b){return a.name.localeCompare(b.name,undefined,{numeric:true})});resolve(pl)};
+      }catch(e){resolve(empty)}};
+    }catch(e){resolve(empty)}
+  });
+}
+
+/* ---------- constants ---------- */
+var SKILLS={
+ "Batting":["Stance","Grip","Backlift","Head position","Front-foot drive","Back-foot play","Footwork","Cut / pull","Sweep","Shot selection"],
+ "Bowling":["Run-up","Load-up","Front-foot landing","Release","Follow-through","Wrist position","Seam / spin"],
+ "Fielding":["Catching","Ground fielding","Throwing","Backing up"],
+ "Keeping":["Stance","Gathering","Standing up"]
+};
+var CUES=["Head still through contact","Eyes level at release","Stable base at landing","Soft hands on contact","Front shoulder closed","Full extension through the ball","Balanced finish","Weight transfers to front foot","Bat path straight through the line","Wrist behind the ball"];
+var COLORS=["#ffd400","#ff3b30","#34c759","#00c8ff","#ffffff"];
+var FPS_LIST=[24,25,30,48,50,60,100,120,240];
+
+/* ---------- state ---------- */
+var S={view:"home",roster:[],moments:[],player:"",clip:null,fps:30,speed:1,loopA:null,loopB:null,looping:false,raf:0,fpsDetected:false};
+var ED=null; // editor state
+
+/* ---------- shapes: normalized 0..1 coordinates ---------- */
+function drawShapes(ctx,w,h,shapes,preview){
+  var lw=Math.max(2.5,w/260);
+  var all=preview?shapes.concat([preview]):shapes;
+  all.forEach(function(s){
+    ctx.save();ctx.strokeStyle=s.c;ctx.fillStyle=s.c;ctx.lineWidth=lw;ctx.lineCap="round";ctx.lineJoin="round";
+    var P=function(p){return[p[0]*w,p[1]*h]};
+    if(s.t==="spot"){
+      var a=P(s.p[0]),b=P(s.p[1]),cx=(a[0]+b[0])/2,cy=(a[1]+b[1])/2,rx=Math.abs(b[0]-a[0])/2,ry=Math.abs(b[1]-a[1])/2;
+      ctx.beginPath();ctx.rect(0,0,w,h);ctx.ellipse(cx,cy,Math.max(rx,1),Math.max(ry,1),0,0,Math.PI*2);
+      ctx.fillStyle="rgba(0,0,0,.62)";ctx.fill("evenodd");ctx.beginPath();ctx.ellipse(cx,cy,Math.max(rx,1),Math.max(ry,1),0,0,Math.PI*2);ctx.strokeStyle="#fff";ctx.setLineDash([lw*2,lw*2]);ctx.stroke();
+    }else if(s.t==="line"||s.t==="arrow"){
+      var p=P(s.p[0]),q=P(s.p[1]);ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(q[0],q[1]);ctx.stroke();
+      if(s.t==="arrow"){var ang=Math.atan2(q[1]-p[1],q[0]-p[0]),hl=lw*6;ctx.beginPath();ctx.moveTo(q[0],q[1]);ctx.lineTo(q[0]-hl*Math.cos(ang-.45),q[1]-hl*Math.sin(ang-.45));ctx.lineTo(q[0]-hl*Math.cos(ang+.45),q[1]-hl*Math.sin(ang+.45));ctx.closePath();ctx.fill()}
+    }else if(s.t==="circle"){
+      var a2=P(s.p[0]),b2=P(s.p[1]);var r=Math.hypot(b2[0]-a2[0],b2[1]-a2[1]);ctx.beginPath();ctx.arc(a2[0],a2[1],Math.max(r,1),0,Math.PI*2);ctx.stroke();
+    }else if(s.t==="vguide"){ctx.setLineDash([lw*3,lw*2]);ctx.beginPath();ctx.moveTo(s.p[0][0]*w,0);ctx.lineTo(s.p[0][0]*w,h);ctx.stroke()}
+    else if(s.t==="hguide"){ctx.setLineDash([lw*3,lw*2]);ctx.beginPath();ctx.moveTo(0,s.p[0][1]*h);ctx.lineTo(w,s.p[0][1]*h);ctx.stroke()}
+    else if(s.t==="angle"){
+      var pts=s.p.map(P);ctx.beginPath();ctx.moveTo(pts[0][0],pts[0][1]);if(pts[1])ctx.lineTo(pts[1][0],pts[1][1]);if(pts[2])ctx.lineTo(pts[2][0],pts[2][1]);ctx.stroke();
+      pts.forEach(function(q){ctx.beginPath();ctx.arc(q[0],q[1],lw*1.6,0,Math.PI*2);ctx.fill()});
+      if(pts[2]){
+        var v=pts[1],a1=Math.atan2(pts[0][1]-v[1],pts[0][0]-v[0]),a3=Math.atan2(pts[2][1]-v[1],pts[2][0]-v[0]);
+        var d=a3-a1;while(d>Math.PI)d-=2*Math.PI;while(d<-Math.PI)d+=2*Math.PI;
+        var deg=Math.round(Math.abs(d)*180/Math.PI);ctx.beginPath();ctx.arc(v[0],v[1],lw*9,a1,a1+d,d<0);ctx.stroke();
+        var mid=a1+d/2,fs=Math.max(16,w/28);ctx.font="700 "+fs+"px Arial";ctx.lineWidth=lw*1.4;ctx.strokeStyle="rgba(0,0,0,.8)";var tx=v[0]+Math.cos(mid)*lw*17,ty=v[1]+Math.sin(mid)*lw*17;
+        ctx.textAlign="center";ctx.textBaseline="middle";ctx.strokeText(deg+"°",tx,ty);ctx.fillText(deg+"°",tx,ty);
+      }
+    }else if(s.t==="text"){
+      var fs2=Math.max(16,w/26);ctx.font="700 "+fs2+"px Arial";var t=P(s.p[0]);ctx.textBaseline="middle";ctx.lineWidth=lw*1.4;ctx.strokeStyle="rgba(0,0,0,.85)";ctx.strokeText(s.txt,t[0],t[1]);ctx.fillText(s.txt,t[0],t[1]);
+    }
+    ctx.restore();
+  });
+}
+function loadImg(src){return new Promise(function(res,rej){var i=new Image();i.onload=function(){res(i)};i.onerror=rej;i.src=src})}
+function composite(base,shapes,quality){
+  return loadImg(base).then(function(img){var c=document.createElement("canvas");c.width=img.naturalWidth;c.height=img.naturalHeight;var x=c.getContext("2d");x.drawImage(img,0,0);drawShapes(x,c.width,c.height,shapes);return c.toDataURL("image/jpeg",quality||.88)});
+}
+
+/* ---------- views ---------- */
+function setView(v){S.view=v;render()}
+function render(){
+  stopLoop();
+  var app=document.getElementById("app");
+  if(S.view==="home")return renderHome(app);
+  if(S.view==="studio")return renderStudio(app);
+  if(S.view==="editor")return renderEditor(app);
+  if(S.view==="viewer")return renderViewer(app);
+}
+function hdr(title,back){return '<header>'+(back?'<button class="btn sm" onclick="'+back+'">← Back</button>':'<a class="btn sm" href="app.html" style="text-decoration:none">← App</a>')+'<h1>'+esc(title)+'</h1></header>'}
+function refresh(){return dbAll().then(function(m){S.moments=m.sort(function(a,b){return String(b.created).localeCompare(String(a.created))})})}
+
+function renderHome(app){
+  var players=S.roster;
+  var opts='<option value="">Choose a player…</option>'+players.map(function(p){return '<option value="'+esc(p.name)+'"'+(S.player===p.name?" selected":"")+'>'+esc(p.name)+(p.team?" · "+esc(p.team):"")+'</option>'}).join("")+'<option value="__other"'+(S.player&&!players.some(function(p){return p.name===S.player})?" selected":"")+'>Someone else (type a name)…</option>';
+  var mine=S.moments.filter(function(m){return !S.player||m.player===S.player});
+  var mb=0;S.moments.forEach(function(m){mb+=(m.base||"").length+(m.composite||"").length});
+  app.innerHTML=hdr("Video Review Studio")+'<main>'+
+   '<div class="card"><b>Review a clip</b><div class="muted small" style="margin:4px 0 8px">Pick a video from your phone. It plays here and is never uploaded or copied.</div>'+
+   '<label style="margin-top:0">Player</label><select id="plSel" onchange="pickPlayer(this.value)">'+opts+'</select>'+
+   '<label class="vlabelOther" style="display:none">Name</label><input type="text" id="plOther" placeholder="Player name" style="display:none" oninput="S.player=this.value.trim()">'+
+   '<div style="margin-top:12px"><label class="btn primary full" style="text-align:center;margin:0;cursor:pointer">🎬 Choose video<input type="file" accept="video/*" style="display:none" onchange="openClip(this)"></label></div>'+
+   '<div class="tip">Film side-on for drives and cuts, front-on for bowling actions, with the camera still and the player in full view. Angles you measure are on-screen angles, not exact body angles.</div></div>'+
+   '<div class="row" style="margin:6px 0 8px"><b class="grow">Saved moments'+(S.player&&S.player!=="__other"?' — '+esc(S.player):'')+'</b><span class="muted small">'+mine.length+' · '+(mb/1048576).toFixed(1)+' MB total</span></div>'+
+   (mine.length?'<div class="grid">'+mine.map(function(m){return '<div class="mom" onclick="openMoment(\''+m.id+'\')"><img src="'+(m.composite||m.base)+'" alt=""><div><b>'+esc(m.player)+'</b><br><span class="muted">'+fmtDate(m.date)+' · '+esc((m.tags||[]).slice(0,2).join(", ")||"no tags")+'</span></div></div>'}).join("")+'</div>':'<div class="card muted">No saved moments yet. Choose a video, freeze a frame, draw, and save.</div>')+
+   '<div class="row" style="margin-top:14px"><button class="btn sm" onclick="exportAll()">Export moments (.json)</button><label class="btn sm" style="cursor:pointer;margin:0">Import<input type="file" accept="application/json" style="display:none" onchange="importAll(this)"></label></div>'+
+   '</main>';
+  if(S.player==="__other"||(S.player&&!players.some(function(p){return p.name===S.player}))){var o=document.getElementById("plOther");o.style.display="";document.querySelector(".vlabelOther").style.display="";if(S.player!=="__other")o.value=S.player}
+}
+function pickPlayer(v){
+  if(v==="__other"){S.player="__other";render();return}
+  S.player=v;render();
+}
+function needPlayer(){
+  if(!S.player||S.player==="__other"){alert("Choose a player first (or type a name).");return true}return false}
+
+/* ---------- studio (playback) ---------- */
+var VEL=null;
+function openClip(inp){
+  var f=inp.files&&inp.files[0];if(!f)return;
+  if(needPlayer()){inp.value="";return}
+  if(S.clip&&S.clip.url)URL.revokeObjectURL(S.clip.url);
+  S.clip={name:f.name,size:f.size,url:URL.createObjectURL(f),key:f.name+"|"+f.size};
+  S.fps=30;S.speed=1;S.loopA=S.loopB=null;S.looping=false;S.fpsDetected=false;
+  setView("studio");
+}
+function fmtT(t){if(!isFinite(t))return"0:00.00";var m=Math.floor(t/60),s=t-m*60;return m+":"+(s<10?"0":"")+s.toFixed(2)}
+function renderStudio(app){
+  app.innerHTML=hdr("Reviewing: "+S.player,"leaveStudio()")+'<main>'+
+   '<div class="vwrap"><video id="vid" src="'+S.clip.url+'" playsinline muted preload="auto"></video></div>'+
+   '<div class="seekRow"><div class="marks" id="marks"></div><div class="loopZone" id="loopZone" style="display:none"></div><input type="range" id="seek" min="0" max="1000" value="0" aria-label="Timeline"></div>'+
+   '<div class="tinfo"><span id="tcur">0:00.00</span><span id="tfr"></span><span id="tdur"></span></div>'+
+   '<div class="ctrl"><button class="btn" onclick="stepF(-1)" aria-label="Back one frame">◀|</button><button class="btn primary" id="pp" onclick="togglePlay()" style="min-width:76px">▶</button><button class="btn" onclick="stepF(1)" aria-label="Forward one frame">|▶</button>'+
+   '<div class="chips" id="speeds">'+[["1×",1],["½",.5],["¼",.25],["⅒",.1]].map(function(s){return '<button class="chip'+(S.speed===s[1]?" on":"")+'" onclick="setSpeed('+s[1]+')">'+s[0]+'</button>'}).join("")+'</div></div>'+
+   '<div class="ctrl"><button class="btn sm" onclick="setLoop(\'A\')" id="bA">Loop start</button><button class="btn sm" onclick="setLoop(\'B\')" id="bB">Loop end</button><button class="btn sm" id="bL" onclick="toggleLoop()">Loop: off</button><button class="btn sm" onclick="clearLoop()">Clear</button>'+
+   '<span class="grow"></span><span class="muted small">Frame rate</span><select id="fpsSel" style="width:auto;padding:6px 8px" onchange="S.fps=+this.value;updFr()">'+FPS_LIST.map(function(f){return '<option'+(f===S.fps?' selected':'')+'>'+f+'</option>'}).join("")+'</select></div>'+
+   '<div class="muted small" id="fpsNote" style="margin-top:4px"></div>'+
+   '<button class="btn primary full" style="margin-top:12px" onclick="freeze()">✏️ Freeze this frame &amp; draw</button>'+
+   '<div id="mkList" style="margin-top:14px"></div>'+
+   '</main>';
+  var v=VEL=document.getElementById("vid");
+  v.addEventListener("loadedmetadata",function(){document.getElementById("tdur").textContent=fmtT(v.duration);drawMarks();detect()});
+  v.addEventListener("error",function(){document.getElementById("fpsNote").innerHTML='<span style="color:var(--red)">This video format can\'t be played by your browser. iPhone clips (HEVC/MOV) play on iPhones but may not on some computers.</span>'});
+  v.addEventListener("play",function(){setPP();tick()});v.addEventListener("pause",function(){setPP();upd()});v.addEventListener("seeked",upd);
+  document.getElementById("seek").addEventListener("input",function(){v.pause();v.currentTime=(this.value/1000)*(v.duration||0)});
+  v.playbackRate=S.speed;
+}
+function leaveStudio(){if(VEL){VEL.pause()}setView("home")}
+function setPP(){var b=document.getElementById("pp");if(b&&VEL)b.textContent=VEL.paused?"▶":"⏸"}
+function togglePlay(){var v=VEL;if(v.paused){if(v.ended||v.currentTime>=v.duration-.05)v.currentTime=S.loopA||0;v.playbackRate=S.speed;v.play()}else v.pause()}
+function stepF(n){var v=VEL;v.pause();var d=1/S.fps;v.currentTime=Math.max(0,Math.min(v.duration||0,v.currentTime+n*d))}
+function setSpeed(s){S.speed=s;VEL.playbackRate=s;var c=document.querySelectorAll("#speeds .chip"),vals=[1,.5,.25,.1];c.forEach(function(el,i){el.classList.toggle("on",vals[i]===s)})}
+function updFr(){var t=VEL?VEL.currentTime:0;var el=document.getElementById("tfr");if(el)el.textContent="frame "+Math.round(t*S.fps)}
+function upd(){var v=VEL;if(!v||!document.getElementById("seek"))return;if(v.duration)document.getElementById("seek").value=Math.round(v.currentTime/v.duration*1000);document.getElementById("tcur").textContent=fmtT(v.currentTime);updFr()}
+function tick(){
+  cancelAnimationFrame(S.raf);
+  (function loop(){var v=VEL;if(!v||!document.getElementById("seek"))return;
+    if(S.looping&&S.loopA!=null&&S.loopB!=null&&S.loopB>S.loopA&&v.currentTime>=S.loopB)v.currentTime=S.loopA;
+    upd();if(!v.paused)S.raf=requestAnimationFrame(loop)})();
+}
+function stopLoop(){cancelAnimationFrame(S.raf)}
+function setLoop(w){var t=VEL.currentTime;if(w==="A")S.loopA=t;else S.loopB=t;if(S.loopA!=null&&S.loopB!=null&&S.loopB<=S.loopA){if(w==="A")S.loopB=null;else S.loopA=null}paintLoop()}
+function toggleLoop(){if(S.loopA==null||S.loopB==null){alert("Set a loop start and end first.");return}S.looping=!S.looping;paintLoop();if(S.looping){VEL.currentTime=S.loopA;VEL.playbackRate=S.speed;VEL.play()}}
+function clearLoop(){S.loopA=S.loopB=null;S.looping=false;paintLoop()}
+function paintLoop(){
+  var z=document.getElementById("loopZone"),d=VEL.duration||1;
+  document.getElementById("bL").textContent="Loop: "+(S.looping?"on":"off");document.getElementById("bL").classList.toggle("on",S.looping);
+  document.getElementById("bA").textContent="Loop start"+(S.loopA!=null?" ✓":"");document.getElementById("bB").textContent="Loop end"+(S.loopB!=null?" ✓":"");
+  if(S.loopA!=null&&S.loopB!=null){z.style.display="";z.style.left=(S.loopA/d*100)+"%";z.style.width=((S.loopB-S.loopA)/d*100)+"%"}else z.style.display="none";
+}
+function drawMarks(){
+  var d=VEL.duration||1,list=S.moments.filter(function(m){return m.clipKey===S.clip.key});
+  document.getElementById("marks").innerHTML=list.map(function(m){return '<i style="left:calc('+(m.timeSec/d*100)+'% - 1px)"></i>'}).join("");
+  document.getElementById("mkList").innerHTML=list.length?'<b>Saved markers on this clip</b><div class="chips" style="margin-top:8px">'+list.sort(function(a,b){return a.timeSec-b.timeSec}).map(function(m){return '<button class="chip" onclick="jumpTo('+m.timeSec+')">'+fmtT(m.timeSec)+(m.tags&&m.tags[0]?" · "+esc(m.tags[0]):"")+'</button>'}).join("")+'</div>':'';
+}
+function jumpTo(t){VEL.pause();VEL.currentTime=t}
+function snapFps(f){var best=null,bd=1e9;FPS_LIST.forEach(function(x){var d=Math.abs(x-f)/x;if(d<bd){bd=d;best=x}});return bd<.04?best:Math.round(f)}
+function detect(){
+  var v=VEL,note=document.getElementById("fpsNote");
+  if(!v.requestVideoFrameCallback){note.textContent="Using 30 fps for frame stepping — change it above if the clip is different.";return}
+  var last=null,min=1e9,n=0,done=false;
+  function fin(){if(done)return;done=true;v.pause();v.currentTime=0;
+    if(n>=4&&min<1){S.fps=snapFps(1/min);S.fpsDetected=true;var s=document.getElementById("fpsSel");if(s){if(![].some.call(s.options,function(o){return +o.value===S.fps})){var o=document.createElement("option");o.textContent=S.fps;s.appendChild(o)}s.value=S.fps}note.textContent="Frame rate detected: "+S.fps+" fps. Correct it above if steps look wrong (slow-motion clips can differ)."}
+    else note.textContent="Using 30 fps for frame stepping — change it above if the clip is different.";
+    v.playbackRate=S.speed;updFr()}
+  function cb(now,meta){if(last!==null){var d=meta.mediaTime-last;if(d>.0005&&d<min)min=d;n++}last=meta.mediaTime;if(n<14&&!done)v.requestVideoFrameCallback(cb);else fin()}
+  v.requestVideoFrameCallback(cb);v.playbackRate=1;v.play().catch(fin);setTimeout(fin,1800);
+}
+
+/* ---------- freeze -> editor ---------- */
+function captureFrame(v){
+  var w=v.videoWidth,h=v.videoHeight,max=1280,sc=Math.min(1,max/Math.max(w,h));
+  var c=document.createElement("canvas");c.width=Math.round(w*sc);c.height=Math.round(h*sc);c.getContext("2d").drawImage(v,0,0,c.width,c.height);
+  return c.toDataURL("image/jpeg",.86);
+}
+function freeze(){
+  var v=VEL;v.pause();
+  if(!v.videoWidth){alert("The video isn't ready yet.");return}
+  var base=captureFrame(v);
+  ED={base:base,shapes:[],tool:"line",color:COLORS[0],pts:[],drag:null,timeSec:v.currentTime,existing:null};
+  setView("editor");
+}
+var TOOLS=[["line","Line"],["angle","Angle"],["vguide","Vertical"],["hguide","Horizontal"],["circle","Circle"],["arrow","Arrow"],["text","Text"],["spot","Spotlight"]];
+var TOOL_HELP={line:"Drag to draw a line.",angle:"Tap three points: first arm, the joint, second arm.",vguide:"Tap to place a vertical guide line.",hguide:"Tap to place a horizontal guide line.",circle:"Drag from the centre outwards.",arrow:"Drag from the tail to the point.",text:"Tap where the label should go.",spot:"Drag a box — everything outside is darkened."};
+function renderEditor(app){
+  app.innerHTML=hdr("Draw on frame",ED.existing?"setView('viewer')":"setView('studio')")+'<main>'+
+   '<div class="edWrap"><canvas id="cv"></canvas></div>'+
+   '<div class="tools" id="tools">'+TOOLS.map(function(t){return '<button class="chip'+(ED.tool===t[0]?" on":"")+'" data-t="'+t[0]+'" onclick="setTool(\''+t[0]+'\')">'+t[1]+'</button>'}).join("")+'</div>'+
+   '<div class="row"><div class="row" id="cols">'+COLORS.map(function(c){return '<button class="sw'+(ED.color===c?" on":"")+'" style="background:'+c+'" onclick="setColor(\''+c+'\')" aria-label="Colour"></button>'}).join("")+'</div><span class="grow"></span><button class="btn sm" onclick="edUndo()">Undo</button><button class="btn sm danger" onclick="edClear()">Clear all</button></div>'+
+   '<div class="tip" id="toolHelp"></div>'+
+   '<button class="btn primary full" onclick="saveSheet()">'+(ED.existing?"Save changes":"Save moment…")+'</button></main>';
+  var cv=document.getElementById("cv");
+  loadImg(ED.base).then(function(img){ED.img=img;cv.width=img.naturalWidth;cv.height=img.naturalHeight;redraw()});
+  cv.addEventListener("pointerdown",edDown);cv.addEventListener("pointermove",edMove);cv.addEventListener("pointerup",edUp);cv.addEventListener("pointercancel",edUp);
+  document.getElementById("toolHelp").textContent=TOOL_HELP[ED.tool];
+}
+function setTool(t){ED.tool=t;ED.pts=[];ED.drag=null;document.querySelectorAll("#tools .chip").forEach(function(c){c.classList.toggle("on",c.dataset.t===t)});document.getElementById("toolHelp").textContent=TOOL_HELP[t];redraw()}
+function setColor(c){ED.color=c;document.querySelectorAll("#cols .sw").forEach(function(s){s.classList.toggle("on",s.style.background.replace(/\s/g,"")===hexToRgb(c))})}
+function hexToRgb(h){var n=parseInt(h.slice(1),16);return"rgb("+(n>>16)+","+((n>>8)&255)+","+(n&255)+")"}
+function redraw(){
+  var cv=document.getElementById("cv");if(!cv||!ED.img)return;var x=cv.getContext("2d");x.clearRect(0,0,cv.width,cv.height);x.drawImage(ED.img,0,0);
+  var prev=null;
+  if(ED.tool==="angle"&&ED.pts.length)prev={t:"angle",c:ED.color,p:ED.pts.concat(ED.cur&&ED.pts.length<3?[ED.cur]:[]).slice(0,3)};
+  else if(ED.drag)prev={t:ED.tool,c:ED.color,p:[ED.drag.a,ED.drag.b]};
+  drawShapes(x,cv.width,cv.height,ED.shapes,prev);
+}
+function evPt(e){var cv=document.getElementById("cv"),r=cv.getBoundingClientRect();return[Math.max(0,Math.min(1,(e.clientX-r.left)/r.width)),Math.max(0,Math.min(1,(e.clientY-r.top)/r.height))]}
+function edDown(e){
+  e.preventDefault();var p=evPt(e),t=ED.tool;
+  try{e.target.setPointerCapture(e.pointerId)}catch(x){}
+  if(t==="vguide"||t==="hguide"){ED.shapes.push({t:t,c:ED.color,p:[p]});redraw();return}
+  if(t==="text"){var txt=prompt("Label text");if(txt&&txt.trim()){ED.shapes.push({t:"text",c:ED.color,p:[p],txt:txt.trim().slice(0,40)});redraw()}return}
+  if(t==="angle"){ED.pts.push(p);if(ED.pts.length===3){ED.shapes.push({t:"angle",c:ED.color,p:ED.pts.slice()});ED.pts=[]}ED.cur=null;redraw();return}
+  ED.drag={a:p,b:p};redraw();
+}
+function edMove(e){
+  var p=evPt(e);
+  if(ED.tool==="angle"&&ED.pts.length){ED.cur=p;redraw();return}
+  if(ED.drag){ED.drag.b=p;redraw()}
+}
+function edUp(e){
+  if(!ED.drag)return;var d=ED.drag;ED.drag=null;
+  if(Math.hypot(d.b[0]-d.a[0],d.b[1]-d.a[1])>.01)ED.shapes.push({t:ED.tool,c:ED.color,p:[d.a,d.b]});
+  redraw();
+}
+function edUndo(){if(ED.pts.length){ED.pts.pop()}else ED.shapes.pop();redraw()}
+function edClear(){if(ED.shapes.length&&!confirm("Remove all drawings from this frame?"))return;ED.shapes=[];ED.pts=[];redraw()}
+
+/* ---------- save sheet ---------- */
+function sheet(h){var host=document.getElementById("sheetHost");host.innerHTML='<div class="sheet" onclick="if(event.target===this)closeSheet()"><div>'+h+'</div></div>'}
+function closeSheet(){document.getElementById("sheetHost").innerHTML=""}
+function saveSheet(){
+  var ex=ED.existing||{},tags=ex.tags||[];ED.tags=tags.slice();ED.rating=ex.rating||0;
+  var groups=Object.keys(SKILLS).map(function(g){return '<div class="muted small" style="margin:8px 0 4px">'+g+'</div><div class="chips">'+SKILLS[g].map(function(s){var tg=g+" / "+s;return '<button type="button" class="chip'+(tags.indexOf(tg)>=0?" on":"")+'" data-tag="'+esc(tg)+'" onclick="toggleTag(this)">'+esc(s)+'</button>'}).join("")+'</div>'}).join("");
+  sheet('<h2>'+(ED.existing?"Save changes":"Save moment")+'</h2><div class="muted small">'+esc(S.player||ex.player)+' · '+fmtDate(ex.date||todayStr())+'</div>'+
+   '<label>Tags</label>'+groups+
+   '<label>Coaching cue</label><select onchange="if(this.value){var c=document.getElementById(\'cm\');c.value=(c.value?c.value+\'. \':\'\')+this.value;this.value=\'\'}"><option value="">Add a cue…</option>'+CUES.map(function(c){return '<option>'+esc(c)+'</option>'}).join("")+'</select>'+
+   '<label>Comment</label><textarea id="cm" rows="2" placeholder="One line the player can act on">'+esc(ex.comment||"")+'</textarea>'+
+   '<label>Rating of this moment (optional)</label><div class="stars" id="stars">'+[1,2,3,4,5].map(function(n){return '<button type="button" class="'+(n<=ED.rating?"on":"")+'" onclick="setRating('+n+')">★</button>'}).join("")+'</div>'+
+   '<div class="row" style="margin-top:14px"><button class="btn grow" onclick="closeSheet()">Cancel</button><button class="btn primary grow" onclick="saveMoment()">Save</button></div>');
+}
+function toggleTag(b){var t=b.dataset.tag,i=ED.tags.indexOf(t);if(i>=0)ED.tags.splice(i,1);else ED.tags.push(t);b.classList.toggle("on",i<0)}
+function setRating(n){ED.rating=ED.rating===n?0:n;[].forEach.call(document.querySelectorAll("#stars button"),function(b,i){b.classList.toggle("on",i<ED.rating)})}
+function saveMoment(){
+  var ex=ED.existing,cm=document.getElementById("cm").value.trim();
+  var rec=ex?Object.assign({},ex):{id:vid(),player:S.player,date:todayStr(),clipName:S.clip&&S.clip.name,clipSize:S.clip&&S.clip.size,clipKey:S.clip&&S.clip.key,timeSec:ED.timeSec,fps:S.fps,created:new Date().toISOString()};
+  rec.base=ED.base;rec.shapes=ED.shapes;rec.tags=ED.tags;rec.comment=cm;rec.rating=ED.rating||0;rec.edited=new Date().toISOString();
+  (ED.shapes.length?composite(ED.base,ED.shapes):Promise.resolve(null)).then(function(c){rec.composite=c;return dbPut(rec)}).then(refresh).then(function(){
+    closeSheet();if(ex){ED=null;S.cur=rec;setView("viewer")}else{ED=null;setView("studio")}
+  }).catch(function(e){alert("Couldn't save: "+(e&&e.message||e)+". Your device may be low on space.")});
+}
+
+/* ---------- viewer ---------- */
+function openMoment(id){S.cur=S.moments.find(function(m){return m.id===id});if(S.cur)setView("viewer")}
+function renderViewer(app){
+  var m=S.cur;if(!m){setView("home");return}
+  app.innerHTML=hdr(m.player,"setView('"+(S.clip&&false?"studio":"home")+"')")+'<main>'+
+   '<div class="edWrap"><img src="'+(m.composite||m.base)+'" style="width:100%;display:block" alt=""></div>'+
+   '<div class="card" style="margin-top:12px"><div class="muted small">'+fmtDate(m.date)+' · '+esc(m.clipName||"")+' · '+fmtT(m.timeSec)+' · frame '+Math.round(m.timeSec*(m.fps||30))+'</div>'+
+   (m.tags&&m.tags.length?'<div class="chips" style="margin-top:8px">'+m.tags.map(function(t){return '<span class="chip">'+esc(t)+'</span>'}).join("")+'</div>':'')+
+   (m.comment?'<p style="margin:10px 0 0">'+esc(m.comment)+'</p>':'')+
+   (m.rating?'<div style="color:var(--gold);font-size:20px;margin-top:6px">'+"★".repeat(m.rating)+'<span class="muted">'+"★".repeat(5-m.rating)+'</span></div>':'')+'</div>'+
+   '<div class="row"><button class="btn grow" onclick="editMoment()">Edit drawings &amp; notes</button><button class="btn grow" onclick="shareMoment()">Share image</button></div>'+
+   '<button class="btn danger full" style="margin-top:10px" onclick="delMoment()">Delete this moment</button></main>';
+}
+function editMoment(){var m=S.cur;ED={base:m.base,shapes:(m.shapes||[]).slice(),tool:"line",color:COLORS[0],pts:[],drag:null,timeSec:m.timeSec,existing:m};setView("editor")}
+function delMoment(){if(!confirm("Delete this saved moment? This can't be undone."))return;dbDel(S.cur.id).then(refresh).then(function(){S.cur=null;setView("home")})}
+function dataToBlob(u){var a=u.split(","),mime=a[0].match(/:(.*?);/)[1],b=atob(a[1]),n=b.length,u8=new Uint8Array(n);while(n--)u8[n]=b.charCodeAt(n);return new Blob([u8],{type:mime})}
+function shareMoment(){
+  var m=S.cur,blob=dataToBlob(m.composite||m.base),file=new File([blob],(m.player+"-"+m.date+".jpg").replace(/\s+/g,"-"),{type:"image/jpeg"});
+  if(navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file],title:m.player+" — technique review",text:m.comment||""}).catch(function(){});return}
+  var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=file.name;document.body.appendChild(a);a.click();a.remove();
+}
+
+/* ---------- backup of moments ---------- */
+function exportAll(){
+  if(!S.moments.length){alert("Nothing to export yet.");return}
+  var blob=new Blob([JSON.stringify({app:"ProCoach OS video moments",version:1,created:new Date().toISOString(),moments:S.moments})],{type:"application/json"});
+  var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="procoachos-video-moments-"+todayStr()+".json";document.body.appendChild(a);a.click();a.remove();
+}
+function importAll(inp){
+  var f=inp.files&&inp.files[0];if(!f)return;var r=new FileReader();
+  r.onload=function(){try{var d=JSON.parse(r.result);if(!d||!Array.isArray(d.moments))throw 0;
+    var have={};S.moments.forEach(function(m){have[m.id]=1});var add=d.moments.filter(function(m){return m&&m.id&&m.base&&!have[m.id]});
+    Promise.all(add.map(dbPut)).then(refresh).then(function(){alert("Imported "+add.length+" moment"+(add.length===1?"":"s")+".");render()})}catch(e){alert("That file isn't a valid moments backup.")}};
+  r.readAsText(f);inp.value="";
+}
+
+/* ---------- boot ---------- */
+(function(){
+  if(!isPremiumUser()){
+    document.body.innerHTML='<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;background:#0a1420;color:#eef2f6;font-family:Inter,Arial,sans-serif;text-align:center;padding:24px"><div style="max-width:420px"><h2>Video Review Studio is a Premium tool</h2><p style="color:#9aa8b8">Open ProCoach OS and activate Premium on this device to use it.</p><a href="app.html" style="color:#34d399;font-weight:700">Back to ProCoach OS</a></div></div>';return}
+  Promise.all([loadRoster(),refresh()]).then(function(r){S.roster=r[0];render()}).catch(function(){render()});
+})();
+</script>
+</body>
+</html>
