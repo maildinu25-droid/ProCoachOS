@@ -306,6 +306,21 @@ html.hc :focus-visible{outline:3px solid var(--gold)!important;outline-offset:2p
 html.hc .lkKey{border:2px solid var(--ink)}
 .hcRow{display:flex;justify-content:space-between;align-items:center;gap:12px}
 
+.btn.sm{padding:6px 10px;font-size:var(--fs-1)}
+.techTabs{display:flex;gap:8px;margin:14px 0 6px}.techTabs .btn{flex:1;margin:0}
+.techComp{border:1px solid var(--line);border-radius:12px;margin:8px 0;background:var(--surface2)}
+.techComp summary{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:12px;cursor:pointer;list-style:none}
+.techComp summary::-webkit-details-marker{display:none}
+.techComp summary::after{content:"▾";margin-left:6px;color:var(--muted)}.techComp[open] summary::after{content:"▴"}
+.techSum{flex:1;text-align:right;font-size:var(--fs-1)}.techBody{padding:0 12px 12px}
+.techRow{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)}.techLbl{flex:1;min-width:0}.techBtns{display:flex;gap:6px}
+.tb{width:40px;height:38px;border-radius:9px;border:1.5px solid var(--line);background:transparent;color:var(--muted);font-weight:800;font-size:15px;padding:0}
+.tbG{border-color:rgba(47,166,106,.6)}.tbM{border-color:rgba(224,161,0,.7)}.tbA{border-color:rgba(229,72,77,.65)}
+.tbG.on{background:#2fa66a;border-color:#2fa66a;color:#fff}.tbM.on{background:#e0a100;border-color:#e0a100;color:#1a1200}.tbA.on{background:#e5484d;border-color:#e5484d;color:#fff}
+.techGrp{font-weight:700;font-size:var(--fs-1);text-transform:uppercase;letter-spacing:.3px;color:var(--muted);margin:12px 0 2px}.techHid{opacity:.55}
+.techRbw{display:flex;gap:6px;margin-top:8px}.techRbw button{flex:1;padding:10px 4px;border-radius:10px;border:1.5px solid var(--line);background:transparent;color:var(--ink);font-weight:700;font-size:var(--fs-1)}.techRbw button.on{background:#067a56;border-color:#067a56;color:#fff}
+.techMedia{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}.techImg{position:relative}.techImg img{width:84px;height:84px;object-fit:cover;border-radius:8px;display:block}.techImg button{position:absolute;top:-6px;right:-6px;width:24px;height:24px;border-radius:50%;border:0;background:#e5484d;color:#fff;font-size:16px;line-height:1;padding:0}
+.techChip{display:inline-block;padding:2px 9px;border-radius:999px;font-size:var(--fs-1);margin:2px 5px 2px 0;border:1.5px solid}.techChip small{opacity:.8}
 .vmGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:8px}
 .vmCell{position:relative;border:2px solid var(--line);border-radius:10px;overflow:hidden;cursor:pointer;background:var(--surface2)}
 .vmCell img{width:100%;aspect-ratio:16/10;object-fit:cover;display:block}
@@ -1268,18 +1283,26 @@ async function vmFillSection(){
 }
 async function vmPrep(p){
  VMPAIRS[p.id]="";
- let list=(await vmAll()).filter(m=>m.player===p.name&&m.report&&m.base).sort(vmByOld);
- if(list.length<2)return;
- let groups={};list.forEach(m=>{let k=(m.tags&&m.tags[0])?m.tags[0].split(" / ").pop():"Technique";(groups[k]=groups[k]||[]).push(m)});
- let pairs=Object.entries(groups).filter(([,a])=>a.length>=2).map(([k,a])=>[k,a[0],a[a.length-1]]);
- if(!pairs.length)pairs=[["Technique",list[0],list[list.length-1]]];
- pairs=pairs.slice(0,3);
- let out=[];
- for(let [k,a,b] of pairs){
-  let [ia,ib]=await Promise.all([vmComposite(a,700),vmComposite(b,700)]);
-  out.push(`<div class="card" style="break-inside:avoid"><b>${esc(k)}</b><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><figure style="margin:0"><img src="${ia}" style="width:100%;border-radius:8px" alt=""><figcaption class="muted">Before · ${esc(fmtDate(a.date))}</figcaption></figure><figure style="margin:0"><img src="${ib}" style="width:100%;border-radius:8px" alt=""><figcaption class="muted">Now · ${esc(fmtDate(b.date))}</figcaption></figure></div>${b.comment?`<p style="margin:8px 0 0">${esc(b.comment)}</p>`:""}</div>`);
+ let all=(await vmAll()).filter(m=>m.player===p.name&&m.base);
+ let seqs={};all.filter(m=>m.seq).forEach(m=>{(seqs[m.clipKey||m.id]=seqs[m.clipKey||m.id]||[]).push(m)});
+ let seqOut=[];
+ for(let [,fr] of Object.entries(seqs).filter(([,a])=>a.length>=2).slice(0,2)){
+  fr.sort((x,y)=>(x.timeSec||0)-(y.timeSec||0));fr=fr.slice(0,8);
+  let imgs=await Promise.all(fr.map(m=>vmComposite(m,520)));
+  seqOut.push(`<div class="card" style="break-inside:avoid"><b>${esc(fr[0].clipName||"Technique review")}</b> <span class="muted">· ${esc(fmtDate(fr[0].date))}</span><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px">${fr.map((m,i)=>`<figure style="margin:0;break-inside:avoid"><img src="${imgs[i]}" style="width:100%;border-radius:8px" alt=""><figcaption class="muted"><b>${i+1}${m.phase?". "+esc(m.phase):""}</b>${m.comment?" — "+esc(m.comment):""}</figcaption></figure>`).join("")}</div></div>`);
  }
- VMPAIRS[p.id]=`<h2>Technique — before &amp; after</h2>${out.join("")}`;
+ let list=all.filter(m=>m.report&&!m.seq).sort(vmByOld);
+ let out=[];
+ if(list.length>=2){
+  let groups={};list.forEach(m=>{let k=(m.tags&&m.tags[0])?m.tags[0].split(" / ").pop():"Technique";(groups[k]=groups[k]||[]).push(m)});
+  let pairs=Object.entries(groups).filter(([,a])=>a.length>=2).map(([k,a])=>[k,a[0],a[a.length-1]]);
+  if(!pairs.length)pairs=[["Technique",list[0],list[list.length-1]]];
+  for(let [k,a,b] of pairs.slice(0,3)){
+   let [ia,ib]=await Promise.all([vmComposite(a,700),vmComposite(b,700)]);
+   out.push(`<div class="card" style="break-inside:avoid"><b>${esc(k)}</b><div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:8px"><figure style="margin:0"><img src="${ia}" style="width:100%;border-radius:8px" alt=""><figcaption class="muted">Before · ${esc(fmtDate(a.date))}</figcaption></figure><figure style="margin:0"><img src="${ib}" style="width:100%;border-radius:8px" alt=""><figcaption class="muted">Now · ${esc(fmtDate(b.date))}</figcaption></figure></div>${b.comment?`<p style="margin:8px 0 0">${esc(b.comment)}</p>`:""}</div>`);
+  }
+ }
+ VMPAIRS[p.id]=(seqOut.length?`<h2>Technique review — phase by phase</h2>${seqOut.join("")}`:"")+(out.length?`<h2>Technique — before &amp; after</h2>${out.join("")}`:"");
 }
 const vmPairsHtml=p=>VMPAIRS[p.id]||"";
 const _vmPPR=playerProfileReport,_vmPSR=parentSummaryReport;
@@ -1391,6 +1414,15 @@ function initApp(){
     db.archivedFormatSkills[d][f]=Array.isArray(db.archivedFormatSkills[d][f])?db.archivedFormatSkills[d][f]:[];
    });
   });
+  db.techCustom=(db.techCustom&&typeof db.techCustom==="object")?db.techCustom:{};
+  db.techHidden=(db.techHidden&&typeof db.techHidden==="object")?db.techHidden:{};
+  // One-time: game skills that Technique now covers are archived (hidden from NEW assessments).
+  // Nothing is deleted or re-indexed, so every past rating still reads back exactly as entered.
+  if(!db.techMigrated){
+   const OVERLAP={Batting:["Setup & Balance","Footwork"],Bowling:["Run-up / Approach","Action & Alignment"],Fielding:["Catching","Ground Fielding"],Wicketkeeping:["Set Position","Footwork","Glove Work","Standing Back","Standing Up","Taking Spin","Leg-side Takes"]};
+   Object.keys(OVERLAP).forEach(d=>{db.archivedSkills[d]=db.archivedSkills[d]||[];OVERLAP[d].forEach(n=>{if(!db.archivedSkills[d].includes(n))db.archivedSkills[d].push(n)})});
+   db.techMigrated=1;
+  }
   db.settings=(db.settings&&typeof db.settings==="object")?db.settings:{};
   db.teams=Array.isArray(db.teams)?db.teams:[];
   db.tournaments=Array.isArray(db.tournaments)?db.tournaments:[];
@@ -3255,8 +3287,9 @@ function playerViewBody(p,forPrint){
  ${p.strengths?`<h2 class="section">Strengths</h2><div class="card">${esc(p.strengths)}</div>`:""}
  ${p.areas?`<h2 class="section">Development areas</h2><div class="card">${esc(p.areas)}</div>`:""}
  ${p.notes?`<h2 class="section">Coach notes</h2><div class="card">${esc(p.notes)}</div>`:""}
- ${latest?`<h2 class="section">Latest assessment</h2><div class="card"><b>Overall ${assessmentAvg(latest)}/10</b><br>${assessmentDisciplines(latest).map(d=>`<span class="tag">${d} ${disciplineAvg(latest,d)}/10</span>`).join("")}</div>${assessmentDetailHTML(latest)}`:""}
- <h2 class="section">Assessment history (${assessments.length})</h2>${assessments.length?`<div class="card">${assessments.map(a=>`<div class="item"><div><b>${esc(fmtDate(a.date))}</b>${assessmentFormatTagsHtml(a)}<div class="muted">Overall ${assessmentAvg(a)}/10</div>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div></div>`).join("")}</div>`:empty("No assessments yet.")}
+ ${techViewHtml(p,forPrint)}
+ ${latest?`<h2 class="section">Latest assessment</h2><div class="card"><b>${assessmentAvg(latest)==="—"?"Technique only":"Overall "+assessmentAvg(latest)+"/10"}</b><br>${assessmentDisciplines(latest).map(d=>`<span class="tag">${d}${disciplineAvg(latest,d)==="—"?"":" "+disciplineAvg(latest,d)+"/10"}</span>`).join("")}</div>${assessmentDetailHTML(latest)}`:""}
+ <h2 class="section">Assessment history (${assessments.length})</h2>${assessments.length?`<div class="card">${assessments.map(a=>`<div class="item"><div><b>${esc(fmtDate(a.date))}</b>${assessmentFormatTagsHtml(a)}<div class="muted">${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</div>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div></div>`).join("")}</div>`:empty("No assessments yet.")}
  <h2 class="section">Session attendance (${sessions.length})</h2>${sessions.length?`<div class="card">${sessions.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}</div></div></div>`).join("")}</div>`:empty("No recorded attendance yet.")}
  ${matchPatternsHtml(p)}
  <h2 class="section">Match history (${matches.length})</h2>${matches.length?`<div class="card">${matches.map(m=>{let bat=(m.battingReview||[]).find(r=>r.name===p.name);let bowl=(m.bowlingReview||[]).find(r=>r.name===p.name);return `<div class="item"><div><b>vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(fmtDate(m.date))}${bat?" · "+esc(bat.runs||0)+"("+esc(bat.balls||0)+")":""}${bowl?" · "+esc(bowl.wickets||0)+"/"+esc(bowl.runs||0):""}</div></div><button class="btn secondary" onclick="closeM();matchReportView('${m.id}')">Report</button></div>`}).join("")}</div>`:empty("No match entries yet.")}`;
@@ -3324,6 +3357,7 @@ function parentSummaryReport(id){
  ${activeGoals.length?`<h2>Current Goals</h2><div class="card">${activeGoals.map(g=>`<p><b>${esc(g.text)}</b>${g.targetDate?" — target "+esc(fmtDate(g.targetDate)):""}</p>`).join("")}</div>`:""}
  ${trendLines.length?`<h2>Recent Progress</h2><div class="card">${trendLines.map(l=>`<p>${esc(l)}</p>`).join("")}</div>`:""}
  ${playerProgressPrintHtml(aa)}
+ ${techParentHtml(p)}
  ${vmPairsHtml(p)}
  ${attendanceRate!==null?`<h2>Attendance</h2><div class="card"><p>${attended} of ${teamSessions.length} sessions attended (${attendanceRate}%).</p></div>`:""}
  ${p.focus?`<h2>Next Focus</h2><div class="card"><p>${esc(p.focus)}</p></div>`:""}`);
@@ -3355,6 +3389,9 @@ const FORMAT_SKILLS={
  }
 };
 const ASSESSMENT_FORMATS=["General","T20","ODI","Test"];
+// "General" is the stored key (kept so old data still reads); it is shown as "Game skills".
+const fmtLabel=f=>f==="General"?"Game skills":f;
+function hasAnyGameRating(a){let r=a.ratings||{};if(Object.values(r).some(v=>Array.isArray(v)&&v.some(x=>Number(x)>0)))return true;let f=a.formatRatings||{};return Object.values(f).some(o=>o&&typeof o==='object'&&Object.values(o).some(v=>Array.isArray(v)&&v.some(x=>Number(x)>0)))}
 function allSkillsFor(d){return skillSets[d].concat((db.customSkills&&db.customSkills[d])||[])}
 function isSkillArchived(d,skillName){return((db.archivedSkills&&db.archivedSkills[d])||[]).includes(skillName)}
 function skillEverUsed(d,skillIdx){
@@ -3466,6 +3503,15 @@ function openBulkAssessment(){
  <div id="bulkAssessmentBody"></div>`);
 }
 function bulkPlayers(){return activePlayers().filter(p=>!isReleased(p)).filter(p=>!bulkAssessmentDraft.team||p.team===bulkAssessmentDraft.team)}
+// Full (positional) skill list + which positions are visible. Ratings are stored by position,
+// so archived skills must keep their slot (saved as 0 = not assessed) or later skills would shift.
+function bulkFullList(){
+ let d=bulkAssessmentDraft.discipline,f=bulkAssessmentDraft.format;if(!d)return {names:[],vis:[]};
+ let fmt=f&&f!=="General"&&FORMAT_SKILLS[d]&&FORMAT_SKILLS[d][f];
+ let names=fmt?allFormatSkillsFor(d,f):allSkillsFor(d);
+ let vis=names.map((s,i)=>i).filter(i=>fmt?!isFormatSkillArchived(d,f,names[i]):!isSkillArchived(d,names[i]));
+ return {names,vis};
+}
 function bulkSkillsList(){
  let d=bulkAssessmentDraft.discipline,f=bulkAssessmentDraft.format;
  if(!d)return [];
@@ -3496,7 +3542,7 @@ function renderBulkFormatPick(){
  let d=bulkAssessmentDraft.discipline;
  if(!d||!FORMAT_SKILLS[d]){box.innerHTML="";return}
  let formats=["General",...Object.keys(FORMAT_SKILLS[d])];
- box.innerHTML=`<label style="margin-top:12px;display:block">Format Focus</label><div class="skillPick">${formats.map(f=>`<label><input type="radio" name="bulkFormat" value="${f}" ${bulkAssessmentDraft.format===f?"checked":""} onchange="selectBulkFormat('${f}')"> ${f}</label>`).join("")}</div>`;
+ box.innerHTML=`<label style="margin-top:12px;display:block">Format Focus</label><div class="skillPick">${formats.map(f=>`<label><input type="radio" name="bulkFormat" value="${f}" ${bulkAssessmentDraft.format===f?"checked":""} onchange="selectBulkFormat('${f}')"> ${fmtLabel(f)}</label>`).join("")}</div>`;
 }
 function selectBulkFormat(format){
  bulkAssessmentDraft.format=format;
@@ -3509,7 +3555,8 @@ function computeBulkRatings(){
  bulkAssessmentDraft.ratings={};
  players.forEach(p=>{
   let oldVals=bulkCarryForwardFor(p.name,discipline,format);
-  bulkAssessmentDraft.ratings[p.name]=skills.map((s,i)=>oldVals&&oldVals[i]!==undefined?Number(oldVals[i]):5);
+  let full=bulkFullList();
+  bulkAssessmentDraft.ratings[p.name]=full.names.map((s,i)=>full.vis.includes(i)?(oldVals&&Number(oldVals[i])>0?Number(oldVals[i]):5):0);
  });
  renderBulkAssessmentGrid();
 }
@@ -3532,7 +3579,7 @@ function renderBulkAssessmentGrid(){
  let players=bulkPlayers();
  if(!players.length){box.innerHTML=`<div class="muted" style="margin-top:12px">No players ${bulkAssessmentDraft.team?`in ${esc(bulkAssessmentDraft.team)}`:""}.</div>`;return}
  box.innerHTML=`<div class="matchEntryWrap" style="margin-top:12px"><table class="matchEntryTable"><thead><tr><th style="min-width:110px">Player</th>${skills.map(s=>`<th style="min-width:78px;text-align:center">${esc(s)}</th>`).join("")}</tr></thead><tbody>
- ${players.map((p,pi)=>`<tr><td><b>${esc(p.name)}</b></td>${skills.map((s,si)=>{
+ ${players.map((p,pi)=>`<tr><td><b>${esc(p.name)}</b></td>${bulkFullList().vis.map(si=>{
   let safeName=p.name.replace(/'/g,"\\'");
   return `<td>${numberStepperHtml(bulkAssessmentDraft.ratings[p.name][si],`stepBulkAssessmentRating('${safeName}',${si},-1)`,`stepBulkAssessmentRating('${safeName}',${si},1)`,16)}</td>`;
  }).join("")}</tr>`).join("")}
@@ -3553,7 +3600,8 @@ function saveBulkAssessment(){
  players.forEach(p=>{
   let vals=bulkAssessmentDraft.ratings[p.name];
   if(!vals)return;
-  let clamped=skills.map((s,i)=>Math.max(1,Math.min(10,Number(vals[i])||5)));
+  let full=bulkFullList();
+  let clamped=full.names.map((s,i)=>full.vis.includes(i)?Math.max(1,Math.min(10,Number(vals[i])||5)):0);
   let rec={id:uid("assess"),player:p.name,date:d,disciplines:[discipline],disciplineNotes:{},priority:"",comments:"",mediaLinks:[]};
   if(isFormat){
    rec.ratings={[discipline]:[]};
@@ -3570,7 +3618,7 @@ function saveBulkAssessment(){
  closeM();
  assessments();
 }
-function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<div class="actionRow"><button class="btn primary" onclick="newAssessment()">+ New Assessment</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess Squad</button></div><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(fmtDate(a.date))} · Overall ${assessmentAvg(a)}/10</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}${assessmentFormatTagsHtml(a)}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editAssessment('${a.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delAssessment('${a.id}')">${icon("trash",17)}</button></div></div>`).join(""):emptyRich("No assessments yet","Rate batting, bowling and fielding to track each player's progress over time.","+ New Assessment","newAssessment()")}</div>`}
+function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<div class="actionRow"><button class="btn primary" onclick="newAssessment()">+ New Assessment</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess Squad</button></div><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(fmtDate(a.date))} · ${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}${assessmentFormatTagsHtml(a)}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editAssessment('${a.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delAssessment('${a.id}')">${icon("trash",17)}</button></div></div>`).join(""):emptyRich("No assessments yet","Rate batting, bowling and fielding to track each player's progress over time.","+ New Assessment","newAssessment()")}</div>`}
 function assessmentFormHtml(a,mode){
  a=a||{};
  return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Assessment":"Player Assessment"}</h2><button class="x" onclick="closeM()">×</button></div>
@@ -3582,10 +3630,15 @@ function assessmentFormHtml(a,mode){
  <label style="margin-bottom:6px">Choose Skill Areas</label>
  <div class="muted">Select as many as required.</div>
  <div class="skillPick">${Object.keys(skillSets).map(k=>`<label><input type="checkbox" name="disciplines" value="${k}" ${(a.disciplines||[]).includes(k)?"checked":""} onchange="renderAssessmentSkills()"> ${k}</label>`).join("")}</div>
- <label style="margin-bottom:6px">Format Focus <span class="muted" style="font-weight:400">(Batting/Bowling — pick one or more; General is the core skill set)</span></label>
+ <div class="techTabs"><button type="button" class="btn primary" data-t="game" onclick="techTabSet('game')">Game skills</button><button type="button" class="btn secondary" data-t="tech" onclick="techTabSet('tech')">Technique</button></div>
+ <div id="tabGame">
+ <label style="margin-bottom:6px">Format Focus <span class="muted" style="font-weight:400">(Batting/Bowling — pick one or more; Game skills is the core skill set)</span></label>
  <div class="muted">Select as many as required.</div>
- <div class="skillPick">${ASSESSMENT_FORMATS.map(f=>`<label><input type="checkbox" name="formats" value="${f}" ${(Array.isArray(a.formats)&&a.formats.length?a.formats:["General"]).includes(f)?"checked":""} onchange="renderAssessmentSkills()"> ${f}</label>`).join("")}</div>
+ <div class="skillPick">${ASSESSMENT_FORMATS.map(f=>`<label><input type="checkbox" name="formats" value="${f}" ${(Array.isArray(a.formats)&&a.formats.length?a.formats:["General"]).includes(f)?"checked":""} onchange="renderAssessmentSkills()"> ${fmtLabel(f)}</label>`).join("")}</div>
+ <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:8px 0"><input type="checkbox" name="skipGame" style="width:auto" ${a.technique&&!hasAnyGameRating(a)?"checked":""}> <span>Technique-only assessment — don't record game-skill ratings</span></label>
  <div id="assessmentSkills">${empty("Select at least one skill area.")}</div>
+ </div>
+ <div id="tabTech" style="display:none"><div id="assessmentTech"></div></div>
  <label>Key development priority<textarea name="priority">${esc(a.priority||"")}</textarea></label>
  <label>Coach comments<textarea name="comments">${esc(a.comments||"")}</textarea></label>
  <label class="full">Video / Photo Links <span class="muted" style="font-weight:400">(optional — one per line, e.g. YouTube, Google Drive, Dropbox)</span><textarea name="mediaLinks" placeholder="https://...">${esc((a.mediaLinks||[]).join("\n"))}</textarea></label>
@@ -3594,6 +3647,7 @@ function assessmentFormHtml(a,mode){
 }
 function openAssessmentForm(existing,mode){
  editingAssessmentId=mode==="edit"?existing.id:null;
+ techDraft=(mode==="edit"&&existing&&existing.technique)?JSON.parse(JSON.stringify(existing.technique)):{};techOpen={};techManage={};techTab="game";window._techPick=null;
  modal(assessmentFormHtml(existing,mode));
  renderAssessmentSkills();
 }
@@ -3697,7 +3751,7 @@ function renderAssessmentSkills(){
    // unrated when this is a genuinely NEW assessment (no prior value to
    // preserve). If editing an assessment that already had a real rating
    // here, that value is kept exactly as-is, just out of view.
-   if(archived&&!oldVals)wasAssessed=false;
+   if(archived&&(!oldVals||!editingAssessmentId))wasAssessed=false;
    let rowHtml=sliderRow(s,`${d}_${i}`,val,wasAssessed);
    if(archived)return `<div style="display:none">${rowHtml}</div>`;
    return `<div style="position:relative">${rowHtml}<button type="button" class="btn secondary" style="position:absolute;top:0;right:0;padding:3px 8px;font-size:var(--fs-1)" title="Archive this metric — hides it from future assessments without affecting past data" onclick="archiveSkill('${d}','${esc(s).replace(/'/g,"\\'")}')">Archive</button></div>`;
@@ -3720,7 +3774,7 @@ function renderAssessmentSkills(){
     // prior assessment and that specific metric wasn't rated there.
     let wasAssessed=oldFormatVals?!!oldFormatVals[i]:true;
     let archived=isFormatSkillArchived(d,f,s);
-    if(archived&&!oldFormatVals)wasAssessed=false;
+    if(archived&&(!oldFormatVals||!editingAssessmentId))wasAssessed=false;
     let rowHtml=sliderRow(s,`${d}_fmt_${f}_${i}`,val,wasAssessed);
     if(archived)return `<div style="display:none">${rowHtml}</div>`;
     return `<div style="position:relative">${rowHtml}<button type="button" class="btn secondary" style="position:absolute;top:0;right:0;padding:3px 8px;font-size:var(--fs-1)" title="Archive this metric — hides it from future assessments without affecting past data" onclick="archiveFormatSkill('${d}','${f}','${esc(s).replace(/'/g,"\\'")}')">Archive</button></div>`;
@@ -3729,10 +3783,11 @@ function renderAssessmentSkills(){
    return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><div class="muted" style="font-weight:700;text-transform:uppercase;font-size:var(--fs-1);letter-spacing:.3px;margin-bottom:6px">${esc(f)} specifics</div>${rowsHtml}${formatCustomAddHtml}</div>`;
   }).join("");
   let customAddHtml=`<div class="formgrid" style="margin-top:8px"><input type="text" id="newSkill_${d}" placeholder="Add a custom metric for ${d}..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomSkill('${d}')}"><button type="button" class="btn primary" onclick="addCustomSkill('${d}')">+ Add metric</button></div>${(()=>{let unused=unusedUnarchivedSkills(d);return unused.length?`<button type="button" class="btn secondary" style="margin-top:6px" onclick="bulkArchiveUnused('${d}')">Archive ${unused.length} never-used metric${unused.length===1?"":"s"}</button>`:""})()}${archivedList.length?`<div style="margin-top:8px"><a href="#" onclick="event.preventDefault();toggleArchivedSkillsPanel('${d}')" class="muted">Archived metrics (${archivedList.length})</a><div id="archivedSkillsPanel_${d}" style="display:none;margin-top:6px">${archivedList.map(s=>`<div class="item"><span class="muted">${esc(s)}</span><button type="button" class="btn secondary" onclick="unarchiveSkill('${d}','${esc(s).replace(/'/g,"\\'")}')">Unarchive</button></div>`).join("")}</div></div>`:""}`;
-  let bodyHtml=(showGeneral?coreRowsHtml:"")+formatBlocksHtml+(showGeneral?customAddHtml:"")+(!showGeneral&&!activeFormats.length?`<div class="muted">Pick a Format Focus above (General, T20, ODI or Test) to rate ${esc(d)}.</div>`:"");
+  let bodyHtml=(showGeneral?coreRowsHtml:"")+formatBlocksHtml+(showGeneral?customAddHtml:"")+(!showGeneral&&!activeFormats.length?`<div class="muted">Pick a Format Focus above (Game skills, T20, ODI or Test) to rate ${esc(d)}.</div>`:"");
   return `<label style="margin-bottom:6px">${d}${showGeneral?" · Rate 1–10":""}</label><div class="card">${bodyHtml}<label>${d} development notes<textarea name="${d}_notes">${esc((existing&&existing.disciplineNotes&&existing.disciplineNotes[d])||"")}</textarea></label></div>`;
  }).join("")||empty("Select at least one skill area.");
  enhanceTextareasWithVoice(box);
+ renderAssessmentTech();
 }
 function addCustomSkill(d){
  let input=document.getElementById(`newSkill_${d}`);
@@ -3745,6 +3800,199 @@ function addCustomSkill(d){
  save();
  renderAssessmentSkills();
 }
+/* ===== Technique assessment (from the 2024 video analysis forms) ===== */
+// Each component lists observations. A string is one observation; ["Heading",[...]] is a group, whose
+// items are stored as "Heading — item" so repeated wording in different groups never collides.
+const TECH={
+ Batting:[
+  {n:"Grip",o:["Too high on the handle","Too low on the handle","Hands apart on the handle","Top hand V on splice / towards outer edge","Bottom hand V towards inner edge","Bottom hand loose and turning in pick-up"]},
+  {n:"Stance",o:["Narrow stance","Broad stance","Upright stance","Crouched stance","Weight on heels","Weight on toes","Weight on balls of the feet","Closed stance","Open stance","Front foot / back foot weighted","Head out of base"]},
+  {n:"Backlift",o:["Backlift initiated by top hand","Backlift initiated by bottom hand","Backlift towards gully / point","Backlift towards fine leg","Backlift away from body","Hands away in downswing"]},
+  {n:"Initial movement",o:["Initial movement late","Initial movement early","Initial movement big","Initial movement small","Front foot weighted after initial movement","Back foot weighted after initial movement","Excessive head movement during initial movement"]}
+ ],
+ Bowling:[
+  {n:"Run-up",o:["Angular","Straight","Curved"]},
+  {n:"Loading (jump & gather)",o:[["Bowling hand",["Behind head","Close to the body","Away from body"]],["Bowling arm elbow",["Towards target","Away from body","Towards mid-wicket"]],["Foot position at jump",["Towards target","Open","Closed"]],["Jump into crease",["Forward jump","Jump in","Jump out"]]]},
+  {n:"Back-foot landing",o:["Side on","Past side on","Semi-open","Front on"]},
+  {n:"Hip / shoulder alignment",o:["Aligned","In range","Mixed"]},
+  {n:"Front-foot landing",o:["In line with back-foot landing","Opening out","Across","Splayed"]},
+  {n:"Alignment",o:["Aligned","Across","Open"]},
+  {n:"Release",o:["Vertical","Past vertical","Round arm","Presence of flexion and extension"]},
+  {n:"Follow-through",o:["Efficient transfer of weight","Inefficient transfer of weight","Finish of the non-bowling arm","Running into the danger area"]}
+ ],
+ Wicketkeeping:[
+  {n:"Crouch",o:["Feet shoulder-width apart","Feet too wide","Feet narrow","Weight on balls of the feet","Weight on heels","Weight on toes","Weight on one leg","Head steady","Eyes level","Gloves lightly touching the ground"]},
+  {n:"Position — spinners",o:["Clear view","Head steady","Inside leg too wide of off stump","Inside leg outside off stump","Inside leg behind off stump","Standing too far","Standing too close","Arm's length from stump"]},
+  {n:"Position — pacers",o:["Has clear view","Head steady","Collecting at hip","Collecting at ankle","Collecting at one bounce"]},
+  {n:"Footwork — spinners",o:["Moving in a straight line","Moving in a curve","Moving in a K-shape","Stepping with toes","Stepping with balls of the feet","Flexed knees","Knees too straight","Head over gloves","Head at the side","Gloves in line with the ball","Outside foot slightly in line","Outside foot beside the ball"]},
+  {n:"Footwork — pacers",o:["Collecting in front","Collecting between inside hip and stump","Collecting outside hip",["While moving",["Optimum stride","Strides too long","Strides too short"]]]},
+  {n:"Glovework",o:["Cupped gloves","Hands apart","Fingers pointing forward","Fingers pointing away","Fingers pointing down","Extends the arm","No extension"]}
+ ],
+ Fielding:[
+  {n:"Catching",o:[["Ready position",["Balanced on the balls of the feet","Flat-footed","Hands ready in front"]],["Moving to the ball",["Moves early","Late movement","Poor path to the ball","Head bobbing while running"]],["Hands",["Fingers up for high balls","Fingers down for low balls","Hands apart","Soft hands (gives with the ball)","Hard hands"]],["Eyes and body",["Eyes on the ball into the hands","Head still","Catching away from the body","Body behind the line of the ball"]]]},
+  {n:"Ground fielding",o:[["Ready and approach",["Balanced, low ready position","Weight on heels","Straight-line approach","Curved approach","Slow approach"]],["Hands and body",["Hands low and wide, ahead of the feet","Hands too close to the body","Fingers down","Head down over the ball","Eyes on the ball into the hands","Body behind the line of the ball"]],["Pick-up and release",["Clean pick-up","Quick transfer to throw","Long barrier — trailing leg tucked","Long barrier — not getting down in time"]]]},
+  {n:"Throwing",o:[["Non-throwing hand",["Strong","Drop"]],["Throwing hand elbow",["Above shoulder level","At shoulder level","Below shoulder level"]],["Stride",["Optimum","Short"]],["Alignment",["Cross","Towards target","Open"]]]}
+ ]
+};
+const TECH_DISC=["Batting","Bowling","Wicketkeeping","Fielding"];
+const RBW_OPTS=["Excellent","Satisfactory","Needs attention"];
+const TS={G:{l:"Good",c:"#2fa66a"},M:{l:"Monitor",c:"#e0a100"},A:{l:"Attention",c:"#e5484d"}};
+let techDraft={},techOpen={},techManage={},techTab="game";
+function techObsFull(d,ci){
+ let comp=TECH[d][ci],out=[];
+ comp.o.forEach(x=>{if(Array.isArray(x))x[1].forEach(it=>out.push({k:x[0]+" — "+it,l:it,g:x[0]}));else out.push({k:x,l:x,g:""})});
+ let cu=(db.techCustom&&db.techCustom[d]&&db.techCustom[d][comp.n])||[];
+ cu.forEach(n=>out.push({k:n,l:n,g:"",custom:true}));
+ return out;
+}
+function techHidden(d,ci){return(db.techHidden&&db.techHidden[d]&&db.techHidden[d][TECH[d][ci].n])||[]}
+function techCount(d,cn){let c=(techDraft[d]||{})[cn];let n={G:0,M:0,A:0};if(c&&c.obs)Object.values(c.obs).forEach(v=>{if(n[v]!==undefined)n[v]++});return n}
+function techSummaryText(d,cn){let n=techCount(d,cn),p=[];if(n.G)p.push(n.G+" Good");if(n.M)p.push(n.M+" Monitor");if(n.A)p.push(n.A+" Attention");return p.join(" · ")}
+function techComp(d,cn){techDraft[d]=techDraft[d]||{};return techDraft[d][cn]=techDraft[d][cn]||{obs:{},comment:"",adjust:"",link:"",imgs:[],frames:[]}}
+function techSet(d,ci,oi,v){
+ let cn=TECH[d][ci].n,o=techObsFull(d,ci)[oi];if(!o)return;let c=techComp(d,cn);
+ if(c.obs[o.k]===v)delete c.obs[o.k];else c.obs[o.k]=v;
+ techRowPaint(d,ci,oi);let s=document.getElementById(`ts_${d}_${ci}`);if(s)s.textContent=techSummaryText(d,cn);
+}
+function techRowPaint(d,ci,oi){
+ let cn=TECH[d][ci].n,o=techObsFull(d,ci)[oi],cur=(techComp(d,cn).obs||{})[o.k]||"";
+ ["G","M","A"].forEach(v=>{let b=document.getElementById(`tb_${d}_${ci}_${oi}_${v}`);if(b){b.classList.toggle("on",cur===v);b.setAttribute("aria-pressed",cur===v?"true":"false")}});
+}
+function techPrev(d,cn,k){
+ let pid=editingAssessmentId,sel=document.querySelector('select[name="player"]'),pl=sel&&sel.value;if(!pl)return"";
+ let list=db.assessments.filter(a=>a.player===pl&&a.id!==pid&&a.technique&&a.technique[d]&&a.technique[d][cn]&&a.technique[d][cn].obs&&a.technique[d][cn].obs[k]).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+ let a=list[0];return a?a.technique[d][cn].obs[k]:"";
+}
+function techTabSet(t){
+ techTab=t;let g=document.getElementById("tabGame"),x=document.getElementById("tabTech");if(!g||!x)return;
+ g.style.display=t==="game"?"":"none";x.style.display=t==="tech"?"":"none";
+ document.querySelectorAll(".techTabs button").forEach(b=>b.className="btn "+(b.dataset.t===t?"primary":"secondary"));
+}
+function renderAssessmentTech(){
+ let box=document.getElementById("assessmentTech");if(!box)return;
+ let sel=[...document.querySelectorAll('input[name="disciplines"]:checked')].map(x=>x.value).filter(d=>TECH[d]);
+ if(!sel.length){box.innerHTML=empty("Select Batting, Bowling, Wicketkeeping or Fielding above to record technique.");return}
+ box.innerHTML=`<div class="muted" style="margin:4px 0 8px;font-size:var(--fs-1)">Tap <b style="color:${TS.G.c}">G</b> Good · <b style="color:${TS.M.c}">M</b> Monitor · <b style="color:${TS.A.c}">A</b> Attention needed. Leave a line blank for NA. Only components you open are saved.</div>`+sel.map(d=>{
+  let rbw=d==="Batting"?`<div class="card" style="margin-bottom:8px"><b>RBW</b><div class="techRbw">${RBW_OPTS.map(o=>`<button type="button" class="${((techDraft.Batting||{}).RBW||{}).overall===o?"on":""}" onclick="techRbwSet('${o}')">${o}</button>`).join("")}</div></div>`:"";
+  return `<h3 style="margin:12px 0 6px">${esc(d)} technique</h3>`+TECH[d].map((comp,ci)=>techCompHtml(d,ci)).join("")+rbw;
+ }).join("");
+ vmFillThumbs&&vmFillThumbs();
+}
+function techRbwSet(o){techDraft.Batting=techDraft.Batting||{};let c=techDraft.Batting.RBW=techDraft.Batting.RBW||{};c.overall=c.overall===o?"":o;renderAssessmentTech()}
+function techCompHtml(d,ci){
+ let comp=TECH[d][ci],cn=comp.n,c=techComp(d,cn),key=`${d}_${ci}`,man=!!techManage[key],hid=techHidden(d,ci);
+ let obs=techObsFull(d,ci),lastG="",rows="";
+ obs.forEach((o,oi)=>{
+  let isHid=hid.includes(o.k);if(isHid&&!man)return;
+  if(o.g!==lastG){if(o.g)rows+=`<div class="techGrp">${esc(o.g)}</div>`;lastG=o.g}
+  let cur=c.obs[o.k]||"",prev=techPrev(d,cn,o.k);
+  rows+=`<div class="techRow${isHid?" techHid":""}"><div class="techLbl">${esc(o.l)}${prev?`<small class="muted"> · last: ${TS[prev]?TS[prev].l:""}</small>`:""}</div>`+(man?(isHid?`<button type="button" class="btn secondary sm" onclick="techHide('${d}',${ci},${oi},false)">Restore</button>`:`<button type="button" class="btn secondary sm" onclick="${o.custom?`techDelCustom('${d}',${ci},${oi})`:`techHide('${d}',${ci},${oi},true)`}">${o.custom?"Delete":"Hide"}</button>`):`<div class="techBtns">${["G","M","A"].map(v=>`<button type="button" id="tb_${d}_${ci}_${oi}_${v}" class="tb tb${v}${cur===v?" on":""}" aria-pressed="${cur===v}" aria-label="${TS[v].l}" onclick="techSet('${d}',${ci},${oi},'${v}')">${v}</button>`).join("")}</div>`)+`</div>`;
+ });
+ let frames=(c.frames||[]);
+ let body=`${rows}
+  <div class="formgrid" style="margin-top:8px"><input type="text" id="tadd_${key}" placeholder="Add another observation…" onkeydown="if(event.key==='Enter'){event.preventDefault();techAddCustom('${d}',${ci})}"><button type="button" class="btn secondary" onclick="techAddCustom('${d}',${ci})">+ Add</button></div>
+  <label>Comment<textarea oninput="techComp('${d}','${esc(cn)}').comment=this.value">${esc(c.comment||"")}</textarea></label>
+  <label>Suggested adjustments<textarea oninput="techComp('${d}','${esc(cn)}').adjust=this.value">${esc(c.adjust||"")}</textarea></label>
+  <label>Video link <span class="muted" style="font-weight:400">(e.g. OnForm)</span><input type="url" placeholder="https://…" value="${esc(c.link||"")}" oninput="techComp('${d}','${esc(cn)}').link=this.value"></label>
+  <div class="techMedia">${(c.imgs||[]).map((u,i)=>`<span class="techImg"><img src="${u}" alt=""><button type="button" onclick="techImgDel('${d}','${esc(cn)}',${i})" aria-label="Remove photo">×</button></span>`).join("")}</div>
+  <div class="vmThumbs techFrames" data-ids="${esc(frames.join(","))}"></div>${techPickHtml(d,cn)}
+  <div class="row" style="gap:8px;flex-wrap:wrap;margin-top:6px"><label class="btn secondary sm" style="cursor:pointer;margin:0">📷 Add photo<input type="file" accept="image/*" style="display:none" onchange="techImgAdd('${d}','${esc(cn)}',this)"></label><button type="button" class="btn secondary sm" onclick="techPickFrames('${d}','${esc(cn)}')">🎬 Frames from Video Review${frames.length?" ("+frames.length+")":""}</button><button type="button" class="btn secondary sm" onclick="techManageToggle('${key}')">${man?"Done":"Manage list"}</button></div>`;
+ let open=techOpen[key]?" open":"";
+ return `<details class="techComp"${open} ontoggle="techOpen['${key}']=this.open"><summary><b>${esc(cn)}</b><span class="muted techSum" id="ts_${d}_${ci}">${esc(techSummaryText(d,cn))}</span></summary><div class="techBody">${body}</div></details>`;
+}
+function techManageToggle(key){techManage[key]=!techManage[key];techOpen[key]=true;renderAssessmentTech()}
+function techHide(d,ci,oi,on){
+ let o=techObsFull(d,ci)[oi],cn=TECH[d][ci].n;db.techHidden=db.techHidden||{};db.techHidden[d]=db.techHidden[d]||{};let a=db.techHidden[d][cn]=db.techHidden[d][cn]||[];
+ db.techHidden[d][cn]=on?a.concat(a.includes(o.k)?[]:[o.k]):a.filter(x=>x!==o.k);save();renderAssessmentTech();
+}
+function techAddCustom(d,ci){
+ let cn=TECH[d][ci].n,inp=document.getElementById(`tadd_${d}_${ci}`),name=((inp&&inp.value)||"").trim();if(!name)return;
+ if(techObsFull(d,ci).some(o=>o.l.toLowerCase()===name.toLowerCase())){alert(`"${name}" is already in ${cn}.`);return}
+ db.techCustom=db.techCustom||{};db.techCustom[d]=db.techCustom[d]||{};(db.techCustom[d][cn]=db.techCustom[d][cn]||[]).push(name);
+ techComp(d,cn).obs[name]="";delete techComp(d,cn).obs[name];techOpen[`${d}_${ci}`]=true;save();renderAssessmentTech();
+}
+function techDelCustom(d,ci,oi){
+ let o=techObsFull(d,ci)[oi],cn=TECH[d][ci].n;if(!confirm(`Delete "${o.l}" from ${cn}? Past assessments that used it keep their entry.`))return;
+ db.techCustom[d][cn]=(db.techCustom[d][cn]||[]).filter(x=>x!==o.k);save();renderAssessmentTech();
+}
+function techImgAdd(d,cn,inp){
+ let f=inp.files&&inp.files[0];if(!f)return;let c=techComp(d,cn);if((c.imgs||[]).length>=4){alert("Up to 4 photos per component.");inp.value="";return}
+ let url=URL.createObjectURL(f),im=new Image();
+ im.onload=()=>{let sc=Math.min(1,900/Math.max(im.naturalWidth,im.naturalHeight)),cv=document.createElement("canvas");cv.width=Math.round(im.naturalWidth*sc);cv.height=Math.round(im.naturalHeight*sc);cv.getContext("2d").drawImage(im,0,0,cv.width,cv.height);URL.revokeObjectURL(url);c.imgs=(c.imgs||[]).concat(cv.toDataURL("image/jpeg",.72));renderAssessmentTech()};
+ im.onerror=()=>{URL.revokeObjectURL(url);alert("Could not read that image.")};im.src=url;inp.value="";
+}
+function techImgDel(d,cn,i){let c=techComp(d,cn);c.imgs.splice(i,1);renderAssessmentTech()}
+async function techPickFrames(d,cn){
+ let pl=(document.querySelector('select[name="player"]')||{}).value;if(!pl)return;
+ let all=[];try{all=(await vmAll()).filter(m=>m.player===pl)}catch(e){}
+ if(!all.length){alert("No Video Review frames saved for "+pl+" yet. Save some in Video Review Studio first.");return}
+ let norm=s=>String(s||"").toLowerCase().replace(/[^a-z]/g,""),k=norm(cn.split(" — ")[0]);
+ all.forEach(m=>{m._match=!!m.phase&&(norm(m.phase)===k||k.startsWith(norm(m.phase))||norm(m.phase).startsWith(k))});
+ all.sort((x,y)=>(y._match-x._match)||String(y.created).localeCompare(String(x.created)));
+ window._techPick={d,cn,all,on:new Set(techComp(d,cn).frames||[])};
+ let ci=TECH[d].findIndex(c=>c.n===cn);techOpen[`${d}_${ci}`]=true;renderAssessmentTech();
+}
+function techPickHtml(d,cn){
+ let p=window._techPick;if(!p||p.d!==d||p.cn!==cn)return"";
+ return `<div class="card techPick"><div class="muted" style="margin-bottom:6px">Tap to select. Frames tagged with this phase come first.</div><div class="vmGrid">${p.all.map((m,i)=>`<div class="vmCell${p.on.has(m.id)?" on":""}" id="tpf_${i}" onclick="techPickTog(${i})"><img src="${vmSrc(m.thumb||m.base)}" alt=""><span>${esc(fmtDate(m.date))}${m._match?" ✓":""}${m.phase?" · "+esc(m.phase):""}</span></div>`).join("")}</div><button type="button" class="btn primary full" style="margin-top:8px" onclick="techPickDone(true)">Use selected</button> <button type="button" class="btn secondary full" style="margin-top:6px" onclick="techPickDone(false)">Cancel</button></div>`;
+}
+function techPickTog(i){let p=window._techPick,id=p.all[i].id;if(p.on.has(id))p.on.delete(id);else p.on.add(id);document.getElementById("tpf_"+i).classList.toggle("on",p.on.has(id))}
+function techPickDone(ok){let p=window._techPick;if(ok&&p)techComp(p.d,p.cn).frames=[...p.on];window._techPick=null;renderAssessmentTech()}
+function techCollect(sel){
+ let out={};
+ sel.forEach(d=>{
+  if(!TECH[d])return;let dd=techDraft[d]||{};
+  Object.keys(dd).forEach(cn=>{
+   let c=dd[cn];if(!c)return;
+   if(cn==="RBW"){if(c.overall)(out[d]=out[d]||{})[cn]={overall:c.overall};return}
+   let obs={};Object.keys(c.obs||{}).forEach(k=>{if(c.obs[k])obs[k]=c.obs[k]});
+   if(Object.keys(obs).length||c.comment||c.adjust||c.link||(c.imgs||[]).length||(c.frames||[]).length)(out[d]=out[d]||{})[cn]={obs,comment:c.comment||"",adjust:c.adjust||"",link:c.link||"",imgs:c.imgs||[],frames:c.frames||[]};
+  });
+ });
+ return out;
+}
+// Latest entry per component (and the one before it) across a player's assessments.
+function techHistory(p){
+ let res={};
+ playerAssessments(p).forEach(a=>{
+  if(!a.technique)return;
+  Object.keys(a.technique).forEach(d=>Object.keys(a.technique[d]||{}).forEach(cn=>{
+   let c=a.technique[d][cn];if(!c)return;
+   (res[d]=res[d]||{})[cn]=(res[d][cn]||[]).concat([{date:a.date,c}]);
+  }));
+ });
+ return res;
+}
+const TRANK={G:1,M:2,A:3};
+function techChip(label,st,note){let t=TS[st];return `<span class="techChip" style="border-color:${t.c};color:${t.c}">${esc(label)}${note?` <small>${esc(note)}</small>`:""}</span>`}
+function techViewHtml(p,forPrint){
+ let h=techHistory(p),ds=TECH_DISC.filter(d=>h[d]);if(!ds.length)return"";
+ return `<h2 class="section">Technique</h2>`+ds.map(d=>{
+  let order=TECH[d].map(c=>c.n).concat(d==="Batting"?["RBW"]:[]);
+  let cards=order.filter(cn=>h[d][cn]).map(cn=>{
+   let list=h[d][cn],cur=list[list.length-1],prev=list.length>1?list[list.length-2]:null,c=cur.c;
+   if(cn==="RBW")return `<div class="item"><div><b>RBW</b> <span class="muted">${esc(fmtDate(cur.date))}</span><div>${esc(c.overall)}${prev&&prev.c.overall&&prev.c.overall!==c.overall?` <span class="muted">(was ${esc(prev.c.overall)})</span>`:""}</div></div></div>`;
+   let keys=Object.keys(c.obs||{}),pv=(prev&&prev.c.obs)||{};
+   let flagged=keys.filter(k=>c.obs[k]!=="G").sort((a,b)=>TRANK[c.obs[b]]-TRANK[c.obs[a]]);
+   let good=keys.filter(k=>c.obs[k]==="G");
+   let chips=flagged.map(k=>{let note=pv[k]?(TRANK[pv[k]]>TRANK[c.obs[k]]?"improved":TRANK[pv[k]]<TRANK[c.obs[k]]?"worse":""):"";return techChip(k,c.obs[k],note)}).join("")+(good.length?`<span class="muted" style="font-size:var(--fs-1)"> ${good.length} good: ${esc(good.slice(0,4).join(", "))}${good.length>4?"…":""}</span>`:"");
+   return `<div class="item" style="display:block"><b>${esc(cn)}</b> <span class="muted">${esc(fmtDate(cur.date))}</span><div style="margin-top:4px">${chips||'<span class="muted">No observations</span>'}</div>${c.comment?`<div style="margin-top:4px">${esc(c.comment)}</div>`:""}${c.adjust?`<div style="margin-top:4px"><b>Adjustments:</b> ${esc(c.adjust)}</div>`:""}${c.link&&!forPrint?`<div style="margin-top:4px"><a href="${esc(c.link)}" target="_blank" rel="noopener" class="tag">🎬 Video</a></div>`:""}${(c.imgs||[]).length?`<div class="techMedia">${c.imgs.map(u=>`<img src="${u}" alt="" style="width:96px;height:96px;object-fit:cover;border-radius:8px">`).join("")}</div>`:""}${(!forPrint&&(c.frames||[]).length)?`<div class="vmThumbs" data-ids="${esc(c.frames.join(","))}"></div>`:""}</div>`;
+  }).join("");
+  return `<div class="card"><b>${esc(d)}</b>${cards}</div>`;
+ }).join("");
+}
+// Plain-language version for the parent summary: what is going well and what is being worked on.
+function techParentHtml(p){
+ let h=techHistory(p),lines=[];
+ TECH_DISC.forEach(d=>{if(!h[d])return;Object.keys(h[d]).forEach(cn=>{
+  if(cn==="RBW")return;let list=h[d][cn],c=list[list.length-1].c,keys=Object.keys(c.obs||{});
+  let work=keys.filter(k=>c.obs[k]!=="G"),good=keys.filter(k=>c.obs[k]==="G");
+  if(!work.length&&!good.length&&!c.adjust)return;
+  lines.push(`<p><b>${esc(cn)}</b>${good.length?` — going well: ${esc(good.slice(0,3).join(", "))}.`:""}${work.length?` Working on: ${esc(work.slice(0,3).join(", "))}.`:""}${c.adjust?` Next: ${esc(c.adjust)}`:""}</p>`);
+ })});
+ return lines.length?`<h2>Technique</h2><div class="card">${lines.join("")}</div>`:"";
+}
+
 function saveAssessment(e){
  e.preventDefault();
  if(!requireWriteAccess())return;
@@ -3753,14 +4001,17 @@ function saveAssessment(e){
  let formats=fd.getAll("formats");
  let a={player:fd.get("player"),date:fd.get("date"),disciplines:sel,priority:fd.get("priority"),comments:fd.get("comments"),ratings:{},disciplineNotes:{},formats,formatRatings:{}};
  a.mediaLinks=(fd.get("mediaLinks")||"").split("\n").map(s=>s.trim()).filter(Boolean);
+ let skipGame=fd.get("skipGame")!==null;
+ let tech=techCollect(sel);if(Object.keys(tech).length)a.technique=tech;
+ if(skipGame&&!a.technique){alert("Technique-only needs at least one technique entry. Untick it to save game-skill ratings.");return}
  sel.forEach(d=>{
   let hasFormatConcept=!!FORMAT_SKILLS[d];
-  let showGeneral=!hasFormatConcept||formats.includes("General");
+  let showGeneral=!skipGame&&(!hasFormatConcept||formats.includes("General"));
   a.ratings[d]=showGeneral?allSkillsFor(d).map((_,i)=>Number(fd.get(`${d}_${i}`)||0)):[];
   a.disciplineNotes[d]=fd.get(`${d}_notes`)||"";
   if(hasFormatConcept){
    let activeFormats=formats.filter(f=>f!=="General"&&FORMAT_SKILLS[d][f]&&FORMAT_SKILLS[d][f].length);
-   if(activeFormats.length){
+   if(activeFormats.length&&!skipGame){
     a.formatRatings[d]={};
     activeFormats.forEach(f=>{a.formatRatings[d][f]=allFormatSkillsFor(d,f).map((_,i)=>Number(fd.get(`${d}_fmt_${f}_${i}`)||0))});
    }
@@ -3791,9 +4042,9 @@ function assessmentFormatEntries(a,d){
  if(typeof fr==="object")return Object.keys(fr).filter(f=>FORMAT_SKILLS[d]&&FORMAT_SKILLS[d][f]).map(f=>({format:f,vals:fr[f],labels:allFormatSkillsFor(d,f)}));
  return [];
 }
-function assessmentFormatTagsHtml(a){return (Array.isArray(a.formats)?a.formats:[]).filter(f=>f!=="General").map(f=>`<span class="tag">${esc(f)}</span>`).join("")}
+function assessmentFormatTagsHtml(a){return (Array.isArray(a.formats)?a.formats:[]).filter(f=>f!=="General").map(f=>`<span class="tag">${esc(f)}</span>`).join("")+(a.technique&&Object.keys(a.technique).length?`<span class="tag">Technique</span>`:"")}
 function disciplineAvg(a,d){let n=[];if(a.ratings&&Array.isArray(a.ratings[d]))n=a.ratings[d].map(Number).filter(x=>x>0);else if(d==="Fielding")n=legacySkills.map((_,i)=>Number(a["s"+i]||0)).filter(x=>x>0);assessmentFormatEntries(a,d).forEach(({vals})=>{n=n.concat(vals.map(Number).filter(x=>x>0))});return n.length?(n.reduce((x,y)=>x+y,0)/n.length).toFixed(1):"—"}function assessmentAvg(a){let n=assessmentDisciplines(a).map(d=>Number(disciplineAvg(a,d))).filter(Number.isFinite);return n.length?(n.reduce((x,y)=>x+y,0)/n.length).toFixed(1):"—"}
-function assessmentDetailHTML(a){return assessmentDisciplines(a).map(d=>{let vals=a.ratings?.[d]||[],labels=(d==="Bowling"&&vals.length===10)?legacyBowlingSkills:allSkillsFor(d);if(!vals.length&&d==="Fielding")vals=legacySkills.map((_,i)=>Number(a["s"+i]||0));let formatEntries=assessmentFormatEntries(a,d).filter(({vals:fv})=>fv.some(x=>x));let fmtHtml=formatEntries.map(({format,vals:fv,labels:fl})=>`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><b>${esc(format)} specifics</b>${fl.map((s,i)=>fv[i]?`<div style="margin-top:4px"><b>${esc(s)}</b> — ${esc(fv[i])}/10</div>`:"").join("")}</div>`).join("");let formatTags=formatEntries.map(({format})=>` <span class="tag">${esc(format)}</span>`).join("");return `<h2 class="section">${d} · ${disciplineAvg(a,d)}/10${formatTags}</h2><div class="card">${labels.map((s,i)=>vals[i]?`<div><b>${esc(s)}</b> — ${esc(vals[i])}/10</div>`:"").join("")}${fmtHtml}${a.disciplineNotes?.[d]?`<p><b>Development notes</b><br>${esc(a.disciplineNotes[d])}</p>`:""}</div>`}).join("")+assessmentMediaLinksHtml(a)}
+function assessmentDetailHTML(a){return assessmentDisciplines(a).map(d=>{let vals=a.ratings?.[d]||[],labels=(d==="Bowling"&&vals.length===10)?legacyBowlingSkills:allSkillsFor(d);if(!vals.length&&d==="Fielding")vals=legacySkills.map((_,i)=>Number(a["s"+i]||0));let formatEntries=assessmentFormatEntries(a,d).filter(({vals:fv})=>fv.some(x=>x));let fmtHtml=formatEntries.map(({format,vals:fv,labels:fl})=>`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><b>${esc(format)} specifics</b>${fl.map((s,i)=>fv[i]?`<div style="margin-top:4px"><b>${esc(s)}</b> — ${esc(fv[i])}/10</div>`:"").join("")}</div>`).join("");let formatTags=formatEntries.map(({format})=>` <span class="tag">${esc(format)}</span>`).join("");if(disciplineAvg(a,d)==="—"&&!(a.disciplineNotes&&a.disciplineNotes[d]))return "";return `<h2 class="section">${d} · ${disciplineAvg(a,d)}/10${formatTags}</h2><div class="card">${labels.map((s,i)=>vals[i]?`<div><b>${esc(s)}</b> — ${esc(vals[i])}/10</div>`:"").join("")}${fmtHtml}${a.disciplineNotes?.[d]?`<p><b>Development notes</b><br>${esc(a.disciplineNotes[d])}</p>`:""}</div>`}).join("")+assessmentMediaLinksHtml(a)}
 function assessmentMediaLinksHtml(a){
  if(!a.mediaLinks||!a.mediaLinks.length)return "";
  return `<div class="card" style="margin-top:10px"><b>Video / Photo Links</b><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px">${a.mediaLinks.map((link,i)=>{
@@ -6489,7 +6740,7 @@ function buildPlayerReport(){
  ${playerProgressPrintHtml(aa)}
  ${matches.length?`<h2>Match Performance</h2><div class="card"><p>${battingEntries.length?`Batting: ${totalRuns} run${totalRuns!==1?"s":""} across ${battingEntries.length} innings`:""}${battingEntries.length&&bowlingEntries.length?" · ":""}${bowlingEntries.length?`Bowling: ${totalWickets} wicket${totalWickets!==1?"s":""} across ${bowlingEntries.length} match${bowlingEntries.length!==1?"es":""}`:""}${!battingEntries.length&&!bowlingEntries.length?`Played in ${matches.length} match${matches.length!==1?"es":""}, no batting or bowling entries logged.`:""}</p>${backToBackCount>0?`<p style="margin-top:8px;color:var(--gold)"><b>⚠ Workload note:</b> ${backToBackCount} match${backToBackCount!==1?"es":""} played with a day or less rest before the next one.</p>`:""}</div>`:""}
  ${matchTrendHtml}
- <h2>Assessment History</h2>${aa.length?aa.slice().reverse().map(a=>`<div class="card"><b>${esc(fmtDate(a.date))} · Overall ${assessmentAvg(a)}/10</b><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d} ${disciplineAvg(a,d)}/10</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${assessmentDetailHTML(a)}</div>`).join(""):empty("No assessments for this player.")}`)}
+ <h2>Assessment History</h2>${aa.length?aa.slice().reverse().map(a=>`<div class="card"><b>${esc(fmtDate(a.date))} · ${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</b><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d} ${disciplineAvg(a,d)}/10</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${assessmentDetailHTML(a)}</div>`).join(""):empty("No assessments for this player.")}`)}
 function seasonReport(){scopeAndRangeModal("Season / Full Report","buildSeasonReport")}
 function buildSeasonReport(){
  let scope=scopeValues();
@@ -7514,7 +7765,7 @@ function reflectionResultHtml(r){return `<div class="item" style="cursor:pointer
 function playerResultHtml(p){return `<div class="item" style="cursor:pointer" onclick="closeM();playerView('${p.id}')"><div><b>${esc(p.name)}</b><div class="muted">${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}</div></div></div>`}
 function drillResultHtml(d){return `<div class="item" style="cursor:pointer" onclick="closeM();editDrill('${d.id}')"><div><b>${esc(d.name)}</b><div class="muted">${esc(d.cat||"General")}</div></div></div>`}
 function drillIntoAssessment(name){let p=db.players.find(x=>x.name===name);closeM();if(p)playerView(p.id);else go('assessments')}
-function assessmentResultHtml(a){return `<div class="item" style="cursor:pointer" onclick="drillIntoAssessment('${esc(a.player||"")}')"><div><b>${esc(a.player||"Unknown player")}</b><div class="muted">${esc(a.date||"")} · Overall ${assessmentAvg(a)}/10</div></div></div>`}
+function assessmentResultHtml(a){return `<div class="item" style="cursor:pointer" onclick="drillIntoAssessment('${esc(a.player||"")}')"><div><b>${esc(a.player||"Unknown player")}</b><div class="muted">${esc(a.date||"")} · ${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</div></div></div>`}
 function matchResultHtml(m){return `<div class="item" style="cursor:pointer" onclick="closeM();matchReportView('${m.id}')"><div><b>vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.date||"")} · ${esc(m.result||"")}</div></div></div>`}
 function eventResultHtml(e){return `<div class="item" style="cursor:pointer" onclick="closeM();go('calendar')"><div><b>${esc(e.title||"")}</b><div class="muted">${esc(e.date||"")} · ${esc(e.type||"Event")}</div></div></div>`}
 function globalSearchResultsHtml(){

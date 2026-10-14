@@ -62,6 +62,8 @@ html.hc .card,html.hc .btn,html.hc .chip,html.hc select,html.hc input,html.hc te
 .dockRow2{display:flex;align-items:center;gap:8px}
 .dockHelp{font-size:12px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin:0 36px 6px 2px;min-height:30px}
 .dockToggle{position:absolute;top:2px;right:6px;width:32px;height:28px;border:0;background:none;color:var(--muted);font-size:18px;font-weight:700}
+.cueList{display:flex;flex-wrap:wrap;gap:6px;max-height:170px;overflow:auto;margin-top:8px;padding:2px}
+.cueList .chip{font-size:12.5px;text-align:left}
 .dock.min .dockHelp,.dock.min .dockRow2{display:none}.dock.min .dockTools{padding-bottom:2px;padding-right:34px}
 .dockRow2 #cols{flex-wrap:nowrap;gap:6px!important}.dockRow2 .sw{width:26px;height:26px;border-width:2px;flex:0 0 auto}.dockRow2 .btn.sm{padding:6px 9px}
 </style>
@@ -120,7 +122,20 @@ var SKILLS={
  "Fielding":["Catching","Ground fielding","Throwing","Backing up"],
  "Keeping":["Stance","Gathering","Standing up"]
 };
-var CUES=["Head still through contact","Eyes level at release","Stable base at landing","Soft hands on contact","Front shoulder closed","Full extension through the ball","Balanced finish","Weight transfers to front foot","Bat path straight through the line","Wrist behind the ball"];
+var CUES_BY={
+ "Batting":["Head still, eyes level at release","Balanced stance, weight on the balls of the feet","Trigger early, settled before release","Watch the ball onto the bat","Hands lead, bat comes down straight","Soft hands at impact — let the ball arrive","Front shoulder points at the bowler","Head over the front knee into the drive","Hit through the line, full extension","Play it as late as possible","Get back and across, head over the ball","Under the eyes against the short ball","Stay balanced after the shot — no falling over","Against spin: use the crease, get to the pitch or right back","Sweep: stay low, eyes on the ball, roll the wrists","Rotate strike — read the single before the shot"],
+ "Pace bowling":["Smooth, rhythmic run-up, accelerate to the crease","Tall at the top, eyes on the target","Strong base at gather, hips and shoulders aligned","Front arm up and pulled down hard","Front foot lands braced, knee firm","Head still and over the front leg at release","Chest to the target — don't fall away","Seam upright, wrist behind the ball","Same release point every ball","Hit the deck hard, attack the top of off","Same action for every variation","Full follow-through, run off the pitch","Land the front foot in line with the target","Non-bowling arm strong and towards the target","Repeat the length: hit the same spot six times"],
+ "Spin bowling":["Stay tall, smooth approach, no rush","Front arm up and pointing at the batter","Hips and shoulders aligned through the delivery","Strong front leg — brace and rotate over it","Release out in front, fingers or wrist through the ball","Revolutions before speed — spin it hard","Shape the ball up: flight, dip and drift","Vary pace and flight with the same action","Land on the same spot, over after over","Head still, eyes on the target","Follow through across the body","Bowl at the stumps and make the batter play","Wrist behind the ball, seam angle intact (wrist-spin)","Bowl the plan: line, length and field working together","Hold your shape under pressure — don't push it quicker"],
+ "Fielding":["Ready position: low, weight forward, hands relaxed","Split step as the bat meets the ball","Watch the ball all the way into the hands","Soft hands — give with the ball","Get behind the line, body as the second barrier","Attack the ball: move early, stay low","Gather and throw in one movement","Cross-step, shoulders side-on to the target","Eyes on the stumps, non-throwing arm leads","Throw to the top of the stumps","High catch: get under it, fingers up, soft hands","Slip catch: stay low, hands move with the ball","Communicate early — call loud, call first","Back up every throw, anticipate the overthrow","Boundary: slide or dive with control, keep the body behind","Reset immediately after every ball"],
+ "Wicket keeping":["Low, balanced, weight on the balls of the feet","Head still, eyes level, watch the ball to the gloves","Feet first, hands follow","Soft hands — give with the ball","Rise with the ball, gather at the chest","Standing up: gloves in front, stable on the toes","Standing back: take it as it rises, not as it dips","Leg-side: step across, hands outside the line of the ball","Taking spin: watch it off the pitch, late hands","Stumping: gather behind the stumps, break them with the ball in hand","Gather and clear in one movement for run-outs","Collect and give — never snatch","Read the batter's feet and the bowler's hand","Communicate with the bowler and the field","Reset between balls, keep your rhythm"]
+};
+var PHASES={
+ "Batting":["Grip","Stance","Backlift","Initial movement","Downswing","Impact","Follow-through"],
+ "Pace bowling":["Run-up","Loading (jump & gather)","Back-foot landing","Hip / shoulder alignment","Front-foot landing","Alignment","Release","Follow-through"],
+ "Spin bowling":["Run-up","Loading (jump & gather)","Back-foot landing","Hip / shoulder alignment","Front-foot landing","Alignment","Release","Follow-through"],
+ "Fielding":["Catching","Ground fielding","Throwing","Ready position","Approach"],
+ "Wicket keeping":["Crouch","Position","Footwork","Glovework","Stumping / throw"]
+};
 var COLORS=["#ffd400","#ff3b30","#34c759","#00c8ff","#ffffff"];
 var FPS_LIST=[24,25,30,48,50,60,100,120,240];
 
@@ -193,6 +208,7 @@ function render(){
   if(S.view==="studio")return renderStudio(app);
   if(S.view==="editor")return renderEditor(app);
   if(S.view==="viewer")return renderViewer(app);
+  if(S.view==="clip")return renderClip(app);
   if(S.view==="comparePick")return renderComparePick(app);
   if(S.view==="compare"&&C.a&&C.b)return renderCompare(app);
   S.view="home";renderHome(app);
@@ -211,7 +227,7 @@ function renderHome(app){
    '<label class="vlabelOther" style="display:none">Name</label><input type="text" id="plOther" placeholder="Player name" style="display:none" oninput="S.player=this.value.trim()">'+
    '<div style="margin-top:12px"><label class="btn primary full" style="text-align:center;margin:0;cursor:pointer">🎬 Choose video<input type="file" accept="video/*" style="display:none" onchange="openClip(this)"></label></div>'+
    '<button class="btn full" style="margin-top:10px" onclick="setView(\'comparePick\')">⇆ Compare two clips</button><div class="tip">Film side-on for drives and cuts, front-on for bowling actions, with the camera still and the player in full view. Angles you measure are on-screen angles, not exact body angles.</div></div>'+
-   '<div class="row" style="margin:6px 0 8px"><b class="grow">Saved moments'+(S.player&&S.player!=="__other"?' — '+esc(S.player):'')+'</b><span class="muted small">'+mine.length+' · '+fmtB(mb)+' total</span></div>'+
+   clipReviewsHtml()+'<div class="row" style="margin:6px 0 8px"><b class="grow">Saved moments'+(S.player&&S.player!=="__other"?' — '+esc(S.player):'')+'</b><span class="muted small">'+mine.length+' · '+fmtB(mb)+' total</span></div>'+
    (mine.length?'<div class="grid">'+mine.map(function(m){return '<div class="mom" onclick="openMoment(\''+m.id+'\')"><img src="'+thumbSrc(m)+'" alt=""><div><b>'+esc(m.player)+'</b><br><span class="muted">'+fmtDate(m.date)+' · '+fmtB(momBytes(m))+'</span></div></div>'}).join("")+'</div>':'<div class="card muted">No saved moments yet. Choose a video, freeze a frame, draw, and save.</div>')+
    '<div class="card" style="margin-top:14px"><b>Storage</b><div class="muted small" style="margin:4px 0 8px">Each saved moment is a small compressed image plus the drawing instructions — the video itself is never stored. Lower quality keeps your phone light.</div>'+
    '<label style="margin-top:0">Frame quality for new saves</label><select onchange="try{localStorage.setItem(\'video_quality\',this.value)}catch(e){}">'+Object.keys(QUAL).map(function(k){return '<option value="'+k+'"'+(qualKey()===k?' selected':'')+'>'+QUAL[k].label+'</option>'}).join("")+'</select>'+
@@ -252,7 +268,7 @@ function renderStudio(app){
    '<div id="mkList" style="margin-top:14px"></div>'+
    '</main>';
   var v=VEL=document.getElementById("vid");
-  v.addEventListener("loadedmetadata",function(){document.getElementById("tdur").textContent=fmtT(v.duration);drawMarks();detect()});
+  v.addEventListener("loadedmetadata",function(){document.getElementById("tdur").textContent=fmtT(v.duration);drawMarks();if(S.fpsDetected){document.getElementById("fpsNote").textContent="Frame rate: "+S.fps+" fps. Correct it above if steps look wrong (slow-motion clips can differ).";applyResume()}else detect()});
   v.addEventListener("error",function(){document.getElementById("fpsNote").innerHTML='<span style="color:var(--red)">This video format can\'t be played by your browser. iPhone clips (HEVC/MOV) play on iPhones but may not on some computers.</span>'});
   v.addEventListener("play",function(){setPP();tick()});v.addEventListener("pause",function(){setPP();upd()});v.addEventListener("seeked",upd);
   document.getElementById("seek").addEventListener("input",function(){v.pause();v.currentTime=(this.value/1000)*(v.duration||0)});
@@ -286,16 +302,17 @@ function drawMarks(){
   document.getElementById("marks").innerHTML=list.map(function(m){return '<i style="left:calc('+(m.timeSec/d*100)+'% - 1px)"></i>'}).join("");
   document.getElementById("mkList").innerHTML=list.length?'<b>Saved markers on this clip</b><div class="chips" style="margin-top:8px">'+list.sort(function(a,b){return a.timeSec-b.timeSec}).map(function(m){return '<button class="chip" onclick="jumpTo('+m.timeSec+')">'+fmtT(m.timeSec)+(m.tags&&m.tags[0]?" · "+esc(m.tags[0]):"")+'</button>'}).join("")+'</div>':'';
 }
+function applyResume(){if(!VEL)return;if(S.resumeT!=null){VEL.pause();VEL.currentTime=S.resumeT;S.resumeT=null}paintLoop();setSpeed(S.speed);updFr()}
 function jumpTo(t){VEL.pause();VEL.currentTime=t}
 function snapFps(f){var best=null,bd=1e9;FPS_LIST.forEach(function(x){var d=Math.abs(x-f)/x;if(d<bd){bd=d;best=x}});return bd<.04?best:Math.round(f)}
 function detect(){
   var v=VEL,note=document.getElementById("fpsNote");
-  if(!v.requestVideoFrameCallback){note.textContent="Using 30 fps for frame stepping — change it above if the clip is different.";return}
+  if(!v.requestVideoFrameCallback){note.textContent="Using 30 fps for frame stepping — change it above if the clip is different.";applyResume();return}
   var last=null,min=1e9,n=0,done=false;
   function fin(){if(done)return;done=true;v.pause();v.currentTime=0;
     if(n>=4&&min<1){S.fps=snapFps(1/min);S.fpsDetected=true;var s=document.getElementById("fpsSel");if(s){if(![].some.call(s.options,function(o){return +o.value===S.fps})){var o=document.createElement("option");o.textContent=S.fps;s.appendChild(o)}s.value=S.fps}note.textContent="Frame rate detected: "+S.fps+" fps. Correct it above if steps look wrong (slow-motion clips can differ)."}
     else note.textContent="Using 30 fps for frame stepping — change it above if the clip is different.";
-    v.playbackRate=S.speed;updFr()}
+    v.playbackRate=S.speed;updFr();applyResume()}
   function cb(now,meta){if(last!==null){var d=meta.mediaTime-last;if(d>.0005&&d<min)min=d;n++}last=meta.mediaTime;if(n<14&&!done)v.requestVideoFrameCallback(cb);else fin()}
   v.requestVideoFrameCallback(cb);v.playbackRate=1;v.play().catch(fin);setTimeout(fin,1800);
 }
@@ -309,7 +326,7 @@ function captureFrame(v){
 function freeze(){
   var v=VEL;v.pause();
   if(!v.videoWidth){alert("The video isn't ready yet.");return}
-  var t=v.currentTime;
+  var t=v.currentTime;S.resumeT=t;
   captureFrame(v).then(function(base){ED={base:base,shapes:[],tool:"line",color:COLORS[0],pts:[],drag:null,timeSec:t,existing:null};setView("editor")});
 }
 var TOOLS=[["edit","Edit"],["line","Line"],["angle","Angle"],["vguide","Vertical"],["hguide","Horizontal"],["circle","Circle"],["arrow","Arrow"],["text","Text"],["spot","Spotlight"],["pan","Pan"]];
@@ -453,18 +470,34 @@ function saveSheet(){
   var groups=Object.keys(SKILLS).map(function(g){return '<div class="muted small" style="margin:8px 0 4px">'+g+'</div><div class="chips">'+SKILLS[g].map(function(s){var tg=g+" / "+s;return '<button type="button" class="chip'+(tags.indexOf(tg)>=0?" on":"")+'" data-tag="'+esc(tg)+'" onclick="toggleTag(this)">'+esc(s)+'</button>'}).join("")+'</div>'}).join("");
   sheet('<h2>'+(ED.existing?"Save changes":"Save moment")+'</h2><div class="muted small">'+esc(S.player||ex.player)+' · '+fmtDate(ex.date||todayStr())+'</div>'+
    '<label>Tags</label>'+groups+
-   '<label>Coaching cue</label><select onchange="if(this.value){var c=document.getElementById(\'cm\');c.value=(c.value?c.value+\'. \':\'\')+this.value;this.value=\'\'}"><option value="">Add a cue…</option>'+CUES.map(function(c){return '<option>'+esc(c)+'</option>'}).join("")+'</select>'+
+   '<label>Phase of the action</label><div class="chips" id="cueDeps">'+Object.keys(CUES_BY).map(function(d){return '<button type="button" class="chip" data-d="'+d+'" onclick="showCues(\''+d+'\',true)">'+d+'</button>'}).join("")+'</div><div class="chips" id="phaseList" style="margin-top:8px"></div>'+
+   '<label>Coaching cues <span class="muted" style="font-weight:400">(tap to add to the comment)</span></label><div class="cueList" id="cueList"></div>'+
    '<label>Comment</label><textarea id="cm" rows="2" placeholder="One line the player can act on">'+esc(ex.comment||"")+'</textarea>'+
    '<label>Rating of this moment (optional)</label><div class="stars" id="stars">'+[1,2,3,4,5].map(function(n){return '<button type="button" class="'+(n<=ED.rating?"on":"")+'" onclick="setRating('+n+')">★</button>'}).join("")+'</div>'+
    '<label style="display:flex;gap:10px;align-items:center;font-weight:600;margin-top:14px"><input type="checkbox" id="rep" '+(ex.report?"checked":"")+' style="width:20px;height:20px"> Include in player reports &amp; parent summary</label>'+
-   '<div class="row" style="margin-top:14px"><button class="btn grow" onclick="closeSheet()">Cancel</button><button class="btn primary grow" onclick="saveMoment()">Save</button></div>');
+   '<div class="row" style="margin-top:14px"><button class="btn grow" onclick="closeSheet()">Cancel</button><button class="btn primary grow" onclick="saveMoment()">Save</button></div>');initCues();
 }
-function toggleTag(b){var t=b.dataset.tag,i=ED.tags.indexOf(t);if(i>=0)ED.tags.splice(i,1);else ED.tags.push(t);b.classList.toggle("on",i<0)}
+function initCues(){var ex=ED.existing||{};ED.phase=ex.phase||"";var d=ex.phaseDep&&CUES_BY[ex.phaseDep]?ex.phaseDep:((ED.tags||[]).length?depFor(ED.tags[ED.tags.length-1]):"Batting");ED.depManual=false;showCues(d,false)}
+function toggleTag(b){var t=b.dataset.tag,i=ED.tags.indexOf(t);if(i>=0)ED.tags.splice(i,1);else ED.tags.push(t);b.classList.toggle("on",i<0);if(i<0&&!ED.depManual)showCues(depFor(t),false)}
+function depFor(tag){return /^Bowling/.test(tag)?(ED.lastDep==="Spin bowling"?"Spin bowling":"Pace bowling"):/^Fielding/.test(tag)?"Fielding":/^Keeping/.test(tag)?"Wicket keeping":"Batting"}
+function showCues(d,manual){
+  if(manual)ED.depManual=true;ED.lastDep=d;
+  [].forEach.call(document.querySelectorAll("#cueDeps .chip"),function(c){c.classList.toggle("on",c.dataset.d===d)});
+  var box=document.getElementById("cueList");if(!box)return;
+  var pl=document.getElementById("phaseList");if(pl)pl.innerHTML=PHASES[d].map(function(ph){return '<button type="button" class="chip'+(ED.phase===ph&&ED.phaseDep===d?" on":"")+'" onclick="setPhase(\''+d+'\',\''+ph+'\',this)">'+ph+'</button>'}).join("");
+  box.innerHTML=CUES_BY[d].map(function(c,i){return '<button type="button" class="chip" data-i="'+i+'" onclick="addCue(\''+d+'\','+i+')">'+esc(c)+'</button>'}).join("");
+}
+function setPhase(d,ph,b){var same=ED.phase===ph&&ED.phaseDep===d;ED.phase=same?"":ph;ED.phaseDep=same?"":d;[].forEach.call(document.querySelectorAll("#phaseList .chip"),function(c){c.classList.remove("on")});if(!same)b.classList.add("on")}
+function addCue(d,i){
+  var c=CUES_BY[d][i],t=document.getElementById("cm"),v=t.value.trim();
+  if(v.indexOf(c)>=0)return;
+  t.value=v?(/[.!?]$/.test(v)?v+" ":v+". ")+c:c;
+}
 function setRating(n){ED.rating=ED.rating===n?0:n;[].forEach.call(document.querySelectorAll("#stars button"),function(b,i){b.classList.toggle("on",i<ED.rating)})}
 function saveMoment(){
   var ex=ED.existing,cm=document.getElementById("cm").value.trim();
   var rec=ex?Object.assign({},ex):{id:vid(),player:S.player,date:todayStr(),clipName:S.clip&&S.clip.name,clipSize:S.clip&&S.clip.size,clipKey:S.clip&&S.clip.key,timeSec:ED.timeSec,fps:S.fps,created:new Date().toISOString()};
-  rec.base=ED.base;rec.shapes=ED.shapes;rec.tags=ED.tags;rec.comment=cm;rec.rating=ED.rating||0;rec.edited=new Date().toISOString();delete rec.composite;rec.report=!!(document.getElementById("rep")&&document.getElementById("rep").checked);
+  rec.base=ED.base;rec.shapes=ED.shapes;rec.tags=ED.tags;rec.comment=cm;rec.rating=ED.rating||0;rec.phase=ED.phase||"";rec.phaseDep=ED.phase?(ED.phaseDep||ED.lastDep):"";rec.edited=new Date().toISOString();delete rec.composite;rec.report=!!(document.getElementById("rep")&&document.getElementById("rep").checked);
   composite(ED.base,ED.shapes,.7).then(function(full){return imgOf(full)}).then(makeThumb).catch(function(){return null}).then(function(th){rec.thumb=th||null;return dbPut(rec)}).then(refresh).then(function(){
     closeSheet();if(ex){ED=null;S.cur=rec;setView("viewer")}else{ED=null;setView("studio")}
   }).catch(function(e){alert("Couldn't save: "+(e&&e.message||e)+". Your device may be low on space.")});
@@ -475,10 +508,10 @@ function openMoment(id){S.cur=S.moments.find(function(m){return m.id===id});if(S
 function renderViewer(app){
   var m=S.cur;if(!m){setView("home");return}
   composite(m.base,m.shapes||[],.85).then(function(b){var i=document.getElementById("vImg");if(i)i.src=urlOf(m.id+"v"+(m.edited||""),b)});
-  app.innerHTML=hdr(m.player,"setView('"+(S.clip&&false?"studio":"home")+"')")+'<main>'+
+  app.innerHTML=hdr(m.player,"setView('"+(S.fromReview&&S.rev?"clip":"home")+"')")+'<main>'+
    '<div class="edWrap"><img id="vImg" src="'+thumbSrc(m)+'" style="width:100%;display:block;min-height:120px" alt=""></div>'+
    '<div class="card" style="margin-top:12px"><div class="muted small">'+fmtDate(m.date)+' · '+esc(m.clipName||"")+' · '+fmtT(m.timeSec)+' · frame '+Math.round(m.timeSec*(m.fps||30))+' · '+fmtB(momBytes(m))+'</div>'+
-   (m.tags&&m.tags.length?'<div class="chips" style="margin-top:8px">'+m.tags.map(function(t){return '<span class="chip">'+esc(t)+'</span>'}).join("")+'</div>':'')+
+   (m.phase||(m.tags&&m.tags.length)?'<div class="chips" style="margin-top:8px">'+(m.phase?'<span class="chip on">'+esc(m.phase)+'</span>':'')+(m.tags||[]).map(function(t){return '<span class="chip">'+esc(t)+'</span>'}).join("")+'</div>':'')+
    (m.comment?'<p style="margin:10px 0 0">'+esc(m.comment)+'</p>':'')+
    (m.rating?'<div style="color:var(--gold);font-size:20px;margin-top:6px">'+"★".repeat(m.rating)+'<span class="muted">'+"★".repeat(5-m.rating)+'</span></div>':'')+'</div>'+
    '<div class="row"><button class="btn grow" onclick="editMoment()">Edit drawings &amp; notes</button><button class="btn grow" onclick="shareMoment()">Share image</button></div>'+
@@ -620,6 +653,63 @@ function updC(){
   var pb=document.getElementById("cpp");if(pb){var pl=["a","b"].some(function(i){var v=vOf(i);return v&&!v.paused});pb.textContent=pl?"⏸ Both":"▶ Both"}
 }
 function tickC(){cancelAnimationFrame(C.raf);(function loop(){updC();if(["a","b"].some(function(i){var v=vOf(i);return v&&!v.paused}))C.raf=requestAnimationFrame(loop)})()}
+
+
+/* ---------- clip reviews: all frames from one video, in order ---------- */
+function clipGroups(){
+  var g={},list=S.moments.filter(function(m){return !S.player||S.player==="__other"||m.player===S.player});
+  list.forEach(function(m){var k=(m.clipKey||m.id)+"||"+m.player;(g[k]=g[k]||[]).push(m)});
+  return Object.keys(g).map(function(k){var a=g[k].sort(function(x,y){return x.timeSec-y.timeSec});return{key:k,list:a,newest:a.reduce(function(n,m){return m.created>n?m.created:n},"")}}).filter(function(x){return x.list.length>=2}).sort(function(a,b){return b.newest.localeCompare(a.newest)});
+}
+function clipReviewsHtml(){
+  S.groups=clipGroups();if(!S.groups.length)return"";
+  return '<div class="muted small" style="margin:6px 0 8px"><b style="color:var(--ink)">Clip reviews</b> — frames from the same video, in order</div>'+S.groups.map(function(g,i){var f=g.list[0];
+    return '<div class="card" style="cursor:pointer" onclick="openReview('+i+')"><div class="row"><b class="grow">'+esc(f.player)+' · '+esc((f.clipName||"clip").slice(0,26))+'</b><span class="muted small">'+g.list.length+' frames</span></div><div class="muted small">'+fmtDate(f.date)+'</div><div class="row" style="margin-top:8px;gap:6px;flex-wrap:nowrap;overflow:hidden">'+g.list.slice(0,5).map(function(m){return '<img src="'+thumbSrc(m)+'" alt="" style="width:20%;aspect-ratio:16/10;object-fit:cover;border-radius:8px">'}).join("")+'</div></div>'}).join("");
+}
+function openReview(i){var g=S.groups[i];if(!g)return;S.rev={ids:g.list.map(function(m){return m.id})};setView("clip")}
+function revList(){return(S.rev?S.rev.ids:[]).map(function(id){return S.moments.find(function(m){return m.id===id})}).filter(Boolean).sort(function(a,b){return a.timeSec-b.timeSec})}
+function shortTags(m){return(m.tags||[]).map(function(t){return t.split(" / ").pop()}).join(", ")}
+function renderClip(app){
+  var list=revList();if(!list.length){setView("home");return}var f=list[0],inRep=list.every(function(m){return m.seq});
+  app.innerHTML=hdr("Clip review","setView('home')")+'<main>'+
+   '<div class="card"><b>'+esc(f.player)+'</b><div class="muted small">'+fmtDate(f.date)+' · '+esc(f.clipName||"")+' · '+list.length+' frames</div></div>'+
+   '<div class="row"><button class="btn grow" onclick="shareReview()">Share as one image</button><button class="btn grow'+(inRep?" on":"")+'" onclick="toggleSeq()">'+(inRep?"✓ In player reports":"Add to player reports")+'</button></div>'+
+   list.map(function(m,i){return '<div class="card" style="margin-top:12px"><div class="row" style="margin-bottom:8px"><b class="grow">'+(i+1)+'. '+esc(m.phase||"Frame")+'</b><span class="muted small">'+fmtT(m.timeSec)+'</span></div>'+
+    '<img id="rv'+i+'" src="'+thumbSrc(m)+'" style="width:100%;border-radius:10px;display:block" alt="">'+
+    (shortTags(m)?'<div class="muted small" style="margin-top:6px">'+esc(shortTags(m))+'</div>':'')+(m.comment?'<p style="margin:6px 0 0">'+esc(m.comment)+'</p>':'')+
+    '<button class="btn sm" style="margin-top:8px" onclick="S.cur=S.moments.find(function(x){return x.id===\''+m.id+'\'});S.fromReview=true;setView(\'viewer\')">Open frame</button></div>'}).join("")+'</main>';
+  list.forEach(function(m,i){composite(asBlob(m.base),m.shapes||[],.82).then(function(b){var im=document.getElementById("rv"+i);if(im)im.src=urlOf(m.id+"r"+(m.edited||""),b)})});
+}
+function toggleSeq(){
+  var list=revList(),on=!list.every(function(m){return m.seq});
+  Promise.all(list.map(function(m){var c=Object.assign({},m);c.seq=on;return dbPut(c)})).then(refresh).then(render);
+}
+function wrapText(ctx,text,maxW){var words=String(text||"").split(/\s+/),lines=[],cur="";words.forEach(function(w){var t=cur?cur+" "+w:w;if(ctx.measureText(t).width>maxW&&cur){lines.push(cur);cur=w}else cur=t});if(cur)lines.push(cur);return lines}
+function shareReview(){
+  var list=revList(),f=list[0],W=1080,pad=30,gap=20,cw=(W-pad*2-gap)/2,ctx0=document.createElement("canvas").getContext("2d");
+  Promise.all(list.map(function(m){return composite(asBlob(m.base),m.shapes||[],.85).then(imgOf)})).then(function(imgs){
+    ctx0.font="22px Arial";
+    var cells=list.map(function(m,i){var im=imgs[i],ih=Math.round(im.naturalHeight*cw/im.naturalWidth);ctx0.font="22px Arial";var cl=wrapText(ctx0,m.comment||"",cw-20).slice(0,5);return{m:m,im:im,ih:ih,cl:cl,h:ih+16+34+(shortTags(m)?28:0)+cl.length*28+22}});
+    var rows=[];for(var i=0;i<cells.length;i+=2)rows.push(cells.slice(i,i+2));
+    var rh=rows.map(function(r){return Math.max.apply(null,r.map(function(c){return c.h}))});
+    var H=140+rh.reduce(function(a,b){return a+b+gap},0)+50,c=document.createElement("canvas");c.width=W;c.height=H;var x=c.getContext("2d");
+    x.fillStyle="#fff";x.fillRect(0,0,W,H);x.fillStyle="#0e9968";x.fillRect(0,0,W,10);
+    x.fillStyle="#12201a";x.font="700 40px Arial";x.textBaseline="alphabetic";x.fillText("Technique review — "+f.player,pad,66);
+    x.fillStyle="#5c6d64";x.font="22px Arial";x.fillText(fmtDate(f.date)+" · "+list.length+" frames",pad,102);
+    var y=140;
+    rows.forEach(function(r,ri){r.forEach(function(cell,ci){var cx=pad+ci*(cw+gap);
+      x.drawImage(cell.im,cx,y,cw,cell.ih);var ty=y+cell.ih+34;
+      x.fillStyle="#0e9968";x.font="700 26px Arial";x.fillText((list.indexOf(cell.m)+1)+". "+(cell.m.phase||"Frame"),cx,ty);ty+=6;
+      if(shortTags(cell.m)){x.fillStyle="#5c6d64";x.font="20px Arial";ty+=26;x.fillText(shortTags(cell.m).slice(0,48),cx,ty)}
+      x.fillStyle="#12201a";x.font="22px Arial";cell.cl.forEach(function(l){ty+=28;x.fillText(l,cx,ty)})});y+=rh[ri]+gap});
+    x.fillStyle="#9aa8a0";x.font="18px Arial";x.fillText("ProCoach OS",pad,H-18);
+    c.toBlob(function(blob){
+      var file=new File([blob],(f.player+"-technique-review-"+f.date+".jpg").replace(/\s+/g,"-"),{type:"image/jpeg"});
+      if(navigator.canShare&&navigator.canShare({files:[file]})){navigator.share({files:[file],title:"Technique review — "+f.player}).catch(function(){});return}
+      var a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=file.name;document.body.appendChild(a);a.click();a.remove();
+    },"image/jpeg",.9);
+  });
+}
 
 /* ---------- boot ---------- */
 (function(){
