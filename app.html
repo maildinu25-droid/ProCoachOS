@@ -3385,7 +3385,7 @@ function playerRosterReport(){
  let list=db.players.slice().sort((a,b)=>String(a.team||"").localeCompare(String(b.team||""))||String(a.name||"").localeCompare(String(b.name||"")));
  reportShell("Player Roster",`${list.length} players`,list.length?list.map(p=>`<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span><p class="muted">${p.team?esc(p.team):"No team set"}${p.group?" · "+esc(p.group):""}</p><p>${esc(p.focus||"")}</p></div>`).join(""):empty("No players yet."));
 }
-const skillSets={Batting:["Setup & Balance","Footwork","Bat Swing / Contact","Shot Selection","Playing Pace","Playing Spin","Strike Rotation","Boundary Options","Game Awareness","Execution Under Pressure"],Bowling:["Run-up / Approach","Action & Alignment","Accuracy","Control & Consistency","Pace / Revolutions","Swing / Seam / Spin","Variations","Tactical Awareness","Execution Under Pressure"],Fielding:["Catching","Ground Fielding","Throwing Accuracy","Throwing Power","Movement & Agility","Positioning","Game Awareness","Communication","Decision Making","Execution Under Pressure"],Wicketkeeping:["Set Position","Footwork","Glove Work","Standing Back","Standing Up","Taking Spin","Leg-side Takes","Gather & Release","Communication","Decision Making"]};const legacySkills=["Catching","Ground Fielding","Throwing Accuracy","Movement","Game Awareness","Communication","Decision Making","Work Ethic","Coachability"];
+const skillSets={Batting:["Setup & Balance","Footwork","Bat Swing / Contact","Shot Selection","Playing Pace","Playing Spin","Strike Rotation","Boundary Options","Game Awareness","Execution Under Pressure"],Bowling:["Run-up / Approach","Action & Alignment","Line & Length Accuracy","Control & Consistency","Pace / Revolutions","Swing / Seam / Spin","Variations","Tactical Awareness","Execution Under Pressure"],Fielding:["Catching","Ground Fielding","Throwing Accuracy","Throwing Power","Movement & Agility","Positioning & Awareness","Game Awareness","Communication","Decision Making","Execution Under Pressure","Catching Reliability","Stopping Runs / Ground Fielding Reliability","Backing Up & Support Play"],Wicketkeeping:["Set Position","Footwork","Glove Work","Standing Back","Standing Up","Taking Spin","Leg-side Takes","Gather & Release","Communication","Decision Making","Take Reliability","Stumping Efficiency","Anticipation","Execution Under Pressure"]};const legacySkills=["Catching","Ground Fielding","Throwing Accuracy","Movement","Game Awareness","Communication","Decision Making","Work Ethic","Coachability"];
 // Format-specific metrics, layered ON TOP of the core skillSets above (never
 // replacing them) for Batting/Bowling only — Fielding/Wicketkeeping barely
 // change by format, so they stay core-only. Kept in their own namespace
@@ -3397,19 +3397,19 @@ const skillSets={Batting:["Setup & Balance","Footwork","Bat Swing / Contact","Sh
 // third, fully open-ended layer, untouched by any of this.
 const FORMAT_SKILLS={
  Batting:{
-  T20:["Intent vs New Ball","Hitting Spin (Middle Overs)","Range Hitting","Match-up Reading","Dot-ball Recovery","Powerplay Adaptation"],
-  ODI:["Phase Awareness","Running & Rotation","Rebuilding After Wicket","Finishing (Overs 40-50)","Strike Rotation Control","Anchoring"],
-  Test:["Shot Discipline","Converting Starts","Moving Ball & Bouncers","Spin Defense","Crease Occupation","Pressure Handling"]
+  T20:["Intent vs New Ball","Hitting Spin (Middle Overs)","Death-overs Finishing","Match-up Reading","Dot-ball Recovery","Powerplay Adaptation"],
+  ODI:["Innings Phase Awareness","Running Between Wickets","Rebuilding After Wicket","Finishing (Overs 40-50)","Chasing & Target Management","Anchoring"],
+  Test:["Leaving the Ball","Converting Starts","Moving Ball & Bouncers","Adapting to Pitch & Conditions","Crease Occupation","Session Management"]
  },
  Bowling:{
-  T20:["Death-overs Execution","Variation Disguise","Powerplay Execution","Reading Batter Intent","Bounce-back After Runs","Pressure Composure"],
+  T20:["Death-overs Execution","Variation Disguise","Powerplay Execution","Reading Batter Intent","Bounce-back After Runs","Spell Planning"],
   ODI:["Opening-overs Control","Middle-overs Containment","Powerplay Wicket-taking","Death-overs Execution","Older-ball Effectiveness","Control Under Restrictions"],
-  Test:["Opening-spell Discipline","Older-ball Effectiveness","Long-spell Consistency","Building Pressure","Situational Bowling","Role Control Across Ends"]
+  Test:["Opening-spell Discipline","Older-ball Effectiveness","Pace & Intensity Retention","Building Pressure","Bowling to the Situation","Role Control Across Ends"]
  }
 };
 const ASSESSMENT_FORMATS=["General","T20","ODI","Test"];
-// "General" is the stored key (kept so old data still reads); it is shown as "Game skills".
-const fmtLabel=f=>f==="General"?"Game skills":f;
+// "General" is the stored key (kept so old data still reads); it is shown as "Core skills".
+const fmtLabel=f=>f==="General"?"Core skills":f;
 function hasAnyGameRating(a){let r=a.ratings||{};if(Object.values(r).some(v=>Array.isArray(v)&&v.some(x=>Number(x)>0)))return true;let f=a.formatRatings||{};return Object.values(f).some(o=>o&&typeof o==='object'&&Object.values(o).some(v=>Array.isArray(v)&&v.some(x=>Number(x)>0)))}
 function allSkillsFor(d){return skillSets[d].concat((db.customSkills&&db.customSkills[d])||[])}
 function isSkillArchived(d,skillName){return((db.archivedSkills&&db.archivedSkills[d])||[]).includes(skillName)}
@@ -3733,7 +3733,7 @@ function assessmentFormHtml(a,mode){
  <div id="tabGame">
  <label style="display:flex;align-items:center;gap:8px;font-weight:400;margin:8px 0"><input type="checkbox" name="skipGame" style="width:auto" ${a.technique&&!hasAnyGameRating(a)?"checked":""} onchange="techOnlyToggle(this.checked)"> <span>Technique-only assessment — don't record game-skill ratings</span></label>
  <div id="gameBody">
- <label style="margin-bottom:6px">Format Focus <span class="muted" style="font-weight:400">(Batting/Bowling — pick one or more; Game skills is the core skill set)</span></label>
+ <label style="margin-bottom:6px">Format Focus <span class="muted" style="font-weight:400">(Batting/Bowling — pick one or more; Core skills is the base set)</span></label>
  <div class="muted">Select as many as required.</div>
  <div class="skillPick">${ASSESSMENT_FORMATS.map(f=>`<label><input type="checkbox" name="formats" value="${f}" ${(Array.isArray(a.formats)&&a.formats.length?a.formats:["General"]).includes(f)?"checked":""} onchange="renderAssessmentSkills()"> ${fmtLabel(f)}</label>`).join("")}</div>
  <div id="assessmentSkills">${empty("Select at least one skill area.")}</div>
@@ -3885,7 +3885,7 @@ function renderAssessmentSkills(){
    return `<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><div class="muted" style="font-weight:700;text-transform:uppercase;font-size:var(--fs-1);letter-spacing:.3px;margin-bottom:6px">${esc(f)} specifics</div>${rowsHtml}${formatCustomAddHtml}</div>`;
   }).join("");
   let customAddHtml=`<div class="formgrid" style="margin-top:8px"><input type="text" id="newSkill_${d}" placeholder="Add a custom metric for ${d}..." onkeydown="if(event.key==='Enter'){event.preventDefault();addCustomSkill('${d}')}"><button type="button" class="btn primary" onclick="addCustomSkill('${d}')">+ Add metric</button></div>${(()=>{let unused=unusedUnarchivedSkills(d);return unused.length?`<button type="button" class="btn secondary" style="margin-top:6px" onclick="bulkArchiveUnused('${d}')">Archive ${unused.length} never-used metric${unused.length===1?"":"s"}</button>`:""})()}${archivedList.length?`<div style="margin-top:8px"><a href="#" onclick="event.preventDefault();toggleArchivedSkillsPanel('${d}')" class="muted">Archived metrics (${archivedList.length})</a><div id="archivedSkillsPanel_${d}" style="display:none;margin-top:6px">${archivedList.map(s=>`<div class="item"><span class="muted">${esc(s)}</span><button type="button" class="btn secondary" onclick="unarchiveSkill('${d}','${esc(s).replace(/'/g,"\\'")}')">Unarchive</button></div>`).join("")}</div></div>`:""}`;
-  let bodyHtml=(showGeneral?coreRowsHtml:"")+formatBlocksHtml+(showGeneral?customAddHtml:"")+(!showGeneral&&!activeFormats.length?`<div class="muted">Pick a Format Focus above (Game skills, T20, ODI or Test) to rate ${esc(d)}.</div>`:"");
+  let bodyHtml=(showGeneral?coreRowsHtml:"")+formatBlocksHtml+(showGeneral?customAddHtml:"")+(!showGeneral&&!activeFormats.length?`<div class="muted">Pick a Format Focus above (Core skills, T20, ODI or Test) to rate ${esc(d)}.</div>`:"");
   return `<label style="margin-bottom:6px">${d}${showGeneral?" · Rate 1–10":""}</label><div class="card">${bodyHtml}${(editingAssessmentId&&existing&&existing.disciplineNotes&&existing.disciplineNotes[d])?`<label>${d} development notes <span class="muted" style="font-weight:400">(older note — new ones go in Coach comments below)</span><textarea name="${d}_notes">${esc(existing.disciplineNotes[d])}</textarea></label>`:""}</div>`;
  }).join("")||empty("Select at least one skill area.");
  enhanceTextareasWithVoice(box);
