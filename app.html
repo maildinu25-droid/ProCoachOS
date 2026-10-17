@@ -49,6 +49,10 @@ input[type=range]{accent-color:var(--g);width:100%;height:6px;padding:0;backgrou
 .bulkTbl tr.bulkActive td{background:#0d4a3a!important;background:color-mix(in srgb,#067a56 28%,var(--surface))!important;border-bottom:2px solid #067a56;border-top:2px solid #067a56}
 .bulkTbl tr.bulkActive td:first-child{border-left:5px solid #067a56;color:var(--ink)}
 .bulkNow{position:sticky;top:0;z-index:5;display:flex;align-items:center;gap:10px;margin-top:12px;padding:8px;border-radius:12px;background:var(--surface2);border:1px solid var(--line)}
+.bulkTools{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:12px}
+.bulkChip{padding:6px 10px;border-radius:999px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);font-size:var(--fs-1);font-weight:600}.bulkChip small{color:var(--muted)}
+.bulkWho{display:flex;align-items:center;gap:8px;margin:0;font-weight:400;cursor:pointer}.bulkWho input{width:20px;height:20px;flex:none;margin:0;accent-color:#067a56}
+.bulkTbl tr.bulkOff td{opacity:.42}.bulkTbl tr.bulkOff td:not(:first-child){pointer-events:none}.bulkTbl tr.bulkOff td:first-child{opacity:.7}
 .bulkNowName{flex:1;text-align:center;display:flex;flex-direction:column;line-height:1.2}.bulkNowName b{font-size:var(--fs-4,18px)}.chipGrid2{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:12px 0 18px}.chipGrid2 label{display:flex;flex-direction:row;align-items:center;border:1px solid var(--line);padding:10px;border-radius:10px;font-size:var(--fs-3);min-width:0;overflow-wrap:anywhere;word-break:break-word}.chipGrid2 input{width:auto;flex-shrink:0}.netNamePickGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(136px,1fr));gap:5px;margin-top:4px;max-height:196px;overflow-y:auto;padding:6px;border:1px solid var(--line);border-radius:8px;background:var(--surface2)}.netNamePickGrid label{display:flex;align-items:center;gap:5px;font-size:var(--fs-3);padding:6px 7px;border-radius:5px;cursor:pointer}.netNamePickGrid label:hover{background:var(--surface)}.netNamePickGrid input{width:auto;flex-shrink:0;margin:0}.netNamePickGrid label.isDisabled{opacity:.35;pointer-events:none}.fdFsOverlay{display:flex;flex-direction:column}.fdFsToolbar{display:flex;flex-direction:row;flex-wrap:wrap;gap:4px;flex-shrink:0;padding:4px;padding-bottom:max(4px,env(safe-area-inset-bottom));align-content:flex-start;order:2}.fdFsToolbar button{width:34px;height:34px;padding:0;display:flex;align-items:center;justify-content:center;flex-shrink:0;border-radius:8px}.fdFsStepPill{border-radius:50%!important;font-size:12px;font-weight:700}.fdFsCanvasArea{flex:1 1 auto;min-height:80px;display:flex;align-items:center;justify-content:center;overflow:hidden;position:relative;order:1}@media (orientation:landscape){.fdFsOverlay{flex-direction:row;padding-left:max(4px,env(safe-area-inset-left));padding-right:max(4px,env(safe-area-inset-right))}.fdFsToolbar{flex-direction:column;flex-wrap:nowrap;overflow-y:auto;max-height:100%;padding-bottom:4px;order:0}.fdFsCanvasArea{order:0;justify-content:flex-start}}.fab{position:fixed;right:22px;bottom:22px;width:58px;height:58px;border:0;border-radius:50%;background:var(--g);color:#fff;font-size:30px;z-index:30}
 .report{background:#fff;color:#18211e}.report h1{color:var(--g)}.report h2{margin-top:24px}.report .card{background:#fbfbfa;border-color:#e2e8e4}.report .item{border-color:#e2e8e4;background:#fff;color:#18211e}.report .empty{border-color:#cfd8d2;color:#707a76}.reportTable{width:100%;border-collapse:collapse}.reportTable th,.reportTable td{border-bottom:1px solid #e2e8e4;padding:9px;text-align:left;vertical-align:top}.reportActions{position:sticky;bottom:0;background:#fff;padding:12px 0}
 .certBox{padding:7px;margin-top:10px;background:linear-gradient(135deg,#c9a13b,#f0deac,#c9a13b);border-radius:20px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
@@ -3506,10 +3510,10 @@ function addCustomFormatSkill(d,f){
 // Old assessments still have 10 stored values — this preserves them exactly as
 // originally entered rather than silently corrupting/relabeling them.
 const legacyBowlingSkills=["Run-up / Approach","Action & Alignment","Accuracy","Length Control","Consistency","Pace / Revolutions","Swing / Seam / Spin","Variations","Tactical Awareness","Execution Under Pressure"];
-let bulkAssessmentDraft={team:"",discipline:null,format:"General",ratings:{},active:""};
+let bulkAssessmentDraft={team:"",discipline:null,format:"General",ratings:{},active:"",include:{},order:[]};
 function openBulkAssessment(){
  if(!activePlayers().length){alert("Add a player first.");return}
- bulkAssessmentDraft={team:"",discipline:null,format:"General",ratings:{},active:""};
+ bulkAssessmentDraft={team:"",discipline:null,format:"General",ratings:{},active:"",include:{},order:[]};
  modal(`<div class="sheetHead"><h2>Bulk Assess Squad</h2><button class="x" onclick="closeM()">×</button></div>
  <p class="muted">Optionally narrow to one team, then pick a skill area (and format focus, if relevant) to rate in one pass. Each player's last rating for this area is pre-filled — adjust rather than start from scratch.</p>
  <label>Team<select onchange="selectBulkTeam(this.value)"><option value="">All Players</option>${db.teams.map(t=>`<option value="${esc(t.name)}">${esc(t.name)}</option>`).join("")}</select></label>
@@ -3517,6 +3521,28 @@ function openBulkAssessment(){
  <div id="bulkFormatPick"></div>
  <div id="bulkAssessmentBody"></div>`);
 }
+// Which roles are assessed for each skill area by default. Fielding is everyone; players with no role are never auto-ticked (except Fielding).
+const BULK_ROLE_FIT={Batting:["Batter","All-rounder","Wicketkeeper","Wicketkeeper-Batter"],Bowling:["Bowler","All-rounder"],Wicketkeeping:["Wicketkeeper","Wicketkeeper-Batter"]};
+function bulkRoleFits(d,role){if(d==="Fielding")return true;return !!role&&(BULK_ROLE_FIT[d]||[]).includes(role)}
+function bulkSelKey(){return (bulkAssessmentDraft.team||"all")+"|"+bulkAssessmentDraft.discipline}
+// Decide who is ticked: last saved choice for this team + area if there is one (new players fall back to role), else by role.
+function bulkInitInclude(){
+ let d=bulkAssessmentDraft.discipline;if(!d)return;
+ let players=bulkPlayers(),mem=(db.settings&&db.settings.bulkSel&&db.settings.bulkSel[bulkSelKey()])||null;
+ bulkAssessmentDraft.include={};
+ players.forEach(p=>{
+  let known=mem&&(mem.on.includes(p.name)||mem.off.includes(p.name));
+  bulkAssessmentDraft.include[p.name]=known?mem.on.includes(p.name):bulkRoleFits(d,p.role);
+ });
+ // Ticked players first, then the rest (dimmed). Order is fixed from here so rows don't jump while ticking.
+ bulkAssessmentDraft.order=players.map(p=>p.name).sort((a,b)=>(bulkAssessmentDraft.include[b]?1:0)-(bulkAssessmentDraft.include[a]?1:0));
+}
+function bulkOrdered(){
+ let ps=bulkPlayers(),by={};ps.forEach(p=>by[p.name]=p);
+ let names=(bulkAssessmentDraft.order||[]).filter(n=>by[n]);ps.forEach(p=>{if(!names.includes(p.name))names.push(p.name)});
+ return names.map(n=>by[n]);
+}
+function bulkIncluded(){return bulkOrdered().filter(p=>bulkAssessmentDraft.include[p.name])}
 function bulkPlayers(){return activePlayers().filter(p=>!isReleased(p)).filter(p=>!bulkAssessmentDraft.team||p.team===bulkAssessmentDraft.team)}
 // Full (positional) skill list + which positions are visible. Ratings are stored by position,
 // so archived skills must keep their slot (saved as 0 = not assessed) or later skills would shift.
@@ -3543,12 +3569,13 @@ function bulkCarryForwardFor(playerName,discipline,format){
 }
 function selectBulkTeam(team){
  bulkAssessmentDraft.team=team;
- if(bulkAssessmentDraft.discipline)computeBulkRatings();
+ if(bulkAssessmentDraft.discipline){bulkInitInclude();computeBulkRatings();}
 }
 function selectBulkDiscipline(discipline){
  bulkAssessmentDraft.discipline=discipline;
  bulkAssessmentDraft.format="General";
  renderBulkFormatPick();
+ bulkInitInclude();
  computeBulkRatings();
 }
 function renderBulkFormatPick(){
@@ -3576,51 +3603,85 @@ function computeBulkRatings(){
  renderBulkAssessmentGrid();
 }
 function stepBulkAssessmentRating(playerName,skillIndex,delta){
+ if(!bulkAssessmentDraft.include[playerName])return;
  let current=Number(bulkAssessmentDraft.ratings[playerName][skillIndex])||1;
  let next=Math.max(1,Math.min(10,current+delta));
- bulkAssessmentDraft.active=playerName;
  bulkAssessmentDraft.ratings[playerName][skillIndex]=next;
+ // Update just the one number in place. Re-drawing the whole table threw the scroll position back to the top.
+ let row=[...document.querySelectorAll(".bulkTbl tr[data-p]")].find(r=>r.dataset.p===playerName);
+ let vi=bulkFullList().vis.indexOf(skillIndex),sp=row&&row.children[vi+1]&&row.children[vi+1].querySelector("span");
+ if(sp){sp.textContent=next;bulkSetActive(playerName,false);return}
+ bulkAssessmentDraft.active=playerName;
  renderBulkAssessmentGrid();
 }
 function bulkNowBar(players){
- let a=bulkAssessmentDraft.active,i=players.findIndex(p=>p.name===a);
- return `<div class="bulkNow"><button type="button" class="btn secondary sm" onclick="bulkMove(-1)" aria-label="Previous player">◀</button><div class="bulkNowName">${i>=0?`<span class="muted">Assessing ${i+1} of ${players.length}</span><b>${esc(a)}</b>`:`<span class="muted">Tap a row or ▶ to start</span><b>${players.length} players</b>`}</div><button type="button" class="btn secondary sm" onclick="bulkMove(1)" aria-label="Next player">▶</button></div>`;
+ let inc=players.filter(p=>bulkAssessmentDraft.include[p.name]),a=bulkAssessmentDraft.active,i=inc.findIndex(p=>p.name===a);
+ return `<div class="bulkNow"><button type="button" class="btn secondary sm" onclick="bulkMove(-1)" aria-label="Previous player">◀</button><div class="bulkNowName">${i>=0?`<span class="muted">Assessing ${i+1} of ${inc.length}</span><b>${esc(a)}</b>`:`<span class="muted">Tap a row or ▶ to start</span><b>${inc.length} of ${players.length} selected</b>`}</div><button type="button" class="btn secondary sm" onclick="bulkMove(1)" aria-label="Next player">▶</button></div>`;
 }
 function bulkSetActive(name,scroll){
+ if(!bulkAssessmentDraft.include[name])return;
  if(bulkAssessmentDraft.active===name&&!scroll)return;
  bulkAssessmentDraft.active=name;
  document.querySelectorAll(".bulkTbl tr[data-p]").forEach(r=>r.classList.toggle("bulkActive",r.dataset.p===name));
- let ps=bulkPlayers(),i=ps.findIndex(p=>p.name===name),el=document.querySelector(".bulkNow .bulkNowName");
- if(el)el.innerHTML=`<span class="muted">Assessing ${i+1} of ${ps.length}</span><b>${esc(name)}</b>`;
+ let inc=bulkIncluded(),i=inc.findIndex(p=>p.name===name),el=document.querySelector(".bulkNow .bulkNowName");
+ if(el)el.innerHTML=`<span class="muted">Assessing ${i+1} of ${inc.length}</span><b>${esc(name)}</b>`;
  if(scroll){let r=[...document.querySelectorAll(".bulkTbl tr[data-p]")].find(x=>x.dataset.p===name);if(r)r.scrollIntoView({block:"center",behavior:"smooth"})}
 }
 function bulkMove(d){
- let ps=bulkPlayers();if(!ps.length)return;
+ let ps=bulkIncluded();if(!ps.length)return;
  let i=ps.findIndex(p=>p.name===bulkAssessmentDraft.active);
  i=i<0?(d>0?0:ps.length-1):Math.max(0,Math.min(ps.length-1,i+d));
  bulkSetActive(ps[i].name,true);
 }
+function bulkToolbar(players){
+ let cnt=f=>players.filter(f).length,isK=p=>p.role==="Wicketkeeper"||p.role==="Wicketkeeper-Batter";
+ let chip=(label,n,fn)=>`<button type="button" class="bulkChip" onclick="${fn}">${label}${n!==null?` <small>${n}</small>`:""}</button>`;
+ return `<div class="bulkTools"><span class="muted">Tick:</span>${chip("All",players.length,"bulkTickGroup('all')")}${chip("None",null,"bulkTickGroup('none')")}${chip("Batters",cnt(p=>p.role==="Batter"),"bulkTickGroup('Batter')")}${chip("Bowlers",cnt(p=>p.role==="Bowler"),"bulkTickGroup('Bowler')")}${chip("All-rounders",cnt(p=>p.role==="All-rounder"),"bulkTickGroup('All-rounder')")}${chip("Keepers",cnt(isK),"bulkTickGroup('keepers')")}${chip("No role",cnt(p=>!p.role),"bulkTickGroup('norole')")}</div>`;
+}
+function bulkRowHtml(p){
+ let on=!!bulkAssessmentDraft.include[p.name],safeName=p.name.replace(/'/g,"\\'");
+ let nm=`<td><label class="bulkWho"><input type="checkbox" ${on?"checked":""} onclick="event.stopPropagation()" onchange="bulkToggle(this.dataset.p,this.checked)" data-p="${esc(p.name)}" aria-label="Assess ${esc(p.name)}"><span><b>${esc(p.name)}</b>${p.role?"":`<small class="muted"> · no role</small>`}</span></label></td>`;
+ return `<tr data-p="${esc(p.name)}" class="${on?"":"bulkOff"} ${on&&bulkAssessmentDraft.active===p.name?"bulkActive":""}" onclick="bulkSetActive(this.dataset.p,false)">${nm}${bulkFullList().vis.map(si=>`<td>${numberStepperHtml(bulkAssessmentDraft.ratings[p.name][si],`stepBulkAssessmentRating('${safeName}',${si},-1)`,`stepBulkAssessmentRating('${safeName}',${si},1)`,16)}</td>`).join("")}</tr>`;
+}
+function bulkSaveLabel(){let n=bulkIncluded().length;return n?`Save ${n} Assessment${n===1?"":"s"}`:"Tick at least one player"}
+function bulkToggle(name,on){
+ bulkAssessmentDraft.include[name]=!!on;
+ if(!on&&bulkAssessmentDraft.active===name)bulkAssessmentDraft.active="";
+ let r=[...document.querySelectorAll(".bulkTbl tr[data-p]")].find(x=>x.dataset.p===name);
+ if(r){r.classList.toggle("bulkOff",!on);if(!on)r.classList.remove("bulkActive")}
+ bulkRefreshBar();
+ if(on)bulkSetActive(name,false);
+}
+function bulkRefreshBar(){
+ let ps=bulkOrdered(),b=document.getElementById("bulkSaveBtn"),n=bulkIncluded().length;
+ if(b){b.textContent=bulkSaveLabel();b.disabled=!n}
+ let nowBar=document.querySelector(".bulkNow");if(nowBar){let tmp=document.createElement("div");tmp.innerHTML=bulkNowBar(ps);nowBar.replaceWith(tmp.firstChild)}
+}
+function bulkTickGroup(g){
+ let ps=bulkPlayers();
+ ps.forEach(p=>{
+  let hit=g==="all"?true:g==="none"?false:g==="keepers"?(p.role==="Wicketkeeper"||p.role==="Wicketkeeper-Batter"):g==="norole"?!p.role:p.role===g;
+  if(g==="none")bulkAssessmentDraft.include[p.name]=false;else if(hit)bulkAssessmentDraft.include[p.name]=true;
+ });
+ if(!bulkAssessmentDraft.include[bulkAssessmentDraft.active])bulkAssessmentDraft.active="";
+ renderBulkAssessmentGrid();
+}
 function renderBulkAssessmentGrid(){
  let box=document.getElementById("bulkAssessmentBody");
  if(!box)return;
- // Re-rendering replaces the table's markup entirely, which would
- // otherwise silently reset horizontal scroll back to the first column
- // every time a rating is stepped — capture and restore it here so the
- // grid only moves when the coach actually scrolls it.
+ // Re-rendering replaces the table, so remember both scroll positions (table and sheet) and put them back.
  let existingWrap=box.querySelector(".matchEntryWrap");
- let scrollLeft=existingWrap?existingWrap.scrollLeft:0;
+ let scrollLeft=existingWrap?existingWrap.scrollLeft:0,scrollTop=existingWrap?existingWrap.scrollTop:0,sheetTop=(typeof sheet!=="undefined"&&sheet)?sheet.scrollTop:0;
  let skills=bulkSkillsList();
- let players=bulkPlayers();
+ let players=bulkOrdered();
  if(!players.length){box.innerHTML=`<div class="muted" style="margin-top:12px">No players ${bulkAssessmentDraft.team?`in ${esc(bulkAssessmentDraft.team)}`:""}.</div>`;return}
- box.innerHTML=`${bulkNowBar(players)}<div class="matchEntryWrap bulkWrap" style="margin-top:8px"><table class="matchEntryTable bulkTbl"><thead><tr><th style="min-width:110px">Player</th>${skills.map(s=>`<th style="min-width:78px;text-align:center">${esc(s)}</th>`).join("")}</tr></thead><tbody>
- ${players.map((p,pi)=>`<tr data-p="${esc(p.name)}" class="${bulkAssessmentDraft.active===p.name?"bulkActive":""}" onclick="bulkSetActive(this.dataset.p,false)"><td><b>${esc(p.name)}</b></td>${bulkFullList().vis.map(si=>{
-  let safeName=p.name.replace(/'/g,"\\'");
-  return `<td>${numberStepperHtml(bulkAssessmentDraft.ratings[p.name][si],`stepBulkAssessmentRating('${safeName}',${si},-1)`,`stepBulkAssessmentRating('${safeName}',${si},1)`,16)}</td>`;
- }).join("")}</tr>`).join("")}
+ box.innerHTML=`${bulkToolbar(players)}${bulkNowBar(players)}<div class="matchEntryWrap bulkWrap" style="margin-top:8px"><table class="matchEntryTable bulkTbl"><thead><tr><th style="min-width:130px">Player</th>${skills.map(s=>`<th style="min-width:78px;text-align:center">${esc(s)}</th>`).join("")}</tr></thead><tbody>
+ ${players.map(bulkRowHtml).join("")}
  </tbody></table></div>
- <button class="btn primary full" style="margin-top:14px" onclick="saveBulkAssessment()">Save ${players.length} Assessments</button>`;
+ <button class="btn primary full" id="bulkSaveBtn" style="margin-top:14px" ${bulkIncluded().length?"":"disabled"} onclick="saveBulkAssessment()">${bulkSaveLabel()}</button>`;
  let newWrap=box.querySelector(".matchEntryWrap");
- if(newWrap)newWrap.scrollLeft=scrollLeft;
+ if(newWrap){newWrap.scrollLeft=scrollLeft;newWrap.scrollTop=scrollTop}
+ if(typeof sheet!=="undefined"&&sheet)sheet.scrollTop=sheetTop;
 }
 function saveBulkAssessment(){
  if(!requireWriteAccess())return;
@@ -3629,8 +3690,12 @@ function saveBulkAssessment(){
  let format=bulkAssessmentDraft.format;
  let isFormat=!!(format&&format!=="General"&&FORMAT_SKILLS[discipline]&&FORMAT_SKILLS[discipline][format]);
  let skills=bulkSkillsList();
- let players=bulkPlayers();
+ let players=bulkIncluded();
+ if(!players.length){alert("Tick at least one player to assess.");return}
  let d=today();
+ // Remember who was ticked for this team + skill area, so next time starts from the same selection.
+ db.settings=db.settings||{};db.settings.bulkSel=db.settings.bulkSel||{};
+ let all=bulkPlayers();db.settings.bulkSel[bulkSelKey()]={on:all.filter(p=>bulkAssessmentDraft.include[p.name]).map(p=>p.name),off:all.filter(p=>!bulkAssessmentDraft.include[p.name]).map(p=>p.name)};
  players.forEach(p=>{
   let vals=bulkAssessmentDraft.ratings[p.name];
   if(!vals)return;
