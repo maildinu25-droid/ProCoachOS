@@ -1942,8 +1942,29 @@ function sessions(){
  }).join("")}</div>`:empty("No sessions match your search.")}</div>`;
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
+// Squad-stage filter for a session (Camp 2, Tournament squad ...). Empty = whole team.
+let sessionStageDraft=[];
+function sessionStageDefaultIds(){let open=stagesList().filter(x=>!x.released);for(let i=open.length-1;i>=0;i--){if(stagePlayers(open[i].id).length)return [open[i].id]}return []}
+function sessionStageIds(){if(!stagesInUse())return [];let L=stagesList().filter(x=>!x.released).map(x=>x.id);return sessionStageDraft.filter(id=>L.includes(id))}
+function sessionStageChipsHtml(){
+ if(!stagesInUse())return "";
+ let open=stagesList().filter(x=>!x.released);
+ return `<div class="full" id="sessionStageWrap"><span class="fpLabel">Squad stage <span class="muted" style="font-weight:400">(tick one or more — leave all unticked for the whole team)</span></span><div class="chipGrid2" style="margin-top:6px">${open.map(st=>`<label><input type="checkbox" name="stageFilter" value="${st.id}" ${sessionStageDraft.includes(st.id)?"checked":""} onchange="onSessionStageChange()"> ${esc(st.name)} (${stagePlayers(st.id).length})</label>`).join("")}</div></div>`;
+}
+function onSessionStageChange(){
+ sessionStageDraft=[...document.querySelectorAll('input[name="stageFilter"]:checked')].map(c=>c.value);
+ let typeSel=document.getElementById("sessionTypeSelect"),teamSel=document.querySelector('select[name="squadTeam"]');
+ let team=(typeSel&&typeSel.value==="team"&&teamSel)?teamSel.value:"";
+ let container=document.getElementById("attendanceListInner");
+ let isNew=editingSessionId===null;
+ let checkedNow=[...document.querySelectorAll('input[name="attendees"]:checked')].map(cb=>cb.value);
+ if(container)container.innerHTML=attendanceOptionsHtml({},team,isNew?null:(checkedNow.length?checkedNow:null),isNew);
+ updateFormSectionCount("attendance","marked present");
+ renderNetPlanBuilder();
+}
 function attendanceOptionsHtml(s,teamFilter,checkedOverride,defaultAllChecked){
- let players=(teamFilter?activePlayers().filter(p=>p.team===teamFilter):activePlayers()).filter(p=>!isReleased(p)||(s&&Array.isArray(s.attendees)&&s.attendees.includes(p.name)));
+ let stIds=sessionStageIds();
+ let players=(teamFilter?activePlayers().filter(p=>p.team===teamFilter):activePlayers()).filter(p=>{let saved=s&&Array.isArray(s.attendees)&&s.attendees.includes(p.name);return saved||(!isReleased(p)&&(!stIds.length||stIds.includes(stageOf(p).id)))});
  if(!players.length)return `<div class="muted">${teamFilter?"No players in this team yet.":"No players yet — add players to enable attendance tracking."}</div>`;
  // Priority: an explicit override (e.g. switching teams mid-form) > a
  // session's own real saved attendance, even if it's genuinely empty >
@@ -1972,6 +1993,7 @@ function toggleSessionType(val){
  document.getElementById("sessionTypeCustomWrap").style.display=val==="custom"?"":"none";
  let attWrap=document.getElementById("sessionAttendanceWrap");
  if(attWrap)attWrap.style.display=val==="player"?"none":"";
+ let stHost=document.getElementById("sessionStageHost");if(stHost)stHost.style.display=val==="player"?"none":"";
  if(val==="team"){
   let teamSelect=document.querySelector('select[name="squadTeam"]');
   updateAttendanceForTeam(teamSelect?teamSelect.value:"");
@@ -1982,6 +2004,7 @@ function toggleSessionType(val){
 }
 function sessionFormHtml(s,mode){
  s=s||{};
+ sessionStageDraft=Array.isArray(s.stageFilter)?s.stageFilter.slice():(mode==="new"?sessionStageDefaultIds():[]);
  let sType=s.sessionType||"custom";
  let squadCustomVal=sType==="custom"?(s.squad||""):"";
  return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Session Plan":"New Session Plan"}</h2><button class="x" onclick="closeM()">×</button></div>
@@ -1996,6 +2019,7 @@ function sessionFormHtml(s,mode){
  <div class="full" id="sessionTypeTeamWrap" style="${sType==="team"?"":"display:none"}"><label>Team<select name="squadTeam" onchange="onSessionTeamChange(this.value)">${db.teams.length?db.teams.map(t=>`<option value="${esc(t.name)}" ${s.squad===t.name?"selected":""}>${esc(t.name)}</option>`).join(""):`<option value="">No teams yet — add one in Teams & Seasons</option>`}</select></label></div>
  <div class="full" id="sessionTypePlayerWrap" style="${sType==="player"?"":"display:none"}"><label>Player<select name="sessionPlayerId">${activePlayers().length?activePlayers().map(p=>`<option value="${p.id}" ${s.sessionPlayerId===p.id?"selected":""}>${esc(p.name)}</option>`).join(""):`<option value="">No players yet — add one in Players</option>`}</select></label></div>
  <div class="full" id="sessionTypeCustomWrap" style="${sType==="custom"?"":"display:none"}"><label>Group name<input name="squadCustom" value="${esc(squadCustomVal)}" placeholder="e.g. Weekend intensive group"></label></div>
+ <div class="full" id="sessionStageHost" style="${sType==="player"?"display:none":""}">${sessionStageChipsHtml()}</div>
  <label>Duration (minutes)<input type="number" name="duration" value="${esc(s.duration||90)}"></label>
  <div class="full" id="focusPicker"><input type="hidden" name="focus" value="${esc(s.focus||"")}"><span class="fpLabel">Session focus <span class="muted" style="font-weight:400">(tick one or more — the first is primary)</span></span><div id="focusPickerBody">${focusPickerInner(s.focus||"")}</div></div>
  <label>Venue<input name="venue" list="venueDatalist" value="${esc(s.venue||"")}"><datalist id="venueDatalist">${venueOptions()}</datalist></label>
@@ -2100,7 +2124,8 @@ function currentNetPlanTeamFilter(){
 }
 function rosterPlayerNames(){
  let teamFilter=currentNetPlanTeamFilter();
- let players=teamFilter?activePlayers().filter(p=>p.team===teamFilter):activePlayers();
+ let stIds=sessionStageIds();
+ let players=(teamFilter?activePlayers().filter(p=>p.team===teamFilter):activePlayers()).filter(p=>!isReleased(p)&&(!stIds.length||stIds.includes(stageOf(p).id)));
  return players.map(p=>p.name);
 }
 // Two different reasons a name can be "taken" elsewhere in today's plan:
@@ -2486,6 +2511,7 @@ function saveSession(e){
   s.squad=fd.get("squadCustom")||"";
   s.attendees=fd.getAll("attendees");
  }
+ s.stageFilter=sessionType==="player"?[]:fd.getAll("stageFilter");
  s.objectiveTags=fd.getAll("objectiveTags");
  s.cueTags=fd.getAll("cueTags");s.successTags=fd.getAll("successTags");
  delete s.squadTeam;delete s.squadCustom;
