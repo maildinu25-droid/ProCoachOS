@@ -1946,10 +1946,17 @@ function sessions(){
 let sessionStageDraft=[];
 function sessionStageDefaultIds(){let open=stagesList().filter(x=>!x.released);for(let i=open.length-1;i>=0;i--){if(stagePlayers(open[i].id).length)return [open[i].id]}return []}
 function sessionStageIds(){if(!stagesInUse())return [];let L=stagesList().filter(x=>!x.released).map(x=>x.id);return sessionStageDraft.filter(id=>L.includes(id))}
-function sessionStageChipsHtml(){
+function sessionStageTeam(){let t=document.getElementById("sessionTypeSelect"),ts=document.querySelector('select[name="squadTeam"]');return(t&&t.value==="team"&&ts)?ts.value:""}
+function sessionStageChipsHtml(team){
  if(!stagesInUse())return "";
+ if(team===undefined)team=sessionStageTeam();
  let open=stagesList().filter(x=>!x.released);
- return `<div class="full" id="sessionStageWrap"><span class="fpLabel">Squad stage <span class="muted" style="font-weight:400">(tick one or more — leave all unticked for the whole team)</span></span><div class="chipGrid2" style="margin-top:6px">${open.map(st=>`<label><input type="checkbox" name="stageFilter" value="${st.id}" ${sessionStageDraft.includes(st.id)?"checked":""} onchange="onSessionStageChange()"> ${esc(st.name)} (${stagePlayers(st.id).length})</label>`).join("")}</div></div>`;
+ return `<div class="full" id="sessionStageWrap"><span class="fpLabel">Squad stage <span class="muted" style="font-weight:400">(tick one or more — leave all unticked for the whole team)</span></span><div class="chipGrid2" style="margin-top:6px">${open.map(st=>`<label><input type="checkbox" name="stageFilter" value="${st.id}" ${sessionStageDraft.includes(st.id)?"checked":""} onchange="onSessionStageChange()"> ${esc(st.name)} (${stagePlayers(st.id,team).length})</label>`).join("")}</div></div>`;
+}
+function refreshSessionStageCounts(){
+ let host=document.getElementById("sessionStageHost");if(!host)return;
+ let boxes=document.querySelectorAll('input[name="stageFilter"]');if(boxes.length)sessionStageDraft=[...boxes].filter(c=>c.checked).map(c=>c.value);
+ host.innerHTML=sessionStageChipsHtml();
 }
 function onSessionStageChange(){
  sessionStageDraft=[...document.querySelectorAll('input[name="stageFilter"]:checked')].map(c=>c.value);
@@ -1984,6 +1991,7 @@ function updateAttendanceForTeam(teamName){
  updateFormSectionCount("attendance","marked present");
 }
 function onSessionTeamChange(teamName){
+ refreshSessionStageCounts();
  updateAttendanceForTeam(teamName);
  renderNetPlanBuilder();
 }
@@ -1993,7 +2001,7 @@ function toggleSessionType(val){
  document.getElementById("sessionTypeCustomWrap").style.display=val==="custom"?"":"none";
  let attWrap=document.getElementById("sessionAttendanceWrap");
  if(attWrap)attWrap.style.display=val==="player"?"none":"";
- let stHost=document.getElementById("sessionStageHost");if(stHost)stHost.style.display=val==="player"?"none":"";
+ let stHost=document.getElementById("sessionStageHost");if(stHost){stHost.style.display=val==="player"?"none":"";refreshSessionStageCounts()}
  if(val==="team"){
   let teamSelect=document.querySelector('select[name="squadTeam"]');
   updateAttendanceForTeam(teamSelect?teamSelect.value:"");
