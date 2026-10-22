@@ -455,13 +455,13 @@ const RATING_LABELS={1:"Struggled",2:"Below Par",3:"Solid",4:"Good",5:"Excellent
 // Coach Self Reflection is about the coach's own performance, not the
 // players' — every chip list below is framed around what the coach did,
 // not what the team/players did, so "What went well" etc. stay coach-centric.
-const COACH_WENT_WELL_SESSION=["Communication Clarity","Session Planning & Structure","Time Management","Adapting on the Fly","Individual Attention Given","Energy & Enthusiasm","Patience & Tone","Feedback Quality","Group / Behavior Management","Technical Knowledge Applied"];
-const COACH_WENT_WELL_MATCH=["Tactical Decision-making","In-game Communication","Composure Under Pressure","Player Man-management","Adaptability to Match Situations","Pre-match Preparation","Clarity of Instructions","Reading the Game"];
-const BETTER_REASONS=["Session Planning","Time Management","Group Management","Communication Clarity","Individual Attention","Adaptability","Instructions / Demonstrations","Energy / Pacing Control"];
-const MATCH_BETTER_REASONS=["Tactical Calls","Team Selection","In-game Communication","Composure","Player Management / Rotation","Preparation","Adaptability to Match Situations"];
-const COACH_TAKEAWAY_SESSION=["Adjust Session Structure","Use Smaller Groups","Give More 1:1 Attention","Revisit Drill / Technique Teaching","Communicate Expectations More Clearly","Manage Time Better","Rotate Players More Effectively","Simplify Instructions","Build in More Game-based Practice"];
-const COACH_TAKEAWAY_MATCH=["Reconsider Team Selection Approach","Adjust Tactical Approach","Manage Match Situations Better","Communicate More Calmly Under Pressure","Do Closer Opposition Analysis","Trust Preparation More"];
-const COACH_NEXT_FOCUS=["Communication","Session Planning","Game-day Tactics","Player Management","Time Management","Feedback Delivery","Preparation","Adaptability","Technical Knowledge","Composure"];
+const COACH_WENT_WELL_SESSION=["Communication Clarity","Session Planning & Structure","Time Management","Adapting on the Fly","Individual Attention Given","Energy & Enthusiasm","Patience & Tone","Feedback Quality","Group / Behavior Management","Technical Knowledge Applied","Clear Session Objectives","Drill Selection & Progression","Demonstration Quality","Player Engagement","Checking Understanding","Positive Reinforcement","Safety & Organisation","Technical Corrections Made"];
+const COACH_WENT_WELL_MATCH=["Tactical Decision-making","In-game Communication","Composure Under Pressure","Player Man-management","Adaptability to Match Situations","Pre-match Preparation","Clarity of Instructions","Reading the Game","Bowling Changes","Field Settings","Batting Order Calls","Handling Momentum Swings","Team Talk / Motivation","Use of Opposition Analysis"];
+const BETTER_REASONS=["Session Planning","Time Management","Group Management","Communication Clarity","Individual Attention","Adaptability","Instructions / Demonstrations","Energy / Pacing Control","Drill Selection","Demonstration Quality","Player Engagement","Checking Understanding","Feedback Timing","Pitching to Different Skill Levels","Equipment & Space Set-up","Follow-up on Last Session"];
+const MATCH_BETTER_REASONS=["Tactical Calls","Team Selection","In-game Communication","Composure","Player Management / Rotation","Preparation","Adaptability to Match Situations","Bowling Changes","Field Settings","Batting Order Calls","Handling Momentum Swings","Team Talk / Motivation","Use of Opposition Analysis"];
+const COACH_TAKEAWAY_SESSION=["Adjust Session Structure","Use Smaller Groups","Give More 1:1 Attention","Revisit Drill / Technique Teaching","Communicate Expectations More Clearly","Manage Time Better","Rotate Players More Effectively","Simplify Instructions","Build in More Game-based Practice","Plan Fewer, Better Drills","Demonstrate Before Explaining","Check Understanding More Often","Give Feedback Sooner","Link Practice to Match Situations","Adjust Difficulty to Player Level","Write Notes Right After the Session"];
+const COACH_TAKEAWAY_MATCH=["Reconsider Team Selection Approach","Adjust Tactical Approach","Manage Match Situations Better","Communicate More Calmly Under Pressure","Do Closer Opposition Analysis","Trust Preparation More","Plan Bowling Changes Earlier","Review Field Settings","Clarify Roles Before the Match","Use Breaks and Timeouts Better","Debrief Players Sooner"];
+const COACH_NEXT_FOCUS=["Communication","Session Planning","Game-day Tactics","Player Management","Time Management","Feedback Delivery","Preparation","Adaptability","Technical Knowledge","Composure","Demonstration & Explanation","Player Engagement","Individual Feedback","Match Simulation","Opposition Analysis","Workload Awareness","Record Keeping","Mental Skills Coaching"];
 function matchLabel(m){return `${m.team||"My Team"} vs ${m.opp||"Opposition"}`}
 function ratingSelectRow(name,label,currentValue){
  return `<label>${esc(label)}<select name="${name}">${[5,4,3,2,1].map(n=>`<option value="${n}" ${String(currentValue)===String(n)?"selected":""}>${n} — ${RATING_LABELS[n]}</option>`).join("")}</select></label>`;
@@ -2218,7 +2218,7 @@ function netPlanNameFieldHtml(si,ni,field,label,net){
  }).join("")}</div>`:`<div class="muted" style="font-size:var(--fs-2);margin-top:4px">${currentNetPlanTeamFilter()?"No players in this team yet.":"No players in roster yet."}</div>`;
  return `<div style="min-width:0">
   <div class="muted" style="font-size:var(--fs-3);font-weight:600;text-transform:uppercase;letter-spacing:.3px;display:flex;justify-content:space-between;align-items:center;gap:4px;cursor:pointer" onclick="toggleNetPlayerAssign('${key}')">
-   <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(label)}${capLabel}</span>
+   <span id="netPlayerLabel-${key}" style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(label)}${capLabel}</span>
    <span class="chev" style="flex-shrink:0">${icon("chevronRight",12)}</span>
   </div>
   <div id="netPlayerSummary-${key}" style="margin-top:2px">${netPlanSelectedNamesHtml(selected)}</div>
@@ -2400,10 +2400,22 @@ function updateNetPlanField(si,ni,field,value){
   // netPlanExpandedKeys, not in the DOM being rebuilt.)
   let namesField=field==="batters"?"battersNames":"bowlersNames";
   let cap=parseNetCap(net[field]);
+  let trimmed=false;
   if(isFinite(cap)&&net[namesField]&&net[namesField].length>cap){
-   net[namesField]=net[namesField].slice(0,cap);
+   net[namesField]=net[namesField].slice(0,cap);trimmed=true;
   }
-  renderNetPlanBuilder();
+  // Rebuilding the whole builder here destroys whichever field the coach is tapping
+  // next (this runs on blur), which dismisses the phone keyboard mid-typing. So only
+  // rebuild when names were trimmed or that player picker is open; otherwise just
+  // refresh the "· max N" label in place.
+  let key=`${si}-${ni}-${namesField}`;
+  if(trimmed||netPlanExpandedKeys.has(key)){renderNetPlanBuilder();}
+  else{
+   let lab=document.getElementById("netPlayerLabel-"+key);
+   if(lab)lab.textContent=(field==="batters"?"Batters":"Bowlers")+(isFinite(cap)?" · max "+cap:"");
+   let countEl=document.getElementById("formSecCount-netPlan");
+   if(countEl)countEl.textContent=sessionNetPlanDraft.length?`(${netPlanCountLabel(sessionNetPlanDraft)})`:"";
+  }
  }
 }
 function netPlanSummaryText(netPlan){
