@@ -238,6 +238,8 @@ p{orphans:3;widows:3}
 .kebabWrap{position:relative;flex:0 0 auto}.kebabWrap>.btn{font-size:20px;line-height:1;letter-spacing:1px}.kebabWrap>.btn.lbl{font-size:inherit;line-height:normal;letter-spacing:0;white-space:nowrap}
 .kebabMenu{display:none;position:absolute;right:0;top:44px;z-index:40;min-width:190px;background:var(--surface2);border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 30px rgba(0,0,0,.35);padding:6px}
 .kebabMenu.up{top:auto;bottom:44px}.kebabMenu.open{display:block}
+.playerRow{border-color:transparent;background:var(--surface);padding:12px 14px}.playerRow:hover{background:var(--surface2,var(--surface))}
+#players .list{gap:8px}
 .campSec{margin:24px 0 8px;font-size:12px;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);font-weight:700}
 .campNav{display:flex;gap:18px;margin:12px 0 0;font-size:var(--fs-3)}.campNav a{color:var(--muted);font-weight:600;cursor:pointer;text-decoration:none;padding:4px 0;border-bottom:2px solid transparent}.campNav a:hover{color:var(--ink);border-bottom-color:var(--g)}
 .campInfo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}.campInfo .l{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}.campInfo b{display:block;font-weight:600;overflow-wrap:anywhere}
@@ -3108,7 +3110,7 @@ function kebabMenu(id,items){return `<div class="kebabWrap"><button type="button
 function closeKebabs(){document.querySelectorAll(".kebabMenu.open").forEach(m=>m.classList.remove("open"))}
 function toggleKebab(id,ev){ev.stopPropagation();let m=document.getElementById("kb-"+id);if(!m)return;let was=m.classList.contains("open");closeKebabs();if(was)return;m.classList.remove("up");m.classList.add("open");let r=m.getBoundingClientRect();if(r.bottom>window.innerHeight-80)m.classList.add("up")}
 document.addEventListener("click",function(e){if(!e.target.closest(".kebabWrap"))closeKebabs()});
-function playerCardHtml(p){return `<div class="item"><div class="avatar">${esc(initials(p.name))}</div><div><b>${esc(p.name)}</b>${stageBadge(p)}${p.available==="no"?` <span class="tag" style="background:var(--redTint);color:var(--red)">Unavailable</span>`:""}<div class="muted">${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}${p.group?" · "+esc(p.group):""}</div></div><div class="toolbar"><button class="btn secondary" onclick="playerView('${p.id}')">Profile</button>${kebabMenu("p"+p.id,[{label:"Edit",icon:"edit",fn:`editPlayer('${p.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delPlayer('${p.id}')`}])}</div></div>`}
+function playerCardHtml(p){return `<div class="item playerRow" onclick="playerView('${p.id}')" style="cursor:pointer"><div class="avatar">${esc(initials(p.name))}</div><div style="min-width:0;flex:1"><b>${esc(p.name)}</b>${stageBadge(p)}${p.available==="no"?` <span class="tag" style="background:var(--redTint);color:var(--red)">Unavailable</span>`:""}<div class="muted" style="font-size:var(--fs-3)">${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}${p.group?" · "+esc(p.group):""}</div></div><div style="margin-left:auto;flex:0 0 auto" onclick="event.stopPropagation()">${kebabMenu("p"+p.id,[{label:"Open profile",icon:"players",fn:`playerView('${p.id}')`},{label:"Edit",icon:"edit",fn:`editPlayer('${p.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delPlayer('${p.id}')`}])}</div></div>`}
 /* ===== Squad stages (Camp 1 → Camp 2 → Tournament → Released) ===== */
 const DEFAULT_STAGES=[{id:"st1",name:"Camp 1"},{id:"st2",name:"Camp 2"},{id:"st3",name:"Tournament squad"},{id:"stR",name:"Released",released:true}];
 let stageFilter="";
@@ -3212,11 +3214,11 @@ function players(){
  if(stageFilter&&!stagesList().some(x=>x.id===stageFilter))stageFilter="";
  if(stageFilter)list=list.filter(p=>stageOf(p).id===stageFilter);
  document.getElementById("players").innerHTML=head("Players","Development record for every player.")
- +`<div class="toolbar noPrint" style="flex-wrap:wrap"><button class="btn primary" onclick="newPlayer()">+ Add Player</button><button class="btn secondary" onclick="newPlayersBulk()">+ Add Multiple</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess</button><button class="btn secondary" onclick="squadSelectSheet(undefined,playerTeamFilter)">Select squad</button><button class="btn secondary iconBtn" title="Print Roster" onclick="playerRosterReport()">${icon("print",17)}</button></div>
+ +`<div class="toolbar noPrint"><button class="btn primary" onclick="newPlayer()">+ Add Player</button>${campMenu("plAct","Actions ▾",[{label:"Add multiple",icon:"players",fn:"newPlayersBulk()"},{label:"Bulk assess",icon:"edit",fn:"openBulkAssessment()"},{label:"Select squad",icon:"share",fn:"squadSelectSheet(undefined,playerTeamFilter)"},{label:"Print roster",icon:"print",fn:"playerRosterReport()"}])}</div>
  ${stageChipsHtml()}
  ${filterBarHtml("players",`<input id="playerSearch" value="${esc(playerQuery)}" oninput="playerQuery=this.value;players()" onfocus="playerSearchFocused=true" onblur="playerSearchFocused=false" placeholder="Search players, teams, notes...">`,`<label>Role<select onchange="playerRoleFilter=this.value;players()"><option value="">All roles</option>${PLAYER_ROLES.map(r=>`<option value="${r}" ${playerRoleFilter===r?"selected":""}>${r}</option>`).join("")}</select></label>
  <label>Team<select onchange="playerTeamFilter=this.value;players()"><option value="">All teams</option>${playerTeams().map(t=>`<option value="${esc(t)}" ${playerTeamFilter===t?"selected":""}>${esc(t)}</option>`).join("")}</select></label>`,(playerRoleFilter?1:0)+(playerTeamFilter?1:0))}
- <h2 class="section">Player database (${list.length})</h2>
+ <div class="campSec">Players · ${list.length}</div>
  <div class="list">${list.length?list.map(playerCardHtml).join(""):empty("Add players to begin.")}</div>`;
  let sEl=document.getElementById("playerSearch");if(sEl&&playerSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
