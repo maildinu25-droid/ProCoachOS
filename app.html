@@ -1943,7 +1943,7 @@ function sessions(){
   let linkedReflection=db.reflections.find(r=>r.sessionId===s.id);
   let showReflectionStatus=s.date<=today();
   let thumbDrill=mainDrills.concat(gameDrills).find(d=>d.fieldSteps&&d.fieldSteps.length);
-  return `<div class="item">${thumbDrill?`<div class="sessThumb">${fieldStepsPreviewHtml(thumbDrill.fieldSteps.slice(0,1),76)}</div>`:""}<div><b>${esc(sessionLabel(s))}${sessionFocusText(s)?" · "+esc(sessionFocusText(s)):""}</b><div class="muted" style="font-size:var(--fs-3)">${esc(fmtDate(s.date))}${s.time?" · "+esc(fmtTime(s.time)):""}${s.duration?" · "+esc(s.duration)+"m":""} · ${esc(sessionTypeLabel(s.sessionType))}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.concat(gameDrills).map(d=>`<span class="tag" style="cursor:pointer" onclick="viewDrill('${d.id}')">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px">${s.attachment.dataUrl?`<a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a>`:`<span class="muted" style="font-size:var(--fs-3)">📎 ${esc(s.attachment.name)} (archived)</span>`}</div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="printSessionPlan('${s.id}')">View</button>${kebabMenu("s"+s.id,[{label:"Edit",icon:"edit",fn:`editSession('${s.id}')`},{label:"Start timer",icon:"clock",fn:`timerSetup('${s.id}')`},{label:"Remind me (calendar)",icon:"bell",fn:`remindSheet('${s.id}')`},{label:"Share on WhatsApp",icon:"share",fn:`shareSessionSummary('${s.id}')`},{label:"Copy text",icon:"copy",fn:`copySessionSummary('${s.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delSession('${s.id}')`}])}</div></div>`;
+  return `<div class="item">${thumbDrill?`<div class="sessThumb">${fieldStepsPreviewHtml(thumbDrill.fieldSteps.slice(0,1),76)}</div>`:""}<div><b>${esc(sessionLabel(s))}${sessionFocusText(s)?" · "+esc(sessionFocusText(s)):""}</b><div class="muted" style="font-size:var(--fs-3)">${esc(fmtDate(s.date))}${s.time?" · "+esc(fmtTime(s.time)):""}${s.duration?" · "+esc(s.duration)+"m":""} · ${esc(sessionTypeLabel(s.sessionType))}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.concat(gameDrills).map(d=>`<span class="tag" style="cursor:pointer" onclick="viewDrill('${d.id}')">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px">${s.attachment.dataUrl?`<a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a>`:`<span class="muted" style="font-size:var(--fs-3)">📎 ${esc(s.attachment.name)} (archived)</span>`}</div>`:""}${(s.campId&&campById(s.campId))?`<div style="margin-top:6px"><span class="tag" style="cursor:pointer" onclick="go('camps');openCamp('${s.campId}')">🏕 ${esc(campById(s.campId).name)}</span></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="printSessionPlan('${s.id}')">View</button>${kebabMenu("s"+s.id,[{label:"Edit",icon:"edit",fn:`editSession('${s.id}')`},{label:"Start timer",icon:"clock",fn:`timerSetup('${s.id}')`},{label:"Remind me (calendar)",icon:"bell",fn:`remindSheet('${s.id}')`},{label:"Share on WhatsApp",icon:"share",fn:`shareSessionSummary('${s.id}')`},{label:"Copy text",icon:"copy",fn:`copySessionSummary('${s.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delSession('${s.id}')`}])}</div></div>`;
  }).join("")}</div>`:empty("No sessions match your search.")}</div>`;
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -3158,7 +3158,7 @@ ${(()=>{let lt=db.tournaments.filter(t=>t.syncStage&&L.some(x=>x.id===t.syncStag
  <label>Ticked players move to<select id="ssTo">${L.filter(s=>s.id!==fromId&&!s.released).map(s=>`<option value="${s.id}" ${s.id===toDefault?"selected":""}>${esc(s.name)}</option>`).join("")}</select></label>
  <label class="full">Players not ticked<select id="ssMode"><option value="release">Move to ${esc(rel.name)}</option><option value="stay">Leave in ${esc(L[fi].name)}</option></select></label></div>
  <div style="display:flex;gap:8px;margin:10px 0"><button class="btn secondary" onclick="document.querySelectorAll('.ssChk').forEach(c=>c.checked=true)">Tick all</button><button class="btn secondary" onclick="document.querySelectorAll('.ssChk').forEach(c=>c.checked=false)">Clear</button><span class="muted" style="align-self:center" id="ssCount"></span></div>
- <div class="list">${players.length?players.map(p=>`<div class="item ssRow"><input type="checkbox" class="ssChk" data-id="${p.id}" checked onchange="ssUpdateCount()"><div class="ssMain"><div class="ssName"><b>${esc(p.name)}</b> <span class="muted">${esc(p.role||"Player")}</span></div><input class="ssNote" data-id="${p.id}" placeholder="Note (optional)"></div></div>`).join(""):empty("No players in this stage.")}</div>
+ <div class="list">${players.length?players.map(p=>`<div class="item ssRow"><input type="checkbox" class="ssChk" data-id="${p.id}" checked onchange="ssUpdateCount()"><div class="ssMain"><div class="ssName"><b>${esc(p.name)}</b> <span class="muted">${esc(p.role||"Player")}</span></div>${playerCampLine(p)}<input class="ssNote" data-id="${p.id}" placeholder="Note (optional)"></div></div>`).join(""):empty("No players in this stage.")}</div>
  <div style="display:grid;gap:8px;margin-top:14px"><button class="btn primary" onclick="applySquadSelection('${fromId}')">Apply selection</button>
  <div class="actionRow"><button class="btn secondary" onclick="stageListReport('${fromId}',squadTeam)">Print this list</button><button class="btn secondary" onclick="stagesSettingsSheet()">Edit stages</button></div>
  ${last?`<button class="btn danger" onclick="undoSquadSelection()">Undo last selection (${esc(fmtDate(last.date))}, ${last.moves.length} moved)</button>`:""}</div>`);
@@ -3370,13 +3370,15 @@ function playerViewBody(p,forPrint){
  let latest=assessments.slice(-1)[0];
  let sessions=playerSessions(p);
  let matches=playerMatches(p);
- return `<div class="pHead"><div class="avatar">${esc(initials(p.name))}</div><div><h3>${esc(p.role||"Player")}</h3><div class="muted">${esc(playingStyleLabel(p)||"")}</div><div class="muted">${esc(p.team||"No team")}${p.group?" · "+esc(p.group):""}${p.age?" · Age "+esc(p.age):""}</div></div></div>
+ return `<div class="pHead"><div class="avatar">${esc(initials(p.name))}</div><div><h3>${esc(p.role||"Player")}</h3><div class="muted">${esc(playingStyleLabel(p)||"")}</div><div class="muted">${p.team?`<span style="cursor:pointer;border-bottom:1px dotted var(--muted)" data-t="${esc(p.team)}" onclick="teamOverview(this.dataset.t)">${esc(p.team)}</span>`:"No team"}${p.group?" · "+esc(p.group):""}${p.age?" · Age "+esc(p.age):""}</div></div></div>
  <div class="pStats"><div><b>${sessions.length}</b><span>Sessions</span></div><div><b>${assessments.length}</b><span>Assessments</span></div><div><b>${latest?assessmentAvg(latest):"—"}</b><span>Latest /10</span></div><div><b>${matches.length}</b><span>Matches</span></div></div>
+ ${playerStandingHtml(p,assessments,sessions,matches)}
  ${p.focus?`<h2 class="section">Current goal</h2><div class="card">${esc(p.focus)}</div>`:""}
  ${playerGoalsHtml(p)}
  ${forPrint?playerProgressPrintHtml(playerAssessments(p)):playerProgressChartHtml(p)}
  ${fitnessTestsHtml(p,forPrint)}
  ${forPrint?"":playerStageHtml(p)}
+ ${playerCampsHtml(p,forPrint)}
  ${forPrint?vmPairsHtml(p):`<div id="vmSec" data-p="${esc(p.name)}"></div>`}
  ${p.strengths?`<h2 class="section">Strengths</h2><div class="card">${esc(p.strengths)}</div>`:""}
  ${p.areas?`<h2 class="section">Development areas</h2><div class="card">${esc(p.areas)}</div>`:""}
@@ -3384,7 +3386,7 @@ function playerViewBody(p,forPrint){
  ${techViewHtml(p,forPrint)}
  ${latest?`<h2 class="section">Latest assessment</h2><div class="card"><b>${assessmentAvg(latest)==="—"?"Technique only":"Overall "+assessmentAvg(latest)+"/10"}</b><br>${assessmentDisciplines(latest).map(d=>`<span class="tag">${d}${disciplineAvg(latest,d)==="—"?"":" "+disciplineAvg(latest,d)+"/10"}</span>`).join("")}</div>${assessmentDetailHTML(latest)}`:""}
  <h2 class="section">Assessment history (${assessments.length})</h2>${assessments.length?`<div class="card">${assessments.map(a=>`<div class="item"><div><b>${esc(fmtDate(a.date))}</b>${assessmentFormatTagsHtml(a)}<div class="muted">${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</div>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div></div>`).join("")}</div>`:empty("No assessments yet.")}
- <h2 class="section">Session attendance (${sessions.length})</h2>${sessions.length?`<div class="card">${sessions.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}</div></div></div>`).join("")}</div>`:empty("No recorded attendance yet.")}
+ <h2 class="section">Session attendance (${sessions.length})</h2>${sessions.length?`<div class="card">${sessions.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}${sessionFocusText(s)?" · "+esc(sessionFocusText(s)):""}</b><div class="muted">${esc(fmtDate(s.date))}${(s.campId&&campById(s.campId))?" · 🏕 "+esc(campById(s.campId).name):""}</div></div>${forPrint?"":`<button class="btn secondary" onclick="closeM();printSessionPlan('${s.id}')">View</button>`}</div>`).join("")}</div>`:empty("No recorded attendance yet.")}
  ${matchPatternsHtml(p)}
  <h2 class="section">Match history (${matches.length})</h2>${matches.length?`<div class="card">${matches.map(m=>{let bat=(m.battingReview||[]).find(r=>r.name===p.name);let bowl=(m.bowlingReview||[]).find(r=>r.name===p.name);return `<div class="item"><div><b>vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(fmtDate(m.date))}${bat?" · "+esc(bat.runs||0)+"("+esc(bat.balls||0)+")":""}${bowl?" · "+esc(bowl.wickets||0)+"/"+esc(bowl.runs||0):""}</div></div><button class="btn secondary" onclick="closeM();matchReportView('${m.id}')">Report</button></div>`}).join("")}</div>`:empty("No match entries yet.")}`;
 }
@@ -5755,7 +5757,7 @@ function organisation(){
   let playerCount=db.players.filter(p=>p.team===t.name).length;
   let sessionCount=activeSessions().filter(s=>s.squad===t.name).length;
   let matchCount=db.matches.filter(m=>m.team===t.name).length;
-  return `<div class="card"><b>${esc(t.name)}</b>${t.category?`<div class="muted">${esc(t.category)}</div>`:""}<div class="muted" style="margin-top:6px">${playerCount} player${playerCount!==1?"s":""} · ${sessionCount} session${sessionCount!==1?"s":""} · ${matchCount} match${matchCount!==1?"es":""}</div>${t.notes?`<p style="margin-top:8px">${esc(t.notes)}</p>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary iconBtn" title="Edit" onclick="editOrgEntity('team','${t.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delOrgEntity('team','${t.id}')">${icon("trash",17)}</button></div></div>`;
+  return `<div class="card"><b style="cursor:pointer;border-bottom:1px dotted var(--muted)" data-t="${esc(t.name)}" onclick="teamOverview(this.dataset.t)">${esc(t.name)} ›</b>${t.category?`<div class="muted">${esc(t.category)}</div>`:""}<div class="muted" style="margin-top:6px">${playerCount} player${playerCount!==1?"s":""} · ${sessionCount} session${sessionCount!==1?"s":""} · ${matchCount} match${matchCount!==1?"es":""}</div>${t.notes?`<p style="margin-top:8px">${esc(t.notes)}</p>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary iconBtn" title="Edit" onclick="editOrgEntity('team','${t.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delOrgEntity('team','${t.id}')">${icon("trash",17)}</button></div></div>`;
  }).join(""):empty("No teams yet. Add one here, or assign a team to a player and it'll appear automatically.")}</div>
 
  <h2 class="section">Tournaments</h2>
@@ -6170,6 +6172,7 @@ const REPORT_GROUPS=[
  ]},
  {key:"competition",label:"Competition",items:[
   {fn:"tournamentReport",title:"Tournament Report",desc:"Results, batting/bowling/fielding averages and match log for a tournament."},
+  {fn:"campReportPick",title:"Camp Summary Report",desc:"Overview of a camp for owners and administrators: what was covered, assessments, selection outcome and a written summary."},
   {fn:"seasonAnalyticsReport",title:"Season Analytics",desc:"Sessions, matches and ratings for a specific registered season."},
   {fn:"matchReport",title:"Match Report",desc:"Batting, bowling and fielding averages, results, team review and training actions."}
  ]},
@@ -8145,11 +8148,11 @@ function campDetailHtml(c){
  let unassigned=pool.filter(p=>!(c.batches||[]).some(b=>b.names.includes(p.name)));
  return `<button class="backBtn noPrint" onclick="closeCamp()">${icon("chevronLeft",13)} All camps</button>
  <div class="hero"><h1>${esc(c.name)} <span class="tag" style="font-size:12px;vertical-align:middle">${esc(c.kind||"Camp")}</span></h1><div class="muted">${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""} · ${days.length} day${days.length===1?"":"s"}</div></div>
- <div class="toolbar noPrint" style="flex-wrap:wrap"><button class="btn secondary" onclick="editCamp('${c.id}')">Edit details</button><button class="btn secondary" onclick="campBatchesSheet('${c.id}')">Groups</button><button class="btn primary" onclick="campSheetReport('${c.id}')">Print sheet</button><button class="btn secondary" onclick="campShareImage('${c.id}')">Share as image</button><button class="btn secondary" onclick="campCopyForm('${c.id}')">Copy camp</button><button class="btn secondary" onclick="campSaveTemplate('${c.id}')">Save as template</button><button class="btn primary" onclick="campSummaryReport('${c.id}')">Camp summary report</button></div>
+ <div class="toolbar noPrint" style="flex-wrap:wrap"><button class="btn secondary" onclick="editCamp('${c.id}')">Edit details</button><button class="btn secondary" onclick="campBatchesSheet('${c.id}')">Groups</button><button class="btn primary" onclick="campSheetReport('${c.id}')">Print sheet</button><button class="btn secondary" onclick="campShareImage('${c.id}')">Share as image</button><button class="btn secondary" onclick="campCopyForm('${c.id}')">Copy camp</button><button class="btn secondary" onclick="campSaveTemplate('${c.id}')">Save as template</button></div>
  ${campTodayHtml(c)}
  <div class="grid g4" style="margin-top:12px">${meta(campVenues(c).length>1?"Venues":"Venue",esc(campVenues(c).join(" · ")))}${meta("Team / stage",esc([c.team,stName].filter(Boolean).join(" · ")||"Everyone"))}${meta("Season phase",(()=>{let po=campPhaseOf(c);return po?esc(po.season.name+" · "+po.phase.name):""})())}${meta("Players",pool.length+(unassigned.length&&(c.batches||[]).length>1?` <span class="muted" style="font-weight:400">(${unassigned.length} not in a group)</span>`:""))}${meta("Coaches",esc(c.coaches||""))}</div>
  ${(c.batches||[]).length>1?`<div style="margin-top:10px">${c.batches.map(b=>`<span class="tag">${esc(b.name)} · ${b.names.length}</span>`).join(" ")}</div>`:""}
- <div class="card" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><b>Sessions</b><div class="muted" style="font-size:var(--fs-3)">${(()=>{let st=campSessionStats(c);return st.have?st.have+" of "+st.rows+" schedule rows are sessions in Session Plans":"Turn each schedule row into a session with its date, time, venue and focus"})()}</div></div><button class="btn primary" onclick="campSyncSessions('${c.id}')">${campSessionStats(c).have?"Update sessions":"Create sessions"}</button></div>
+ <div class="card" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><b>Sessions</b><div class="muted" style="font-size:var(--fs-3)">${(()=>{let st=campSessionStats(c);return st.have?st.have+" of "+st.rows+" schedule rows are sessions in Session Plans":"Turn each schedule row into a session with its date, time, venue and focus"})()}</div></div><button class="btn primary" onclick="campSyncSessions('${c.id}')">${campSessionStats(c).have?"Update sessions":"Create sessions"}</button></div>${campSessionsListHtml(c)}
  <h2 class="section">Schedule <span class="muted" style="font-weight:400;font-size:var(--fs-3)">— tap a time to edit a row, a cell to change what's planned, a day to set its theme</span></h2>
  <div class="list">${days.map((d,i)=>campDayCardHtml(c,d,i,groups)).join("")||empty("Set the camp dates in Edit details.")}</div>
  <h2 class="section">Player review</h2><div id="campRevBox">${campReviewHtml(c)}</div>
@@ -8725,12 +8728,12 @@ function campRevRowHtml(c,name){
  let v=campRevOf(c,name),pl=db.players.find(p=>p.name===name&&!p.deletedAt),ev=campEvidence(c,name),open=!!campRevOpen[name]||(v.tags.length||v.note)&&campRevOpen[name]!==false&&false;
  let tagBtns=CAMP_REV_TAGS.map(([t,good])=>{let on=v.tags.includes(t),col=good?"#1f8a4c":"#d97706";return `<button type="button" data-t="${esc(t)}" onclick="campRevTag(this)" style="border:1px solid ${col};background:${on?col:"transparent"};color:${on?"#fff":col};border-radius:14px;padding:4px 10px;font-size:12.5px;margin:0 6px 6px 0">${esc(t)}</button>`}).join("");
  return `<div class="card campRevRow" data-n="${esc(name)}" style="padding:10px 12px;margin-top:8px">
- <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap"><div><b>${esc(name)}</b> <span class="muted">${esc((pl&&pl.role)||"")}</span></div>${ev?`<span class="muted" style="font-size:var(--fs-3)">${esc(ev)}</span>`:""}</div>
+ <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap"><div>${pl?`<b style="cursor:pointer;border-bottom:1px dotted var(--muted)" onclick="playerView('${pl.id}')">${esc(name)}</b>`:`<b>${esc(name)}</b>`} <span class="muted">${esc((pl&&pl.role)||"")}</span></div>${ev?`<span class="muted" style="font-size:var(--fs-3)">${esc(ev)}</span>`:""}</div>
  <div style="display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap">
   <div style="display:flex;gap:4px">${[1,2,3,4,5].map(i=>`<button type="button" onclick="campRevSet(this,'r',${i})" aria-label="${i} of 5" style="width:34px;height:34px;border-radius:50%;border:1px solid ${v.r>=i?"#f59e0b":"#8886"};background:${v.r>=i?"#f59e0b":"transparent"};color:${v.r>=i?"#fff":"var(--muted)"};font-size:14px">${i}</button>`).join("")}</div>
   <div style="display:flex;gap:4px;margin-left:auto">${CAMP_REV_REC.map(([k,l,col])=>`<button type="button" onclick="campRevSet(this,'rec','${k}')" style="padding:6px 12px;border-radius:8px;border:1px solid ${col};background:${v.rec===k?col:"transparent"};color:${v.rec===k?"#fff":col};font-weight:600;font-size:13px">${l}</button>`).join("")}</div>
  </div>
- <div style="margin-top:6px"><button type="button" class="btn secondary" style="padding:3px 10px;font-size:12px" onclick="campRevToggle(this)">${campRevOpen[name]?"Hide":(v.tags.length||v.note?"Tags & note ("+(v.tags.length+(v.note?1:0))+")":"+ Tags & note")}</button></div>
+ <div style="margin-top:6px"><button type="button" class="btn secondary" style="padding:3px 10px;font-size:12px" onclick="campRevToggle(this)">${campRevOpen[name]?"Hide":(v.tags.length||v.note?"Tags & note ("+(v.tags.length+(v.note?1:0))+")":"+ Tags & note")}</button>${(v.r||v.rec||v.tags.length||v.note)?` <button type="button" class="btn secondary" style="padding:3px 10px;font-size:12px" onclick="campRevClear(this)">Clear</button>`:""}</div>
  ${campRevOpen[name]?`<div style="margin-top:8px">${tagBtns}<input placeholder="One line note (optional)" value="${esc(v.note)}" onchange="campRevNote(this)" style="margin-top:2px"></div>`:""}</div>`;
 }
 function campRevCounts(c){let k={in:0,maybe:0,out:0,none:0};campRevNames(c).forEach(n=>{let v=campRevOf(c,n);k[v.rec||"none"]++});return k}
@@ -8744,28 +8747,52 @@ function campReviewHtml(c){
  let f=campRevFilter,list=names.filter(n=>!f||(campRevOf(c,n).rec||"none")===f);
  return `<div class="muted" style="font-size:var(--fs-3);margin-bottom:8px">Tap a number (1–5) for how they did, then In, Maybe or Out for the next squad. Tags and a note are optional. Assessments and session attendance show beside each name when you have them.</div>
  <div id="campRevSum">${campRevSumHtml(c)}</div><div id="campRevList">${list.map(n=>campRevRowHtml(c,n)).join("")||`<div class="muted" style="margin-top:8px">Nobody here.</div>`}</div>
- <div class="toolbar noPrint" style="margin-top:10px"><button class="btn primary" onclick="campReviewReport('${c.id}')">Camp report</button><button class="btn secondary" onclick="campSelectSquad('${c.id}')">Select squad from review</button></div>`;
+ <div class="toolbar noPrint" style="margin-top:10px"><button class="btn secondary" onclick="campSelectSquad('${c.id}')">Select squad from review</button><button class="btn primary" onclick="campSummaryReport('${c.id}')">Camp summary report</button></div>
+ <div class="toolbar noPrint" style="margin-top:6px"><button class="btn secondary" onclick="campRevRefreshAll()">Refresh</button>${(c.revUndo&&c.revUndo.length)?`<button class="btn secondary" onclick="campRevUndo('${c.id}')">Undo last change</button>`:""}${Object.keys(c.review||{}).length?`<button class="btn danger" onclick="campRevClearAll('${c.id}')">Clear all ratings</button>`:""}</div>`;
 }
 function campRevCtx(el){let c=campById(campOpenId),row=el.closest(".campRevRow");return c&&row?{c,name:row.dataset.n,row}:null}
 function campRevRefreshRow(x){let t=document.createElement("div");t.innerHTML=campRevRowHtml(x.c,x.name);x.row.replaceWith(t.firstElementChild);let s=document.getElementById("campRevSum");if(s)s.innerHTML=campRevSumHtml(x.c)}
 function campRevSet(el,k,val){
  if(!requireWriteAccess())return;let x=campRevCtx(el);if(!x)return;
- if(!x.c.review)x.c.review={};let v=x.c.review[x.name]=x.c.review[x.name]||{r:0,rec:"",tags:[],note:""};
+ campRevPush(x.c,x.name);if(!x.c.review)x.c.review={};let v=x.c.review[x.name]=x.c.review[x.name]||{r:0,rec:"",tags:[],note:""};
  v[k]=(v[k]===val)?(k==="r"?0:""):val;campQuiet();
  if(campRevFilter&&k==="rec"&&(v.rec||"none")!==campRevFilter){let box=document.getElementById("campRevBox");if(box)box.innerHTML=campReviewHtml(x.c);return}
  campRevRefreshRow(x);
 }
 function campRevTag(el){
  if(!requireWriteAccess())return;let x=campRevCtx(el);if(!x)return;
- if(!x.c.review)x.c.review={};let v=x.c.review[x.name]=x.c.review[x.name]||{r:0,rec:"",tags:[],note:""},t=el.dataset.t;
+ campRevPush(x.c,x.name);if(!x.c.review)x.c.review={};let v=x.c.review[x.name]=x.c.review[x.name]||{r:0,rec:"",tags:[],note:""},t=el.dataset.t;
  v.tags=v.tags.includes(t)?v.tags.filter(a=>a!==t):v.tags.concat(t);campQuiet();campRevRefreshRow(x);
 }
 function campRevNote(el){
  if(!requireWriteAccess())return;let x=campRevCtx(el);if(!x)return;
- if(!x.c.review)x.c.review={};let v=x.c.review[x.name]=x.c.review[x.name]||{r:0,rec:"",tags:[],note:""};v.note=el.value.trim();campQuiet();
+ campRevPush(x.c,x.name);if(!x.c.review)x.c.review={};let v=x.c.review[x.name]=x.c.review[x.name]||{r:0,rec:"",tags:[],note:""};v.note=el.value.trim();campQuiet();
 }
 function campRevToggle(el){let x=campRevCtx(el);if(!x)return;campRevOpen[x.name]=!campRevOpen[x.name];campRevRefreshRow(x)}
 function campRevSetFilter(id){let c=campById(campOpenId);if(!c)return;campRevFilter=id;let b=document.getElementById("campRevBox");if(b)b.innerHTML=campReviewHtml(c)}
+
+function campRevPush(c,name){
+ if(!Array.isArray(c.revUndo))c.revUndo=[];
+ let prev=c.review&&c.review[name]?JSON.parse(JSON.stringify(c.review[name])):null;
+ c.revUndo.push({n:name,v:prev});if(c.revUndo.length>40)c.revUndo.shift();
+}
+function campRevRefreshAll(){let c=campById(campOpenId),b=document.getElementById("campRevBox");if(c&&b)b.innerHTML=campReviewHtml(c)}
+function campRevClear(el){
+ if(!requireWriteAccess())return;let x=campRevCtx(el);if(!x)return;
+ campRevPush(x.c,x.name);if(x.c.review)delete x.c.review[x.name];campQuiet();campRevRefreshAll();
+}
+function campRevClearAll(id){
+ if(!requireWriteAccess())return;let c=campById(id);if(!c||!Object.keys(c.review||{}).length)return;
+ if(!confirm("Clear every rating, decision, tag and note in this camp's review?\n\nYou can bring them back with Undo last change."))return;
+ if(!Array.isArray(c.revUndo))c.revUndo=[];c.revUndo.push({all:true,data:JSON.parse(JSON.stringify(c.review||{}))});if(c.revUndo.length>40)c.revUndo.shift();
+ c.review={};campQuiet();campRevRefreshAll();
+}
+function campRevUndo(id){
+ if(!requireWriteAccess())return;let c=campById(id);if(!c||!c.revUndo||!c.revUndo.length)return;
+ let u=c.revUndo.pop();
+ if(u.all)c.review=u.data;else{if(!c.review)c.review={};if(u.v)c.review[u.n]=u.v;else delete c.review[u.n]}
+ campQuiet();campRevRefreshAll();
+}
 function campReviewReport(id){
  let c=campById(id);if(!c)return;let names=campRevNames(c),k=campRevCounts(c);
  let order={in:0,maybe:1,out:2,"":3},sorted=names.slice().sort((a,b)=>{let x=campRevOf(c,a),y=campRevOf(c,b);return (order[x.rec||""]-order[y.rec||""])||(y.r-x.r)||a.localeCompare(b)});
@@ -8850,7 +8877,7 @@ function campSummaryAuto(c,d){
   (d.goodTags.length?` The most common strengths noted were ${join(d.goodTags.map(x=>x[0].toLowerCase()))}.`:"")+(d.badTags.length?` The most common areas to work on were ${join(d.badTags.map(x=>x[0].toLowerCase()))}.`:""))}
  return L.join(" ");
 }
-function campSumToggle(k,v){campSumOpts[k]=v;if(k==="names"&&!v)campSumOpts.notes=false;campSummaryReport(campOpenId||campSumLast)}
+function campSumToggle(k,v){campSumOpts[k]=v;if(k==="names"&&!v)campSumOpts.notes=false;campSummaryReport(campSumLast||campOpenId)}
 let campSumLast=null;
 function campSumSave(id,k,el){let c=campById(id);if(!c)return;c[k]=el.value;campQuiet();let t=document.getElementById("sum_"+k);if(t)t.textContent=el.value}
 function campSumReset(id){let c=campById(id);if(!c)return;delete c.sumText;campQuiet();campSummaryReport(id)}
@@ -8863,6 +8890,13 @@ async function campSumShare(id){
  try{if(navigator.share){await navigator.share({title:c.name+" — camp summary",text:t});return}}catch(e){if(e&&e.name==="AbortError")return}
  try{await navigator.clipboard.writeText(t);alert("Summary copied. Paste it into a message or email.")}catch(e){prompt("Copy this summary:",t)}
 }
+function campReportPick(){
+ let list=(db.camps||[]).slice().sort((a,b)=>String(b.startDate||"").localeCompare(String(a.startDate||"")));
+ if(!list.length){alert("Add a camp first (Camps & Clinics).");return}
+ if(list.length===1){campSummaryReport(list[0].id);return}
+ modal(`<div class="sheetHead"><h2>Camp Summary Report</h2><button class="x" onclick="closeM()">×</button></div><label>Select camp<select id="reportCamp">${list.map(c=>`<option value="${c.id}">${esc(c.name)} · ${esc(fmtDate(c.startDate))}</option>`).join("")}</select></label><button class="btn primary" style="margin-top:15px" onclick="campReportGo()">Generate Report</button>`);
+}
+function campReportGo(){let id=document.getElementById("reportCamp").value;if(id)campSummaryReport(id)}
 function campSummaryReport(id){
  let c=campById(id);if(!c)return;campSumLast=id;let d=campSummaryData(c),o=campSumOpts;
  let auto=campSummaryAuto(c,d),txt=c.sumText!==undefined?c.sumText:auto;
@@ -8895,6 +8929,78 @@ function campSummaryReport(id){
  reportShell(esc(c.name)+" — camp summary",`${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""}${campVenues(c).length?" · "+esc(campVenues(c).join(" / ")):""}${c.team?" · "+esc(c.team):""}${c.coaches?" · Coaches: "+esc(c.coaches):""}`,body);
 }
 /* ===== end camps ===== */
+/* ===== Connected views: player journey, camp links, team overview ===== */
+function campOfPlayer(p){return(db.camps||[]).filter(c=>{try{return campRevNames(c).includes(p.name)||(c.batches||[]).some(b=>(b.names||[]).includes(p.name))}catch(e){return false}}).sort((a,b)=>String(b.startDate||"").localeCompare(String(a.startDate||"")))}
+function campStatusOf(c){let t=today(),e=c.endDate||c.startDate;return t<c.startDate?"Upcoming":t>e?"Done":"On now"}
+function playerCampLine(p){
+ let c=campOfPlayer(p).find(x=>{let v=campRevOf(x,p.name);return v.r||v.rec});if(!c)return "";
+ let v=campRevOf(c,p.name),rc=CAMP_REV_REC.find(x=>x[0]===v.rec);
+ return `<div class="muted" style="font-size:12.5px">Camp: ${esc(c.name)}${v.r?` · <span style="color:#d97706">${campRevStars(v.r)}</span>`:""}${rc?` · <b style="color:${rc[2]}">${rc[1]}</b>`:""}</div>`;
+}
+function playerStandingHtml(p,assessments,sessions,matches){
+ let box=(l,v,sub)=>`<div class="card" style="padding:8px 10px"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.3px">${l}</div><b>${v}</b>${sub?`<div class="muted" style="font-size:12px">${sub}</div>`:""}</div>`;
+ let items=[];
+ if(stagesInUse()){let st=stageOf(p),lg=Array.isArray(p.stageLog)&&p.stageLog.length?p.stageLog[p.stageLog.length-1]:null;items.push(box("Squad stage",esc(st.name),lg?"since "+esc(fmtDate(lg.date)):""))}
+ let latest=assessments[assessments.length-1],prev=assessments[assessments.length-2];
+ if(latest&&assessmentAvg(latest)!=="—"){let a=Number(assessmentAvg(latest)),b=prev?Number(assessmentAvg(prev)):NaN,tr=Number.isFinite(b)?(a-b>0.04?" ▲ +"+(a-b).toFixed(1):a-b<-0.04?" ▼ "+(a-b).toFixed(1):" ="):"";items.push(box("Latest assessment",a.toFixed(1)+" / 10"+tr,esc(fmtDate(latest.date))))}
+ let cs=campOfPlayer(p).filter(c=>{let v=campRevOf(c,p.name);return v.r||v.rec})[0];
+ if(cs){let v=campRevOf(cs,p.name),rc=CAMP_REV_REC.find(x=>x[0]===v.rec);items.push(box("Latest camp review",`${v.r?`<span style="color:#d97706">${campRevStars(v.r)}</span> `:""}${rc?`<span style="color:${rc[2]}">${rc[1]}</span>`:""}`,esc(cs.name)))}
+ if(sessions.length)items.push(box("Sessions",sessions.length,"last "+esc(fmtDate(sessions[0].date))));
+ if(matches.length){let m=matches[0],bat=(m.battingReview||[]).find(r=>r.name===p.name),bowl=(m.bowlingReview||[]).find(r=>r.name===p.name);items.push(box("Last match","vs "+esc(m.opp||"Opposition"),esc(fmtDate(m.date))+(bat?" · "+esc(bat.runs||0)+"("+esc(bat.balls||0)+")":"")+(bowl?" · "+esc(bowl.wickets||0)+"/"+esc(bowl.runs||0):"")))}
+ return items.length?`<h2 class="section">Where they stand</h2><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">${items.join("")}</div>`:"";
+}
+function playerCampsInner(p,forPrint){
+ let list=campOfPlayer(p);
+ if(!list.length)return empty("Not in any camp yet.");
+ return list.map(c=>{
+  let v=campRevOf(c,p.name),days=campDays(c).length,st=campStatusOf(c),rc=CAMP_REV_REC.find(x=>x[0]===v.rec);
+  let ctrl=forPrint?"":`<div class="pcRev" data-c="${c.id}" data-n="${esc(p.name)}" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px"><div style="display:flex;gap:4px">${[1,2,3,4,5].map(i=>`<button type="button" onclick="pcRev(this,'r',${i})" aria-label="${i} of 5" style="width:30px;height:30px;border-radius:50%;border:1px solid ${v.r>=i?"#f59e0b":"#8886"};background:${v.r>=i?"#f59e0b":"transparent"};color:${v.r>=i?"#fff":"var(--muted)"};font-size:13px">${i}</button>`).join("")}</div><div style="display:flex;gap:4px;margin-left:auto">${CAMP_REV_REC.map(([k,l,col])=>`<button type="button" onclick="pcRev(this,'rec','${k}')" style="padding:5px 10px;border-radius:8px;border:1px solid ${col};background:${v.rec===k?col:"transparent"};color:${v.rec===k?"#fff":col};font-weight:600;font-size:12.5px">${l}</button>`).join("")}</div></div>`;
+  let ro=forPrint?`<div style="margin-top:4px">${v.r?`<span style="color:#d97706">${campRevStars(v.r)}</span> `:""}${rc?`<b style="color:${rc[2]}">${rc[1]}</b>`:""}</div>`:"";
+  return `<div class="item" style="display:block"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:flex-start"><div><b>${esc(c.name)}</b> <span class="tag">${st}</span><div class="muted" style="font-size:var(--fs-3)">${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""} · ${days} day${days===1?"":"s"}</div></div>${forPrint?"":`<button class="btn secondary" style="padding:4px 10px" onclick="closeM();go('camps');openCamp('${c.id}')">Open camp</button>`}</div>
+  ${ctrl}${ro}${v.tags.length?`<div style="margin-top:6px">${v.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join(" ")}</div>`:""}${v.note?`<div style="margin-top:4px;font-size:var(--fs-3)">${esc(v.note)}</div>`:""}</div>`;
+ }).join("");
+}
+function playerCampsHtml(p,forPrint){
+ let list=campOfPlayer(p);if(forPrint&&!list.some(c=>{let v=campRevOf(c,p.name);return v.r||v.rec}))return "";
+ return `<h2 class="section">Camps (${list.length})</h2><div class="card" id="pCamps">${playerCampsInner(p,forPrint)}</div>`;
+}
+function pcRev(btn,k,val){
+ if(!requireWriteAccess())return;let box=btn.closest(".pcRev");if(!box)return;
+ let c=campById(box.dataset.c),name=box.dataset.n;if(!c)return;
+ campRevPush(c,name);if(!c.review)c.review={};let v=c.review[name]=c.review[name]||{r:0,rec:"",tags:[],note:""};
+ v[k]=(v[k]===val)?(k==="r"?0:""):val;campQuiet();
+ let p=db.players.find(x=>x.name===name&&!x.deletedAt),el=document.getElementById("pCamps");if(p&&el)el.innerHTML=playerCampsInner(p,false);
+}
+function campSessionsListHtml(c){
+ let ss=db.sessions.filter(x=>x.campId===c.id&&!x.deletedAt).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b)));
+ if(!ss.length)return "";
+ return `<details class="card noPrint" style="margin-top:8px"><summary style="cursor:pointer;font-weight:600">View the ${ss.length} linked session${ss.length===1?"":"s"}</summary><div style="max-height:260px;overflow-y:auto;margin-top:6px">${ss.map(x=>`<div class="item" style="align-items:center"><div style="min-width:0"><b style="font-size:var(--fs-3)">${esc(fmtDate(x.date))}${x.time?" · "+esc(fmtTime(x.time)):""}</b><div class="muted" style="font-size:12.5px;overflow-wrap:anywhere">${esc(sessionFocusText(x)||sessionLabel(x))}</div></div><div class="toolbar"><button class="btn secondary" style="padding:4px 10px" onclick="printSessionPlan('${x.id}')">View</button><button class="btn secondary" style="padding:4px 10px" onclick="go('sessions');editSession('${x.id}')">Edit</button></div></div>`).join("")}</div></details>`;
+}
+function teamOverview(name){
+ let t=today(),L=stagesList(),players=activePlayers().filter(p=>p.team===name);
+ let section=(h,b)=>`<h2 class="section">${h}</h2>${b}`;
+ let stageHtml=stagesInUse()?`<div class="card" style="display:flex;gap:8px;flex-wrap:wrap">${L.map(s=>{let n=stagePlayers(s.id,name).length;return n?`<span class="tag" style="${s.released?"background:var(--redTint);color:var(--red)":""}">${esc(s.name)} · ${n}</span>`:""}).join("")||`<span class="muted">No players yet.</span>`}</div>`:`<div class="card">${players.length} player${players.length===1?"":"s"}</div>`;
+ let season=db.seasons.find(s=>s.team===name&&s.startDate<=t&&t<=s.endDate),ph=season&&(season.phases||[]).find(x=>x.startDate<=t&&t<=x.endDate);
+ let camps=(db.camps||[]).filter(c=>c.team===name).sort((a,b)=>String(b.startDate||"").localeCompare(String(a.startDate||"")));
+ let campHtml=camps.length?camps.map(c=>{let k=campRevCounts(c);return `<div class="item" style="align-items:center"><div><b>${esc(c.name)}</b> <span class="tag">${campStatusOf(c)}</span><div class="muted" style="font-size:var(--fs-3)">${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""}${(k.in+k.maybe+k.out)?` · In ${k.in} · Maybe ${k.maybe} · Out ${k.out}`:""}</div></div><button class="btn secondary" onclick="closeM();go('camps');openCamp('${c.id}')">Open</button></div>`}).join(""):`<div class="muted">No camps for this team.</div>`;
+ let ss=activeSessions().filter(s=>s.squad===name),mk=t.slice(0,7);
+ let upcoming=ss.filter(s=>s.date>=t).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b))).slice(0,3),recent=ss.filter(s=>s.date<t).sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a))).slice(0,3);
+ let sessRow=s=>`<div class="item" style="align-items:center"><div style="min-width:0"><b style="font-size:var(--fs-3)">${esc(fmtDate(s.date))}${s.time?" · "+esc(fmtTime(s.time)):""}</b><div class="muted" style="font-size:12.5px">${esc(sessionFocusText(s)||sessionLabel(s))}</div></div><button class="btn secondary" style="padding:4px 10px" onclick="closeM();printSessionPlan('${s.id}')">View</button></div>`;
+ let ms=db.matches.filter(m=>m.team===name).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
+ let w=ms.filter(m=>/^\s*(won|win)/i.test(m.result||"")).length,l=ms.filter(m=>/^\s*(lost|loss)/i.test(m.result||"")).length,o=ms.length-w-l;
+ let matchHtml=ms.length?`<div class="muted" style="margin-bottom:6px">${ms.length} played · ${w} won · ${l} lost${o?" · "+o+" other":""}</div>`+ms.slice(0,4).map(m=>`<div class="item" style="align-items:center"><div><b>vs ${esc(m.opp||"Opposition")}</b><div class="muted" style="font-size:var(--fs-3)">${esc(fmtDate(m.date))}${m.result?" · "+esc(m.result):""}</div></div><button class="btn secondary" style="padding:4px 10px" onclick="closeM();matchReportView('${m.id}')">Report</button></div>`).join(""):`<div class="muted">No matches yet.</div>`;
+ let tn=db.tournaments.filter(x=>ms.some(m=>m.tournamentId===x.id));
+ window._teamOvName=name;
+ modal(`<div class="sheetHead"><h2>${esc(name)}</h2><button class="x" onclick="closeM()">×</button></div>
+ ${season?`<div class="card"><b>${esc(season.name)}</b>${ph?` · <span class="tag">${esc(ph.name)}</span>${ph.focus?`<div class="muted" style="font-size:var(--fs-3)">${esc(ph.focus)}</div>`:""}`:""}</div>`:""}
+ ${section("Squad",stageHtml)}
+ <div class="toolbar noPrint" style="margin-top:8px"><button class="btn secondary" onclick="closeM();go('players')">Players</button><button class="btn secondary" onclick="squadSelectSheet(undefined,window._teamOvName)">Select squad</button></div>
+ ${section("Camps ("+camps.length+")",`<div class="card">${campHtml}</div>`)}
+ ${section("Sessions",`<div class="card"><div class="muted" style="margin-bottom:6px">${ss.filter(s=>String(s.date||"").slice(0,7)===mk).length} this month · ${ss.length} in total</div>${upcoming.length?`<b style="font-size:var(--fs-3)">Coming up</b>${upcoming.map(sessRow).join("")}`:""}${recent.length?`<b style="font-size:var(--fs-3)">Recent</b>${recent.map(sessRow).join("")}`:""}${ss.length?"":`<div class="muted">No sessions yet.</div>`}</div>`)}
+ ${section("Matches",`<div class="card">${matchHtml}</div>`)}
+ ${tn.length?section("Tournaments",`<div class="card">${tn.map(x=>`<span class="tag">${esc(x.name)}</span>`).join(" ")}</div>`):""}`);
+}
+
 
 function renderAll(){refreshProfileBadge();dashboard();sessions();reflections();players();assessments();drills();matches();analysisTools();reports();booking();calendar();camps();organisation();accountPage()}initApp();
 if("serviceWorker" in navigator && /(^|\/)app\.html$/.test(location.pathname)){
