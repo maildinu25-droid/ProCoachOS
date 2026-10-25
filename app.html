@@ -2025,7 +2025,8 @@ function sessionFormHtml(s,mode){
  <label>Session time<input type="time" name="time" value="${esc(s.time||"")}"></label>
  <label>Session title <span class="muted" style="font-weight:400">(optional)</span><input name="title" value="${esc(s.title||"")}" placeholder="Leave blank to show time + squad instead"></label>
  <label class="full">Session type<select name="sessionType" id="sessionTypeSelect" onchange="toggleSessionType(this.value)"><option value="team" ${sType==="team"?"selected":""}>Team / Squad session</option><option value="player" ${sType==="player"?"selected":""}>Individual Player (1-on-1)</option><option value="custom" ${sType==="custom"?"selected":""}>Custom Group</option></select></label>
- ${mode==="new"?`<div class="full"><label><input type="checkbox" id="sessionRepeatCheck" onchange="document.getElementById('sessionRepeatWeeksWrap').style.display=this.checked?'':'none'" style="width:auto;margin-right:6px">Repeat this session weekly</label><div id="sessionRepeatWeeksWrap" style="display:none;margin-top:8px"><label>For how many weeks (including this one)<input type="number" id="sessionRepeatWeeks" min="2" max="26" value="4"></label></div></div>`:""}
+ ${mode==="new"?`<div class="full"><span class="fpLabel">Same session on more days <span class="muted" style="font-weight:400">(e.g. a 3-day match)</span></span><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button type="button" class="btn secondary" style="padding:5px 10px" onclick="sessionNextDays(1)">+ Next day</button><button type="button" class="btn secondary" style="padding:5px 10px" onclick="sessionNextDays(2)">+ Next 2 days</button><input type="date" id="sessionExtraInput" style="flex:1;min-width:140px"><button type="button" class="btn secondary" style="padding:5px 10px" onclick="sessionAddExtraInput()">Add date</button></div><div id="sessionExtraList" style="margin-top:8px">${sessionExtraHtml()}</div></div>
+ <div class="full"><label><input type="checkbox" id="sessionRepeatCheck" onchange="document.getElementById('sessionRepeatWeeksWrap').style.display=this.checked?'':'none'" style="width:auto;margin-right:6px">Repeat this session weekly</label><div id="sessionRepeatWeeksWrap" style="display:none;margin-top:8px"><label>For how many weeks (including this one)<input type="number" id="sessionRepeatWeeks" min="2" max="26" value="4"></label></div></div>`:""}
  <div class="full" id="sessionTypeTeamWrap" style="${sType==="team"?"":"display:none"}"><label>Team<select name="squadTeam" onchange="onSessionTeamChange(this.value)">${db.teams.length?db.teams.map(t=>`<option value="${esc(t.name)}" ${s.squad===t.name?"selected":""}>${esc(t.name)}</option>`).join(""):`<option value="">No teams yet — add one in Teams & Seasons</option>`}</select></label></div>
  <div class="full" id="sessionTypePlayerWrap" style="${sType==="player"?"":"display:none"}"><label>Player<select name="sessionPlayerId">${activePlayers().length?activePlayers().map(p=>`<option value="${p.id}" ${s.sessionPlayerId===p.id?"selected":""}>${esc(p.name)}</option>`).join(""):`<option value="">No players yet — add one in Players</option>`}</select></label></div>
  <div class="full" id="sessionTypeCustomWrap" style="${sType==="custom"?"":"display:none"}"><label>Group name<input name="squadCustom" value="${esc(squadCustomVal)}" placeholder="e.g. Weekend intensive group"></label></div>
@@ -2105,7 +2106,19 @@ function tagListHtml(title,tags,text){
  if(!(tags&&tags.length)&&!text)return"";
  return `<h2>${esc(title)}</h2><div class="card">${(tags&&tags.length)?`<ul style="margin:0 0 ${text?"8px":"0"} 18px;padding:0">${tags.map(t=>`<li>${esc(t)}</li>`).join("")}</ul>`:""}${text?esc(text):""}</div>`;
 }
+let sessionExtraDates=[];
+function sessionExtraHtml(){
+ let base=(document.querySelector('form[onsubmit*="saveSession"] [name="date"]')||{}).value||"";
+ let list=sessionExtraDates.filter(d=>d!==base).sort();
+ return `<div class="muted" style="font-size:var(--fs-3);margin-bottom:6px">${list.length?"Also on: ":"No extra days added."}</div><div style="display:flex;flex-wrap:wrap;gap:6px">${list.map(d=>`<span class="tag" style="cursor:pointer" data-d="${d}" onclick="sessionRemoveExtra(this.dataset.d)">${esc(fmtDate(d))} ×</span>`).join("")}</div>${list.length?`<div class="muted" style="font-size:var(--fs-3);margin-top:6px">${list.length+1} sessions will be created, titled "Day 1 of ${list.length+1}" and so on. Each can be edited separately.</div>`:""}`;
+}
+function sessionRefreshExtra(){let b=document.getElementById("sessionExtraList");if(b)b.innerHTML=sessionExtraHtml()}
+function sessionAddExtra(d){if(!d)return;if(!sessionExtraDates.includes(d))sessionExtraDates.push(d);sessionRefreshExtra()}
+function sessionAddExtraInput(){let i=document.getElementById("sessionExtraInput");if(!i||!i.value)return;sessionAddExtra(i.value);i.value=""}
+function sessionNextDays(n){let base=document.querySelector('form[onsubmit*="saveSession"] [name="date"]');if(!base||!base.value){alert("Pick the date first.");return}for(let i=1;i<=n;i++){let d=new Date(base.value+"T00:00:00Z");d.setUTCDate(d.getUTCDate()+i);sessionAddExtra(d.toISOString().slice(0,10))}}
+function sessionRemoveExtra(d){sessionExtraDates=sessionExtraDates.filter(x=>x!==d);sessionRefreshExtra()}
 function openSessionForm(existing,mode){
+ sessionExtraDates=[];
  sessionDrillLinks={main:existing&&existing.mainDrillIds?[...existing.mainDrillIds]:[],game:existing&&existing.gameDrillIds?[...existing.gameDrillIds]:[]};
  sessionAttachment=existing&&existing.attachment?existing.attachment:null;
  sessionNetPlanDraft=existing&&existing.netPlan?JSON.parse(JSON.stringify(existing.netPlan)):[];
@@ -2549,10 +2562,14 @@ function saveSession(e){
   let repeatChecked=repeatEl&&repeatEl.checked;
   let weeks=repeatChecked?Math.max(2,Math.min(26,+document.getElementById("sessionRepeatWeeks").value||2)):1;
   let baseDate=s.date;
+  let multiDates=[...new Set([s.date].concat(sessionExtraDates).filter(Boolean))].sort();
+  if(multiDates.length>1){weeks=multiDates.length;repeatChecked=false}
+  let baseTitle=s.title||s.squad||"Session";
   for(let i=0;i<weeks;i++){
    let copy={...s,attendees:[...(s.attendees||[])],objectiveTags:[...(s.objectiveTags||[])],cueTags:[...(s.cueTags||[])],successTags:[...(s.successTags||[])],mainDrillIds:[...(s.mainDrillIds||[])],gameDrillIds:[...(s.gameDrillIds||[])],netPlan:JSON.parse(JSON.stringify(s.netPlan||[]))};
    copy.id=uid("sess");
-   if(i>0){
+   if(multiDates.length>1){copy.date=multiDates[i];copy.title=baseTitle+" · Day "+(i+1)+" of "+multiDates.length}
+   else if(i>0){
     let d=new Date(baseDate+"T00:00:00Z");
     d.setUTCDate(d.getUTCDate()+7*i);
     copy.date=d.toISOString().slice(0,10);
@@ -2560,7 +2577,7 @@ function saveSession(e){
    db.sessions.push(copy);
   }
  }
- editingSessionId=null;
+ editingSessionId=null;sessionExtraDates=[];
  sessionDrillLinks={main:[],game:[]};sessionAttachment=null;sessionNetPlanDraft=[];
  closeM();save();
 }
@@ -8014,7 +8031,7 @@ const CAMP_BLOCK_TYPES=[
  {id:"meet",label:"Meeting / feedback",c:"#ca8a04"},{id:"brk",label:"Rest / recovery / meal",c:"#94a3b8"},
  {id:"oth",label:"Other",c:"#64748b"}];
 const CAMP_QUICK=[["Nets","bat"],["Combined Nets","bat"],["Fielding","fld"],["S&C","fit"],["Drills","oth"],["Fitness Test","fit"],["Physio","fit"],["Practice Match","mat"],["Match Simulation","mat"],["Video Analysis","meet"],["Video Shoot","oth"],["Meeting","meet"],["Recovery","brk"],["Rest","brk"]];
-let campOpenId=null,campEditingId=null,campCellCtx=null,campImportParsed=null;
+let campLinkedRows={};let campOpenId=null,campEditingId=null,campCellCtx=null,campImportParsed=null;
 function campById(id){return(db.camps||[]).find(c=>c.id===id)}
 function campType(id){return CAMP_BLOCK_TYPES.find(t=>t.id===id)||CAMP_BLOCK_TYPES[CAMP_BLOCK_TYPES.length-1]}
 function campGuessType(t){
@@ -8200,6 +8217,7 @@ function campRowForm(id,rowId,date){
  <form class="formgrid" onsubmit="campSaveRow(event)">
  <label>Starts<input type="time" name="start" value="${esc(r.start||"")}"></label><label>Ends <span class="muted" style="font-weight:400">(optional)</span><input type="time" name="end" value="${esc(r.end||"")}"></label>
  ${campVenues(c).length?`<label class="full">Venue <span class="muted" style="font-weight:400">(blank = ${esc(campMainVenue(c))})</span><input name="venue" list="campVenueList" value="${esc(r.venue||"")}" placeholder="${esc(campMainVenue(c))}" autocomplete="off"><datalist id="campVenueList">${campVenues(c).map(v=>`<option value="${esc(v)}">`).join("")}</datalist></label>`:`<label class="full">Venue <span class="muted" style="font-weight:400">(optional)</span><input name="venue" list="venueDatalist" value="${esc(r.venue||"")}"><datalist id="venueDatalist">${venueOptions()}</datalist></label>`}
+ ${(!rowId&&campDays(c).length>1)?`<div class="full"><span class="fpLabel">Also on these days <span class="muted" style="font-weight:400">(e.g. a 3-day match: tick the other two days)</span></span><div class="skillPick" style="margin-top:6px">${campDays(c).map((d,i)=>d===r.date?"":`<label><input type="checkbox" name="alsoDays" value="${d}"> ${esc(campDayLabel(d,i))} · ${esc(fmtDate(d))}</label>`).join("")}</div></div>`:""}
  ${groups.length>1?`<label class="full" style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="whole" style="width:auto" ${r.whole?"checked":""}> Whole squad (one merged cell, e.g. practice match or rest)</label>`:""}
  <button class="btn primary full">${rowId?"Save":"Save & fill in"}</button>${(rowId&&r.sessionId&&db.sessions.find(x=>x.id===r.sessionId&&!x.deletedAt))?`<button type="button" class="btn secondary full" onclick="campOpenSession()">Open linked session</button>`:""}${rowId?`<button type="button" class="btn danger full" onclick="campDeleteRow()">Delete row</button>`:""}</form>
  ${(rowId&&groups.length>1&&!r.whole)?`<div class="card" style="margin-top:14px"><b>Swap groups</b><div class="muted" style="font-size:var(--fs-3);margin:2px 0 8px">Adds another row on the same day where the groups switch activities, e.g. the afternoon session.</div><div style="display:flex;gap:8px"><input type="time" id="campSwapStart" value="${swapDef[0]}" style="flex:1"><input type="time" id="campSwapEnd" value="${swapDef[1]}" style="flex:1"></div><button class="btn secondary full" style="margin-top:8px" onclick="campSwapRow()">Add swapped row</button></div>`:""}`);
@@ -8215,7 +8233,10 @@ function campSaveRow(e){
   r.whole=whole;closeM();save();return;
  }
  let r={id:uid("rw"),date,start:fd.get("start")||"",end:fd.get("end")||"",venue:((fd.get("venue")||"").trim()===campMainVenue(c))?"":(fd.get("venue")||"").trim(),whole,cells:{}};
- (c.rows=c.rows||[]).push(r);closeM();save();
+ (c.rows=c.rows||[]).push(r);
+ let also=[...new Set(fd.getAll("alsoDays"))].filter(d=>d!==date&&campDays(c).includes(d));
+ if(also.length){campLinkedRows[r.id]=also.map(d=>{let x={id:uid("rw"),date:d,start:r.start,end:r.end,venue:r.venue,whole:r.whole,cells:{}};c.rows.push(x);return x.id})}
+ closeM();save();
  campCellForm(id,r.id,whole?"*":groups[0].id);
 }
 function campDeleteRow(){
@@ -8284,7 +8305,11 @@ function campSaveCell(e){
   if(!db.settings)db.settings={};let known=CAMP_QUICK.map(x=>x[0].toLowerCase());
   if(text.length<=24&&!text.includes("&")&&!known.includes(text.toLowerCase())){let cw=db.settings.campWords=db.settings.campWords||[];if(!cw.some(w=>w[0].toLowerCase()===text.toLowerCase())){cw.push([text,r.cells[gid].type]);if(cw.length>20)cw.shift()}}
  }
- let groups=campGroups(c),gi=groups.findIndex(x=>x.id===gid);closeM();save();
+ let lk=campLinkedRows[rowId];
+ if(lk&&lk.length){lk.forEach(rid=>{let o=(c.rows||[]).find(x=>x.id===rid);if(!o)return;if(!o.cells)o.cells={};if(r.cells[gid])o.cells[gid]=JSON.parse(JSON.stringify(r.cells[gid]));else delete o.cells[gid]})}
+ let groups=campGroups(c),gi=groups.findIndex(x=>x.id===gid);
+ if(!(act==="next"&&gi>-1&&gi<groups.length-1))delete campLinkedRows[rowId];
+ closeM();save();
  if(act==="next"&&gi>-1&&gi<groups.length-1)campCellForm(id,rowId,groups[gi+1].id);
 }
 function campClearCell(){
