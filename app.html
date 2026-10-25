@@ -2560,7 +2560,6 @@ function saveSession(e){
    db.sessions.push(copy);
   }
  }
- if(s.campId){try{let cc=campById(s.campId);if(cc)campRecalcAttendance(cc,s.date)}catch(e){}}
  editingSessionId=null;
  sessionDrillLinks={main:[],game:[]};sessionAttachment=null;sessionNetPlanDraft=[];
  closeM();save();
@@ -8011,7 +8010,7 @@ const CAMP_BLOCK_TYPES=[
  {id:"meet",label:"Meeting / feedback",c:"#ca8a04"},{id:"brk",label:"Rest / recovery / meal",c:"#94a3b8"},
  {id:"oth",label:"Other",c:"#64748b"}];
 const CAMP_QUICK=[["Nets","bat"],["Fielding","fld"],["S&C","fit"],["Drills","oth"],["Fitness test","fit"],["Recovery","brk"],["Rest","brk"],["Practice match","mat"],["Combined nets","bat"],["Video shoot","oth"],["Physio","fit"],["Meeting","meet"],["Bowling","bowl"],["Keeping","wk"]];
-let campOpenId=null,campEditingId=null,campCellCtx=null,campAttSel={},campImportParsed=null;
+let campOpenId=null,campEditingId=null,campCellCtx=null,campImportParsed=null;
 function campById(id){return(db.camps||[]).find(c=>c.id===id)}
 function campType(id){return CAMP_BLOCK_TYPES.find(t=>t.id===id)||CAMP_BLOCK_TYPES[CAMP_BLOCK_TYPES.length-1]}
 function campGuessType(t){
@@ -8106,7 +8105,6 @@ function campDetailHtml(c){
  <div class="card" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><b>Sessions</b><div class="muted" style="font-size:var(--fs-3)">${(()=>{let st=campSessionStats(c);return st.have?st.have+" of "+st.rows+" schedule rows are sessions in Session Plans":"Turn each schedule row into a session, with attendees and nets"})()}</div></div><button class="btn primary" onclick="campSyncSessions('${c.id}')">${campSessionStats(c).have?"Update sessions":"Create sessions"}</button></div>
  <h2 class="section">Schedule <span class="muted" style="font-weight:400;font-size:var(--fs-3)">— tap a time to edit a row, a cell to change what's planned, a day to set its theme</span></h2>
  <div class="list">${days.map((d,i)=>campDayCardHtml(c,d,i,groups)).join("")||empty("Set the camp dates in Edit details.")}</div>
- <h2 class="section">Attendance</h2><div class="card" id="campAttBox">${campAttHtml(c)}</div>
  <div class="toolbar noPrint" style="margin-top:10px"><button class="btn secondary" onclick="go('players');openBulkAssessment()">Assess players</button></div>
  ${(c.equipment||c.notes)?`<div class="grid g2" style="margin-top:12px">${c.equipment?`<div class="card"><b>Equipment</b><ul style="margin:6px 0 0 18px;padding:0">${c.equipment.split("\n").map(x=>x.trim()).filter(Boolean).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}${c.notes?`<div class="card"><b>Notes</b><p style="white-space:pre-wrap;margin:6px 0 0">${esc(c.notes)}</p></div>`:""}</div>`:""}`;
 }
@@ -8114,51 +8112,6 @@ function campEditTheme(id,date){
  if(!requireWriteAccess())return;let c=campById(id);if(!c)return;
  let v=prompt("Theme for "+fmtDate(date)+" (optional, e.g. Fitness assessment):",(c.themes&&c.themes[date])||"");if(v===null)return;
  if(!c.themes)c.themes={};c.themes[date]=v.trim();save();
-}
-/* --- attendance (one day at a time) --- */
-function campAttDateFor(c){let days=campDays(c);let s=campAttSel[c.id];if(s&&days.includes(s))return s;let t=today();return days.includes(t)?t:(days[0]||"")}
-function campAttNames(c){let names=campPool(c).map(p=>p.name);Object.values(c.attendance||{}).forEach(a=>(a||[]).forEach(n=>{if(!names.includes(n))names.push(n)}));return names}
-function campDayHasSessions(c,d){return db.sessions.some(s=>s.campId===c.id&&s.date===d&&!s.deletedAt)}
-function campAttStats(c){
- let days=campDays(c),t=today(),names=campAttNames(c),map={};
- names.forEach(n=>map[n]={exp:0,att:0,cells:{}});
- days.forEach(d=>{if(d>t)return;let ss=db.sessions.filter(s=>s.campId===c.id&&s.date===d&&!s.deletedAt);
-  names.forEach(n=>{let e=0,a=0;ss.forEach(x=>{let at=(x.attendees||[]).includes(n);if((x.campNames||[]).includes(n)||at){e++;if(at)a++}});map[n].exp+=e;map[n].att+=a;map[n].cells[d]=e?{e,a}:null})});
- return {days,names,map,t};
-}
-function campAttHtml(c){
- let days=campDays(c);if(!days.length)return "";
- let st=campAttStats(c),names=st.names;if(!names.length)return `<div class="muted">No players match this camp's team and squad stage yet.</div>`;
- if(!campSessionStats(c).have)return `<div class="muted">Attendance is taken in each session. Create sessions from the schedule and this table fills in as you mark who attended.</div>`;
- let totE=0,totA=0;names.forEach(n=>{totE+=st.map[n].exp;totA+=st.map[n].att});
- let th="padding:4px 6px;text-align:center;font-size:11px;white-space:nowrap;border-bottom:1px solid var(--border,#8884)";
- let head=days.map((d,i)=>`<th style="${th}">D${i+1}<br><span class="muted" style="font-weight:400">${esc(fmtDate(d).slice(0,5))}</span></th>`).join("");
- let box=(bg,bd,txt)=>`<span style="display:inline-block;width:26px;height:26px;line-height:24px;border-radius:7px;border:1px solid ${bd};background:${bg};color:#fff;font-size:13px">${txt}</span>`;
- let rowsH=names.map(n=>{let m=st.map[n];return `<tr><td style="position:sticky;left:0;background:var(--surface2);padding:4px 8px;white-space:nowrap;font-weight:600;max-width:140px;overflow:hidden;text-overflow:ellipsis">${esc(n)}</td>${days.map(d=>{let x=m.cells[d],h;
-  if(d>st.t)h=`<span class="muted">—</span>`;else if(!x)h=`<span class="muted">·</span>`;
-  else if(x.a===x.e)h=box("#1f8a4c","#1f8a4c","✓");else if(!x.a)h=box("transparent","#d9534f",`<span style="color:#d9534f">✗</span>`);
-  else h=box("linear-gradient(90deg,#1f8a4c 50%,transparent 50%)","#1f8a4c",`<span style="color:#fff;mix-blend-mode:difference">${x.a}/${x.e}</span>`);
-  return `<td style="text-align:center;padding:2px">${h}</td>`}).join("")}<td style="padding:4px 8px;text-align:center;white-space:nowrap"><b>${m.att}</b><span class="muted">/${m.exp}</span></td></tr>`}).join("");
- return `<div class="muted" style="font-size:var(--fs-3);margin-bottom:8px">Sessions attended so far: <b>${totA}</b> of ${totE} · ${totE?Math.round(totA/totE*100):0}%. Read-only — mark attendance inside each session. ✓ all sessions that day · half = some missed · ✗ none · — upcoming</div>
- <div style="overflow-x:auto;-webkit-overflow-scrolling:touch"><table style="border-collapse:collapse;width:100%"><thead><tr><th style="${th};text-align:left;position:sticky;left:0;background:var(--surface2)">Player</th>${head}<th style="${th}">Sessions</th></tr></thead><tbody>${rowsH}</tbody></table></div>`;
-}
-function campAttCell(id,date,name){
- let c=campById(id);if(!c)return;if(!requireWriteAccess())return;
- let on=((c.attendance&&c.attendance[date])||[]).includes(name);campAttToggle(id,date,name,!on);
-}
-function campAttRefresh(c){let box=document.getElementById("campAttBox");if(box)box.innerHTML=campAttHtml(c)}
-function campAttPick(id,d){let c=campById(id);if(!c)return;campAttSel[id]=d;campAttRefresh(c)}
-function campAttToggle(id,date,name,on){
- let c=campById(id);if(!c)return;if(!requireWriteAccess()){campAttRefresh(c);return}
- if(!c.attendance)c.attendance={};let a=c.attendance[date]=c.attendance[date]||[];
- let has=a.includes(name);if(on&&!has)a.push(name);if(!on&&has)c.attendance[date]=a.filter(n=>n!==name);
-  campPushAttendance(c,date);campQuiet();campAttRefresh(c);
-}
-function campAttAll(id,date){
- if(!requireWriteAccess())return;let c=campById(id);if(!c)return;if(!c.attendance)c.attendance={};
- let pool=campPool(c).map(p=>p.name),cur=c.attendance[date]||[];
- c.attendance[date]=pool.every(n=>cur.includes(n))?cur.filter(n=>!pool.includes(n)):[...new Set(cur.concat(pool))];
- campPushAttendance(c,date);campQuiet();campAttRefresh(c);
 }
 /* --- create / edit camp --- */
 function campFormHtml(c){
@@ -8350,16 +8303,12 @@ function campSheetTable(c){
  return `<div style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:12.5px;color:#18211e"><thead><tr>${th}</tr></thead><tbody>${body}</tbody></table></div>`;
 }
 function campSheetReport(id){
- let c=campById(id);if(!c)return;let days=campDays(c),att=c.attendance||{};
+ let c=campById(id);if(!c)return;let days=campDays(c);
  let sub=`${esc(c.kind||"Camp")} · ${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""}${campVenues(c).length?" · "+esc(campVenues(c).join(" / ")):""}${c.team?" · "+esc(c.team):""}${c.coaches?" · "+esc(c.coaches):""}`;
  let body=`<div style="margin-top:14px">${campSheetTable(c)}</div>`;
  if((c.batches||[]).length>1)body+=`<h2>Groups</h2><div class="grid g2">${c.batches.map(b=>`<div class="card"><b>${esc(b.name)} (${b.names.length})</b><p>${b.names.map(esc).join(", ")||"—"}</p></div>`).join("")}</div>`;
  if(c.equipment)body+=`<h2>Equipment checklist</h2><div class="card"><ul style="margin:0;padding-left:18px">${c.equipment.split("\n").map(x=>x.trim()).filter(Boolean).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`;
  if(c.notes)body+=`<h2>Notes</h2><div class="card"><p style="white-space:pre-wrap;margin:0">${esc(c.notes)}</p></div>`;
- if(days.length&&Object.values(att).some(a=>(a||[]).length)){
-  let names=campAttNames(c),showDays=days.length<=8;
-  body+=`<h2>Attendance</h2><div class="card" style="overflow-x:auto"><table style="border-collapse:collapse;width:100%;font-size:13px"><thead><tr><th style="text-align:left;padding:4px 6px">Player</th>${showDays?days.map((d,i)=>`<th style="padding:4px 6px">D${i+1}</th>`).join(""):""}<th style="padding:4px 6px">Total</th></tr></thead><tbody>${names.map(n=>`<tr style="border-top:1px solid #e2e8e4"><td style="padding:4px 6px">${esc(n)}</td>${showDays?days.map(d=>`<td style="text-align:center">${(att[d]||[]).includes(n)?"✓":"–"}</td>`).join(""):""}<td style="text-align:center;font-weight:700">${days.filter(d=>(att[d]||[]).includes(n)).length}/${days.length}</td></tr>`).join("")}</tbody></table></div>`;
- }
  reportShell(esc(c.name),sub,body);
 }
 /* --- import from Excel / pasted cells --- */
@@ -8529,15 +8478,6 @@ function campBuildSession(c,r){
  return {date:r.date,time:r.start||"",title:c.name+(di>-1?" · D"+(di+1):"")+(r.start?" · "+campFmtT(r.start):""),sessionType:c.team?"team":"custom",squad:c.team||c.name,duration:String(dur),focus:"",venue:campRowVenue(c,r),attendees:names,objectiveTags:[],objectives,warmup:"",main,game:"",cueTags:[],successTags:[],mainDrillIds:drills,gameDrillIds:[],netPlan:nets.length?[{focus:"",nets}]:[],campId:c.id,campRowId:r.id,campNames:names.slice()};
 }
 function campSnap(s){return JSON.stringify([s.date,s.time,s.title,s.duration,s.main,s.objectives,s.mainDrillIds,s.netPlan,s.venue,s.squad])}
-function campRecalcAttendance(c,date){
- let ss=db.sessions.filter(s=>s.campId===c.id&&s.date===date&&!s.deletedAt);if(!ss.length)return;
- let u=[];ss.forEach(s=>(s.attendees||[]).forEach(n=>{if(!u.includes(n))u.push(n)}));
- if(!c.attendance)c.attendance={};c.attendance[date]=u;
-}
-function campPushAttendance(c,date){
- let att=(c.attendance&&c.attendance[date])||[];
- db.sessions.filter(s=>s.campId===c.id&&s.date===date&&!s.deletedAt).forEach(s=>{let exp=s.campNames||[];s.attendees=att.filter(n=>!exp.length||exp.includes(n))});
-}
 function campSessionStats(c){let rows=(c.rows||[]).filter(r=>Object.keys(r.cells||{}).length),have=rows.filter(r=>r.sessionId&&db.sessions.find(s=>s.id===r.sessionId&&!s.deletedAt)).length;return{rows:rows.length,have}}
 function campSyncSessions(id){
  if(!requireWriteAccess())return;let c=campById(id);if(!c)return;
@@ -8555,10 +8495,9 @@ function campSyncSessions(id){
   ["date","time","title","duration","main","objectives","mainDrillIds","netPlan","venue","squad","sessionType"].forEach(k=>ex[k]=s[k]);
   ex.campNames=s.campNames;ex.campSnap=campSnap(ex);updated++;
  });
- [...newDates].forEach(d=>{let ss=db.sessions.filter(x=>x.campId===c.id&&x.date===d&&!x.deletedAt);let cur=(c.attendance&&c.attendance[d])||[];if(cur.length){ss.forEach(x=>{if(x.campNames)x.attendees=cur.filter(n=>x.campNames.includes(n))})}else campRecalcAttendance(c,d)});
  save();
  modal(`<div class="sheetHead"><h2>Sessions updated</h2><button class="x" onclick="closeM()">×</button></div>
- <div class="card"><p><b>${created}</b> created · <b>${updated}</b> updated${skipped?` · <b>${skipped}</b> skipped because you edited them`:""}</p><p class="muted">Each schedule row is now a session in Session Plans and the Calendar. Attendance is shared: ticking someone on the camp page or in the session updates both.</p></div>
+ <div class="card"><p><b>${created}</b> created · <b>${updated}</b> updated${skipped?` · <b>${skipped}</b> skipped because you edited them`:""}</p><p class="muted">Each schedule row is now a session in Session Plans and the Calendar. Take attendance inside each session.</p></div>
  <div class="toolbar" style="margin-top:12px"><button class="btn primary" onclick="closeM();go('sessions')">View sessions</button><button class="btn secondary" onclick="closeM()">Close</button></div>`);
 }
 function campOpenSession(){
