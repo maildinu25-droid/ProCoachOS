@@ -8009,7 +8009,7 @@ const CAMP_BLOCK_TYPES=[
  {id:"fit",label:"Fitness / S&C / physio",c:"#9333ea"},{id:"mat",label:"Match / simulation",c:"#dc2626"},
  {id:"meet",label:"Meeting / feedback",c:"#ca8a04"},{id:"brk",label:"Rest / recovery / meal",c:"#94a3b8"},
  {id:"oth",label:"Other",c:"#64748b"}];
-const CAMP_QUICK=[["Nets","bat"],["Fielding","fld"],["S&C","fit"],["Drills","oth"],["Fitness test","fit"],["Recovery","brk"],["Rest","brk"],["Practice match","mat"],["Combined nets","bat"],["Video shoot","oth"],["Physio","fit"],["Meeting","meet"],["Bowling","bowl"],["Keeping","wk"]];
+const CAMP_QUICK=[["Nets","bat"],["Combined Nets","bat"],["Fielding","fld"],["S&C","fit"],["Drills","oth"],["Fitness Test","fit"],["Physio","fit"],["Practice Match","mat"],["Match Simulation","mat"],["Video Analysis","meet"],["Video Shoot","oth"],["Meeting","meet"],["Recovery","brk"],["Rest","brk"]];
 let campOpenId=null,campEditingId=null,campCellCtx=null,campImportParsed=null;
 function campById(id){return(db.camps||[]).find(c=>c.id===id)}
 function campType(id){return CAMP_BLOCK_TYPES.find(t=>t.id===id)||CAMP_BLOCK_TYPES[CAMP_BLOCK_TYPES.length-1]}
@@ -8017,7 +8017,7 @@ function campGuessType(t){
  t=String(t||"").toLowerCase();
  if(/match|game|simulation/.test(t))return"mat";
  if(/\brest\b|recover|break|lunch|meal/.test(t))return"brk";
- if(/meeting|talk|feedback|briefing/.test(t))return"meet";
+ if(/meeting|talk|feedback|briefing|video analysis|analysis/.test(t))return"meet";
  if(/s\s*&\s*c|fitness|physio|warm|gym|strength|conditioning/.test(t))return"fit";
  if(/field|catch/.test(t))return"fld";
  if(/centre wicket|center wicket|\bnets?\b|batting/.test(t))return"bat";
