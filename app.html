@@ -8673,33 +8673,61 @@ const CAMP_SYNC_FIELDS=["date","time","title","sessionType","squad","duration","
 const CAMP_SYNC_LABELS={date:"date",time:"time",title:"title",sessionType:"type",squad:"team",duration:"duration",venue:"venue",focus:"focus"};
 function campSnap(s){return JSON.stringify(CAMP_SYNC_FIELDS.map(k=>s[k]))}
 function campSessionStats(c){let rows=(c.rows||[]).filter(r=>Object.keys(r.cells||{}).length),have=rows.filter(r=>r.sessionId&&db.sessions.find(s=>s.id===r.sessionId&&!s.deletedAt)).length;return{rows:rows.length,have}}
+let campSyncCtx=null;
+function campRowIsBreak(r){
+ let cells=Object.values(r.cells||{}).filter(x=>x&&(x.text||x.type));if(!cells.length)return false;
+ return cells.every(x=>x.type==="brk"||(!x.type&&campGuessType(x.text)==="brk"));
+}
 function campSyncSessions(id){
  if(!requireWriteAccess())return;let c=campById(id);if(!c)return;
  let rows=(c.rows||[]).slice().sort((a,b)=>(a.date+(a.start||"")).localeCompare(b.date+(b.start||"")));
- let st=campSessionStats(c);
  if(!rows.length){alert("Add something to the schedule first.");return}
  // plan what would change. Only the camp-managed fields are touched, and only where you haven't changed them in the session yourself.
- let plan=[],creates=0;
+ let plan=[];
  rows.forEach(r=>{
   let s=campBuildSession(c,r);if(!s)return;
   let ex=r.sessionId&&db.sessions.find(x=>x.id===r.sessionId&&!x.deletedAt);
-  if(!ex){creates++;plan.push({r,s,ex:null});return}
+  if(!ex){plan.push({r,s,ex:null,brk:campRowIsBreak(r)});return}
   let last=ex.campLast||null,ch=[];
   CAMP_SYNC_FIELDS.forEach(k=>{if(String(ex[k]||"")===String(s[k]||""))return;if(last&&String(ex[k]||"")!==String(last[k]||""))return;ch.push(k)});
   if(ch.length)plan.push({r,s,ex,ch});
  });
  if(!plan.length){alert("Sessions are already up to date.");return}
- let upd=plan.filter(x=>x.ex),cnt={};upd.forEach(x=>x.ch.forEach(k=>cnt[k]=(cnt[k]||0)+1));
- let msg=(creates?"Create "+creates+" session"+(creates>1?"s":"")+" (date, time, type, team, duration, venue and focus only — fill in attendees, objectives and nets yourself).":"")+(upd.length?(creates?"\n\n":"")+"Update "+upd.length+" session"+(upd.length>1?"s":"")+": "+Object.keys(cnt).map(k=>cnt[k]+" "+CAMP_SYNC_LABELS[k]).join(", ")+". Anything you changed in a session yourself is kept.":"")+"\n\nContinue?";
- if(!confirm(msg))return;
+ campSyncCtx={id,plan,skipBrk:true};campSyncSheet();
+}
+function campSyncOn(x){return !(campSyncCtx.skipBrk&&x.brk)&&campSyncCtx.sel.has(x.r.id)}
+function campSyncSheet(first){
+ let K=campSyncCtx,c=campById(K.id),t=today();
+ if(!K.sel||first)K.sel=new Set(K.plan.filter(x=>!(K.skipBrk&&x.brk)).map(x=>x.r.id));
+ let byDay={};K.plan.forEach(x=>{(byDay[x.r.date]=byDay[x.r.date]||[]).push(x)});
+ let body=Object.keys(byDay).sort().map(d=>`<div class="muted" style="font-size:12px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;margin:12px 0 4px">${esc(campDayName(d))} ${esc(fmtDate(d))}</div>`+byDay[d].map(x=>{
+  let dis=K.skipBrk&&x.brk,on=!dis&&K.sel.has(x.r.id);
+  return `<label class="item" style="align-items:center;cursor:${dis?"default":"pointer"};${dis?"opacity:.5":""}"><input type="checkbox" style="width:auto;flex:0 0 auto" ${on?"checked":""} ${dis?"disabled":""} onchange="campSyncTick('${x.r.id}',this.checked)"><div style="min-width:0;flex:1"><b style="font-size:var(--fs-3)">${esc(campRowTime(x.r))}</b> <span class="tag" style="${x.ex?"":"background:var(--g);color:#fff"}">${x.ex?"Update · "+x.ch.map(k=>CAMP_SYNC_LABELS[k]).join(", "):"New"}</span><div class="muted" style="font-size:12.5px;overflow-wrap:anywhere">${esc(x.s.focus||x.s.title)}${x.s.venue?" · "+esc(x.s.venue):""}</div>${dis?`<div class="muted" style="font-size:12px">Break / rest — skipped</div>`:""}</div></label>`}).join("")).join("");
+ modal(`<div class="sheetHead"><h2>Choose sessions</h2><button class="x" onclick="closeM()">×</button></div>
+ <p class="muted" style="margin-top:0">Tick the schedule rows to turn into sessions. Only date, time, type, team, duration, venue and focus are filled in — add attendees, objectives and nets yourself. Anything you changed in a session is kept.</p>
+ <div class="toolbar" style="margin-bottom:6px"><button class="btn secondary" style="padding:4px 10px" onclick="campSyncPick('all')">All</button><button class="btn secondary" style="padding:4px 10px" onclick="campSyncPick('none')">None</button><button class="btn secondary" style="padding:4px 10px" onclick="campSyncPick('future')">From today</button></div>
+ <label style="display:flex;gap:8px;align-items:center;font-size:var(--fs-3);margin:6px 0"><input type="checkbox" style="width:auto" ${K.skipBrk?"checked":""} onchange="campSyncSkip(this.checked)"> Skip rest days and breaks</label>
+ <div style="max-height:46vh;overflow-y:auto">${body}</div>
+ <div id="campSyncCount" style="margin:10px 0;font-weight:700"></div>
+ <button class="btn primary full" onclick="campSyncApply()">Continue</button>`);
+ campSyncCount();
+}
+function campSyncChosen(){let K=campSyncCtx;return K.plan.filter(x=>campSyncOn(x))}
+function campSyncCount(){let L=campSyncChosen(),n=L.filter(x=>!x.ex).length,u=L.filter(x=>x.ex).length,el=document.getElementById("campSyncCount");if(el)el.textContent=(n?"Create "+n:"")+(n&&u?" · ":"")+(u?"Update "+u:"")||"Nothing selected"}
+function campSyncTick(rid,on){if(on)campSyncCtx.sel.add(rid);else campSyncCtx.sel.delete(rid);campSyncCount()}
+function campSyncPick(m){let K=campSyncCtx,t=today();K.sel=new Set(K.plan.filter(x=>m==="all"||(m==="future"&&x.r.date>=t)).map(x=>x.r.id));campSyncSheet()}
+function campSyncSkip(v){let K=campSyncCtx;K.skipBrk=v;campSyncSheet()}
+function campSyncApply(){
+ if(!requireWriteAccess())return;let K=campSyncCtx;if(!K)return;let c=campById(K.id);if(!c)return;
+ let L=campSyncChosen();if(!L.length){alert("Tick at least one row.");return}
  let created=0,updated=0;
- plan.forEach(x=>{
+ L.forEach(x=>{
   if(!x.ex){let n=Object.assign({},x.s,{id:uid("sess"),attendees:c.prefillAttendees?(x.s.names||[]).slice():[],objectiveTags:[],objectives:"",warmup:"",main:"",game:"",cueTags:[],successTags:[],mainDrillIds:[],gameDrillIds:[],netPlan:[],campId:c.id,campRowId:x.r.id,campLast:Object.assign({},x.s)});delete n.names;delete n.campLast.names;db.sessions.push(n);x.r.sessionId=n.id;created++;return}
   x.ch.forEach(k=>x.ex[k]=x.s[k]);let ls=Object.assign({},x.s);delete ls.names;x.ex.campLast=Object.assign({},x.ex.campLast||{},ls);updated++;
  });
- save();
+ campSyncCtx=null;save();
  modal(`<div class="sheetHead"><h2>Sessions ${created&&!updated?"created":"updated"}</h2><button class="x" onclick="closeM()">×</button></div>
- <div class="card"><p><b>${created}</b> created · <b>${updated}</b> updated</p><p class="muted">The camp fills in date, time, type, team, duration, venue and focus. Add attendees, objectives and nets in each session.</p></div>
+ <div class="card"><p><b>${created}</b> created · <b>${updated}</b> updated</p><p class="muted">Rows you didn't tick stay in the schedule — run this again any time to add them.</p></div>
  <div class="toolbar" style="margin-top:12px"><button class="btn primary" onclick="closeM();go('sessions')">View sessions</button><button class="btn secondary" onclick="closeM()">Close</button></div>`);
 }
 function campOpenSession(){
