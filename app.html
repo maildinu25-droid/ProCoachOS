@@ -175,12 +175,14 @@ input[type=range]{accent-color:var(--g);width:100%;height:6px;padding:0;backgrou
 .msdChips{margin-top:8px;display:flex;flex-wrap:wrap;gap:4px}
 .msdAdd{display:flex;gap:8px;margin:6px 0 4px}.msdAdd input{flex:1;min-width:0}
 .msdDel{background:none;border:0;color:var(--muted);font-size:18px;line-height:1;padding:0 6px;cursor:pointer}
+.printOnly{display:none}
 @media print{
 html,body{margin:0!important;padding:0!important;background:#fff!important;width:100%!important;height:auto!important;min-height:0!important;overflow:visible!important}
 body>*{display:none!important}
 #modal{display:block!important;position:static!important;inset:auto!important;width:100%!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important}
 #sheet{display:block!important;position:static!important;width:100%!important;max-width:none!important;height:auto!important;max-height:none!important;min-height:0!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:visible!important;background:#fff!important}
-.sheetHead,.reportActions,.noPrint{display:none!important}
+.sheetHead,.reportActions,.noPrint,.sumEdit{display:none!important}
+.printOnly{display:block!important}
 .report{display:block!important;position:static!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important}
 .fieldStepPreviewWrap{gap:14mm!important}
 .drillPrint .fieldStepBlock{width:50mm!important}.drillPrint .fieldStepPreviewWrap{gap:4mm!important;margin:1.5mm 0!important}.drillPrint img.dpPhoto{max-height:55mm!important;width:auto!important}.drillPrint h3{font-size:11.5pt!important;margin:0 0 1mm!important}.drillPrint p,.drillPrint .dpPts{font-size:9.5pt!important;line-height:1.35!important;margin:1mm 0!important}
@@ -8143,7 +8145,7 @@ function campDetailHtml(c){
  let unassigned=pool.filter(p=>!(c.batches||[]).some(b=>b.names.includes(p.name)));
  return `<button class="backBtn noPrint" onclick="closeCamp()">${icon("chevronLeft",13)} All camps</button>
  <div class="hero"><h1>${esc(c.name)} <span class="tag" style="font-size:12px;vertical-align:middle">${esc(c.kind||"Camp")}</span></h1><div class="muted">${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""} · ${days.length} day${days.length===1?"":"s"}</div></div>
- <div class="toolbar noPrint" style="flex-wrap:wrap"><button class="btn secondary" onclick="editCamp('${c.id}')">Edit details</button><button class="btn secondary" onclick="campBatchesSheet('${c.id}')">Groups</button><button class="btn primary" onclick="campSheetReport('${c.id}')">Print sheet</button><button class="btn secondary" onclick="campShareImage('${c.id}')">Share as image</button><button class="btn secondary" onclick="campCopyForm('${c.id}')">Copy camp</button><button class="btn secondary" onclick="campSaveTemplate('${c.id}')">Save as template</button></div>
+ <div class="toolbar noPrint" style="flex-wrap:wrap"><button class="btn secondary" onclick="editCamp('${c.id}')">Edit details</button><button class="btn secondary" onclick="campBatchesSheet('${c.id}')">Groups</button><button class="btn primary" onclick="campSheetReport('${c.id}')">Print sheet</button><button class="btn secondary" onclick="campShareImage('${c.id}')">Share as image</button><button class="btn secondary" onclick="campCopyForm('${c.id}')">Copy camp</button><button class="btn secondary" onclick="campSaveTemplate('${c.id}')">Save as template</button><button class="btn primary" onclick="campSummaryReport('${c.id}')">Camp summary report</button></div>
  ${campTodayHtml(c)}
  <div class="grid g4" style="margin-top:12px">${meta(campVenues(c).length>1?"Venues":"Venue",esc(campVenues(c).join(" · ")))}${meta("Team / stage",esc([c.team,stName].filter(Boolean).join(" · ")||"Everyone"))}${meta("Season phase",(()=>{let po=campPhaseOf(c);return po?esc(po.season.name+" · "+po.phase.name):""})())}${meta("Players",pool.length+(unassigned.length&&(c.batches||[]).length>1?` <span class="muted" style="font-weight:400">(${unassigned.length} not in a group)</span>`:""))}${meta("Coaches",esc(c.coaches||""))}</div>
  ${(c.batches||[]).length>1?`<div style="margin-top:10px">${c.batches.map(b=>`<span class="tag">${esc(b.name)} · ${b.names.length}</span>`).join(" ")}</div>`:""}
@@ -8786,6 +8788,111 @@ function campSelectSquad(id){
  });
  ssUpdateCount();
  let hint=document.querySelector("#sheet p.muted,.sheet p.muted");if(hint)hint.insertAdjacentHTML("afterend",`<p class="muted" style="font-size:var(--fs-3)"><b>Pre-ticked from the camp review:</b> only players marked In. Change any tick before applying.</p>`);
+}
+
+/* --- camp summary report for owners / administrators --- */
+let campSumOpts={names:false,notes:false,sched:false};
+function campHoursByType(c){
+ let by={},total=0,blocks=0,mat=0;
+ (c.rows||[]).forEach(r=>{
+  let cells=r.whole?[r.cells&&r.cells["*"]].filter(Boolean):Object.values(r.cells||{}).filter(x=>x&&(x.text||x.type));
+  if(!cells.length)return;blocks++;
+  if(cells.some(x=>x.type==="mat"))mat++;
+  if(!r.start)return;let dur=campRowDuration(r)/60;
+  cells.forEach(x=>{let t=x.type||campGuessType(x.text);if(t==="brk")return;by[t]=(by[t]||0)+dur/cells.length;total+=dur/cells.length});
+ });
+ return{by,total,blocks,mat};
+}
+function campSummaryData(c){
+ let names=campRevNames(c),days=campDays(c),end=c.endDate||c.startDate,d={names,P:names.length,days:days.length,groups:(c.batches||[]).length>1?c.batches.length:0};
+ d.hours=campHoursByType(c);
+ d.themes=days.map((x,i)=>({i,date:x,t:(c.themes&&c.themes[x])||""})).filter(x=>x.t);
+ // assessments within the camp dates
+ let as=db.assessments.filter(a=>names.includes(a.player)&&a.date&&a.date>=c.startDate&&a.date<=end).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+ d.assessed=[...new Set(as.map(a=>a.player))].length;d.nAssess=as.length;
+ let per={};as.forEach(a=>{let v=Number(assessmentAvg(a));if(Number.isFinite(v))(per[a.player]=per[a.player]||[]).push(v)});
+ let multi=Object.entries(per).filter(([n,v])=>v.length>1);
+ d.firstAvg=null;d.lastAvg=null;d.improvers=[];
+ if(multi.length){d.firstAvg=multi.reduce((a,[n,v])=>a+v[0],0)/multi.length;d.lastAvg=multi.reduce((a,[n,v])=>a+v[v.length-1],0)/multi.length;d.improvers=multi.map(([n,v])=>({n,d:v[v.length-1]-v[0],last:v[v.length-1]})).sort((a,b)=>b.d-a.d).slice(0,3).filter(x=>x.d>0.04)}
+ let disc={},skill={};
+ as.forEach(a=>{try{assessmentDisciplines(a).forEach(dn=>{let v=Number(disciplineAvg(a,dn));if(Number.isFinite(v))(disc[dn]=disc[dn]||[]).push(v);
+  let vals=(a.ratings&&a.ratings[dn])||[],labels=(dn==="Bowling"&&vals.length===10)?legacyBowlingSkills:allSkillsFor(dn);
+  vals.forEach((x,i)=>{x=Number(x);if(x>0&&labels[i])(skill[labels[i]]=skill[labels[i]]||[]).push(x)})})}catch(e){}});
+ let avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
+ d.disc=Object.entries(disc).map(([k,v])=>({k,v:avg(v)})).sort((a,b)=>b.v-a.v);
+ d.skills=Object.entries(skill).filter(([k,v])=>v.length>=3).map(([k,v])=>({k,v:avg(v)})).sort((a,b)=>b.v-a.v);
+ // attendance recorded in sessions
+ let ss=db.sessions.filter(x=>x.campId===c.id&&!x.deletedAt&&x.date<=today()&&(x.attendees||[]).length);
+ d.attSessions=ss.length;d.attAvg=ss.length&&d.P?ss.reduce((a,x)=>a+Math.min(x.attendees.length,d.P),0)/ss.length:0;
+ d.sessionsHeld=db.sessions.filter(x=>x.campId===c.id&&!x.deletedAt&&x.date<=today()).length;
+ // review
+ let k={in:0,maybe:0,out:0,none:0},rs=[],good={},bad={};
+ names.forEach(n=>{let v=campRevOf(c,n);k[v.rec||"none"]++;if(v.r)rs.push(v.r);v.tags.forEach(t=>{let g=(CAMP_REV_TAGS.find(x=>x[0]===t)||[0,1])[1];(g?good:bad)[t]=((g?good:bad)[t]||0)+1})});
+ d.rev=k;d.rated=rs.length;d.revAvg=rs.length?rs.reduce((a,b)=>a+b,0)/rs.length:0;
+ let top=o=>Object.entries(o).sort((a,b)=>b[1]-a[1]).slice(0,3);d.goodTags=top(good);d.badTags=top(bad);
+ d.decided=k.in+k.maybe+k.out;
+ return d;
+}
+function campSummaryAuto(c,d){
+ let L=[],nm=n=>n,join=a=>a.length>1?a.slice(0,-1).join(", ")+" and "+a[a.length-1]:a[0]||"";
+ let when=fmtDate(c.startDate)+(c.endDate&&c.endDate!==c.startDate?" to "+fmtDate(c.endDate):""),ven=campVenues(c).join(" and ");
+ L.push(`${c.name} ran ${c.endDate&&c.endDate!==c.startDate?"from "+when:"on "+when}${ven?" at "+ven:""} (${d.days} day${d.days===1?"":"s"}) for ${c.team||"the squad"}, with ${d.P} player${d.P===1?"":"s"}${d.groups?" in "+d.groups+" groups":""}.`);
+ let h=d.hours;
+ if(h.total>0){let lab=Object.entries(h.by).sort((a,b)=>b[1]-a[1]).slice(0,2).map(([t,v])=>`${campType(t).label.split(" / ")[0].toLowerCase()} (${Math.round(v/h.total*100)}%)`);
+  L.push(`${Math.round(h.total)} hours of structured activity were planned across ${h.blocks} blocks, mostly ${join(lab)}${h.mat?`, including ${h.mat} match block${h.mat>1?"s":""}`:""}.`)}
+ if(d.assessed){let t=`${d.assessed} of ${d.P} players were assessed during the camp`;
+  if(d.firstAvg!==null){let df=d.lastAvg-d.firstAvg;t+=`, with the average rating ${Math.abs(df)<0.05?"holding at "+d.lastAvg.toFixed(1):(df>0?"rising":"falling")+" from "+d.firstAvg.toFixed(1)+" to "+d.lastAvg.toFixed(1)}`}
+  t+=".";L.push(t);
+  if(d.disc.length>1)L.push(`${d.disc[0].k} was the strongest area (${d.disc[0].v.toFixed(1)}) and ${d.disc[d.disc.length-1].k} the weakest (${d.disc[d.disc.length-1].v.toFixed(1)}).`);
+  if(d.skills.length>=4)L.push(`The highest-rated skill was ${d.skills[0].k} and the lowest was ${d.skills[d.skills.length-1].k}.`)}
+ if(d.attSessions)L.push(`Sessions averaged ${Math.round(d.attAvg)} of ${d.P} players (${Math.round(d.attAvg/d.P*100)}%).`);
+ if(d.decided){L.push(`${d.rev.in} player${d.rev.in===1?"":"s"} ${d.rev.in===1?"was":"were"} recommended for the next squad, ${d.rev.maybe} ${d.rev.maybe===1?"is":"are"} undecided and ${d.rev.out} ${d.rev.out===1?"was":"were"} not.`+
+  (d.goodTags.length?` The most common strengths noted were ${join(d.goodTags.map(x=>x[0].toLowerCase()))}.`:"")+(d.badTags.length?` The most common areas to work on were ${join(d.badTags.map(x=>x[0].toLowerCase()))}.`:""))}
+ return L.join(" ");
+}
+function campSumToggle(k,v){campSumOpts[k]=v;if(k==="names"&&!v)campSumOpts.notes=false;campSummaryReport(campOpenId||campSumLast)}
+let campSumLast=null;
+function campSumSave(id,k,el){let c=campById(id);if(!c)return;c[k]=el.value;campQuiet();let t=document.getElementById("sum_"+k);if(t)t.textContent=el.value}
+function campSumReset(id){let c=campById(id);if(!c)return;delete c.sumText;campQuiet();campSummaryReport(id)}
+function campSummaryText(c){
+ let d=campSummaryData(c),txt=(c.sumText!==undefined?c.sumText:campSummaryAuto(c,d)),out=[c.name+" — camp summary",txt];
+ if(c.sumNext)out.push("Next steps: "+c.sumNext);return out.join("\n\n");
+}
+async function campSumShare(id){
+ let c=campById(id);if(!c)return;let t=campSummaryText(c);
+ try{if(navigator.share){await navigator.share({title:c.name+" — camp summary",text:t});return}}catch(e){if(e&&e.name==="AbortError")return}
+ try{await navigator.clipboard.writeText(t);alert("Summary copied. Paste it into a message or email.")}catch(e){prompt("Copy this summary:",t)}
+}
+function campSummaryReport(id){
+ let c=campById(id);if(!c)return;campSumLast=id;let d=campSummaryData(c),o=campSumOpts;
+ let auto=campSummaryAuto(c,d),txt=c.sumText!==undefined?c.sumText:auto;
+ const sw=(k,l,dis)=>`<label style="display:flex;gap:8px;align-items:center;margin:4px 0"><input type="checkbox" style="width:auto" ${o[k]?"checked":""} ${dis?"disabled":""} onchange="campSumToggle('${k}',this.checked)"> ${l}</label>`;
+ let stat=(l,v)=>`<div class="card" style="padding:8px 10px;text-align:center"><div class="muted" style="font-size:11px;text-transform:uppercase">${l}</div><b style="font-size:18px">${v}</b></div>`;
+ let h=d.hours,types=Object.entries(h.by).sort((a,b)=>b[1]-a[1]);
+ let bar=types.map(([t,v])=>{let ty=campType(t),pc=Math.round(v/h.total*100);return `<div style="display:flex;align-items:center;gap:8px;margin:4px 0;font-size:13px"><span style="width:150px;flex:0 0 auto">${esc(ty.label)}</span><div style="flex:1;background:#8882;border-radius:4px;height:14px"><div style="width:${pc}%;background:${ty.c};height:14px;border-radius:4px;-webkit-print-color-adjust:exact;print-color-adjust:exact"></div></div><span style="width:70px;text-align:right">${v.toFixed(1)} h · ${pc}%</span></div>`}).join("");
+ let stars=n=>"★".repeat(n)+"☆".repeat(5-n);
+ let names="";
+ if(o.names){
+  names=[["in","In","#1f8a4c"],["maybe","Maybe","#d97706"],["out","Out","#dc2626"],["","Not decided","#64748b"]].map(([key,lab,col])=>{
+   let l=d.names.filter(n=>(campRevOf(c,n).rec||"")===key).sort((a,b)=>campRevOf(c,b).r-campRevOf(c,a).r||a.localeCompare(b));
+   return l.length?`<h3 style="color:${col};margin:12px 0 4px">${lab} (${l.length})</h3>${l.map(n=>{let v=campRevOf(c,n),pl=db.players.find(p=>p.name===n&&!p.deletedAt);return `<div style="padding:4px 0;border-bottom:1px solid #8883;break-inside:avoid"><b>${esc(n)}</b>${pl&&pl.role?` <span class="muted">${esc(pl.role)}</span>`:""}${v.r?` <span style="color:#d97706">${stars(v.r)}</span>`:""}${v.tags.length?`<div class="muted" style="font-size:12.5px">${v.tags.map(esc).join(" · ")}</div>`:""}${(o.notes&&v.note)?`<div style="font-size:13px">${esc(v.note)}</div>`:""}</div>`}).join("")}`:""}).join("");
+ }
+ let body=`<div class="noPrint card" style="margin-top:12px"><b>Include in this report</b>${sw("names","Player names, ratings and tags (off = totals only)")}${sw("notes","My notes on each player",!o.names)}${sw("sched","The schedule sheet at the end")}</div>
+ <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px">${stat("Days",d.days)}${stat("Players",d.P)}${stat("Sessions",d.sessionsHeld||"—")}${stat("Activity hours",h.total?Math.round(h.total):"—")}</div>
+ <h2>Summary</h2><div class="sumEdit noPrint"><textarea rows="8" onchange="campSumSave('${c.id}','sumText',this)" style="width:100%">${esc(txt)}</textarea><div class="muted" style="font-size:12.5px;margin:4px 0">Written from your camp data. Edit freely.${c.sumText!==undefined?` <a href="#" onclick="campSumReset('${c.id}');return false">Reset to auto text</a>`:""}</div></div><p class="printOnly" id="sum_sumText" style="white-space:pre-wrap">${esc(txt)}</p>
+ ${types.length?`<h2>What was covered</h2>${bar}`:""}
+ ${d.themes.length?`<div style="margin-top:8px">${d.themes.map(x=>`<span class="tag">Day ${x.i+1}: ${esc(x.t)}</span>`).join(" ")}</div>`:""}
+ ${d.assessed?`<h2>Assessments</h2><p>${d.assessed} of ${d.P} players assessed (${d.nAssess} assessment${d.nAssess===1?"":"s"})${d.firstAvg!==null?` · squad average ${d.firstAvg.toFixed(1)} → ${d.lastAvg.toFixed(1)}`:""}</p>
+  ${d.disc.length?`<div>${d.disc.map(x=>`<span class="tag">${esc(x.k)} ${x.v.toFixed(1)}</span>`).join(" ")}</div>`:""}
+  ${d.skills.length>=4?`<p style="margin:8px 0 0"><b>Strongest skills:</b> ${d.skills.slice(0,3).map(x=>esc(x.k)+" "+x.v.toFixed(1)).join(", ")}<br><b>Needs work:</b> ${d.skills.slice(-3).reverse().map(x=>esc(x.k)+" "+x.v.toFixed(1)).join(", ")}</p>`:""}
+  ${(o.names&&d.improvers.length)?`<p style="margin:8px 0 0"><b>Biggest improvers:</b> ${d.improvers.map(x=>esc(x.n)+" +"+x.d.toFixed(1)).join(", ")}</p>`:""}`:""}
+ ${d.attSessions?`<h2>Participation</h2><p>Across ${d.attSessions} session${d.attSessions===1?"":"s"} with attendance recorded, an average of <b>${Math.round(d.attAvg)} of ${d.P}</b> players (${Math.round(d.attAvg/d.P*100)}%) attended.</p>`:""}
+ ${d.decided?`<h2>Selection outcome</h2><div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">${stat("In",d.rev.in)}${stat("Maybe",d.rev.maybe)}${stat("Out",d.rev.out)}${stat("Avg rating",d.rated?d.revAvg.toFixed(1)+" / 5":"—")}</div>
+  ${(d.goodTags.length||d.badTags.length)?`<p style="margin-top:8px">${d.goodTags.length?`<b>Common strengths:</b> ${d.goodTags.map(x=>esc(x[0])+" ("+x[1]+")").join(", ")}<br>`:""}${d.badTags.length?`<b>Common work-ons:</b> ${d.badTags.map(x=>esc(x[0])+" ("+x[1]+")").join(", ")}`:""}</p>`:""}${names}`:""}
+ <h2>Next steps</h2><div class="sumEdit noPrint"><textarea rows="3" placeholder="Optional: what happens next, e.g. Camp 2 squad announced on 5 Nov." onchange="campSumSave('${c.id}','sumNext',this)" style="width:100%">${esc(c.sumNext||"")}</textarea></div><p class="printOnly" id="sum_sumNext" style="white-space:pre-wrap">${esc(c.sumNext||"")}</p>
+ ${o.sched?`<h2>Schedule</h2>${campSheetTable(c)}`:""}
+ <div class="noPrint" style="margin-top:12px"><button class="btn secondary" onclick="campSumShare('${c.id}')">Share / copy as text</button></div>`;
+ reportShell(esc(c.name)+" — camp summary",`${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""}${campVenues(c).length?" · "+esc(campVenues(c).join(" / ")):""}${c.team?" · "+esc(c.team):""}${c.coaches?" · Coaches: "+esc(c.coaches):""}`,body);
 }
 /* ===== end camps ===== */
 
