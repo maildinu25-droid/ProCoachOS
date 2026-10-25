@@ -8869,7 +8869,16 @@ async function campShareImage(id){
 
 /* --- camp player review (tap to rate, tap to recommend; evidence fills in by itself) --- */
 const CAMP_REV_REC=[["in","In","#1f8a4c"],["maybe","Maybe","#d97706"],["out","Out","#dc2626"]];
-const CAMP_REV_TAGS=[["Strong technique",1],["Match-ready",1],["Great attitude",1],["Leader",1],["Coachable",1],["Fit",1],["Technique work",0],["Fitness",0],["Match temperament",0],["Consistency",0],["Fielding",0]];
+const CAMP_REV_TAGS=[["Strong technique",1],["Match-ready",1],["Great attitude",1],["Leader",1],["Coachable",1],["Fit",1],["Technique work",0],["Fitness",0],["Match temperament",0],["Consistency",0],["Fielding",0],
+ ["Big hitter",1],["Good timing",1],["Cricket brain",1],["Calm under pressure",1],["Hard worker",1],["Accurate bowler",1],["Safe hands",1],["Athletic",1],
+ ["Shot selection",0],["Footwork",0],["Bowling accuracy",0],["Concentration",0],["Confidence",0],["Communication",0],["Discipline",0],["Strength",0]];
+function campTagSplit(tags){let g=(tags||[]).filter(t=>(CAMP_REV_TAGS.find(x=>x[0]===t)||[0,1])[1]),w=(tags||[]).filter(t=>!g.includes(t));return{g,w}}
+function campTagsHtml(tags,chips){
+ let{g,w}=campTagSplit(tags);if(!g.length&&!w.length)return "";
+ const line=(lab,list,col)=>list.length?`<div style="margin-top:3px;font-size:12.5px;break-inside:avoid"><b style="color:${col}">${lab}:</b> ${chips?list.map(t=>`<span class="tag">${esc(t)}</span>`).join(" "):list.map(esc).join(" · ")}</div>`:"";
+ return `<div style="margin-top:4px">${line("Strengths",g,"#1f8a4c")}${line("Areas to improve",w,"#b45309")}</div>`;
+}
+const CAMP_REV_BASE=11;let campRevMore={};
 let campRevFilter="",campRevOpen={};
 function campRevOf(c,n){return(c.review&&c.review[n])||{r:0,rec:"",tags:[],note:""}}
 function campRevNames(c){let names=campPool(c).map(p=>p.name);Object.keys(c.review||{}).forEach(n=>{if(!names.includes(n))names.push(n)});return names}
@@ -8884,7 +8893,10 @@ function campEvidence(c,name){
 function campRevStars(r){return "★".repeat(r)+"☆".repeat(5-r)}
 function campRevRowHtml(c,name){
  let v=campRevOf(c,name),pl=db.players.find(p=>p.name===name&&!p.deletedAt),ev=campEvidence(c,name),open=!!campRevOpen[name]||(v.tags.length||v.note)&&campRevOpen[name]!==false&&false;
- let tagBtns=CAMP_REV_TAGS.map(([t,good])=>{let on=v.tags.includes(t),col=good?"#1f8a4c":"#d97706";return `<button type="button" data-t="${esc(t)}" onclick="campRevTag(this)" style="border:1px solid ${col};background:${on?col:"transparent"};color:${on?"#fff":col};border-radius:14px;padding:4px 10px;font-size:12.5px;margin:0 6px 6px 0">${esc(t)}</button>`}).join("");
+ let showAll=!!campRevMore[name];
+ let tagBtn=([t,good],i)=>{let on=v.tags.includes(t),col=good?"#1f8a4c":"#d97706";if(!showAll&&i>=CAMP_REV_BASE&&!on)return "";return `<button type="button" data-t="${esc(t)}" onclick="campRevTag(this)" style="border:1px solid ${col};background:${on?col:"transparent"};color:${on?"#fff":col};border-radius:14px;padding:4px 10px;font-size:12.5px;margin:0 6px 6px 0">${esc(t)}</button>`};
+ let grp=(lab,good)=>`<div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin:6px 0 4px">${lab}</div>${CAMP_REV_TAGS.map((x,i)=>x[1]===good?tagBtn(x,i):"").join("")}`;
+ let tagBtns=grp("Strengths",1)+grp("Work on",0)+`<div><button type="button" class="btn secondary" style="padding:3px 10px;font-size:12px;margin-bottom:6px" onclick="campRevMoreTags(this)">${showAll?"Fewer tags":"+ More tags"}</button></div>`;
  return `<div class="card campRevRow" data-n="${esc(name)}" style="padding:10px 12px;margin-top:8px">
  <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap"><div>${pl?`<b style="cursor:pointer;border-bottom:1px dotted var(--muted)" onclick="playerView('${pl.id}')">${esc(name)}</b>`:`<b>${esc(name)}</b>`} <span class="muted">${esc((pl&&pl.role)||"")}</span></div>${ev?`<span class="muted" style="font-size:var(--fs-3)">${esc(ev)}</span>`:""}</div>
  <div style="display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap">
@@ -8925,6 +8937,7 @@ function campRevNote(el){
  if(!requireWriteAccess())return;let x=campRevCtx(el);if(!x)return;
  campRevPush(x.c,x.name);if(!x.c.review)x.c.review={};let v=x.c.review[x.name]=x.c.review[x.name]||{r:0,rec:"",tags:[],note:""};v.note=el.value.trim();campQuiet();
 }
+function campRevMoreTags(el){let x=campRevCtx(el);if(!x)return;campRevMore[x.name]=!campRevMore[x.name];campRevRefreshRow(x)}
 function campRevToggle(el){let x=campRevCtx(el);if(!x)return;campRevOpen[x.name]=!campRevOpen[x.name];campRevRefreshRow(x)}
 function campRevSetFilter(id){let c=campById(campOpenId);if(!c)return;campRevFilter=id;let b=document.getElementById("campRevBox");if(b)b.innerHTML=campReviewHtml(c)}
 
@@ -8954,7 +8967,7 @@ function campReviewReport(id){
  let c=campById(id);if(!c)return;let names=campRevNames(c),k=campRevCounts(c);
  let order={in:0,maybe:1,out:2,"":3},sorted=names.slice().sort((a,b)=>{let x=campRevOf(c,a),y=campRevOf(c,b);return (order[x.rec||""]-order[y.rec||""])||(y.r-x.r)||a.localeCompare(b)});
  let card=n=>{let v=campRevOf(c,n),pl=db.players.find(p=>p.name===n&&!p.deletedAt),ev=campEvidence(c,n),rc=CAMP_REV_REC.find(x=>x[0]===v.rec);
-  return `<div class="card" style="break-inside:avoid"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${esc(n)}${pl&&pl.role?` <span class="muted" style="font-weight:400">${esc(pl.role)}</span>`:""}</b><span>${v.r?`<span style="color:#d97706;letter-spacing:1px">${campRevStars(v.r)}</span> `:""}${rc?`<b style="color:${rc[2]}">${rc[1]}</b>`:`<span class="muted">Not decided</span>`}</span></div>${ev?`<div class="muted" style="font-size:12.5px">${esc(ev)}</div>`:""}${v.tags.length?`<div style="margin-top:4px">${v.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join(" ")}</div>`:""}${v.note?`<p style="margin:6px 0 0">${esc(v.note)}</p>`:""}</div>`};
+  return `<div class="card" style="break-inside:avoid"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${esc(n)}${pl&&pl.role?` <span class="muted" style="font-weight:400">${esc(pl.role)}</span>`:""}</b><span>${v.r?`<span style="color:#d97706;letter-spacing:1px">${campRevStars(v.r)}</span> `:""}${rc?`<b style="color:${rc[2]}">${rc[1]}</b>`:`<span class="muted">Not decided</span>`}</span></div>${ev?`<div class="muted" style="font-size:12.5px">${esc(ev)}</div>`:""}${campTagsHtml(v.tags,true)}${v.note?`<p style="margin:6px 0 0">${esc(v.note)}</p>`:""}</div>`};
  let sec=(label,key)=>{let l=sorted.filter(n=>(campRevOf(c,n).rec||"")===key);return l.length?`<h2>${label} (${l.length})</h2>${l.map(card).join("")}`:""};
  reportShell(esc(c.name)+" — Camp Report",`${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""}${c.team?" · "+esc(c.team):""} · ${names.length} players · In ${k.in} · Maybe ${k.maybe} · Out ${k.out}${k.none?" · Not decided "+k.none:""}`,
   sec("In","in")+sec("Maybe","maybe")+sec("Out","out")+sec("Not decided","")||empty("No players."));
@@ -8968,7 +8981,7 @@ function campSelectSquad(id){
   let p=db.players.find(x=>x.id===ch.dataset.id);if(!p||!names.has(p.name))return;
   let v=campRevOf(c,p.name);ch.checked=v.rec==="in";
   let note=document.querySelector('.ssNote[data-id="'+p.id+'"]');
-  if(note&&!note.value)note.value=[c.name,v.r?v.r+"/5":"",v.tags.join(", "),v.note].filter(Boolean).join(" · ");
+  if(note&&!note.value)note.value=[c.name,v.r?v.r+"/5":"",(()=>{let q=campTagSplit(v.tags);return [q.g.length?"Strengths: "+q.g.join(", "):"",q.w.length?"Areas to improve: "+q.w.join(", "):""].filter(Boolean).join(". ")})(),v.note].filter(Boolean).join(" · ");
  });
  ssUpdateCount();
  let hint=document.querySelector("#sheet p.muted,.sheet p.muted");if(hint)hint.insertAdjacentHTML("afterend",`<p class="muted" style="font-size:var(--fs-3)"><b>Pre-ticked from the camp review:</b> only players marked In. Change any tick before applying.</p>`);
@@ -9066,7 +9079,7 @@ function campSummaryReport(id){
  if(o.names){
   names=[["in","In","#1f8a4c"],["maybe","Maybe","#d97706"],["out","Out","#dc2626"],["","Not decided","#64748b"]].map(([key,lab,col])=>{
    let l=d.names.filter(n=>(campRevOf(c,n).rec||"")===key).sort((a,b)=>campRevOf(c,b).r-campRevOf(c,a).r||a.localeCompare(b));
-   return l.length?`<h3 style="color:${col};margin:12px 0 4px">${lab} (${l.length})</h3>${l.map(n=>{let v=campRevOf(c,n),pl=db.players.find(p=>p.name===n&&!p.deletedAt);return `<div style="padding:4px 0;border-bottom:1px solid #8883;break-inside:avoid"><b>${esc(n)}</b>${pl&&pl.role?` <span class="muted">${esc(pl.role)}</span>`:""}${v.r?` <span style="color:#d97706">${stars(v.r)}</span>`:""}${v.tags.length?`<div class="muted" style="font-size:12.5px">${v.tags.map(esc).join(" · ")}</div>`:""}${(o.notes&&v.note)?`<div style="font-size:13px">${esc(v.note)}</div>`:""}</div>`}).join("")}`:""}).join("");
+   return l.length?`<h3 style="color:${col};margin:12px 0 4px">${lab} (${l.length})</h3>${l.map(n=>{let v=campRevOf(c,n),pl=db.players.find(p=>p.name===n&&!p.deletedAt);return `<div style="padding:4px 0;border-bottom:1px solid #8883;break-inside:avoid"><b>${esc(n)}</b>${pl&&pl.role?` <span class="muted">${esc(pl.role)}</span>`:""}${v.r?` <span style="color:#d97706">${stars(v.r)}</span>`:""}${campTagsHtml(v.tags,false)}${(o.notes&&v.note)?`<div style="font-size:13px">${esc(v.note)}</div>`:""}</div>`}).join("")}`:""}).join("");
  }
  let optsHtml=`<div class="noPrint sumEdit" style="margin:10px 0;padding:10px 12px;border:1px solid var(--border,#8884);border-radius:12px"><b>Include in this report</b> <span class="muted" style="font-size:12.5px">(only you see this)</span>${sw("names","Player names, ratings and tags")}${sw("notes","My notes on each player",!o.names)}${sw("sched","The schedule at the end")}</div>`;
  let body=`<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px">${stat("Days",d.days)}${stat("Players",d.P)}${stat("Sessions",d.sessionsHeld||"—")}${stat("Activity hours",h.total?Math.round(h.total):"—")}</div>
@@ -9171,7 +9184,7 @@ function playerCampsInner(p,forPrint){
   let ctrl=forPrint?"":`<div class="pcRev" data-c="${c.id}" data-n="${esc(p.name)}" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px"><div style="display:flex;gap:4px">${[1,2,3,4,5].map(i=>`<button type="button" onclick="pcRev(this,'r',${i})" aria-label="${i} of 5" style="width:30px;height:30px;border-radius:50%;border:1px solid ${v.r>=i?"#f59e0b":"#8886"};background:${v.r>=i?"#f59e0b":"transparent"};color:${v.r>=i?"#fff":"var(--muted)"};font-size:13px">${i}</button>`).join("")}</div><div style="display:flex;gap:4px;margin-left:auto">${CAMP_REV_REC.map(([k,l,col])=>`<button type="button" onclick="pcRev(this,'rec','${k}')" style="padding:5px 10px;border-radius:8px;border:1px solid ${col};background:${v.rec===k?col:"transparent"};color:${v.rec===k?"#fff":col};font-weight:600;font-size:12.5px">${l}</button>`).join("")}</div></div>`;
   let ro=forPrint?`<div style="margin-top:4px">${v.r?`<span style="color:#d97706">${campRevStars(v.r)}</span> `:""}${rc?`<b style="color:${rc[2]}">${rc[1]}</b>`:""}</div>`:"";
   return `<div class="item" style="display:block"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:flex-start"><div><b>${esc(c.name)}</b> <span class="tag">${st}</span><div class="muted" style="font-size:var(--fs-3)">${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""} · ${days} day${days===1?"":"s"}</div></div>${forPrint?"":`<button class="btn secondary" style="padding:4px 10px" onclick="closeM();go('camps');openCamp('${c.id}')">Open camp</button>`}</div>
-  ${ctrl}${ro}${v.tags.length?`<div style="margin-top:6px">${v.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join(" ")}</div>`:""}${v.note?`<div style="margin-top:4px;font-size:var(--fs-3)">${esc(v.note)}</div>`:""}</div>`;
+  ${ctrl}${ro}${campTagsHtml(v.tags,true)}${v.note?`<div style="margin-top:4px;font-size:var(--fs-3)">${esc(v.note)}</div>`:""}</div>`;
  }).join("");
 }
 function playerCampsHtml(p,forPrint){
