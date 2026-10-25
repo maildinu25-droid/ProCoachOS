@@ -22,7 +22,7 @@
 // doesn't leave a stale cache lingering for someone who hasn't opened the
 // app in a while.
 
-const CACHE_VERSION = "procoachos-v38";
+const CACHE_VERSION = "procoachos-v39";
 
 // Every real, installable shell this service worker covers. Each entry's
 // filename is also what the fetch handler matches request URLs against, and

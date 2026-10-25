@@ -1971,6 +1971,11 @@ function onSessionStageChange(){
  updateFormSectionCount("attendance","marked present");
  renderNetPlanBuilder();
 }
+function attendanceMarkAll(btn,on){
+ let box=btn.closest("#attendanceListInner")||btn.parentElement.parentElement;
+ box.querySelectorAll('input[name="attendees"]').forEach(c=>c.checked=on!==false);
+ updateFormSectionCount("attendance","marked present");
+}
 function attendanceOptionsHtml(s,teamFilter,checkedOverride,defaultAllChecked){
  let stIds=sessionStageIds();
  let players=(teamFilter?activePlayers().filter(p=>p.team===teamFilter):activePlayers()).filter(p=>{let saved=s&&Array.isArray(s.attendees)&&s.attendees.includes(p.name);return saved||(!isReleased(p)&&(!stIds.length||stIds.includes(stageOf(p).id)))});
@@ -1980,7 +1985,7 @@ function attendanceOptionsHtml(s,teamFilter,checkedOverride,defaultAllChecked){
  // only for a brand-new session with nothing saved yet, default to
  // everyone checked, since most sessions involve most of the squad.
  let namesToCheck=checkedOverride?checkedOverride:(Array.isArray(s.attendees)?s.attendees:(defaultAllChecked?players.map(p=>p.name):[]));
- return `<div class="skillPick">${players.map(p=>{
+ return `<div style="margin-bottom:8px"><button type="button" class="btn secondary" style="padding:5px 12px" onclick="attendanceMarkAll(this)">Mark all present</button> <button type="button" class="btn secondary" style="padding:5px 12px" onclick="attendanceMarkAll(this,false)">Clear all</button></div><div class="skillPick">${players.map(p=>{
   let isChecked=namesToCheck.includes(p.name);
   return `<label><input type="checkbox" name="attendees" value="${esc(p.name)}" ${isChecked?"checked":""} onchange="updateFormSectionCount('attendance','marked present')"> ${esc(p.name)}</label>`;
  }).join("")}</div>`;
