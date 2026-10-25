@@ -8893,10 +8893,9 @@ function campEvidence(c,name){
 function campRevStars(r){return "★".repeat(r)+"☆".repeat(5-r)}
 function campRevRowHtml(c,name){
  let v=campRevOf(c,name),pl=db.players.find(p=>p.name===name&&!p.deletedAt),ev=campEvidence(c,name),open=!!campRevOpen[name]||(v.tags.length||v.note)&&campRevOpen[name]!==false&&false;
- let showAll=!!campRevMore[name];
- let tagBtn=([t,good],i)=>{let on=v.tags.includes(t),col=good?"#1f8a4c":"#d97706";if(!showAll&&i>=CAMP_REV_BASE&&!on)return "";return `<button type="button" data-t="${esc(t)}" onclick="campRevTag(this)" style="border:1px solid ${col};background:${on?col:"transparent"};color:${on?"#fff":col};border-radius:14px;padding:4px 10px;font-size:12.5px;margin:0 6px 6px 0">${esc(t)}</button>`};
- let grp=(lab,good)=>`<div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;margin:6px 0 4px">${lab}</div>${CAMP_REV_TAGS.map((x,i)=>x[1]===good?tagBtn(x,i):"").join("")}`;
- let tagBtns=grp("Strengths",1)+grp("Work on",0)+`<div><button type="button" class="btn secondary" style="padding:3px 10px;font-size:12px;margin-bottom:6px" onclick="campRevMoreTags(this)">${showAll?"Fewer tags":"+ More tags"}</button></div>`;
+ let tagRow=([t,good])=>{let on=v.tags.includes(t),col=good?"#1f8a4c":"#d97706";return `<button type="button" data-t="${esc(t)}" onclick="campRevTag(this)" style="display:flex;gap:8px;align-items:flex-start;width:100%;text-align:left;border:0;background:${on?col+"22":"transparent"};color:var(--text,inherit);padding:6px 8px;border-radius:8px;font-size:13px;line-height:1.25"><span style="flex:0 0 16px;height:16px;margin-top:1px;border:2px solid ${col};border-radius:4px;background:${on?col:"transparent"};color:#fff;font-size:11px;line-height:12px;text-align:center">${on?"✓":""}</span><span style="min-width:0;overflow-wrap:anywhere;${on?"font-weight:600":""}">${esc(t)}</span></button>`};
+ let col=(lab,good,colr)=>{let L=CAMP_REV_TAGS.filter(x=>x[1]===good),n=L.filter(x=>v.tags.includes(x[0])).length;return `<div style="min-width:0"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:${colr};margin:0 0 4px 2px">${lab}${n?" ("+n+")":""}</div><div class="tagBox" style="max-height:158px;overflow-y:auto;border:1px solid ${colr}55;border-radius:10px;padding:2px">${L.map(tagRow).join("")}</div></div>`};
+ let tagBtns=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">${col("Strengths",1,"#1f8a4c")}${col("Areas to improve",0,"#d97706")}</div>`;
  return `<div class="card campRevRow" data-n="${esc(name)}" style="padding:10px 12px;margin-top:8px">
  <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap"><div>${pl?`<b style="cursor:pointer;border-bottom:1px dotted var(--muted)" onclick="playerView('${pl.id}')">${esc(name)}</b>`:`<b>${esc(name)}</b>`} <span class="muted">${esc((pl&&pl.role)||"")}</span></div>${ev?`<span class="muted" style="font-size:var(--fs-3)">${esc(ev)}</span>`:""}</div>
  <div style="display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap">
@@ -8931,7 +8930,7 @@ function campRevSet(el,k,val){
 function campRevTag(el){
  if(!requireWriteAccess())return;let x=campRevCtx(el);if(!x)return;
  campRevPush(x.c,x.name);if(!x.c.review)x.c.review={};let v=x.c.review[x.name]=x.c.review[x.name]||{r:0,rec:"",tags:[],note:""},t=el.dataset.t;
- v.tags=v.tags.includes(t)?v.tags.filter(a=>a!==t):v.tags.concat(t);campQuiet();campRevRefreshRow(x);
+ v.tags=v.tags.includes(t)?v.tags.filter(a=>a!==t):v.tags.concat(t);campQuiet();let tops=[...x.row.querySelectorAll(".tagBox")].map(b=>b.scrollTop);campRevRefreshRow(x);let nr=document.querySelector('.campRevRow[data-n="'+(window.CSS&&CSS.escape?CSS.escape(x.name):x.name)+'"]');if(nr)nr.querySelectorAll(".tagBox").forEach((b,i)=>b.scrollTop=tops[i]||0);
 }
 function campRevNote(el){
  if(!requireWriteAccess())return;let x=campRevCtx(el);if(!x)return;
