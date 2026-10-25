@@ -8152,7 +8152,7 @@ function campSessionOptsHtml(c){
  let ss=db.sessions.filter(x=>x.campId===c.id&&!x.deletedAt).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b)));
  return `<details class="noPrint" style="margin-top:10px"><summary class="muted" style="cursor:pointer;font-size:var(--fs-3)">Options${ss.length?" · "+ss.length+" linked session"+(ss.length===1?"":"s"):""}</summary>
  <label style="display:flex;gap:8px;align-items:center;font-size:var(--fs-3);margin:10px 0"><input type="checkbox" style="width:auto" ${c.prefillAttendees?"checked":""} onchange="campSetPrefill('${c.id}',this.checked)"> Pre-fill attendees with each group's players when creating sessions</label>
- ${ss.length?`<div style="max-height:260px;overflow-y:auto">${ss.map(x=>`<div class="item" style="align-items:center"><div style="min-width:0"><b style="font-size:var(--fs-3)">${esc(fmtDate(x.date))}${x.time?" · "+esc(fmtTime(x.time)):""}</b><div class="muted" style="font-size:12.5px;overflow-wrap:anywhere">${esc(sessionFocusText(x)||sessionLabel(x))}</div></div><div class="toolbar"><button class="btn secondary" style="padding:4px 10px" onclick="printSessionPlan('${x.id}')">View</button><button class="btn secondary" style="padding:4px 10px" onclick="go('sessions');editSession('${x.id}')">Edit</button></div></div>`).join("")}</div>`:""}</details>`;
+ ${ss.length?`<div style="max-height:260px;overflow-y:auto">${ss.map(x=>`<div class="item" style="align-items:center"><div style="min-width:0"><b style="font-size:var(--fs-3)">${esc(fmtDate(x.date))}${x.time?" · "+esc(fmtTime(x.time)):""}</b><div class="muted" style="font-size:12.5px;overflow-wrap:anywhere">${esc(sessionFocusText(x)||sessionLabel(x))}</div></div><div class="toolbar"><button class="btn secondary" style="padding:4px 10px" onclick="printSessionPlan('${x.id}')">View</button><button class="btn secondary" style="padding:4px 10px" onclick="go('sessions');editSession('${x.id}')">Edit</button><button class="btn secondary" style="padding:4px 10px" onclick="campUnlinkSession('${c.id}','${x.id}')">Unlink</button></div></div>`).join("")}</div>`:""}<button class="btn secondary" style="margin-top:10px;padding:6px 12px" onclick="campAddPastSheet('${c.id}')">+ Add past sessions</button></details>`;
 }
 function campDetailHtml(c){
  let days=campDays(c),stName=campStageNames(c),pool=campPool(c),groups=campGroups(c);
@@ -8229,7 +8229,7 @@ function saveCamp(e){
 function deleteCamp(id){
  if(!requireWriteAccess())return;let c=campById(id);if(!c)return;
  if(!confirm('Delete "'+c.name+'" with its schedule and attendance? Players and their records are not affected.'))return;
- db.camps=db.camps.filter(x=>x.id!==id);if(campOpenId===id)campOpenId=null;save();
+ db.camps=db.camps.filter(x=>x.id!==id);db.sessions.forEach(x=>{if(x.campId===id){delete x.campId;delete x.campRowId;delete x.campLast}});db.assessments.forEach(a=>{if(a.campId===id)delete a.campId});if(campOpenId===id)campOpenId=null;save();
 }
 /* --- groups --- */
 function campBatchOfName(c,name){let b=(c.batches||[]).find(b=>b.names.includes(name));return b?b.id:""}
@@ -8520,7 +8520,7 @@ let campFsSel=new Set();
 function campAddMin(t,m){if(!t)return"";let p=String(t).split(":"),x=(+p[0])*60+(+p[1]||0)+m;if(x<0||x>=1440)return"";return String(Math.floor(x/60)).padStart(2,"0")+":"+String(x%60).padStart(2,"0")}
 function campFromSessionsSheet(){
  if(!requireWriteAccess())return;if(!requirePremium("Camp Planner"))return;
- let t=today(),from=campShift(t,-14);
+ let t=today(),yr=campShift(t,-365),free=activeSessions().filter(x=>campFsFree(x)&&x.date&&x.date>=yr).map(x=>x.date).sort(),from=free[0]||campShift(t,-14);
  let teams=[...new Set(activeSessions().filter(x=>!x.campId).map(x=>x.squad).filter(Boolean))].sort();
  campFsSel=new Set();
  modal(`<div class="sheetHead"><h2>Camp from past sessions</h2><button class="x" onclick="closeM()">×</button></div>
@@ -8529,14 +8529,15 @@ function campFromSessionsSheet(){
  <label class="full">Team<select id="cfsTeam" onchange="campFsRender(true)"><option value="">All teams</option>${teams.map(x=>`<option>${esc(x)}</option>`).join("")}</select></label>
  <label class="full">Camp name<input id="cfsName" placeholder="e.g. Pre-season camp"></label></div>
  <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 6px"><b id="cfsCount"></b><div class="toolbar"><button class="btn secondary" style="padding:4px 10px" onclick="campFsAll(true)">Select all</button><button class="btn secondary" style="padding:4px 10px" onclick="campFsAll(false)">None</button></div></div>
- <div id="cfsList" style="max-height:300px;overflow-y:auto"></div>
+ <div id="cfsList" style="max-height:50vh;overflow-y:auto"></div><div id="cfsHidden" class="muted" style="font-size:var(--fs-3);margin-top:6px"></div>
  <label style="display:flex;gap:8px;align-items:center;font-size:var(--fs-3);margin-top:12px"><input type="checkbox" id="cfsAssess" style="width:auto" checked> Also link assessments logged in this period to the camp</label>
  <button class="btn primary full" style="margin-top:12px" onclick="campFsCreate()">Create camp</button>`);
  campFsRender(true);
 }
+function campFsFree(x){return !x.campId||!(db.camps||[]).some(c=>c.id===x.campId)}
 function campFsFiltered(){
  let from=document.getElementById("cfsFrom").value,to=document.getElementById("cfsTo").value,team=document.getElementById("cfsTeam").value;
- return activeSessions().filter(x=>!x.campId&&x.date&&(!from||x.date>=from)&&(!to||x.date<=to)&&(!team||x.squad===team)).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b)));
+ return activeSessions().filter(x=>campFsFree(x)&&x.date&&(!from||x.date>=from)&&(!to||x.date<=to)&&(!team||x.squad===team)).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b)));
 }
 function campFsRender(reset){
  let L=campFsFiltered();if(reset)campFsSel=new Set(L.map(x=>x.id));else campFsSel=new Set([...campFsSel].filter(id=>L.some(x=>x.id===id)));
@@ -8545,7 +8546,13 @@ function campFsRender(reset){
 }
 function campFsToggle(id,on){if(on)campFsSel.add(id);else campFsSel.delete(id);campFsCount()}
 function campFsAll(on){let L=campFsFiltered();campFsSel=new Set(on?L.map(x=>x.id):[]);campFsRender(false)}
-function campFsCount(){let el=document.getElementById("cfsCount");if(el)el.textContent=campFsSel.size+" session"+(campFsSel.size===1?"":"s")+" selected"}
+function campFsCount(){let el=document.getElementById("cfsCount");if(el)el.textContent=campFsSel.size+" session"+(campFsSel.size===1?"":"s")+" selected";
+ let h=document.getElementById("cfsHidden");if(!h)return;
+ let from=document.getElementById("cfsFrom").value,to=document.getElementById("cfsTo").value,team=document.getElementById("cfsTeam").value;
+ let inRange=activeSessions().filter(x=>x.date&&(!from||x.date>=from)&&(!to||x.date<=to));
+ let inCamp=inRange.filter(x=>!campFsFree(x)&&(!team||x.squad===team)).length,otherTeam=team?inRange.filter(x=>campFsFree(x)&&x.squad!==team).length:0;
+ let parts=[];if(inCamp)parts.push(inCamp+" already in a camp");if(otherTeam)parts.push(otherTeam+" from other teams (set Team to All teams)");
+ h.textContent=parts.length?"Not shown: "+parts.join(", ")+".":""}
 function campFsCreate(){
  if(!requireWriteAccess())return;
  let sel=campFsFiltered().filter(x=>campFsSel.has(x.id));
@@ -8576,6 +8583,51 @@ function campFsCreate(){
  }
  campOpenId=c.id;closeM();save();window.scrollTo(0,0);
  if(linked)setTimeout(()=>alert(linked+" assessment"+(linked===1?"":"s")+" linked to the camp."),50);
+}
+let campAddId=null;
+function campAddPastSheet(id){
+ if(!requireWriteAccess())return;let c=campById(id);if(!c)return;campAddId=id;
+ let teams=[...new Set(activeSessions().filter(x=>!x.campId).map(x=>x.squad).filter(Boolean))].sort();
+ modal(`<div class="sheetHead"><h2>Add past sessions</h2><button class="x" onclick="closeM()">×</button></div>
+ <p class="muted" style="margin-top:0">Pick sessions you've already run to add to <b>${esc(c.name)}</b>. Each becomes a schedule row and stays linked. Attendance and notes aren't touched.</p>
+ <div class="formgrid" style="padding:0"><label>From<input type="date" id="cfsFrom" value="${campShift(c.startDate,-7)}" onchange="campFsRender(true)"></label><label>To<input type="date" id="cfsTo" value="${campShift(c.endDate||c.startDate,7)}" onchange="campFsRender(true)"></label>
+ <label class="full">Team<select id="cfsTeam" onchange="campFsRender(true)"><option value="">All teams</option>${teams.map(x=>`<option ${x===c.team?"selected":""}>${esc(x)}</option>`).join("")}</select></label></div>
+ <div style="display:flex;justify-content:space-between;align-items:center;margin:12px 0 6px"><b id="cfsCount"></b><div class="toolbar"><button class="btn secondary" style="padding:4px 10px" onclick="campFsAll(true)">Select all</button><button class="btn secondary" style="padding:4px 10px" onclick="campFsAll(false)">None</button></div></div>
+ <div id="cfsList" style="max-height:50vh;overflow-y:auto"></div><div id="cfsHidden" class="muted" style="font-size:var(--fs-3);margin-top:6px"></div>
+ <label style="display:flex;gap:8px;align-items:center;font-size:var(--fs-3);margin-top:12px"><input type="checkbox" id="cfsAssess" style="width:auto" checked> Also link assessments logged on those dates to the camp</label>
+ <button class="btn primary full" style="margin-top:12px" onclick="campAddPastApply()">Add to camp</button>`);
+ campFsRender(true);
+}
+function campAddPastApply(){
+ if(!requireWriteAccess())return;let c=campById(campAddId);if(!c)return;
+ let sel=campFsFiltered().filter(x=>campFsSel.has(x.id));if(!sel.length){alert("Pick at least one session.");return}
+ let ds=sel.map(x=>x.date).sort(),lo=ds[0],hi=ds[ds.length-1],newStart=lo<c.startDate?lo:c.startDate,newEnd=hi>(c.endDate||c.startDate)?hi:(c.endDate||c.startDate);
+ if(newStart!==c.startDate||newEnd!==(c.endDate||c.startDate)){
+  if(!confirm("Some sessions fall outside the camp's dates. Extend the camp to "+fmtDate(newStart)+" – "+fmtDate(newEnd)+"?"))return;
+  c.startDate=newStart;c.endDate=newEnd;
+ }
+ let multi=(c.batches||[]).length>1;
+ sel.forEach(x=>{
+  let txt=String(x.focus||"").trim()||sessionLabel(x)||"Session",cell={text:txt,type:campGuessType(txt),note:"",drillIds:[]};
+  let row={id:uid("rw"),date:x.date,start:x.time||"",end:x.time?campAddMin(x.time,Number(x.duration)||90):"",venue:(x.venue&&x.venue!==campMainVenue(c))?x.venue:"",whole:false,cells:{},sessionId:x.id};
+  if(multi){let b=c.batches.find(g=>g.name===x.squad);if(b){row.cells[b.id]=cell;(x.attendees||[]).forEach(n=>{if(!b.names.includes(n))b.names.push(n)})}else{row.whole=true;row.cells["*"]=cell}}
+  else row.cells["_all"]=cell;
+  c.rows.push(row);x.campId=c.id;x.campRowId=row.id;
+  let bs=campBuildSession(c,row);if(bs){delete bs.names;x.campLast=bs}
+  if(x.venue&&!campVenues(c).includes(x.venue)){c.venues=campVenues(c).concat(x.venue);c.venue=c.venues[0]}
+ });
+ let linked=0;
+ if(document.getElementById("cfsAssess").checked){let names=new Set(sel.flatMap(x=>x.attendees||[]));db.assessments.forEach(a=>{if(!a.campId&&a.date>=c.startDate&&a.date<=(c.endDate||c.startDate)&&names.has(a.player)&&sel.some(x=>x.date===a.date)){a.campId=c.id;linked++}})}
+ closeM();save();
+ if(linked)setTimeout(()=>alert(linked+" assessment"+(linked===1?"":"s")+" linked to the camp."),50);
+}
+function campUnlinkSession(cid,sid){
+ if(!requireWriteAccess())return;let c=campById(cid),x=db.sessions.find(q=>q.id===sid);if(!c||!x)return;
+ if(!confirm("Unlink this session from the camp? The session itself is kept."))return;
+ let row=(c.rows||[]).find(q=>q.id===x.campRowId||q.sessionId===sid);
+ delete x.campId;delete x.campRowId;delete x.campLast;
+ if(row){delete row.sessionId;if(confirm("Also remove its row from the camp schedule?\nOK = remove the row, Cancel = keep it."))c.rows=c.rows.filter(q=>q.id!==row.id)}
+ save();
 }
 /* --- links: sessions, net plans, attendance, season phases --- */
 function campPhaseOf(c){
