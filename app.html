@@ -8050,7 +8050,7 @@ function quick(){modal(`<div class="sheetHead"><h2>Create</h2><button class="x" 
  merged cell for the whole squad. Groups = camp.batches (named lists of players). Attendance is
  per day. Schedules can be imported from an Excel sheet or pasted cells. Stored on db.camps. */
 const CAMP_BLOCK_TYPES=[
- {id:"bat",label:"Batting / nets",c:"#2563eb"},{id:"bowl",label:"Bowling",c:"#f97316"},
+ {id:"bat",label:"Nets",c:"#2563eb"},{id:"bowl",label:"Bowling",c:"#f97316"},
  {id:"fld",label:"Fielding / catching",c:"#16a34a"},{id:"wk",label:"Wicketkeeping",c:"#0d9488"},
  {id:"fit",label:"Fitness / S&C / physio",c:"#9333ea"},{id:"mat",label:"Match / simulation",c:"#dc2626"},
  {id:"meet",label:"Meeting / feedback",c:"#ca8a04"},{id:"brk",label:"Rest / recovery / meal",c:"#94a3b8"},
@@ -8928,7 +8928,7 @@ function campReviewReport(id){
  let card=n=>{let v=campRevOf(c,n),pl=db.players.find(p=>p.name===n&&!p.deletedAt),ev=campEvidence(c,n),rc=CAMP_REV_REC.find(x=>x[0]===v.rec);
   return `<div class="card" style="break-inside:avoid"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${esc(n)}${pl&&pl.role?` <span class="muted" style="font-weight:400">${esc(pl.role)}</span>`:""}</b><span>${v.r?`<span style="color:#d97706;letter-spacing:1px">${campRevStars(v.r)}</span> `:""}${rc?`<b style="color:${rc[2]}">${rc[1]}</b>`:`<span class="muted">Not decided</span>`}</span></div>${ev?`<div class="muted" style="font-size:12.5px">${esc(ev)}</div>`:""}${v.tags.length?`<div style="margin-top:4px">${v.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join(" ")}</div>`:""}${v.note?`<p style="margin:6px 0 0">${esc(v.note)}</p>`:""}</div>`};
  let sec=(label,key)=>{let l=sorted.filter(n=>(campRevOf(c,n).rec||"")===key);return l.length?`<h2>${label} (${l.length})</h2>${l.map(card).join("")}`:""};
- reportShell(esc(c.name)+" — camp report",`${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""}${c.team?" · "+esc(c.team):""} · ${names.length} players · In ${k.in} · Maybe ${k.maybe} · Out ${k.out}${k.none?" · Not decided "+k.none:""}`,
+ reportShell(esc(c.name)+" — Camp Report",`${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""}${c.team?" · "+esc(c.team):""} · ${names.length} players · In ${k.in} · Maybe ${k.maybe} · Out ${k.out}${k.none?" · Not decided "+k.none:""}`,
   sec("In","in")+sec("Maybe","maybe")+sec("Out","out")+sec("Not decided","")||empty("No players."));
 }
 function campSelectSquad(id){
@@ -9011,12 +9011,12 @@ let campSumLast=null;
 function campSumSave(id,k,el){let c=campById(id);if(!c)return;c[k]=el.value;campQuiet();let t=document.getElementById("sum_"+k);if(t)t.textContent=el.value}
 function campSumReset(id){let c=campById(id);if(!c)return;delete c.sumText;campQuiet();campSummaryReport(id)}
 function campSummaryText(c){
- let d=campSummaryData(c),txt=(c.sumText!==undefined?c.sumText:campSummaryAuto(c,d)),out=[c.name+" — camp summary",txt];
+ let d=campSummaryData(c),txt=(c.sumText!==undefined?c.sumText:campSummaryAuto(c,d)),out=[c.name+" — Camp Summary",txt];
  if(c.sumNext)out.push("Next steps: "+c.sumNext);return out.join("\n\n");
 }
 async function campSumShare(id){
  let c=campById(id);if(!c)return;let t=campSummaryText(c);
- try{if(navigator.share){await navigator.share({title:c.name+" — camp summary",text:t});return}}catch(e){if(e&&e.name==="AbortError")return}
+ try{if(navigator.share){await navigator.share({title:c.name+" — Camp Summary",text:t});return}}catch(e){if(e&&e.name==="AbortError")return}
  try{await navigator.clipboard.writeText(t);alert("Summary copied. Paste it into a message or email.")}catch(e){prompt("Copy this summary:",t)}
 }
 function campReportPick(){
@@ -9055,7 +9055,7 @@ function campSummaryReport(id){
  <h2>Next steps</h2><div class="sumEdit noPrint"><textarea rows="3" placeholder="Optional: what happens next, e.g. Camp 2 squad announced on 5 Nov." onchange="campSumSave('${c.id}','sumNext',this)" style="width:100%">${esc(c.sumNext||"")}</textarea></div><p class="printOnly" id="sum_sumNext" style="white-space:pre-wrap">${esc(c.sumNext||"")}</p>
  ${o.sched?`<h2>Schedule</h2>${campSheetTable(c)}`:""}
  <div class="noPrint" style="margin-top:12px"><button class="btn secondary" onclick="campSumShare('${c.id}')">Share / copy as text</button></div>`;
- reportShell(esc(c.name)+" — camp summary",`${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""}${campVenues(c).length?" · "+esc(campVenues(c).join(" / ")):""}${c.team?" · "+esc(c.team):""}${c.coaches?" · Coaches: "+esc(c.coaches):""}`,body);
+ reportShell(esc(c.name)+" — Camp Summary",`${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""}${campVenues(c).length?" · "+esc(campVenues(c).join(" / ")):""}${c.team?" · "+esc(c.team):""}${c.coaches?" · Coaches: "+esc(c.coaches):""}`,body);
  let rep=document.querySelector("#sheet .report");if(rep)rep.insertAdjacentHTML("beforebegin",optsHtml);
 }
 /* ===== end camps ===== */
