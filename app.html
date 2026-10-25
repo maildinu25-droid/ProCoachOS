@@ -8914,8 +8914,8 @@ function campSummaryReport(id){
    let l=d.names.filter(n=>(campRevOf(c,n).rec||"")===key).sort((a,b)=>campRevOf(c,b).r-campRevOf(c,a).r||a.localeCompare(b));
    return l.length?`<h3 style="color:${col};margin:12px 0 4px">${lab} (${l.length})</h3>${l.map(n=>{let v=campRevOf(c,n),pl=db.players.find(p=>p.name===n&&!p.deletedAt);return `<div style="padding:4px 0;border-bottom:1px solid #8883;break-inside:avoid"><b>${esc(n)}</b>${pl&&pl.role?` <span class="muted">${esc(pl.role)}</span>`:""}${v.r?` <span style="color:#d97706">${stars(v.r)}</span>`:""}${v.tags.length?`<div class="muted" style="font-size:12.5px">${v.tags.map(esc).join(" · ")}</div>`:""}${(o.notes&&v.note)?`<div style="font-size:13px">${esc(v.note)}</div>`:""}</div>`}).join("")}`:""}).join("");
  }
- let body=`<div class="noPrint sumEdit card" style="margin-top:12px"><b>Include in this report</b> <span class="muted" style="font-size:12.5px">(only you see this — it does not print)</span>${sw("names","Player names, ratings and tags")}${sw("notes","My notes on each player",!o.names)}${sw("sched","The schedule at the end")}</div>
- <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px">${stat("Days",d.days)}${stat("Players",d.P)}${stat("Sessions",d.sessionsHeld||"—")}${stat("Activity hours",h.total?Math.round(h.total):"—")}</div>
+ let optsHtml=`<div class="noPrint sumEdit" style="margin:10px 0;padding:10px 12px;border:1px solid var(--border,#8884);border-radius:12px"><b>Include in this report</b> <span class="muted" style="font-size:12.5px">(only you see this)</span>${sw("names","Player names, ratings and tags")}${sw("notes","My notes on each player",!o.names)}${sw("sched","The schedule at the end")}</div>`;
+ let body=`<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px">${stat("Days",d.days)}${stat("Players",d.P)}${stat("Sessions",d.sessionsHeld||"—")}${stat("Activity hours",h.total?Math.round(h.total):"—")}</div>
  <h2>Summary</h2><div class="sumEdit noPrint"><textarea rows="8" onchange="campSumSave('${c.id}','sumText',this)" style="width:100%">${esc(txt)}</textarea><div class="muted" style="font-size:12.5px;margin:4px 0">Written from your camp data. Edit freely.${c.sumText!==undefined?` <a href="#" onclick="campSumReset('${c.id}');return false">Reset to auto text</a>`:""}</div></div><p class="printOnly" id="sum_sumText" style="white-space:pre-wrap">${esc(txt)}</p>
  ${types.length?`<h2>What was covered</h2>${bar}`:""}
  ${d.themes.length?`<div style="margin-top:8px">${d.themes.map(x=>`<span class="tag">Day ${x.i+1}: ${esc(x.t)}</span>`).join(" ")}</div>`:""}
@@ -8930,6 +8930,7 @@ function campSummaryReport(id){
  ${o.sched?`<h2>Schedule</h2>${campSheetTable(c)}`:""}
  <div class="noPrint" style="margin-top:12px"><button class="btn secondary" onclick="campSumShare('${c.id}')">Share / copy as text</button></div>`;
  reportShell(esc(c.name)+" — camp summary",`${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""}${campVenues(c).length?" · "+esc(campVenues(c).join(" / ")):""}${c.team?" · "+esc(c.team):""}${c.coaches?" · Coaches: "+esc(c.coaches):""}`,body);
+ let rep=document.querySelector("#sheet .report");if(rep)rep.insertAdjacentHTML("beforebegin",optsHtml);
 }
 /* ===== end camps ===== */
 function campSetPrefill(id,v){let c=campById(id);if(!c)return;c.prefillAttendees=!!v;campQuiet()}
