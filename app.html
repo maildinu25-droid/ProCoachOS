@@ -216,6 +216,7 @@ p{orphans:3;widows:3}
 .calDotS{background:var(--g)}
 .calDotM{background:var(--red)}
 .calDotE{background:var(--gold)}
+.calDotC{background:#9333ea}
 .calLegend{display:flex;align-items:center;gap:6px;margin-top:14px;font-size:var(--fs-3);color:var(--muted)}
 .calLegend .calDot{margin-left:10px}
 .calLegend .calDot:first-child{margin-left:0}
@@ -3057,7 +3058,7 @@ function cascadePlayerRename(oldName,newName){
   (m.bowlingReview||[]).forEach(r=>{if(r.name===oldName)r.name=newName});
   if(Array.isArray(m.playingXI)){m.playingXI=m.playingXI.map(n=>n===oldName?newName:n)}
  });
- (db.camps||[]).forEach(c=>{(c.batches||[]).forEach(b=>{b.names=(b.names||[]).map(n=>n===oldName?newName:n)});Object.keys(c.attendance||{}).forEach(d=>{c.attendance[d]=(c.attendance[d]||[]).map(n=>n===oldName?newName:n)})});
+ (db.camps||[]).forEach(c=>{if(c.review&&c.review[oldName]&&!c.review[newName]){c.review[newName]=c.review[oldName];delete c.review[oldName]}(c.batches||[]).forEach(b=>{b.names=(b.names||[]).map(n=>n===oldName?newName:n)});Object.keys(c.attendance||{}).forEach(d=>{c.attendance[d]=(c.attendance[d]||[]).map(n=>n===oldName?newName:n)})});
 }
 function savePlayer(e){
  e.preventDefault();
@@ -3457,7 +3458,7 @@ function playerRosterReport(){
  let list=db.players.slice().sort((a,b)=>String(a.team||"").localeCompare(String(b.team||""))||String(a.name||"").localeCompare(String(b.name||"")));
  reportShell("Player Roster",`${list.length} players`,list.length?list.map(p=>`<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span><p class="muted">${p.team?esc(p.team):"No team set"}${p.group?" · "+esc(p.group):""}</p><p>${esc(p.focus||"")}</p></div>`).join(""):empty("No players yet."));
 }
-const skillSets={Batting:["Setup & Balance","Footwork","Bat Swing / Contact","Shot Selection","Playing Pace","Playing Spin","Strike Rotation","Boundary Options","Game Awareness","Execution Under Pressure"],Bowling:["Run-up / Approach","Action & Alignment","Line & Length Accuracy","Control & Consistency","Pace / Revolutions","Swing / Seam / Spin","Variations","Tactical Awareness","Execution Under Pressure"],Fielding:["Catching","Ground Fielding","Throwing Accuracy","Throwing Power","Movement & Agility","Positioning & Awareness","Game Awareness","Communication","Decision Making","Execution Under Pressure","Catching Reliability","Stopping Runs / Ground Fielding Reliability","Backing Up & Support Play"],Wicketkeeping:["Set Position","Footwork","Glove Work","Standing Back","Standing Up","Taking Spin","Leg-side Takes","Gather & Release","Communication","Decision Making","Take Reliability","Stumping Efficiency","Anticipation","Execution Under Pressure"]};const legacySkills=["Catching","Ground Fielding","Throwing Accuracy","Movement","Game Awareness","Communication","Decision Making","Work Ethic","Coachability"];
+const skillSets={Batting:["Setup & Balance","Footwork","Bat Swing / Contact","Shot Selection","Playing Pace","Playing Spin","Strike Rotation","Boundary Options","Game Awareness","Execution Under Pressure"],Bowling:["Run-up / Approach","Action & Alignment","Line & Length Accuracy","Control & Consistency","Pace / Revolutions","Swing / Seam / Spin","Variations","Tactical Awareness","Execution Under Pressure","Wicket-taking Threat","Setting Up Dismissals"],Fielding:["Catching","Ground Fielding","Throwing Accuracy","Throwing Power","Movement & Agility","Positioning & Awareness","Game Awareness","Communication","Decision Making","Execution Under Pressure","Catching Reliability","Stopping Runs / Ground Fielding Reliability","Backing Up & Support Play"],Wicketkeeping:["Set Position","Footwork","Glove Work","Standing Back","Standing Up","Taking Spin","Leg-side Takes","Gather & Release","Communication","Decision Making","Take Reliability","Stumping Efficiency","Anticipation","Execution Under Pressure"]};const legacySkills=["Catching","Ground Fielding","Throwing Accuracy","Movement","Game Awareness","Communication","Decision Making","Work Ethic","Coachability"];
 // Format-specific metrics, layered ON TOP of the core skillSets above (never
 // replacing them) for Batting/Bowling only — Fielding/Wicketkeeping barely
 // change by format, so they stay core-only. Kept in their own namespace
@@ -3474,8 +3475,8 @@ const FORMAT_SKILLS={
   Test:["Leaving the Ball","Converting Starts","Moving Ball & Bouncers","Adapting to Pitch & Conditions","Crease Occupation","Session Management"]
  },
  Bowling:{
-  T20:["Death-overs Execution","Variation Disguise","Powerplay Execution","Reading Batter Intent","Bounce-back After Runs","Spell Planning"],
-  ODI:["Opening-overs Control","Middle-overs Containment","Powerplay Wicket-taking","Death-overs Execution","Older-ball Effectiveness","Control Under Restrictions"],
+  T20:["Death-overs Execution","Variation Disguise","Powerplay Execution","Reading Batter Intent","Bounce-back After Runs","Middle-overs Wicket-taking"],
+  ODI:["Opening-overs Control","Middle-overs Containment","Early Wicket-taking","Death-overs Execution","Older-ball Effectiveness","Death-overs Wicket-taking"],
   Test:["Opening-spell Discipline","Older-ball Effectiveness","Pace & Intensity Retention","Building Pressure","Bowling to the Situation","Role Control Across Ends"]
  }
 };
@@ -7132,7 +7133,16 @@ function exportExcel(){
 
 /* ===== Calendar ===== */
 let calYear=new Date().getFullYear(),calMonth=new Date().getMonth(),calEventQuery="",calSearchFocused=false,editingEventId=null;
-function calItemsForDate(ds){return{sessions:activeSessions().filter(s=>s.date===ds),matches:db.matches.filter(m=>m.date===ds),events:db.events.filter(e=>e.date===ds)}}
+function calItemsForDate(ds){return{sessions:activeSessions().filter(s=>s.date===ds),matches:db.matches.filter(m=>m.date===ds),events:db.events.filter(e=>e.date===ds),camps:(db.camps||[]).filter(c=>{try{return campDays(c).includes(ds)}catch(e){return false}})}}
+function calClashes(ds){
+ let out={sessions:[],matches:[]},camps=(db.camps||[]).filter(c=>{try{return campDays(c).includes(ds)}catch(e){return false}});
+ if(!camps.length)return out;
+ let tm=t=>{let p=String(t).split(":");return (+p[0])*60+(+p[1]||0)};
+ let blocks=[];camps.forEach(c=>campRowsOn(c,ds).forEach(r=>{if(r.start){let a=tm(r.start);blocks.push({c,a,b:a+campRowDuration(r)})}}));
+ activeSessions().filter(x=>x.date===ds&&!x.campId&&x.time).forEach(x=>{let a=tm(x.time),b=a+(Number(x.duration)||60);let hit=blocks.find(k=>a<k.b&&k.a<b);if(hit)out.sessions.push({s:x,c:hit.c})});
+ db.matches.filter(m=>m.date===ds).forEach(m=>out.matches.push({m,c:camps[0]}));
+ return out;
+}
 function fmtCalDate(ds){let d=new Date(ds+"T00:00:00");return d.toLocaleDateString(undefined,{weekday:"long",day:"numeric",month:"long",year:"numeric"})}
 function calPrevMonth(){calMonth--;if(calMonth<0){calMonth=11;calYear--}calendar()}
 function calNextMonth(){calMonth++;if(calMonth>11){calMonth=0;calYear++}calendar()}
@@ -7169,7 +7179,8 @@ function calendar(){
   let items=calItemsForDate(ds);
   let dots="";
   const dd=(n,c,t)=>n?`<span class="calCount" title="${n} ${t}"><span class="calDot ${c}"></span>${n>1?n:""}</span>`:"";
-  dots=dd(items.sessions.length,"calDotS","session(s)")+dd(items.matches.length,"calDotM","match(es)")+dd(items.events.length,"calDotE","reminder(s)/event(s)");
+  dots=dd(items.sessions.length,"calDotS","session(s)")+dd(items.matches.length,"calDotM","match(es)")+dd(items.events.length,"calDotE","reminder(s)/event(s)")+dd(items.camps.length,"calDotC","camp day");
+  if(items.camps.length){let cl=calClashes(ds);if(cl.sessions.length||cl.matches.length)dots+=`<span class="calCount" title="Clash with a camp" style="color:#dc2626;font-weight:800;font-size:12px">!</span>`}
   cells+=`<div class="calCell${ds===today()?" calToday":""}" onclick="openCalDay('${ds}')"><div class="calDayNum">${d}</div><div class="calDots">${dots}</div></div>`;
  }
  let upcoming=db.events.slice().filter(e=>e.date>=today()).sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
@@ -7177,16 +7188,21 @@ function calendar(){
  document.getElementById("calendar").innerHTML=head("Calendar","Training sessions, matches, reminders and events in one place.")
  +`<div class="toolbar noPrint"><button class="btn secondary" style="display:inline-flex;align-items:center;gap:5px" onclick="calPrevMonth()">${icon("chevronLeft",13)} Prev</button><button class="btn secondary" onclick="calToday()">Today</button><button class="btn secondary" style="display:inline-flex;align-items:center;gap:5px" onclick="calNextMonth()">Next ${icon("chevronRight",13)}</button><button class="btn primary" onclick="newCalEvent()">+ Add Reminder / Event</button><button class="btn secondary iconBtn" title="Print Month" onclick="calMonthReport()">${icon("print",17)}</button></div>
  <h2 class="section">${monthLabel}</h2>
- <div class="card"><div class="calGrid calHead">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<div class="calCell calHeadCell">${d}</div>`).join("")}</div><div class="calGrid">${cells}</div><div class="calLegend"><span class="calDot calDotS"></span> Session<span class="calDot calDotM"></span> Match<span class="calDot calDotE"></span> Reminder / Event</div></div>
+ <div class="card"><div class="calGrid calHead">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<div class="calCell calHeadCell">${d}</div>`).join("")}</div><div class="calGrid">${cells}</div><div class="calLegend"><span class="calDot calDotS"></span> Session<span class="calDot calDotM"></span> Match<span class="calDot calDotE"></span> Reminder / Event<span class="calDot calDotC"></span> Camp<b style="color:#dc2626">!</b> Clash</div></div>
  <h2 class="section">Upcoming Reminders &amp; Events</h2>
  <div class="card" style="margin-bottom:15px"><label>Search<input id="calSearch" value="${esc(calEventQuery)}" oninput="calEventQuery=this.value;calendar()" onfocus="calSearchFocused=true" onblur="calSearchFocused=false" placeholder="Search reminders and events..."></label></div>
  <div class="card">${upcoming.length?upcoming.map(e=>`<div class="item"><div><b>${esc(e.title)}</b><div class="muted">${esc(fmtDate(e.date))}${e.time?" · "+esc(e.time):""} · ${esc(e.type||"Event")}</div><small>${esc(e.notes||"")}</small></div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editCalEvent('${e.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delCalEvent('${e.id}')">${icon("trash",17)}</button></div></div>`).join(""):emptyRich("Nothing coming up","Add reminders for fixtures, fitness tests or parent meetings.","+ Add Reminder / Event","newCalEvent()")}</div>`;
  let sEl=document.getElementById("calSearch");if(sEl&&calSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
+function calCampBlockHtml(ds,items){
+ if(!items.camps.length)return "";let cl=calClashes(ds);
+ return `<h2 class="section" style="margin-top:0">Camps</h2><div class="card">${items.camps.map(c=>{let i=campDays(c).indexOf(ds),rows=campRowsOn(c,ds);return `<div class="item"><div><b>${esc(c.name)}</b> <span class="tag">Day ${i+1}</span><div class="muted">${rows.length?rows.map(r=>esc(campRowTime(r))+(r.venue?" @ "+esc(r.venue):"")).join(" · "):"Nothing scheduled"}</div>${(c.themes&&c.themes[ds])?`<small>${esc(c.themes[ds])}</small>`:""}</div><button class="btn secondary" onclick="closeM();go('camps');openCamp('${c.id}')">Open</button></div>`}).join("")}${(cl.sessions.length||cl.matches.length)?`<div style="margin-top:8px;color:#dc2626;font-weight:600;font-size:var(--fs-3)">⚠ Clash: ${cl.sessions.map(x=>esc(sessionLabel(x.s))+" overlaps the camp").concat(cl.matches.map(x=>"a match is on a camp day")).join(" · ")}</div>`:""}</div>`;
+}
 function openCalDay(ds){
  let items=calItemsForDate(ds);
  let body=`<div class="sheetHead"><h2>${esc(fmtCalDate(ds))}</h2><button class="x" onclick="closeM()">×</button></div>
- <h2 class="section" style="margin-top:0">Training Sessions</h2><div class="card">${items.sessions.length?items.sessions.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${s.duration?esc(s.duration)+" min":""}</div><small>${esc(s.objectives||"")}</small></div></div>`).join(""):empty("No sessions.")}</div>
+ ${calCampBlockHtml(ds,items)}
+ <h2 class="section"${items.camps.length?"":' style="margin-top:0"'}>Training Sessions</h2><div class="card">${items.sessions.length?items.sessions.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${s.duration?esc(s.duration)+" min":""}</div><small>${esc(s.objectives||"")}</small></div></div>`).join(""):empty("No sessions.")}</div>
  <h2 class="section">Matches</h2><div class="card">${items.matches.length?items.matches.map(m=>`<div class="item"><div><b>${esc(m.team||"My Team")} vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.result||"")}</div></div><button class="btn secondary" onclick="closeM();matchReportView('${m.id}')">Report</button></div>`).join(""):empty("No matches.")}</div>
  <h2 class="section">Reminders &amp; Events</h2><div class="card">${items.events.length?items.events.map(e=>`<div class="item"><div><b>${esc(e.title)}</b><div class="muted">${e.time?esc(e.time)+" · ":""}${esc(e.type||"Event")}</div><small>${esc(e.notes||"")}</small></div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editCalEvent('${e.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delCalEvent('${e.id}')">${icon("trash",17)}</button></div></div>`).join(""):empty("No reminders or events.")}</div>
  <button class="btn primary" style="margin-top:10px" onclick="newCalEvent('${ds}')">+ Add Reminder / Event for this day</button>`;
@@ -8099,25 +8115,27 @@ function camps(){
  let c=campOpenId?campById(campOpenId):null;if(campOpenId&&!c)campOpenId=null;
  if(c){el.innerHTML=campDetailHtml(c);return}
  el.innerHTML=head("Camps & Clinics","Plan a camp day by day: groups, times, attendance and a printable sheet.")
- +`<div class="toolbar noPrint"><button class="btn primary" onclick="newCamp()">+ New Camp / Clinic</button><button class="btn secondary" onclick="campImportSheet()">Import from Excel</button></div>`
+ +`<div class="toolbar noPrint"><button class="btn primary" onclick="newCamp()">+ New Camp / Clinic</button><button class="btn secondary" onclick="campImportSheet()">Import from Excel</button>${campTpls().length?`<button class="btn secondary" onclick="campTemplatesSheet()">Templates (${campTpls().length})</button>`:""}</div>`
  +`<div class="list" style="margin-top:12px">${db.camps.length?db.camps.slice().sort((a,b)=>String(b.startDate||"").localeCompare(String(a.startDate||""))).map(x=>{
   let days=campDays(x),pool=campPool(x),stName=campStageNames(x);
   return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap"><div style="cursor:pointer;min-width:0" onclick="openCamp('${x.id}')"><b style="font-size:var(--fs-5,17px)">${esc(x.name)}</b> <span class="tag">${esc(x.kind||"Camp")}</span><div class="muted">${esc(fmtDate(x.startDate))}${x.endDate&&x.endDate!==x.startDate?" → "+esc(fmtDate(x.endDate)):""}${campVenues(x).length?" · "+esc(campVenues(x).join(" / ")):""}</div><div class="muted" style="margin-top:4px">${days.length} day${days.length===1?"":"s"} · ${pool.length} player${pool.length===1?"":"s"}${x.team?" · "+esc(x.team):""}${stName?" · "+esc(stName):""}${(x.batches||[]).length>1?" · "+x.batches.length+" groups":""}</div></div><div class="toolbar"><button class="btn primary" onclick="openCamp('${x.id}')">Open</button><button class="btn danger iconBtn" title="Delete" onclick="deleteCamp('${x.id}')">${icon("trash",17)}</button></div></div></div>`}).join(""):emptyRich("No camps yet","Create a camp or clinic, or import the schedule you already have in Excel.","+ New Camp / Clinic","newCamp()")}</div>`;
 }
-function openCamp(id){campOpenId=id;camps();window.scrollTo(0,0)}
+function openCamp(id){campOpenId=id;camps();let c=campById(id),el=c&&campDays(c).includes(today())?document.getElementById("campDay-"+today()):null;if(el)el.scrollIntoView({block:"start"});else window.scrollTo(0,0)}
 function closeCamp(){campOpenId=null;camps();window.scrollTo(0,0)}
 function campDayCardHtml(c,d,i,groups){
  let rows=campRowsOn(c,d),cols=`78px repeat(${groups.length},minmax(0,1fr))`,theme=c.themes&&c.themes[d];
+ let isT=d===today(),nowInfo=isT?campNowInfo(c):null,curId=nowInfo&&nowInfo.cur?nowInfo.cur.id:"";
  let hdr=groups.length>1?`<div style="display:grid;grid-template-columns:${cols};gap:6px;margin-top:8px"><div></div>${groups.map(g=>`<div class="muted" style="font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(g.name)}</div>`).join("")}</div>`:"";
  let body=rows.map(r=>{
-  let tcell=`<div onclick="campRowForm('${c.id}','${r.id}')" style="cursor:pointer;font-size:12px;font-weight:600;color:var(--muted);padding-top:6px;line-height:1.25">${esc(campRowTime(r))}${(r.venue&&r.venue!==campMainVenue(c))?`<span style="display:block;font-weight:500;font-size:10.5px;color:var(--g);margin-top:2px">${esc(r.venue)}</span>`:""}</div>`;
+  let isCur=r.id===curId;
+  let tcell=`<div onclick="campRowForm('${c.id}','${r.id}')" style="cursor:pointer;font-size:12px;font-weight:600;color:${isCur?"var(--g)":"var(--muted)"};padding-top:6px;line-height:1.25">${isCur?`<span style="display:inline-block;background:var(--g);color:#fff;border-radius:4px;padding:0 5px;font-size:10px;margin-bottom:2px">NOW</span><br>`:""}${esc(campRowTime(r))}${(r.venue&&r.venue!==campMainVenue(c))?`<span style="display:block;font-weight:500;font-size:10.5px;color:var(--g);margin-top:2px">${esc(r.venue)}</span>`:""}</div>`;
   if(r.whole&&groups.length>1){
    let cell=(r.cells&&r.cells["*"])||null;
    return `<div style="display:grid;grid-template-columns:${cols};gap:6px;margin-top:6px">${tcell}<div style="grid-column:2/-1;min-width:0">${cell?`<div onclick="campCellForm('${c.id}','${r.id}','*')" style="${campCellStyle(cell,false)}border-radius:8px;padding:7px 9px;cursor:pointer;font-size:12.5px;line-height:1.35">${campCellInner(cell,false)}</div>`:`<button type="button" class="btn secondary" style="width:100%;padding:6px" onclick="campCellForm('${c.id}','${r.id}','*')">+ Whole squad</button>`}</div></div>`;
   }
   return `<div style="display:grid;grid-template-columns:${cols};gap:6px;margin-top:6px">${tcell}${groups.map(g=>{let cell=r.cells&&r.cells[g.id];return cell?`<div onclick="campCellForm('${c.id}','${r.id}','${g.id}')" style="${campCellStyle(cell,false)}border-radius:8px;padding:7px 9px;cursor:pointer;font-size:12.5px;line-height:1.35;min-width:0">${campCellInner(cell,false)}</div>`:`<button type="button" class="btn secondary" style="padding:6px;opacity:.7;min-width:0" onclick="campCellForm('${c.id}','${r.id}','${g.id}')">+</button>`}).join("")}</div>`;
  }).join("");
- return `<div class="card" style="padding:12px 14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><div style="cursor:pointer" onclick="campEditTheme('${c.id}','${d}')" title="Tap to set the day's theme"><b>${esc(campDayLabel(d,i))}</b> <span class="muted">${esc(fmtDate(d))}${theme?" · "+esc(theme):""}</span></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn secondary" style="padding:5px 10px;font-size:12px" onclick="campRowForm('${c.id}','','${d}')">+ Row</button><button class="btn secondary" style="padding:5px 10px;font-size:12px" onclick="campRestDay('${c.id}','${d}')">Rest day</button>${rows.length?`<button class="btn secondary" style="padding:5px 10px;font-size:12px" onclick="campCopyDayForm('${c.id}','${d}')">Copy day</button>`:""}</div></div>${rows.length?hdr+body:`<div class="muted" style="margin-top:8px;font-size:var(--fs-3)">Nothing planned yet.</div>`}</div>`;
+ return `<div class="card" id="campDay-${d}" style="padding:12px 14px;${isT?"outline:2px solid var(--g);scroll-margin-top:70px;":""}"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><div style="cursor:pointer" onclick="campEditTheme('${c.id}','${d}')" title="Tap to set the day's theme"><b>${esc(campDayLabel(d,i))}</b> <span class="muted">${esc(fmtDate(d))}${theme?" · "+esc(theme):""}</span></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn secondary" style="padding:5px 10px;font-size:12px" onclick="campRowForm('${c.id}','','${d}')">+ Row</button><button class="btn secondary" style="padding:5px 10px;font-size:12px" onclick="campRestDay('${c.id}','${d}')">Rest day</button>${rows.length?`<button class="btn secondary" style="padding:5px 10px;font-size:12px" onclick="campCopyDayForm('${c.id}','${d}')">Copy day</button>`:""}</div></div>${rows.length?hdr+body:`<div class="muted" style="margin-top:8px;font-size:var(--fs-3)">Nothing planned yet.</div>`}</div>`;
 }
 function campDetailHtml(c){
  let days=campDays(c),stName=campStageNames(c),pool=campPool(c),groups=campGroups(c);
@@ -8125,12 +8143,14 @@ function campDetailHtml(c){
  let unassigned=pool.filter(p=>!(c.batches||[]).some(b=>b.names.includes(p.name)));
  return `<button class="backBtn noPrint" onclick="closeCamp()">${icon("chevronLeft",13)} All camps</button>
  <div class="hero"><h1>${esc(c.name)} <span class="tag" style="font-size:12px;vertical-align:middle">${esc(c.kind||"Camp")}</span></h1><div class="muted">${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""} · ${days.length} day${days.length===1?"":"s"}</div></div>
- <div class="toolbar noPrint" style="flex-wrap:wrap"><button class="btn secondary" onclick="editCamp('${c.id}')">Edit details</button><button class="btn secondary" onclick="campBatchesSheet('${c.id}')">Groups</button><button class="btn primary" onclick="campSheetReport('${c.id}')">Print sheet</button></div>
+ <div class="toolbar noPrint" style="flex-wrap:wrap"><button class="btn secondary" onclick="editCamp('${c.id}')">Edit details</button><button class="btn secondary" onclick="campBatchesSheet('${c.id}')">Groups</button><button class="btn primary" onclick="campSheetReport('${c.id}')">Print sheet</button><button class="btn secondary" onclick="campShareImage('${c.id}')">Share as image</button><button class="btn secondary" onclick="campCopyForm('${c.id}')">Copy camp</button><button class="btn secondary" onclick="campSaveTemplate('${c.id}')">Save as template</button></div>
+ ${campTodayHtml(c)}
  <div class="grid g4" style="margin-top:12px">${meta(campVenues(c).length>1?"Venues":"Venue",esc(campVenues(c).join(" · ")))}${meta("Team / stage",esc([c.team,stName].filter(Boolean).join(" · ")||"Everyone"))}${meta("Season phase",(()=>{let po=campPhaseOf(c);return po?esc(po.season.name+" · "+po.phase.name):""})())}${meta("Players",pool.length+(unassigned.length&&(c.batches||[]).length>1?` <span class="muted" style="font-weight:400">(${unassigned.length} not in a group)</span>`:""))}${meta("Coaches",esc(c.coaches||""))}</div>
  ${(c.batches||[]).length>1?`<div style="margin-top:10px">${c.batches.map(b=>`<span class="tag">${esc(b.name)} · ${b.names.length}</span>`).join(" ")}</div>`:""}
  <div class="card" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><b>Sessions</b><div class="muted" style="font-size:var(--fs-3)">${(()=>{let st=campSessionStats(c);return st.have?st.have+" of "+st.rows+" schedule rows are sessions in Session Plans":"Turn each schedule row into a session with its date, time, venue and focus"})()}</div></div><button class="btn primary" onclick="campSyncSessions('${c.id}')">${campSessionStats(c).have?"Update sessions":"Create sessions"}</button></div>
  <h2 class="section">Schedule <span class="muted" style="font-weight:400;font-size:var(--fs-3)">— tap a time to edit a row, a cell to change what's planned, a day to set its theme</span></h2>
  <div class="list">${days.map((d,i)=>campDayCardHtml(c,d,i,groups)).join("")||empty("Set the camp dates in Edit details.")}</div>
+ <h2 class="section">Player review</h2><div id="campRevBox">${campReviewHtml(c)}</div>
  <div class="toolbar noPrint" style="margin-top:10px"><button class="btn secondary" onclick="go('players');openBulkAssessment()">Assess players</button></div>
  ${(c.equipment||c.notes)?`<div class="grid g2" style="margin-top:12px">${c.equipment?`<div class="card"><b>Equipment</b><ul style="margin:6px 0 0 18px;padding:0">${c.equipment.split("\n").map(x=>x.trim()).filter(Boolean).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}${c.notes?`<div class="card"><b>Notes</b><p style="white-space:pre-wrap;margin:6px 0 0">${esc(c.notes)}</p></div>`:""}</div>`:""}`;
 }
@@ -8144,6 +8164,7 @@ function campFormHtml(c){
  let isNew=!c;c=c||{};let teams=playerTeams(),open=stagesList().filter(s=>!s.released);
  return `<div class="sheetHead"><h2>${isNew?"New Camp / Clinic":"Edit camp details"}</h2><button class="x" onclick="closeM()">×</button></div>
  <form class="formgrid" onsubmit="saveCamp(event)">
+ ${(isNew&&campTpls().length)?`<label class="full">Start from a template <span class="muted" style="font-weight:400">(optional — dates extend to fit the template)</span><select name="tpl"><option value="">None — blank camp</option>${campTpls().map(t=>`<option value="${t.id}">${esc(t.name)} · ${t.days} day${t.days===1?"":"s"}</option>`).join("")}</select></label>`:""}
  <label class="full">Name<input name="name" required value="${esc(c.name||"")}" placeholder="e.g. U-14 Probables Camp"></label>
  <label>Type<select name="kind"><option ${c.kind!=="Clinic"?"selected":""}>Camp</option><option ${c.kind==="Clinic"?"selected":""}>Clinic</option></select></label>
  <label class="full">Venues <span class="muted" style="font-weight:400">(separate with commas — the first is the main venue)</span><input name="venues" id="campVenuesInput" value="${esc(campVenues(c).join(", "))}" placeholder="e.g. Green Park Nets, SDAT Stadium, Gym" autocomplete="off">${campKnownVenues().length?`<div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px">${campKnownVenues().slice(0,10).map(v=>`<button type="button" class="btn secondary" style="padding:4px 9px;font-size:12px" data-v="${esc(v)}" onclick="campVenueChip(this)">+ ${esc(v)}</button>`).join("")}</div>`:""}</label>
@@ -8173,8 +8194,14 @@ function saveCamp(e){
   {let pk=(f.phaseKey||"").split("|");c.seasonId=pk[0]||"";c.phaseId=pk[1]||""}
  }else{
   let c={id:uid("camp"),name:f.name,kind:f.kind,venues:campParseVenues(f.venues),venue:campParseVenues(f.venues)[0]||"",startDate:f.startDate,endDate:f.endDate,team:f.team||"",stageIds:fd0.getAll("stageIds"),seasonId:(f.phaseKey||"").split("|")[0]||"",phaseId:(f.phaseKey||"").split("|")[1]||"",coaches:f.coaches||"",equipment:f.equipment||"",notes:f.notes||"",batches:[],rows:[],themes:{},attendance:{},createdAt:today()};
-  campAutoSplit(c,Number(f.batchCount)||1);
+  let tpl=f.tpl?campTpls().find(t=>t.id===f.tpl):null;
+  if(tpl){
+   if(tpl.days>campDays(c).length)c.endDate=campShift(c.startDate,tpl.days-1);
+   let gn=tpl.groupNames||[];
+   if(gn.length>1){c.batches=gn.map(n=>({id:uid("bt"),name:n,names:[]}));campAutoSplit(c,gn.length)}else campAutoSplit(c,1);
+  }else campAutoSplit(c,Number(f.batchCount)||1);
   if(c.batches.length===1)c.batches=[];
+  if(tpl)campApplyTemplate(c,tpl);
   db.camps.push(c);campOpenId=c.id;
  }
  closeM();save();
@@ -8543,6 +8570,222 @@ function campSyncSessions(id){
 function campOpenSession(){
  if(!campCellCtx)return;let c=campById(campCellCtx.id);if(!c)return;let r=c.rows.find(x=>x.id===campCellCtx.rowId);if(!r||!r.sessionId)return;
  closeM();go('sessions');editSession(r.sessionId);
+}
+
+/* --- dates, copy camp, templates, share image, today view --- */
+function campShift(d,n){let x=new Date(d+"T00:00:00Z");x.setUTCDate(x.getUTCDate()+n);return x.toISOString().slice(0,10)}
+function campDiff(a,b){return Math.round((new Date(b+"T00:00:00Z")-new Date(a+"T00:00:00Z"))/86400000)}
+let campCopyCtx=null;
+function campCopyForm(id){
+ if(!requireWriteAccess())return;if(!requirePremium("Camp Planner"))return;let c=campById(id);if(!c)return;campCopyCtx=id;
+ modal(`<div class="sheetHead"><h2>Copy camp</h2><button class="x" onclick="closeM()">×</button></div>
+ <p class="muted">Copies the schedule, groups, themes, equipment and notes. Dates move to the new start date. Sessions, attendance and the season link are not copied.</p>
+ <form class="formgrid" onsubmit="campCopySave(event)"><label class="full">New name<input name="name" required value="${esc(c.name+" (copy)")}"></label>
+ <label class="full">New start date<input type="date" name="startDate" required value="${today()}"></label>
+ ${(c.batches||[]).length>1?`<label class="full" style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="keepPlayers" style="width:auto" checked> Keep the players in each group</label>`:""}
+ <button class="btn primary full">Copy camp</button></form>`);
+}
+function campCopySave(e){
+ e.preventDefault();if(!requireWriteAccess())return;let c=campById(campCopyCtx);if(!c)return;
+ let fd=new FormData(e.target),ns=fd.get("startDate");if(!ns)return;let delta=campDiff(c.startDate,ns);
+ let n=JSON.parse(JSON.stringify(c));
+ n.id=uid("camp");n.name=(fd.get("name")||"").trim()||c.name+" (copy)";n.startDate=ns;n.endDate=campShift(c.endDate||c.startDate,delta);
+ n.seasonId="";n.phaseId="";n.attendance={};n.createdAt=today();
+ let map={};(n.batches||[]).forEach(b=>{let nid=uid("bt");map[b.id]=nid;b.id=nid;if(!fd.get("keepPlayers"))b.names=[]});
+ n.rows=(n.rows||[]).map(r=>{let cells={};Object.keys(r.cells||{}).forEach(k=>{cells[map[k]||k]=r.cells[k]});let x=Object.assign({},r,{id:uid("rw"),date:campShift(r.date,delta),cells});delete x.sessionId;return x});
+ n.themes={};Object.keys(c.themes||{}).forEach(d=>{n.themes[campShift(d,delta)]=c.themes[d]});
+ db.camps.push(n);campOpenId=n.id;closeM();save();window.scrollTo(0,0);
+}
+function campTpls(){if(!db.settings)db.settings={};if(!Array.isArray(db.settings.campTemplates))db.settings.campTemplates=[];return db.settings.campTemplates}
+function campSaveTemplate(id){
+ if(!requireWriteAccess())return;let c=campById(id);if(!c)return;
+ let name=prompt("Template name (e.g. 3-day pre-tournament camp):",c.name);if(name===null)return;name=name.trim();if(!name)return;
+ let days=campDays(c),gids=(c.batches||[]).length>1?c.batches.map(b=>b.id):[];
+ let key=k=>{if(k==="*"||k==="_all")return k;let i=gids.indexOf(k);return i>-1?"g"+i:"_all"};
+ let tpl={id:uid("ctpl"),name,kind:c.kind||"Camp",days:days.length,groupNames:gids.length?c.batches.map(b=>b.name):[],equipment:c.equipment||"",notes:c.notes||"",themes:{},
+  rows:(c.rows||[]).filter(r=>days.includes(r.date)).map(r=>{let cells={};Object.keys(r.cells||{}).forEach(k=>{cells[key(k)]=JSON.parse(JSON.stringify(r.cells[k]))});return{day:days.indexOf(r.date),start:r.start||"",end:r.end||"",venue:r.venue||"",whole:!!r.whole,cells}})};
+ days.forEach((d,i)=>{if(c.themes&&c.themes[d])tpl.themes[i]=c.themes[d]});
+ let ex=campTpls().findIndex(t=>t.name.toLowerCase()===name.toLowerCase());
+ if(ex>-1){if(!confirm('A template named "'+name+'" exists. Replace it?'))return;campTpls()[ex]=tpl}else campTpls().push(tpl);
+ save();alert('Saved. Start a new camp and choose "'+name+'" under Start from a template.');
+}
+function campApplyTemplate(c,tpl){
+ let days=campDays(c),gids=(c.batches||[]).length>1?c.batches.map(b=>b.id):[];
+ let key=k=>{if(k==="*"||k==="_all")return k;let i=+String(k).slice(1);return gids[i]||"_all"};
+ c.rows=[];tpl.rows.forEach(t=>{if(t.day>=days.length)return;let cells={};Object.keys(t.cells||{}).forEach(k=>{let nk=key(k);if(!cells[nk])cells[nk]=JSON.parse(JSON.stringify(t.cells[k]))});
+  c.rows.push({id:uid("rw"),date:days[t.day],start:t.start,end:t.end,venue:t.venue||"",whole:t.whole&&gids.length>1,cells})});
+ c.themes={};Object.keys(tpl.themes||{}).forEach(i=>{if(days[i])c.themes[days[i]]=tpl.themes[i]});
+ if(!c.equipment)c.equipment=tpl.equipment||"";if(!c.notes)c.notes=tpl.notes||"";
+}
+function campTemplatesSheet(){
+ modal(`<div class="sheetHead"><h2>Camp templates</h2><button class="x" onclick="closeM()">×</button></div>
+ <div class="list">${campTpls().length?campTpls().map(t=>`<div class="item"><div><b>${esc(t.name)}</b><div class="muted">${t.days} day${t.days===1?"":"s"} · ${t.rows.length} blocks${t.groupNames.length>1?" · "+t.groupNames.length+" groups":""}</div></div><button class="btn danger" data-id="${t.id}" onclick="campDeleteTemplate(this.dataset.id)">Delete</button></div>`).join(""):empty("No templates yet. Open a camp and tap Save as template.")}</div>
+ <p class="muted" style="font-size:var(--fs-3)">To use one: New Camp, then pick it under Start from a template.</p>`);
+}
+function campDeleteTemplate(id){if(!requireWriteAccess())return;let t=campTpls().find(x=>x.id===id);if(!t||!confirm('Delete template "'+t.name+'"? Camps made from it are not affected.'))return;db.settings.campTemplates=campTpls().filter(x=>x.id!==id);save();campTemplatesSheet()}
+
+/* --- today view --- */
+function campNowInfo(c){
+ let t=today(),days=campDays(c);if(!days.includes(t))return null;
+ let rows=campRowsOn(c,t),nm=new Date().getHours()*60+new Date().getMinutes(),tm=x=>{let p=String(x).split(":");return (+p[0])*60+(+p[1]||0)};
+ let timed=rows.filter(r=>r.start),cur=null,next=null;
+ timed.forEach((r,i)=>{let a=tm(r.start),b=r.end?tm(r.end):(timed[i+1]?tm(timed[i+1].start):a+campRowDuration(r));if(nm>=a&&nm<b)cur=r;else if(a>nm&&!next)next=r});
+ return{date:t,day:days.indexOf(t),total:days.length,rows,cur,next,theme:(c.themes&&c.themes[t])||""};
+}
+function campRowSummary(c,r){
+ let groups=campGroups(c),multi=groups.length>1;
+ if(r.whole&&multi){let x=r.cells&&r.cells["*"];return x?x.text:""}
+ return groups.map(g=>{let x=r.cells&&r.cells[g.id];return x&&x.text?(multi?g.name+": ":"")+x.text:""}).filter(Boolean).join(" · ");
+}
+function campTodayHtml(c){
+ let n=campNowInfo(c);if(!n)return "";
+ let line=(lbl,r)=>r?`<div style="margin-top:6px"><span class="muted">${lbl}</span> <b>${esc(campRowTime(r))}</b> — ${esc(campRowSummary(c,r)||"Planned")}${(r.venue&&r.venue!==campMainVenue(c))?` <span class="muted">@ ${esc(r.venue)}</span>`:""}</div>`:"";
+ return `<div class="card noPrint" style="margin-top:12px;border-left:5px solid var(--g)"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><div><b>Today · Day ${n.day+1} of ${n.total}</b>${n.theme?` <span class="muted">· ${esc(n.theme)}</span>`:""}</div><button class="btn secondary" style="padding:5px 12px" onclick="campJumpToday()">Jump to today</button></div>
+ ${n.rows.length?(line("Now",n.cur)||`<div class="muted" style="margin-top:6px">Nothing in progress right now.</div>`)+line("Next",n.next):`<div class="muted" style="margin-top:6px">Nothing scheduled today.</div>`}</div>`;
+}
+function campJumpToday(){let el=document.getElementById("campDay-"+today());if(el)el.scrollIntoView({behavior:"smooth",block:"start"})}
+
+/* --- share as image --- */
+function campRenderCanvas(c){
+ const W=1080,P=28,TC=150,G=10,FONT='-apple-system,"Segoe UI",Roboto,Arial,sans-serif';
+ let groups=campGroups(c),days=campDays(c),multi=groups.length>1,main=campMainVenue(c);
+ let cw=W-2*P-TC-G,colW=multi?(cw-(groups.length-1)*G)/groups.length:cw;
+ function pass(ctx,dry){
+  let y=P;
+  const font=(w,sz)=>{ctx.font=w+" "+sz+"px "+FONT};
+  const wrap=(t,maxW)=>{let out=[];String(t||"").split("\n").forEach(par=>{let line="";par.split(/\s+/).filter(Boolean).forEach(w=>{let test=line?line+" "+w:w;if(ctx.measureText(test).width>maxW&&line){out.push(line);line=w}else line=test});out.push(line)});return out};
+  const text=(t,x,yy,col)=>{if(!dry){ctx.fillStyle=col;ctx.fillText(t,x,yy)}};
+  const rect=(x,yy,w,h,col)=>{if(!dry){ctx.fillStyle=col;ctx.fillRect(x,yy,w,h)}};
+  ctx.textBaseline="top";
+  font("700",34);wrap(c.name,W-2*P).forEach(l=>{text(l,P,y,"#18211e");y+=42});
+  let sub=[c.kind||"Camp",fmtDate(c.startDate)+(c.endDate&&c.endDate!==c.startDate?" → "+fmtDate(c.endDate):""),campVenues(c).join(" / "),c.team,c.coaches].filter(Boolean).join(" · ");
+  font("500",17);wrap(sub,W-2*P).forEach(l=>{text(l,P,y,"#5a6a62");y+=24});
+  y+=14;
+  days.forEach((d,i)=>{
+   let rows=campRowsOn(c,d),theme=c.themes&&c.themes[d];
+   rect(P,y,W-2*P,38,"#e8eeea");font("700",18);text(campDayLabel(d,i)+" · "+fmtDate(d)+(theme?" · "+theme:""),P+12,y+9,"#18211e");y+=44;
+   if(!rows.length){font("500",15);text("Nothing planned yet",P+12,y,"#7a8a82");y+=26}
+   else{
+    if(multi){font("700",12);groups.forEach((g,gi)=>text(String(g.name).toUpperCase(),P+TC+G+gi*(colW+G),y,"#6a7a72"));y+=20}
+    rows.forEach(r=>{
+     font("700",15);let tl=[campRowTime(r)];let tH=tl.length*20;let vl=[];
+     if(r.venue&&r.venue!==main){font("500",13);vl=wrap(r.venue,TC-10);tH+=vl.length*17}
+     let boxes=[];
+     const mk=(cell,x,w)=>{if(!cell)return;font("700",16);let tx=wrap(cell.text||campType(cell.type).label,w-26);font("500",13);let nl=cell.note?wrap(cell.note,w-26):[];boxes.push({cell,x,w,tx,nl,h:14+tx.length*21+nl.length*17})};
+     if(r.whole&&multi)mk(r.cells&&r.cells["*"],P+TC+G,cw);else groups.forEach((g,gi)=>mk(r.cells&&r.cells[g.id],P+TC+G+gi*(colW+G),colW));
+     let h=Math.max(tH+6,...boxes.map(b=>b.h),30);
+     font("700",15);tl.forEach((t,k)=>text(t,P,y+4+k*20,"#3a4a42"));
+     font("500",13);vl.forEach((t,k)=>text(t,P,y+4+tl.length*20+k*17,"#14633a"));
+     boxes.forEach(b=>{let col=campType(b.cell.type).c;rect(b.x,y,b.w,h,col+"26");rect(b.x,y,5,h,col);
+      font("700",16);b.tx.forEach((t,k)=>text(t,b.x+14,y+7+k*21,"#18211e"));
+      font("500",13);b.nl.forEach((t,k)=>text(t,b.x+14,y+7+b.tx.length*21+k*17,"#4a5a52"))});
+     y+=h+8;
+    });
+   }
+   y+=12;
+  });
+  return y+P-12;
+ }
+ let m=document.createElement("canvas").getContext("2d"),H=Math.ceil(pass(m,true));
+ let cv=document.createElement("canvas");cv.width=W;cv.height=Math.min(H,30000);
+ let ctx=cv.getContext("2d");ctx.fillStyle="#ffffff";ctx.fillRect(0,0,W,cv.height);pass(ctx,false);return cv;
+}
+async function campShareImage(id){
+ let c=campById(id);if(!c)return;
+ let cv;try{cv=campRenderCanvas(c)}catch(e){alert("Could not make the image: "+e.message);return}
+ let blob=await new Promise(res=>cv.toBlob(res,"image/png"));
+ if(!blob){alert("Could not make the image.");return}
+ let name=(c.name||"camp").replace(/[^\w\-]+/g,"_")+".png",file=new File([blob],name,{type:"image/png"});
+ try{if(navigator.canShare&&navigator.canShare({files:[file]})){await navigator.share({files:[file],title:c.name});return}}catch(e){if(e&&e.name==="AbortError")return}
+ let url=URL.createObjectURL(blob);
+ modal(`<div class="sheetHead"><h2>Camp sheet image</h2><button class="x" onclick="closeM()">×</button></div>
+ <p class="muted">Save it, or press and hold the image to share it by message.</p>
+ <img src="${url}" alt="Camp schedule" style="width:100%;border:1px solid var(--border,#8884);border-radius:8px;background:#fff">
+ <a class="btn primary full" style="display:block;text-align:center;margin-top:10px;text-decoration:none" href="${url}" download="${esc(name)}">Download image</a>`);
+}
+
+/* --- camp player review (tap to rate, tap to recommend; evidence fills in by itself) --- */
+const CAMP_REV_REC=[["in","In","#1f8a4c"],["maybe","Maybe","#d97706"],["out","Out","#dc2626"]];
+const CAMP_REV_TAGS=[["Strong technique",1],["Match-ready",1],["Great attitude",1],["Leader",1],["Coachable",1],["Fit",1],["Technique work",0],["Fitness",0],["Match temperament",0],["Consistency",0],["Fielding",0]];
+let campRevFilter="",campRevOpen={};
+function campRevOf(c,n){return(c.review&&c.review[n])||{r:0,rec:"",tags:[],note:""}}
+function campRevNames(c){let names=campPool(c).map(p=>p.name);Object.keys(c.review||{}).forEach(n=>{if(!names.includes(n))names.push(n)});return names}
+function campEvidence(c,name){
+ let end=c.endDate||c.startDate,parts=[];
+ let as=db.assessments.filter(a=>a.player===name&&a.date&&a.date>=c.startDate&&a.date<=end).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
+ if(as.length){let v=as.map(a=>Number(assessmentAvg(a))).filter(Number.isFinite);let t=as.length+" assessment"+(as.length>1?"s":"");if(v.length){t+=" · avg "+v[v.length-1].toFixed(1);if(v.length>1){let d=v[v.length-1]-v[0];t+=d>0.04?" ▲ +"+d.toFixed(1):d<-0.04?" ▼ "+d.toFixed(1):" ="}}parts.push(t)}
+ let ss=db.sessions.filter(x=>x.campId===c.id&&!x.deletedAt&&x.date<=today()&&(x.attendees||[]).length);
+ if(ss.length){let a=ss.filter(x=>x.attendees.includes(name)).length;parts.push("attended "+a+" of "+ss.length+" sessions")}
+ return parts.join(" · ");
+}
+function campRevStars(r){return "★".repeat(r)+"☆".repeat(5-r)}
+function campRevRowHtml(c,name){
+ let v=campRevOf(c,name),pl=db.players.find(p=>p.name===name&&!p.deletedAt),ev=campEvidence(c,name),open=!!campRevOpen[name]||(v.tags.length||v.note)&&campRevOpen[name]!==false&&false;
+ let tagBtns=CAMP_REV_TAGS.map(([t,good])=>{let on=v.tags.includes(t),col=good?"#1f8a4c":"#d97706";return `<button type="button" data-t="${esc(t)}" onclick="campRevTag(this)" style="border:1px solid ${col};background:${on?col:"transparent"};color:${on?"#fff":col};border-radius:14px;padding:4px 10px;font-size:12.5px;margin:0 6px 6px 0">${esc(t)}</button>`}).join("");
+ return `<div class="card campRevRow" data-n="${esc(name)}" style="padding:10px 12px;margin-top:8px">
+ <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap"><div><b>${esc(name)}</b> <span class="muted">${esc((pl&&pl.role)||"")}</span></div>${ev?`<span class="muted" style="font-size:var(--fs-3)">${esc(ev)}</span>`:""}</div>
+ <div style="display:flex;gap:6px;margin-top:8px;align-items:center;flex-wrap:wrap">
+  <div style="display:flex;gap:4px">${[1,2,3,4,5].map(i=>`<button type="button" onclick="campRevSet(this,'r',${i})" aria-label="${i} of 5" style="width:34px;height:34px;border-radius:50%;border:1px solid ${v.r>=i?"#f59e0b":"#8886"};background:${v.r>=i?"#f59e0b":"transparent"};color:${v.r>=i?"#fff":"var(--muted)"};font-size:14px">${i}</button>`).join("")}</div>
+  <div style="display:flex;gap:4px;margin-left:auto">${CAMP_REV_REC.map(([k,l,col])=>`<button type="button" onclick="campRevSet(this,'rec','${k}')" style="padding:6px 12px;border-radius:8px;border:1px solid ${col};background:${v.rec===k?col:"transparent"};color:${v.rec===k?"#fff":col};font-weight:600;font-size:13px">${l}</button>`).join("")}</div>
+ </div>
+ <div style="margin-top:6px"><button type="button" class="btn secondary" style="padding:3px 10px;font-size:12px" onclick="campRevToggle(this)">${campRevOpen[name]?"Hide":(v.tags.length||v.note?"Tags & note ("+(v.tags.length+(v.note?1:0))+")":"+ Tags & note")}</button></div>
+ ${campRevOpen[name]?`<div style="margin-top:8px">${tagBtns}<input placeholder="One line note (optional)" value="${esc(v.note)}" onchange="campRevNote(this)" style="margin-top:2px"></div>`:""}</div>`;
+}
+function campRevCounts(c){let k={in:0,maybe:0,out:0,none:0};campRevNames(c).forEach(n=>{let v=campRevOf(c,n);k[v.rec||"none"]++});return k}
+function campRevSumHtml(c){
+ let k=campRevCounts(c),chip=(id,l,n,col)=>`<button type="button" onclick="campRevSetFilter('${id}')" style="padding:5px 12px;border-radius:16px;border:1px solid ${col};background:${campRevFilter===id?col:"transparent"};color:${campRevFilter===id?"#fff":col};font-weight:600;font-size:13px">${l} ${n}</button>`;
+ return `<div style="display:flex;gap:6px;flex-wrap:wrap">${chip("","All",campRevNames(c).length,"#64748b")}${CAMP_REV_REC.map(([id,l,col])=>chip(id,l,k[id],col)).join("")}${chip("none","Not decided",k.none,"#94a3b8")}</div>`;
+}
+function campReviewHtml(c){
+ let names=campRevNames(c);
+ if(!names.length)return `<div class="card muted">No players in this camp yet. Set the team or squad stage in Edit details, and they'll appear here.</div>`;
+ let f=campRevFilter,list=names.filter(n=>!f||(campRevOf(c,n).rec||"none")===f);
+ return `<div class="muted" style="font-size:var(--fs-3);margin-bottom:8px">Tap a number (1–5) for how they did, then In, Maybe or Out for the next squad. Tags and a note are optional. Assessments and session attendance show beside each name when you have them.</div>
+ <div id="campRevSum">${campRevSumHtml(c)}</div><div id="campRevList">${list.map(n=>campRevRowHtml(c,n)).join("")||`<div class="muted" style="margin-top:8px">Nobody here.</div>`}</div>
+ <div class="toolbar noPrint" style="margin-top:10px"><button class="btn primary" onclick="campReviewReport('${c.id}')">Camp report</button><button class="btn secondary" onclick="campSelectSquad('${c.id}')">Select squad from review</button></div>`;
+}
+function campRevCtx(el){let c=campById(campOpenId),row=el.closest(".campRevRow");return c&&row?{c,name:row.dataset.n,row}:null}
+function campRevRefreshRow(x){let t=document.createElement("div");t.innerHTML=campRevRowHtml(x.c,x.name);x.row.replaceWith(t.firstElementChild);let s=document.getElementById("campRevSum");if(s)s.innerHTML=campRevSumHtml(x.c)}
+function campRevSet(el,k,val){
+ if(!requireWriteAccess())return;let x=campRevCtx(el);if(!x)return;
+ if(!x.c.review)x.c.review={};let v=x.c.review[x.name]=x.c.review[x.name]||{r:0,rec:"",tags:[],note:""};
+ v[k]=(v[k]===val)?(k==="r"?0:""):val;campQuiet();
+ if(campRevFilter&&k==="rec"&&(v.rec||"none")!==campRevFilter){let box=document.getElementById("campRevBox");if(box)box.innerHTML=campReviewHtml(x.c);return}
+ campRevRefreshRow(x);
+}
+function campRevTag(el){
+ if(!requireWriteAccess())return;let x=campRevCtx(el);if(!x)return;
+ if(!x.c.review)x.c.review={};let v=x.c.review[x.name]=x.c.review[x.name]||{r:0,rec:"",tags:[],note:""},t=el.dataset.t;
+ v.tags=v.tags.includes(t)?v.tags.filter(a=>a!==t):v.tags.concat(t);campQuiet();campRevRefreshRow(x);
+}
+function campRevNote(el){
+ if(!requireWriteAccess())return;let x=campRevCtx(el);if(!x)return;
+ if(!x.c.review)x.c.review={};let v=x.c.review[x.name]=x.c.review[x.name]||{r:0,rec:"",tags:[],note:""};v.note=el.value.trim();campQuiet();
+}
+function campRevToggle(el){let x=campRevCtx(el);if(!x)return;campRevOpen[x.name]=!campRevOpen[x.name];campRevRefreshRow(x)}
+function campRevSetFilter(id){let c=campById(campOpenId);if(!c)return;campRevFilter=id;let b=document.getElementById("campRevBox");if(b)b.innerHTML=campReviewHtml(c)}
+function campReviewReport(id){
+ let c=campById(id);if(!c)return;let names=campRevNames(c),k=campRevCounts(c);
+ let order={in:0,maybe:1,out:2,"":3},sorted=names.slice().sort((a,b)=>{let x=campRevOf(c,a),y=campRevOf(c,b);return (order[x.rec||""]-order[y.rec||""])||(y.r-x.r)||a.localeCompare(b)});
+ let card=n=>{let v=campRevOf(c,n),pl=db.players.find(p=>p.name===n&&!p.deletedAt),ev=campEvidence(c,n),rc=CAMP_REV_REC.find(x=>x[0]===v.rec);
+  return `<div class="card" style="break-inside:avoid"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><b>${esc(n)}${pl&&pl.role?` <span class="muted" style="font-weight:400">${esc(pl.role)}</span>`:""}</b><span>${v.r?`<span style="color:#d97706;letter-spacing:1px">${campRevStars(v.r)}</span> `:""}${rc?`<b style="color:${rc[2]}">${rc[1]}</b>`:`<span class="muted">Not decided</span>`}</span></div>${ev?`<div class="muted" style="font-size:12.5px">${esc(ev)}</div>`:""}${v.tags.length?`<div style="margin-top:4px">${v.tags.map(t=>`<span class="tag">${esc(t)}</span>`).join(" ")}</div>`:""}${v.note?`<p style="margin:6px 0 0">${esc(v.note)}</p>`:""}</div>`};
+ let sec=(label,key)=>{let l=sorted.filter(n=>(campRevOf(c,n).rec||"")===key);return l.length?`<h2>${label} (${l.length})</h2>${l.map(card).join("")}`:""};
+ reportShell(esc(c.name)+" — camp report",`${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""}${c.team?" · "+esc(c.team):""} · ${names.length} players · In ${k.in} · Maybe ${k.maybe} · Out ${k.out}${k.none?" · Not decided "+k.none:""}`,
+  sec("In","in")+sec("Maybe","maybe")+sec("Out","out")+sec("Not decided","")||empty("No players."));
+}
+function campSelectSquad(id){
+ let c=campById(id);if(!c)return;let L=stagesList(),open=L.filter(s=>!s.released);
+ let from=(c.stageIds||[]).find(x=>open.some(s=>s.id===x))||(open.find(s=>stagePlayers(s.id,c.team||"").length)||open[0]).id;
+ squadSelectSheet(from,c.team||"");
+ let names=new Set(campRevNames(c));
+ document.querySelectorAll(".ssChk").forEach(ch=>{
+  let p=db.players.find(x=>x.id===ch.dataset.id);if(!p||!names.has(p.name))return;
+  let v=campRevOf(c,p.name);ch.checked=v.rec==="in";
+  let note=document.querySelector('.ssNote[data-id="'+p.id+'"]');
+  if(note&&!note.value)note.value=[c.name,v.r?v.r+"/5":"",v.tags.join(", "),v.note].filter(Boolean).join(" · ");
+ });
+ ssUpdateCount();
+ let hint=document.querySelector("#sheet p.muted,.sheet p.muted");if(hint)hint.insertAdjacentHTML("afterend",`<p class="muted" style="font-size:var(--fs-3)"><b>Pre-ticked from the camp review:</b> only players marked In. Change any tick before applying.</p>`);
 }
 /* ===== end camps ===== */
 
