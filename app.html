@@ -26,7 +26,7 @@ button,input,textarea,select{font:inherit}.top{position:sticky;top:0;z-index:20;
 #profileBadge{max-width:150px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0}
 .layout{display:grid;grid-template-columns:235px 1fr;min-height:calc(100vh - 68px);min-height:calc(100dvh - 68px)}aside{background:var(--surface);border-right:1px solid var(--line);padding:16px 12px;position:sticky;top:68px;height:calc(100vh - 68px);height:calc(100dvh - 68px);overflow-y:auto}.nav{display:grid;gap:3px}.nav button{border:0;background:transparent;text-align:left;padding:12px;border-radius:10px;color:var(--muted);display:flex;align-items:center;gap:12px;font-size:var(--fs-5);font-weight:600;transition:.15s;border-left:3px solid transparent}.nav button:hover{background:var(--surface2);color:var(--ink)}.nav button.active{background:var(--mint);color:var(--g);font-weight:800;border-left:3px solid var(--g)}.navIcon{width:21px;height:21px;flex-shrink:0;display:inline-flex;align-items:center;justify-content:center}
 .navGroupLabel{font-size:var(--fs-2);text-transform:uppercase;letter-spacing:.7px;color:var(--muted);font-weight:700;padding:16px 12px 6px;opacity:.65}
-main{padding:28px;max-width:1200px;width:100%;min-width:0;margin:auto;scroll-behavior:smooth}.page{display:none}.page.active{display:block;animation:fadein .18s ease}@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}.hero{margin-bottom:24px}.hero h1{margin:0 0 6px;font-size:var(--fs-8);font-weight:800;letter-spacing:-.3px}.backBtn{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:var(--fs-3);font-weight:600;cursor:pointer;margin-bottom:16px;display:inline-flex;align-items:center;gap:6px;transition:.15s}.backBtn:hover{background:var(--surface2);color:var(--ink);border-color:var(--lineHover)}.muted{color:var(--muted)}.grid{display:grid;gap:16px}.g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}.card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:var(--shadow)}.glass{background:var(--glassBg);border:1px solid var(--glassBorder);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}.stat{transition:.15s}.stat span{font-size:var(--fs-2);text-transform:uppercase;color:var(--muted);letter-spacing:.7px;font-weight:600}.stat b{display:block;font-size:var(--fs-8);color:var(--g);margin-top:8px;font-family:'Sora',sans-serif}.section{margin:28px 0 14px;font-size:var(--fs-6);font-weight:700;letter-spacing:-.2px}.btn{border:0;border-radius:10px;padding:11px 15px;font-weight:750;cursor:pointer;transition:.15s}.btn:hover{filter:brightness(1.1)}.btn:active{transform:scale(.97)}.primary{background:linear-gradient(135deg,var(--g),var(--g2));color:#fff;box-shadow:0 6px 18px rgba(16,185,129,.32)}.secondary{background:var(--mint);color:var(--g)}.danger{background:var(--redTint);color:var(--red)}.toolbar{display:flex;gap:8px;flex-wrap:wrap}
+main{padding:28px;max-width:1200px;width:100%;min-width:0;margin:0 auto;scroll-behavior:smooth}.page{display:none}.page.active{display:block;animation:fadein .18s ease}@keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:translateY(0)}}.hero{margin-bottom:24px}.hero h1{margin:0 0 6px;font-size:var(--fs-8);font-weight:800;letter-spacing:-.3px}.backBtn{background:transparent;border:1px solid var(--line);color:var(--muted);border-radius:8px;padding:7px 12px;font-size:var(--fs-3);font-weight:600;cursor:pointer;margin-bottom:16px;display:inline-flex;align-items:center;gap:6px;transition:.15s}.backBtn:hover{background:var(--surface2);color:var(--ink);border-color:var(--lineHover)}.muted{color:var(--muted)}.grid{display:grid;gap:16px}.g4{grid-template-columns:repeat(4,1fr)}.g3{grid-template-columns:repeat(3,1fr)}.g2{grid-template-columns:repeat(2,1fr)}.card{background:var(--surface);border:1px solid var(--line);border-radius:20px;padding:20px;box-shadow:var(--shadow)}.glass{background:var(--glassBg);border:1px solid var(--glassBorder);backdrop-filter:blur(20px);-webkit-backdrop-filter:blur(20px)}.stat{transition:.15s}.stat span{font-size:var(--fs-2);text-transform:uppercase;color:var(--muted);letter-spacing:.7px;font-weight:600}.stat b{display:block;font-size:var(--fs-8);color:var(--g);margin-top:8px;font-family:'Sora',sans-serif}.section{margin:28px 0 14px;font-size:var(--fs-6);font-weight:700;letter-spacing:-.2px}.btn{border:0;border-radius:10px;padding:11px 15px;font-weight:750;cursor:pointer;transition:.15s}.btn:hover{filter:brightness(1.1)}.btn:active{transform:scale(.97)}.primary{background:linear-gradient(135deg,var(--g),var(--g2));color:#fff;box-shadow:0 6px 18px rgba(16,185,129,.32)}.secondary{background:var(--mint);color:var(--g)}.danger{background:var(--redTint);color:var(--red)}.toolbar{display:flex;gap:8px;flex-wrap:wrap}
 .iconBtn{flex:0 0 auto!important;width:38px;height:38px;padding:0!important;display:inline-flex;align-items:center;justify-content:center}.toolbar .btn{flex:1;text-align:center;white-space:nowrap}.list{display:grid;gap:10px}.item{border:1px solid var(--line);border-radius:14px;padding:14px;display:flex;justify-content:space-between;gap:10px;align-items:flex-start;transition:.15s;background:var(--surface)}.item .toolbar{flex:0 0 auto;flex-wrap:nowrap}.item>:not(.toolbar){flex:1 1 auto;min-width:0}.item .toolbar.wrap3{flex:0 0 130px;width:130px;flex-wrap:wrap}.item:hover{border-color:var(--lineHover);background:var(--surface2)}.tag{display:inline-block;background:var(--mint);color:var(--g);padding:5px 9px;border-radius:999px;font-size:var(--fs-2);font-weight:600;margin:2px}.quick,.reportCard{cursor:pointer;transition:.15s}.quick:hover,.reportCard:hover{transform:translateY(-3px);box-shadow:0 16px 34px rgba(0,0,0,.5)}.quick b,.reportCard b{color:var(--g);font-size:var(--fs-6);font-family:'Sora',sans-serif}.reportCard p{color:var(--muted);margin-bottom:0}.empty{text-align:center;padding:32px;color:var(--muted);border:1px dashed var(--line);border-radius:14px}
 input,textarea,select{width:100%;padding:11px 12px;border:1px solid var(--line);border-radius:10px;background:var(--surface2);color:var(--ink)}textarea{min-height:95px;resize:vertical}label{display:grid;gap:6px;font-size:var(--fs-4);font-weight:650;color:var(--label)}.formgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}.full{grid-column:1/-1}
 .sliderRow{margin-bottom:16px}
@@ -240,6 +240,8 @@ p{orphans:3;widows:3}
 .kebabMenu.up{top:auto;bottom:44px}.kebabMenu.open{display:block}
 .playerRow{border-color:transparent;background:var(--surface);padding:12px 14px}.playerRow:hover{background:var(--surface2,var(--surface))}
 #players .list{gap:8px}
+.reportOv>summary{cursor:pointer;font-weight:700;list-style:none;padding:12px 14px;border:1px solid var(--line);border-radius:14px}.reportOv>summary::-webkit-details-marker{display:none}
+.toolRow{padding:14px 16px}.bento-hero{flex-direction:row!important;gap:14px!important;text-align:left!important;justify-content:flex-start!important;grid-row:span 1!important;padding:12px 16px}.bento-hero .heroRing,.heroRing{width:56px;height:56px}.bento-hero .heroRing b,.heroRing b{font-size:18px}
 .campSec{margin:24px 0 8px;font-size:12px;letter-spacing:.9px;text-transform:uppercase;color:var(--muted);font-weight:700}
 .campNav{display:flex;gap:18px;margin:12px 0 0;font-size:var(--fs-3)}.campNav a{color:var(--muted);font-weight:600;cursor:pointer;text-decoration:none;padding:4px 0;border-bottom:2px solid transparent}.campNav a:hover{color:var(--ink);border-bottom-color:var(--g)}
 .campInfo{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px}.campInfo .l{font-size:11px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}.campInfo b{display:block;font-weight:600;overflow-wrap:anywhere}
@@ -1829,13 +1831,7 @@ function dashboard(){
   :(nextSession?`<div class="todayHero"><div class="thLabel">${todaySessions.length?"All done today · next up":"Nothing today · next up"}</div><div class="thTitle">${esc(sessionLabel(nextSession))}</div><div class="thMeta">${esc(fmtDate(nextSession.date))}${heroMeta(nextSession)?" · "+esc(heroMeta(nextSession)):""}</div><div class="thBtns"><button class="btn primary" onclick="printSessionPlan('${nextSession.id}')">Open plan</button><button class="btn secondary" onclick="editSession('${nextSession.id}')">Edit</button></div></div>`
   :`<div class="todayHero"><div class="thLabel">Today</div><div class="thTitle">Nothing planned</div><div class="thMeta">Plan your next session in a couple of minutes.</div><div class="thBtns"><button class="btn primary" onclick="go('sessions');newSession()">Plan a session</button></div></div>`)));
  dashboardEl.innerHTML=`
- ${showBackupNotice?`<div class="card" style="border-color:var(--blue2);margin-bottom:14px;display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
- <div><b>Your data lives on this device only</b><div class="muted" style="font-size:var(--fs-2);margin-top:2px">Export a backup before switching phone or browser.</div></div>
- <div style="display:flex;gap:8px;flex-shrink:0">
- <button class="btn secondary" onclick="localStorage.setItem('coachbook_backup_notice_dismissed_at',Date.now());dashboard()">Later</button>
- <button class="btn primary" onclick="exportBackup()">Export Backup</button>
- </div>
- </div>`:""}
+ ${showBackupNotice?`<div class="card" style="border-color:var(--blue2);margin-bottom:12px;padding:10px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px"><div style="font-size:var(--fs-3);min-width:0"><b>Back up your data</b> <span class="muted">— it lives on this device only</span></div><div style="display:flex;gap:6px;flex-shrink:0"><button class="btn secondary" style="padding:5px 10px" onclick="localStorage.setItem('coachbook_backup_notice_dismissed_at',Date.now());dashboard()">Later</button><button class="btn primary" style="padding:5px 10px" onclick="exportBackup()">Export</button></div></div>`:""}
  ${(showHomeScreenNotice&&!showBackupNotice)?(hasRealData?`<div class="card" style="border-color:var(--blue2);margin-bottom:14px">
  <b>Add ProCoach OS to your Home Screen</b>
  <div class="muted" style="font-size:var(--fs-2);margin-top:2px">Opens faster and works offline. Back up first — the Home Screen icon uses separate storage.</div>
@@ -1876,9 +1872,9 @@ function dashboard(){
  <div class="bentoGrid">
 
  <div class="bentoTile glass bento-hero">
- <div class="heroRing">${scoreRingSvg(score.composite,84)}<b>${score.composite}</b></div>
- <div class="homeSectionTitle" style="margin:6px 0 0">Coaching Activity</div>
- <div class="homeSub">${scoreCaption(score.composite)}</div>
+ <div class="heroRing">${scoreRingSvg(score.composite,56)}<b>${score.composite}</b></div>
+ <div><div class="homeSectionTitle" style="margin:0">Coaching Activity</div>
+ <div class="homeSub">${scoreCaption(score.composite)}</div></div>
  </div>
 
  <div class="bentoTile bento-sm"><div class="bIcon">${icon("fire",20)}</div><div><div class="bNum">${streak}</div><div class="bLabel">day streak</div></div></div>
@@ -3803,7 +3799,7 @@ function saveBulkAssessment(){
  closeM();
  assessments();
 }
-function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<div class="actionRow"><button class="btn primary" onclick="newAssessment()">+ New Assessment</button><button class="btn secondary" onclick="openBulkAssessment()">Bulk Assess Squad</button></div><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(fmtDate(a.date))} · ${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}${assessmentFormatTagsHtml(a)}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editAssessment('${a.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delAssessment('${a.id}')">${icon("trash",17)}</button></div></div>`).join(""):emptyRich("No assessments yet","Rate batting, bowling and fielding to track each player's progress over time.","+ New Assessment","newAssessment()")}</div>`}
+function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<div class="toolbar noPrint"><button class="btn primary" onclick="newAssessment()">+ New Assessment</button>${campMenu("asAct","Actions ▾",[{label:"Bulk assess squad",icon:"players",fn:"openBulkAssessment()"}])}</div><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(fmtDate(a.date))} · ${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}${assessmentFormatTagsHtml(a)}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editAssessment('${a.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delAssessment('${a.id}')">${icon("trash",17)}</button></div></div>`).join(""):emptyRich("No assessments yet","Rate batting, bowling and fielding to track each player's progress over time.","+ New Assessment","newAssessment()")}</div>`}
 function assessmentFormHtml(a,mode){
  a=a||{};
  return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Assessment":"Player Assessment"}</h2><button class="x" onclick="closeM()">×</button></div>
@@ -5360,7 +5356,7 @@ function fieldStepsPreviewHtml(fieldSteps,size){
  let steps=fieldSteps.map(normalizeFieldStep);
  return `<div class="fieldStepPreviewWrap" style="display:flex;gap:${size>=200?16:8}px;flex-wrap:wrap;margin:10px 0">${steps.map(st=>{let shape=curFieldShape(st);let view={shape:shape,items:curFieldItems(st)};return `<div class="fieldStepBlock" style="width:${size}px"><div style="font-size:${size>=200?"var(--fs-2)":"var(--fs-1)"};color:var(--muted);margin-bottom:3px;text-align:center">${esc(st.label||"")}</div>${fieldDiagramSvg(view,{interactive:false})}${fieldLegendHtml(view.items,true)}</div>`}).join("")}</div>`;
 }
-function drillCardHtml(d){return `<div class="card"><span class="tag">${esc(d.cat||"General")}</span><h3>${esc(d.name)}</h3><div class="muted">${esc(d.players||"")}${d.duration?" · "+esc(d.duration):""}${d.equipment?" · "+esc(d.equipment):""}</div>${d.diagram?`<img src="${d.diagram}" style="max-width:100%;border-radius:10px;margin:10px 0">`:""}${fieldStepsPreviewHtml(d.fieldSteps)}<p>${esc(d.points||"")}</p>${d.progressions?`<div class="muted"><b>Progression:</b> ${esc(d.progressions)}</div>`:""}${d.regressions?`<div class="muted"><b>Regression:</b> ${esc(d.regressions)}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary" onclick="viewDrill('${d.id}')">View</button><button class="btn secondary" onclick="editDrill('${d.id}')">Edit</button>${kebabMenu("d"+d.id,[{label:"Duplicate",icon:"copy",fn:`duplicateDrill('${d.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delDrill('${d.id}')`}])}</div></div>`}
+function drillCardHtml(d){return `<div class="card" style="position:relative;cursor:pointer" onclick="viewDrill('${d.id}')"><span class="tag">${esc(d.cat||"General")}</span><h3>${esc(d.name)}</h3><div class="muted">${esc(d.players||"")}${d.duration?" · "+esc(d.duration):""}${d.equipment?" · "+esc(d.equipment):""}</div>${d.diagram?`<img src="${d.diagram}" style="max-width:100%;border-radius:10px;margin:10px 0">`:""}${fieldStepsPreviewHtml(d.fieldSteps)}<p>${esc(d.points||"")}</p>${d.progressions?`<div class="muted"><b>Progression:</b> ${esc(d.progressions)}</div>`:""}${d.regressions?`<div class="muted"><b>Regression:</b> ${esc(d.regressions)}</div>`:""}<div style="position:absolute;top:10px;right:10px" onclick="event.stopPropagation()">${kebabMenu("d"+d.id,[{label:"View",icon:"players",fn:`viewDrill('${d.id}')`},{label:"Edit",icon:"edit",fn:`editDrill('${d.id}')`},{label:"Duplicate",icon:"copy",fn:`duplicateDrill('${d.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delDrill('${d.id}')`}])}</div></div>`}
 function drillLibraryReport(){
  let list=db.drills.slice().sort((a,b)=>String(a.cat||"").localeCompare(String(b.cat||""))||String(a.name||"").localeCompare(String(b.name||"")));
  reportShell("Drill Library",`${list.length} drills`,
@@ -5400,7 +5396,7 @@ function matches(){
  if(matchQuery){let q=matchQuery.toLowerCase();list=list.filter(m=>[m.team,m.opp,m.venue,m.notes,m.actions,m.result,m.teamNotes,m.battingAssessmentNotes,m.bowlingAssessmentNotes].some(v=>String(v||"").toLowerCase().includes(q)))}
  if(matchFormatFilter)list=list.filter(m=>m.format===matchFormatFilter);
  if(matchResultFilter)list=list.filter(m=>matchResultOutcome(m)===matchResultFilter);
- document.getElementById("matches").innerHTML=head("Match Centre","Match details, foundation, team & individual reviews, and automatic reports.")+`<div class="toolbar noPrint"><button class="btn primary" onclick="newMatch()">+ New Match</button><button class="btn secondary iconBtn" title="Print Report" onclick="matchReport()">${icon("print",17)}</button><button class="btn secondary" onclick="exportExcel()">Export Excel</button></div>
+ document.getElementById("matches").innerHTML=head("Match Centre","Match details, foundation, team & individual reviews, and automatic reports.")+`<div class="toolbar noPrint"><button class="btn primary" onclick="newMatch()">+ New Match</button>${campMenu("mcAct","Actions ▾",[{label:"Print report",icon:"print",fn:"matchReport()"},{label:"Export Excel",icon:"share",fn:"exportExcel()"}])}</div>
  ${filterBarHtml("matches",`<input id="matchSearch" value="${esc(matchQuery)}" oninput="matchQuery=this.value;matches()" onfocus="matchSearchFocused=true" onblur="matchSearchFocused=false" placeholder="Search team, opposition, venue...">`,`<label>Format<select onchange="matchFormatFilter=this.value;matches()"><option value="">All formats</option>${MATCH_FORMATS.map(f=>`<option value="${f}" ${matchFormatFilter===f?"selected":""}>${f}</option>`).join("")}</select></label><label>Result<select onchange="matchResultFilter=this.value;matches()"><option value="">All results</option>${["Win","Loss","Draw","NR","Other"].map(f=>`<option value="${f}" ${matchResultFilter===f?"selected":""}>${f}</option>`).join("")}</select></label>`,(matchFormatFilter?1:0)+(matchResultFilter?1:0))}
  <div id="scorerImportBox"></div>
  <h2 class="section">Match History (${list.length})</h2><div class="grid g2">${list.length?list.map(matchCardHtml).join(""):(db.matches.length?empty("No matches match your filters."):emptyRich("No matches yet","Record a match to get scorecards, reviews and player match history.","+ New Match","newMatch()"))}</div>`;
@@ -5760,17 +5756,15 @@ let tournamentSquadOpen={};
 function toggleTournamentSquad(id){tournamentSquadOpen[id]=!tournamentSquadOpen[id];organisation()}
 function organisation(){
  document.getElementById("organisation").innerHTML=head("Teams & Seasons","Manage the teams, tournaments and seasons your coaching work is organised around.")
- +`<h2 class="section" style="margin-top:0">Teams</h2>
- <div class="toolbar noPrint"><button class="btn primary" onclick="newOrgEntity('team')">+ Add Team</button></div>
+ +`<div class="noPrint" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:0 0 10px"><h2 class="section" style="margin:0">Teams</h2><button class="btn primary" style="padding:6px 14px" onclick="newOrgEntity('team')">+ Add Team</button></div>
  <div class="grid g3" style="margin-top:12px">${db.teams.length?db.teams.map(t=>{
   let playerCount=db.players.filter(p=>p.team===t.name).length;
   let sessionCount=activeSessions().filter(s=>s.squad===t.name).length;
   let matchCount=db.matches.filter(m=>m.team===t.name).length;
-  return `<div class="card"><b style="cursor:pointer;border-bottom:1px dotted var(--muted)" data-t="${esc(t.name)}" onclick="teamOverview(this.dataset.t)">${esc(t.name)} ›</b>${t.category?`<div class="muted">${esc(t.category)}</div>`:""}<div class="muted" style="margin-top:6px">${playerCount} player${playerCount!==1?"s":""} · ${sessionCount} session${sessionCount!==1?"s":""} · ${matchCount} match${matchCount!==1?"es":""}</div>${t.notes?`<p style="margin-top:8px">${esc(t.notes)}</p>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary iconBtn" title="Edit" onclick="editOrgEntity('team','${t.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delOrgEntity('team','${t.id}')">${icon("trash",17)}</button></div></div>`;
+  return `<div class="card" style="position:relative"><b style="cursor:pointer;border-bottom:1px dotted var(--muted)" data-t="${esc(t.name)}" onclick="teamOverview(this.dataset.t)">${esc(t.name)} ›</b>${t.category?`<div class="muted">${esc(t.category)}</div>`:""}<div class="muted" style="margin-top:6px">${playerCount} player${playerCount!==1?"s":""} · ${sessionCount} session${sessionCount!==1?"s":""} · ${matchCount} match${matchCount!==1?"es":""}</div>${t.notes?`<p style="margin-top:8px">${esc(t.notes)}</p>`:""}<div style="position:absolute;top:10px;right:10px">${kebabMenu("t"+t.id,[{label:"Open overview",icon:"players",fn:`teamOverview(${JSON.stringify(t.name).replace(/"/g,"&quot;")})`},{label:"Edit",icon:"edit",fn:`editOrgEntity('team','${t.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delOrgEntity('team','${t.id}')`}])}</div></div>`;
  }).join(""):empty("No teams yet. Add one here, or assign a team to a player and it'll appear automatically.")}</div>
 
- <h2 class="section">Tournaments</h2>
- <div class="toolbar noPrint"><button class="btn primary" onclick="newOrgEntity('tournament')">+ Add Tournament</button></div>
+ <div class="noPrint" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:26px 0 10px"><h2 class="section" style="margin:0">Tournaments</h2><button class="btn primary" style="padding:6px 14px" onclick="newOrgEntity('tournament')">+ Add Tournament</button></div>
  <div class="list" style="margin-top:12px">${db.tournaments.length?db.tournaments.map(t=>{
   let matchCount=db.matches.filter(m=>m.tournamentId===t.id).length;
   let squad=(t.squadPlayerIds||[]).map(id=>db.players.find(p=>p.id===id)).filter(Boolean);
@@ -5794,8 +5788,7 @@ function organisation(){
   </div>`;
  }).join(""):empty("No tournaments yet.")}</div>
 
- <h2 class="section">Seasons</h2>
- <div class="toolbar noPrint"><button class="btn primary" onclick="newOrgEntity('season')">+ Add Season</button></div>
+ <div class="noPrint" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:26px 0 10px"><h2 class="section" style="margin:0">Seasons</h2><button class="btn primary" style="padding:6px 14px" onclick="newOrgEntity('season')">+ Add Season</button></div>
  <div class="list" style="margin-top:12px">${db.seasons.length?db.seasons.map(s=>{
   let inRange=x=>s.startDate&&s.endDate&&x.date>=s.startDate&&x.date<=s.endDate;
   let sessionCount=activeSessions().filter(x=>inRange(x)&&x.sessionType!=="player"&&(!s.team||x.squad===s.team)).length;
@@ -6198,6 +6191,7 @@ const REPORT_GROUPS=[
 ];
 let reportGroupsOpen={};
 function toggleReportGroup(key){reportGroupsOpen[key]=!reportGroupsOpen[key];reports()}
+let reportOvOpen=false;
 function reports(){
  if(!isPremium()){
   let daysLeft=trialDaysLeft();
@@ -6243,7 +6237,14 @@ function reports(){
  let chartData={hours:{values:hrsTrend6,color:cssVar("--g")},ratings:{values:ratingTrend6,color:cssVar("--blue")},development:{values:devTrend6,color:cssVar("--gold")},attendance:{values:attendTrend6,color:cssVar("--blue2")}}[dashChartTab];
  let insights=buildInsights(months6,hrsTrend6,ratingTrend6,assessTrend6,sessTrend6);
  document.getElementById("reports").innerHTML=head("Professional Reports","Generate polished reports from the information you already enter in ProCoach OS.")
- +`<h2 class="section" style="margin-top:0">Today · ${esc(fmtDate(today()))}</h2>
+ +` <h2 class="section" style="margin-top:0">Generate Report</h2>
+ <div style="display:grid;gap:10px">${REPORT_GROUPS.map(g=>{
+  let isOpen=!!reportGroupsOpen[g.key];
+  return `<div><div class="reportGroupHeader${isOpen?" open":""}" onclick="toggleReportGroup('${g.key}')"><span>${esc(g.label)}<span class="count">${g.items.length}</span></span><span class="chev">${icon("chevronRight",16)}</span></div>
+  <div class="reportGroupBody${isOpen?" open":""}"><div class="grid g2">${g.items.map(it=>`<div class="card reportCard" onclick="${it.fn}()"><b>${esc(it.title)}</b><p>${esc(it.desc)}</p></div>`).join("")}</div></div></div>`;
+ }).join("")}</div>
+  <h2 class="section">Data tools</h2><div class="card toolbar"><button class="btn secondary" onclick="exportExcel()">Export Excel</button><button class="btn secondary" style="display:inline-flex;align-items:center;gap:5px" onclick="go('account')">Backup &amp; Restore ${icon("chevronRight",13)}</button></div>
+ <details class="reportOv" style="margin-top:22px" ${reportOvOpen?"open":""} ontoggle="reportOvOpen=this.open"><summary>Overview &amp; analytics <span class="muted" style="font-weight:400;font-size:var(--fs-3)">— today, stats, trends, insights</span></summary><div style="margin-top:14px"><h2 class="section" style="margin-top:0">Today · ${esc(fmtDate(today()))}</h2>
  <div class="card">${(todaySessions.length+todayMatches.length+todayEvents.length)?`
  ${todaySessions.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${s.duration?esc(s.duration)+" min":""}</div></div><span class="tag">Session</span></div>`).join("")}
  ${todayMatches.map(m=>`<div class="item"><div><b>vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.result||"Match day")}</div></div><span class="tag">Match</span></div>`).join("")}
@@ -6287,14 +6288,7 @@ function reports(){
    <div class="insightsGrid" style="max-height:none">${insights.map(i=>`<div class="insightCard"${i.action?` style="cursor:pointer" onclick="${i.action}"`:""}><div class="insightIc">${i.icon}</div><p>${esc(i.text)}</p></div>`).join("")}</div>
    <div class="card" style="margin-top:10px"><div class="scoreCard" style="gap:14px"><div class="scoreRingWrap">${scoreRingSvg(score.composite,64)}<div class="num"><b style="font-size:var(--fs-6)">${score.composite}</b><span>/100</span></div></div><div><div class="homeSectionTitle" style="margin-bottom:2px">Coaching Activity Score</div><div class="muted" style="font-size:var(--fs-3)">${scoreCaption(score.composite)}</div></div></div></div>
   </div>
- </div>
- <h2 class="section">Generate Report</h2>
- <div style="display:grid;gap:10px">${REPORT_GROUPS.map(g=>{
-  let isOpen=!!reportGroupsOpen[g.key];
-  return `<div><div class="reportGroupHeader${isOpen?" open":""}" onclick="toggleReportGroup('${g.key}')"><span>${esc(g.label)}<span class="count">${g.items.length}</span></span><span class="chev">${icon("chevronRight",16)}</span></div>
-  <div class="reportGroupBody${isOpen?" open":""}"><div class="grid g2">${g.items.map(it=>`<div class="card reportCard" onclick="${it.fn}()"><b>${esc(it.title)}</b><p>${esc(it.desc)}</p></div>`).join("")}</div></div></div>`;
- }).join("")}</div>
- <h2 class="section">Data tools</h2><div class="card toolbar"><button class="btn secondary" onclick="exportExcel()">Export Excel</button><button class="btn secondary" style="display:inline-flex;align-items:center;gap:5px" onclick="go('account')">Backup &amp; Restore ${icon("chevronRight",13)}</button></div>`}
+ </div></div></details>`}
 function printReport(){
   document.body.classList.add("printingReport");
   setTimeout(()=>window.print(),100);
@@ -7174,11 +7168,7 @@ function analysisTools(){
   ["video.html","Video Review Studio","Review a player's technique on video — slow motion, frame-by-frame, draw lines and angles, and save key moments. Videos stay on your phone."]
  ];
  document.getElementById("analysisTools").innerHTML=head("Analysis Tools","Deep, ball-by-ball analysis tools — open the one you need for this session.")+
-  `<div class="grid">${tools.map(([url,name,desc])=>`<div class="card">
-    <h3 style="margin-top:0">${esc(name)}</h3>
-    <p class="muted">${esc(desc)}</p>
-    <button class="btn primary full" onclick="openAnalysisTool('${url}')">Open ${esc(name)} &rarr;</button>
-   </div>`).join("")}</div>
+  `<div class="list">${tools.map(([url,name,desc])=>`<div class="item toolRow" onclick="openAnalysisTool('${url}')" style="cursor:pointer;align-items:center"><div style="min-width:0;flex:1"><b>${esc(name)}</b><div class="muted" style="font-size:var(--fs-3);margin-top:2px">${esc(desc.split(" — ")[0].replace(/\.$/,""))}</div></div><span class="muted" style="font-size:20px">&rarr;</span></div>`).join("")}</div>
    <p class="muted" style="margin-top:14px">Opens in a new tab. Each tool saves its own data locally on this device.</p>`;
 }
 function calendar(){
@@ -7200,11 +7190,11 @@ function calendar(){
  let upcoming=db.events.slice().filter(e=>e.date>=today()).sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
  if(calEventQuery){let q=calEventQuery.toLowerCase();upcoming=upcoming.filter(e=>[e.title,e.notes].some(v=>String(v||"").toLowerCase().includes(q)))}
  document.getElementById("calendar").innerHTML=head("Calendar","Training sessions, matches, reminders and events in one place.")
- +`<div class="toolbar noPrint"><button class="btn secondary" style="display:inline-flex;align-items:center;gap:5px" onclick="calPrevMonth()">${icon("chevronLeft",13)} Prev</button><button class="btn secondary" onclick="calToday()">Today</button><button class="btn secondary" style="display:inline-flex;align-items:center;gap:5px" onclick="calNextMonth()">Next ${icon("chevronRight",13)}</button><button class="btn primary" onclick="newCalEvent()">+ Add Reminder / Event</button><button class="btn secondary iconBtn" title="Print Month" onclick="calMonthReport()">${icon("print",17)}</button></div>
- <h2 class="section">${monthLabel}</h2>
+ +`<div class="toolbar noPrint"><button class="btn primary" onclick="newCalEvent()">+ Add Reminder / Event</button><button class="btn secondary iconBtn" title="Print Month" onclick="calMonthReport()">${icon("print",17)}</button></div>
+ <div class="noPrint" style="display:flex;align-items:center;justify-content:space-between;gap:8px;margin:22px 0 10px"><h2 class="section" style="margin:0">${monthLabel}</h2><div style="display:flex;gap:6px"><button class="btn secondary iconBtn" title="Previous month" onclick="calPrevMonth()">${icon("chevronLeft",15)}</button><button class="btn secondary" style="padding:6px 12px" onclick="calToday()">Today</button><button class="btn secondary iconBtn" title="Next month" onclick="calNextMonth()">${icon("chevronRight",15)}</button></div></div>
  <div class="card"><div class="calGrid calHead">${["Sun","Mon","Tue","Wed","Thu","Fri","Sat"].map(d=>`<div class="calCell calHeadCell">${d}</div>`).join("")}</div><div class="calGrid">${cells}</div><div class="calLegend"><span class="calDot calDotS"></span> Session<span class="calDot calDotM"></span> Match<span class="calDot calDotE"></span> Reminder / Event<span class="calDot calDotC"></span> Camp<b style="color:#dc2626">!</b> Clash</div></div>
  <h2 class="section">Upcoming Reminders &amp; Events</h2>
- <div class="card" style="margin-bottom:15px"><label>Search<input id="calSearch" value="${esc(calEventQuery)}" oninput="calEventQuery=this.value;calendar()" onfocus="calSearchFocused=true" onblur="calSearchFocused=false" placeholder="Search reminders and events..."></label></div>
+ ${(db.events.length>3||calEventQuery)?`<div class="card" style="margin-bottom:15px"><label>Search<input id="calSearch" value="${esc(calEventQuery)}" oninput="calEventQuery=this.value;calendar()" onfocus="calSearchFocused=true" onblur="calSearchFocused=false" placeholder="Search reminders and events..."></label></div>`:""}
  <div class="card">${upcoming.length?upcoming.map(e=>`<div class="item"><div><b>${esc(e.title)}</b><div class="muted">${esc(fmtDate(e.date))}${e.time?" · "+esc(e.time):""} · ${esc(e.type||"Event")}</div><small>${esc(e.notes||"")}</small></div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editCalEvent('${e.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delCalEvent('${e.id}')">${icon("trash",17)}</button></div></div>`).join(""):emptyRich("Nothing coming up","Add reminders for fixtures, fitness tests or parent meetings.","+ Add Reminder / Event","newCalEvent()")}</div>`;
  let sEl=document.getElementById("calSearch");if(sEl&&calSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
