@@ -2543,7 +2543,7 @@ function saveSession(e){
  s.netPlan=JSON.parse(JSON.stringify(sessionNetPlanDraft));
  if(editingSessionId){
   let idx=db.sessions.findIndex(x=>x.id===editingSessionId);
-  if(idx>-1){let old=db.sessions[idx];s.id=editingSessionId;["campId","campRowId","campSnap","campNames"].forEach(k=>{if(old[k]!==undefined)s[k]=old[k]});db.sessions[idx]=s}
+  if(idx>-1){let old=db.sessions[idx];s.id=editingSessionId;["campId","campRowId","campSnap","campNames","campLast"].forEach(k=>{if(old[k]!==undefined)s[k]=old[k]});db.sessions[idx]=s}
  } else {
   let repeatEl=document.getElementById("sessionRepeatCheck");
   let repeatChecked=repeatEl&&repeatEl.checked;
@@ -6362,8 +6362,7 @@ function inRange(dateStr,from,to){if(!from&&!to)return true;if(!dateStr)return f
 function rangeLabel(from,to){if(!from&&!to)return "All-time";if(from&&to)return `${fmtDate(from)} → ${fmtDate(to)}`;if(from)return `From ${fmtDate(from)}`;return `Up to ${fmtDate(to)}`}
 function fmtTime(t){if(!t||typeof t!=="string"||!/^\d{2}:\d{2}/.test(t))return t||"";let[h,m]=t.slice(0,5).split(":").map(Number);let period=h>=12?"PM":"AM";let h12=h%12||12;return `${h12}:${String(m).padStart(2,"0")} ${period}`}
 function sessionFocusText(s){
- let f=String(s.focus||"").split(/[,;|]/).map(x=>x.trim()).filter(Boolean)[0]||"";
- if(!f&&s.campId&&s.main){f=String(s.main).split("\n").map(x=>x.trim()).filter(Boolean).join(" / ")}
+ let f=String(s.focus||"").split(" + ").map(x=>x.trim()).filter(Boolean)[0]||"";
  return f.length>60?f.slice(0,57)+"…":f;
 }
 function sessionLabel(s){if(s.title)return s.title;let parts=[];if(s.time)parts.push(fmtTime(s.time));parts.push(s.squad||"Session");return parts.join(" · ")}
@@ -8107,7 +8106,7 @@ function campDetailHtml(c){
  <div class="toolbar noPrint" style="flex-wrap:wrap"><button class="btn secondary" onclick="editCamp('${c.id}')">Edit details</button><button class="btn secondary" onclick="campBatchesSheet('${c.id}')">Groups</button><button class="btn primary" onclick="campSheetReport('${c.id}')">Print sheet</button></div>
  <div class="grid g4" style="margin-top:12px">${meta(campVenues(c).length>1?"Venues":"Venue",esc(campVenues(c).join(" · ")))}${meta("Team / stage",esc([c.team,stName].filter(Boolean).join(" · ")||"Everyone"))}${meta("Season phase",(()=>{let po=campPhaseOf(c);return po?esc(po.season.name+" · "+po.phase.name):""})())}${meta("Players",pool.length+(unassigned.length&&(c.batches||[]).length>1?` <span class="muted" style="font-weight:400">(${unassigned.length} not in a group)</span>`:""))}${meta("Coaches",esc(c.coaches||""))}</div>
  ${(c.batches||[]).length>1?`<div style="margin-top:10px">${c.batches.map(b=>`<span class="tag">${esc(b.name)} · ${b.names.length}</span>`).join(" ")}</div>`:""}
- <div class="card" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><b>Sessions</b><div class="muted" style="font-size:var(--fs-3)">${(()=>{let st=campSessionStats(c);return st.have?st.have+" of "+st.rows+" schedule rows are sessions in Session Plans":"Turn each schedule row into a session, with attendees and nets"})()}</div></div><button class="btn primary" onclick="campSyncSessions('${c.id}')">${campSessionStats(c).have?"Update sessions":"Create sessions"}</button></div>
+ <div class="card" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><b>Sessions</b><div class="muted" style="font-size:var(--fs-3)">${(()=>{let st=campSessionStats(c);return st.have?st.have+" of "+st.rows+" schedule rows are sessions in Session Plans":"Turn each schedule row into a session with its date, time, venue and focus"})()}</div></div><button class="btn primary" onclick="campSyncSessions('${c.id}')">${campSessionStats(c).have?"Update sessions":"Create sessions"}</button></div>
  <h2 class="section">Schedule <span class="muted" style="font-weight:400;font-size:var(--fs-3)">— tap a time to edit a row, a cell to change what's planned, a day to set its theme</span></h2>
  <div class="list">${days.map((d,i)=>campDayCardHtml(c,d,i,groups)).join("")||empty("Set the camp dates in Edit details.")}</div>
  <div class="toolbar noPrint" style="margin-top:10px"><button class="btn secondary" onclick="go('players');openBulkAssessment()">Assess players</button></div>
@@ -8471,38 +8470,43 @@ function campNetsFor(names,text,dur){
 }
 function campBuildSession(c,r){
  let groups=campGroups(c),multi=groups.length>1,whole=!!(r.whole&&multi),days=campDays(c),di=days.indexOf(r.date);
- let parts=whole?[{g:{name:"Whole squad",names:campAllNames(c)},cell:r.cells&&r.cells["*"]}]:groups.map(g=>({g:{name:g.name,names:multi?(g.names||[]):campAllNames(c)},cell:r.cells&&r.cells[g.id]})).filter(x=>x.cell);
- parts=parts.filter(x=>x.cell&&x.cell.text);if(!parts.length)return null;
- let names=[];parts.forEach(x=>x.g.names.forEach(n=>{if(!names.includes(n))names.push(n)}));
- let dur=campRowDuration(r),ph=campPhaseOf(c);
- let main=parts.map(x=>(multi&&!whole?x.g.name+": ":"")+x.cell.text).join("\n");
- let notes=parts.filter(x=>x.cell.note).map(x=>(multi&&!whole?x.g.name+": ":"")+x.cell.note);
- let objectives=["Camp: "+c.name+(di>-1?" · Day "+(di+1):"")].concat(ph&&ph.phase.focus?["Phase focus ("+ph.phase.name+"): "+ph.phase.focus]:[],notes).join("\n");
- let drills=[...new Set(parts.flatMap(x=>x.cell.drillIds||[]).filter(id=>db.drills.find(d=>d.id===id)))];
- let nets=[];parts.forEach(x=>{if(x.cell.type==="bat")campNetsFor(x.g.names,multi&&!whole?x.g.name+": "+x.cell.text:x.cell.text,dur).forEach(n=>nets.push(n))});
- return {date:r.date,time:r.start||"",title:c.name+(di>-1?" · D"+(di+1):"")+(r.start?" · "+campFmtT(r.start):""),sessionType:c.team?"team":"custom",squad:c.team||c.name,duration:String(dur),focus:"",venue:campRowVenue(c,r),attendees:names,objectiveTags:[],objectives,warmup:"",main,game:"",cueTags:[],successTags:[],mainDrillIds:drills,gameDrillIds:[],netPlan:nets.length?[{focus:"",nets}]:[],campId:c.id,campRowId:r.id,campNames:names.slice()};
+ let cells=whole?[r.cells&&r.cells["*"]]:groups.map(g=>r.cells&&r.cells[g.id]);
+ let texts=[...new Set(cells.filter(x=>x&&x.text).map(x=>String(x.text).replace(/\s*\+\s*/g," ").trim()).filter(Boolean))];
+ if(!texts.length)return null;
+ let dur=campRowDuration(r);
+ return {date:r.date,time:r.start||"",title:c.name+(di>-1?" · D"+(di+1):"")+(r.start?" · "+campFmtT(r.start):""),sessionType:c.team?"team":"custom",squad:c.team||c.name,duration:String(dur),focus:texts.join(" + "),venue:campRowVenue(c,r)};
 }
-function campSnap(s){return JSON.stringify([s.date,s.time,s.title,s.duration,s.main,s.objectives,s.mainDrillIds,s.netPlan,s.venue,s.squad])}
+const CAMP_SYNC_FIELDS=["date","time","title","sessionType","squad","duration","venue","focus"];
+const CAMP_SYNC_LABELS={date:"date",time:"time",title:"title",sessionType:"type",squad:"team",duration:"duration",venue:"venue",focus:"focus"};
+function campSnap(s){return JSON.stringify(CAMP_SYNC_FIELDS.map(k=>s[k]))}
 function campSessionStats(c){let rows=(c.rows||[]).filter(r=>Object.keys(r.cells||{}).length),have=rows.filter(r=>r.sessionId&&db.sessions.find(s=>s.id===r.sessionId&&!s.deletedAt)).length;return{rows:rows.length,have}}
 function campSyncSessions(id){
  if(!requireWriteAccess())return;let c=campById(id);if(!c)return;
  let rows=(c.rows||[]).slice().sort((a,b)=>(a.date+(a.start||"")).localeCompare(b.date+(b.start||"")));
  let st=campSessionStats(c);
  if(!rows.length){alert("Add something to the schedule first.");return}
- if(!st.have&&!confirm("Create a session for each schedule row? That is up to "+st.rows+" sessions in your Session Plans and Calendar, with the group's players as attendees and nets planned for batting blocks. You can edit them like any session."))return;
- let created=0,updated=0,skipped=0,newDates=new Set();
+ // plan what would change. Only the camp-managed fields are touched, and only where you haven't changed them in the session yourself.
+ let plan=[],creates=0;
  rows.forEach(r=>{
-  let s=campBuildSession(c,r),ex=r.sessionId&&db.sessions.find(x=>x.id===r.sessionId&&!x.deletedAt);
-  if(!s){return}
-  if(!ex){s.id=uid("sess");s.campSnap=campSnap(s);db.sessions.push(s);r.sessionId=s.id;created++;newDates.add(r.date);return}
-  if(ex.campSnap!==campSnap(ex)){skipped++;return}
-  if(campSnap(s)===ex.campSnap)return;
-  ["date","time","title","duration","main","objectives","mainDrillIds","netPlan","venue","squad","sessionType"].forEach(k=>ex[k]=s[k]);
-  ex.campNames=s.campNames;ex.campSnap=campSnap(ex);updated++;
+  let s=campBuildSession(c,r);if(!s)return;
+  let ex=r.sessionId&&db.sessions.find(x=>x.id===r.sessionId&&!x.deletedAt);
+  if(!ex){creates++;plan.push({r,s,ex:null});return}
+  let last=ex.campLast||null,ch=[];
+  CAMP_SYNC_FIELDS.forEach(k=>{if(String(ex[k]||"")===String(s[k]||""))return;if(last&&String(ex[k]||"")!==String(last[k]||""))return;ch.push(k)});
+  if(ch.length)plan.push({r,s,ex,ch});
+ });
+ if(!plan.length){alert("Sessions are already up to date.");return}
+ let upd=plan.filter(x=>x.ex),cnt={};upd.forEach(x=>x.ch.forEach(k=>cnt[k]=(cnt[k]||0)+1));
+ let msg=(creates?"Create "+creates+" session"+(creates>1?"s":"")+" (date, time, type, team, duration, venue and focus only — fill in attendees, objectives and nets yourself).":"")+(upd.length?(creates?"\n\n":"")+"Update "+upd.length+" session"+(upd.length>1?"s":"")+": "+Object.keys(cnt).map(k=>cnt[k]+" "+CAMP_SYNC_LABELS[k]).join(", ")+". Anything you changed in a session yourself is kept.":"")+"\n\nContinue?";
+ if(!confirm(msg))return;
+ let created=0,updated=0;
+ plan.forEach(x=>{
+  if(!x.ex){let n=Object.assign({},x.s,{id:uid("sess"),attendees:[],objectiveTags:[],objectives:"",warmup:"",main:"",game:"",cueTags:[],successTags:[],mainDrillIds:[],gameDrillIds:[],netPlan:[],campId:c.id,campRowId:x.r.id,campLast:Object.assign({},x.s)});db.sessions.push(n);x.r.sessionId=n.id;created++;return}
+  x.ch.forEach(k=>x.ex[k]=x.s[k]);x.ex.campLast=Object.assign({},x.ex.campLast||{},x.s);updated++;
  });
  save();
- modal(`<div class="sheetHead"><h2>Sessions updated</h2><button class="x" onclick="closeM()">×</button></div>
- <div class="card"><p><b>${created}</b> created · <b>${updated}</b> updated${skipped?` · <b>${skipped}</b> skipped because you edited them`:""}</p><p class="muted">Each schedule row is now a session in Session Plans and the Calendar. Take attendance inside each session.</p></div>
+ modal(`<div class="sheetHead"><h2>Sessions ${created&&!updated?"created":"updated"}</h2><button class="x" onclick="closeM()">×</button></div>
+ <div class="card"><p><b>${created}</b> created · <b>${updated}</b> updated</p><p class="muted">The camp fills in date, time, type, team, duration, venue and focus. Add attendees, objectives and nets in each session.</p></div>
  <div class="toolbar" style="margin-top:12px"><button class="btn primary" onclick="closeM();go('sessions')">View sessions</button><button class="btn secondary" onclick="closeM()">Close</button></div>`);
 }
 function campOpenSession(){
