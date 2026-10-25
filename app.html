@@ -2543,7 +2543,7 @@ function saveSession(e){
  s.netPlan=JSON.parse(JSON.stringify(sessionNetPlanDraft));
  if(editingSessionId){
   let idx=db.sessions.findIndex(x=>x.id===editingSessionId);
-  if(idx>-1){s.id=editingSessionId;db.sessions[idx]=s}
+  if(idx>-1){let old=db.sessions[idx];s.id=editingSessionId;["campId","campRowId","campSnap","campNames"].forEach(k=>{if(old[k]!==undefined)s[k]=old[k]});db.sessions[idx]=s}
  } else {
   let repeatEl=document.getElementById("sessionRepeatCheck");
   let repeatChecked=repeatEl&&repeatEl.checked;
@@ -2560,6 +2560,7 @@ function saveSession(e){
    db.sessions.push(copy);
   }
  }
+ if(s.campId){try{let cc=campById(s.campId);if(cc)campRecalcAttendance(cc,s.date)}catch(e){}}
  editingSessionId=null;
  sessionDrillLinks={main:[],game:[]};sessionAttachment=null;sessionNetPlanDraft=[];
  closeM();save();
@@ -5776,7 +5777,7 @@ function organisation(){
    let actual=activeSessions().filter(x=>ph.startDate&&ph.endDate&&x.date>=ph.startDate&&x.date<=ph.endDate&&x.sessionType!=="player"&&(!s.team||x.squad===s.team)).length;
    let target=Number(ph.sessionTarget)||0;
    let pct=target>0?Math.min(100,Math.round(actual/target*100)):null;
-   return `<div class="item" style="margin-top:8px;align-items:flex-start"><div style="flex:1"><b>${esc(ph.name)}</b><div class="muted" style="font-size:var(--fs-2)">${esc(ph.startDate||"?")} → ${esc(ph.endDate||"?")}</div>${ph.focus?`<div style="margin-top:4px;font-size:var(--fs-3)">${esc(ph.focus)}</div>`:""}<div style="margin-top:6px;font-size:var(--fs-3)">${target>0?`${actual}/${target} sessions`:`${actual} session${actual!==1?"s":""} logged`}</div>${target>0?`<div class="goalBar" style="margin-top:5px"><div class="goalBarFill" style="width:${pct}%;background:${pct>=100?"var(--g)":"var(--gold)"}"></div></div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editPhase('${s.id}','${ph.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delPhase('${s.id}','${ph.id}')">${icon("trash",17)}</button></div></div>`;
+   return `<div class="item" style="margin-top:8px;align-items:flex-start"><div style="flex:1"><b>${esc(ph.name)}</b><div class="muted" style="font-size:var(--fs-2)">${esc(ph.startDate||"?")} → ${esc(ph.endDate||"?")}</div>${ph.focus?`<div style="margin-top:4px;font-size:var(--fs-3)">${esc(ph.focus)}</div>`:""}<div style="margin-top:6px;font-size:var(--fs-3)">${target>0?`${actual}/${target} sessions`:`${actual} session${actual!==1?"s":""} logged`}</div>${campPhaseLinesHtml(ph.id)}${target>0?`<div class="goalBar" style="margin-top:5px"><div class="goalBarFill" style="width:${pct}%;background:${pct>=100?"var(--g)":"var(--gold)"}"></div></div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editPhase('${s.id}','${ph.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delPhase('${s.id}','${ph.id}')">${icon("trash",17)}</button></div></div>`;
   }).join(""):empty("No phases planned yet — break this season into stages like pre-season, in-season and peak period.")}
   </div>
   </div>`;
@@ -6126,7 +6127,7 @@ function buildSeasonAnalyticsReport(){
  ${(s.phases&&s.phases.length)?`<h2>Season Plan — Phase Breakdown</h2>${s.phases.slice().sort((a,b)=>String(a.startDate||"").localeCompare(String(b.startDate||""))).map(ph=>{
   let actual=activeSessions().filter(x=>ph.startDate&&ph.endDate&&x.date>=ph.startDate&&x.date<=ph.endDate&&x.sessionType!=="player"&&(!s.team||x.squad===s.team)).length;
   let target=Number(ph.sessionTarget)||0;
-  return `<div class="card"><b>${esc(ph.name)}</b><div class="muted">${esc(fmtDate(ph.startDate)||"?")} → ${esc(fmtDate(ph.endDate)||"?")}</div>${ph.focus?`<p style="margin-top:6px">${esc(ph.focus)}</p>`:""}<p style="margin-top:6px"><b>${target>0?`${actual}/${target} sessions${actual>=target?" ✓":""}`:`${actual} session${actual!==1?"s":""} logged`}</b></p></div>`;
+  return `<div class="card"><b>${esc(ph.name)}</b><div class="muted">${esc(fmtDate(ph.startDate)||"?")} → ${esc(fmtDate(ph.endDate)||"?")}</div>${ph.focus?`<p style="margin-top:6px">${esc(ph.focus)}</p>`:""}<p style="margin-top:6px"><b>${target>0?`${actual}/${target} sessions${actual>=target?" ✓":""}`:`${actual} session${actual!==1?"s":""} logged`}</b></p>${campPhaseLinesHtml(ph.id)}</div>`;
  }).join("")}`:""}
  ${s.notes?`<h2>Notes</h2><div class="card"><p>${esc(s.notes)}</p></div>`:""}
  <h2>Sessions</h2>${seasonSessions.length?seasonSessions.map(x=>`<div class="card"><b>${esc(fmtDate(x.date))} · ${esc(sessionLabel(x))}</b></div>`).join(""):empty("No sessions in this season.")}
@@ -8046,7 +8047,9 @@ function campMigrate(c){
   delete c.cells;delete c.slots;
  }
 }
-function campPool(c){return activePlayers().filter(p=>!isReleased(p)&&(!c.team||p.team===c.team)&&(!c.stageId||stageOf(p).id===c.stageId)).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")))}
+function campStageIds(c){let L=stagesList().filter(s=>!s.released).map(s=>s.id);let ids=Array.isArray(c.stageIds)?c.stageIds:(c.stageId?[c.stageId]:[]);return ids.filter(id=>L.includes(id))}
+function campStageNames(c){let L=stagesList();return campStageIds(c).map(id=>(L.find(s=>s.id===id)||{}).name).filter(Boolean).join(", ")}
+function campPool(c){let ids=campStageIds(c);return activePlayers().filter(p=>!isReleased(p)&&(!c.team||p.team===c.team)&&(!ids.length||ids.includes(stageOf(p).id))).sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")))}
 function campAutoSplit(c,n){
  let order={"Batter":0,"Wicketkeeper-Batter":1,"Wicketkeeper":2,"All-rounder":3,"Bowler":4};
  let pool=campPool(c).slice().sort((a,b)=>((order[a.role]!==undefined?order[a.role]:5)-(order[b.role]!==undefined?order[b.role]:5))||String(a.name).localeCompare(String(b.name)));
@@ -8073,7 +8076,7 @@ function camps(){
  el.innerHTML=head("Camps & Clinics","Plan a camp day by day: groups, times, attendance and a printable sheet.")
  +`<div class="toolbar noPrint"><button class="btn primary" onclick="newCamp()">+ New Camp / Clinic</button><button class="btn secondary" onclick="campImportSheet()">Import from Excel</button></div>`
  +`<div class="list" style="margin-top:12px">${db.camps.length?db.camps.slice().sort((a,b)=>String(b.startDate||"").localeCompare(String(a.startDate||""))).map(x=>{
-  let days=campDays(x),pool=campPool(x),stName=x.stageId&&(stagesList().find(s=>s.id===x.stageId)||{}).name;
+  let days=campDays(x),pool=campPool(x),stName=campStageNames(x);
   return `<div class="card"><div style="display:flex;justify-content:space-between;align-items:flex-start;gap:10px;flex-wrap:wrap"><div style="cursor:pointer;min-width:0" onclick="openCamp('${x.id}')"><b style="font-size:var(--fs-5,17px)">${esc(x.name)}</b> <span class="tag">${esc(x.kind||"Camp")}</span><div class="muted">${esc(fmtDate(x.startDate))}${x.endDate&&x.endDate!==x.startDate?" → "+esc(fmtDate(x.endDate)):""}${x.venue?" · "+esc(x.venue):""}</div><div class="muted" style="margin-top:4px">${days.length} day${days.length===1?"":"s"} · ${pool.length} player${pool.length===1?"":"s"}${x.team?" · "+esc(x.team):""}${stName?" · "+esc(stName):""}${(x.batches||[]).length>1?" · "+x.batches.length+" groups":""}</div></div><div class="toolbar"><button class="btn primary" onclick="openCamp('${x.id}')">Open</button><button class="btn danger iconBtn" title="Delete" onclick="deleteCamp('${x.id}')">${icon("trash",17)}</button></div></div></div>`}).join(""):emptyRich("No camps yet","Create a camp or clinic, or import the schedule you already have in Excel.","+ New Camp / Clinic","newCamp()")}</div>`;
 }
 function openCamp(id){campOpenId=id;camps();window.scrollTo(0,0)}
@@ -8092,14 +8095,15 @@ function campDayCardHtml(c,d,i,groups){
  return `<div class="card" style="padding:12px 14px"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><div style="cursor:pointer" onclick="campEditTheme('${c.id}','${d}')" title="Tap to set the day's theme"><b>${esc(campDayLabel(d,i))}</b> <span class="muted">${esc(fmtDate(d))}${theme?" · "+esc(theme):""}</span></div><div style="display:flex;gap:6px;flex-wrap:wrap"><button class="btn secondary" style="padding:5px 10px;font-size:12px" onclick="campRowForm('${c.id}','','${d}')">+ Row</button><button class="btn secondary" style="padding:5px 10px;font-size:12px" onclick="campRestDay('${c.id}','${d}')">Rest day</button>${rows.length?`<button class="btn secondary" style="padding:5px 10px;font-size:12px" onclick="campCopyDayForm('${c.id}','${d}')">Copy day</button>`:""}</div></div>${rows.length?hdr+body:`<div class="muted" style="margin-top:8px;font-size:var(--fs-3)">Nothing planned yet.</div>`}</div>`;
 }
 function campDetailHtml(c){
- let days=campDays(c),stName=c.stageId&&(stagesList().find(s=>s.id===c.stageId)||{}).name,pool=campPool(c),groups=campGroups(c);
+ let days=campDays(c),stName=campStageNames(c),pool=campPool(c),groups=campGroups(c);
  const meta=(l,v)=>`<div class="card" style="padding:10px 12px"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.4px">${l}</div><b>${v||"—"}</b></div>`;
  let unassigned=pool.filter(p=>!(c.batches||[]).some(b=>b.names.includes(p.name)));
  return `<button class="backBtn noPrint" onclick="closeCamp()">${icon("chevronLeft",13)} All camps</button>
  <div class="hero"><h1>${esc(c.name)} <span class="tag" style="font-size:12px;vertical-align:middle">${esc(c.kind||"Camp")}</span></h1><div class="muted">${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""} · ${days.length} day${days.length===1?"":"s"}</div></div>
  <div class="toolbar noPrint" style="flex-wrap:wrap"><button class="btn secondary" onclick="editCamp('${c.id}')">Edit details</button><button class="btn secondary" onclick="campBatchesSheet('${c.id}')">Groups</button><button class="btn primary" onclick="campSheetReport('${c.id}')">Print sheet</button></div>
- <div class="grid g4" style="margin-top:12px">${meta("Venue",esc(c.venue||""))}${meta("Team / stage",esc([c.team,stName].filter(Boolean).join(" · ")||"Everyone"))}${meta("Players",pool.length+(unassigned.length&&(c.batches||[]).length>1?` <span class="muted" style="font-weight:400">(${unassigned.length} not in a group)</span>`:""))}${meta("Coaches",esc(c.coaches||""))}</div>
+ <div class="grid g4" style="margin-top:12px">${meta("Venue",esc(c.venue||""))}${meta("Team / stage",esc([c.team,stName].filter(Boolean).join(" · ")||"Everyone"))}${meta("Season phase",(()=>{let po=campPhaseOf(c);return po?esc(po.season.name+" · "+po.phase.name):""})())}${meta("Players",pool.length+(unassigned.length&&(c.batches||[]).length>1?` <span class="muted" style="font-weight:400">(${unassigned.length} not in a group)</span>`:""))}${meta("Coaches",esc(c.coaches||""))}</div>
  ${(c.batches||[]).length>1?`<div style="margin-top:10px">${c.batches.map(b=>`<span class="tag">${esc(b.name)} · ${b.names.length}</span>`).join(" ")}</div>`:""}
+ <div class="card" style="margin-top:12px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div><b>Sessions</b><div class="muted" style="font-size:var(--fs-3)">${(()=>{let st=campSessionStats(c);return st.have?st.have+" of "+st.rows+" schedule rows are sessions in Session Plans":"Turn each schedule row into a session, with attendees and nets"})()}</div></div><button class="btn primary" onclick="campSyncSessions('${c.id}')">${campSessionStats(c).have?"Update sessions":"Create sessions"}</button></div>
  <h2 class="section">Schedule <span class="muted" style="font-weight:400;font-size:var(--fs-3)">— tap a time to edit a row, a cell to change what's planned, a day to set its theme</span></h2>
  <div class="list">${days.map((d,i)=>campDayCardHtml(c,d,i,groups)).join("")||empty("Set the camp dates in Edit details.")}</div>
  <h2 class="section">Attendance</h2><div class="card" id="campAttBox">${campAttHtml(c)}</div>
@@ -8127,13 +8131,13 @@ function campAttToggle(id,date,name,on){
  let c=campById(id);if(!c)return;if(!requireWriteAccess()){campAttRefresh(c);return}
  if(!c.attendance)c.attendance={};let a=c.attendance[date]=c.attendance[date]||[];
  let has=a.includes(name);if(on&&!has)a.push(name);if(!on&&has)c.attendance[date]=a.filter(n=>n!==name);
- campQuiet();campAttRefresh(c);
+  campPushAttendance(c,date);campQuiet();campAttRefresh(c);
 }
 function campAttAll(id,date){
  if(!requireWriteAccess())return;let c=campById(id);if(!c)return;if(!c.attendance)c.attendance={};
  let pool=campPool(c).map(p=>p.name),cur=c.attendance[date]||[];
  c.attendance[date]=pool.every(n=>cur.includes(n))?cur.filter(n=>!pool.includes(n)):[...new Set(cur.concat(pool))];
- campQuiet();campAttRefresh(c);
+ campPushAttendance(c,date);campQuiet();campAttRefresh(c);
 }
 /* --- create / edit camp --- */
 function campFormHtml(c){
@@ -8146,7 +8150,8 @@ function campFormHtml(c){
  <label>Start date<input type="date" name="startDate" required value="${esc(c.startDate||today())}"></label>
  <label>End date<input type="date" name="endDate" required value="${esc(c.endDate||c.startDate||today())}"></label>
  <label>Team<select name="team"><option value="">All teams</option>${teams.map(t=>`<option ${c.team===t?"selected":""}>${esc(t)}</option>`).join("")}</select></label>
- <label>Squad stage<select name="stageId"><option value="">Any stage</option>${open.map(s=>`<option value="${s.id}" ${c.stageId===s.id?"selected":""}>${esc(s.name)}</option>`).join("")}</select></label>
+ ${campPhaseOptions(c)?`<label class="full">Season phase <span class="muted" style="font-weight:400">(optional)</span><select name="phaseKey"><option value="">Not linked</option>${campPhaseOptions(c)}</select></label>`:""}
+ <div class="full"><span class="fpLabel">Squad stage <span class="muted" style="font-weight:400">(tick one or more — leave all unticked for any stage)</span></span><div class="chipGrid2" style="margin-top:6px">${open.map(s=>`<label><input type="checkbox" name="stageIds" value="${s.id}" ${campStageIds(c).includes(s.id)?"checked":""}> ${esc(s.name)}</label>`).join("")}</div></div>
  ${isNew?`<label class="full">Split players into groups<select name="batchCount"><option value="1">1 — one group</option><option value="2" selected>2 groups</option><option value="3">3 groups</option><option value="4">4 groups</option></select></label>`:""}
  <label class="full">Coaches / staff<input name="coaches" value="${esc(c.coaches||"")}" placeholder="e.g. Dinesh + 2 assistants"></label>
  <label class="full">Equipment checklist <span class="muted" style="font-weight:400">(one item per line)</span><textarea name="equipment" rows="4" placeholder="Cones x12&#10;Bowling machine&#10;First-aid kit">${esc(c.equipment||"")}</textarea></label>
@@ -8157,14 +8162,16 @@ function newCamp(){if(!requireWriteAccess())return;if(!requirePremium("Camp Plan
 function editCamp(id){let c=campById(id);if(!c||!requireWriteAccess())return;campEditingId=id;modal(campFormHtml(c))}
 function saveCamp(e){
  e.preventDefault();if(!requireWriteAccess())return;
- let f=Object.fromEntries(new FormData(e.target));
+ let fd0=new FormData(e.target),f=Object.fromEntries(fd0);
  if(f.endDate<f.startDate)f.endDate=f.startDate;
  if(!Array.isArray(db.camps))db.camps=[];
  if(campEditingId){
   let c=campById(campEditingId);if(!c){closeM();return}
-  ["name","kind","venue","startDate","endDate","team","stageId","coaches","equipment","notes"].forEach(k=>c[k]=f[k]||"");
+  ["name","kind","venue","startDate","endDate","team","coaches","equipment","notes"].forEach(k=>c[k]=f[k]||"");
+  c.stageIds=fd0.getAll("stageIds");c.stageId="";
+  {let pk=(f.phaseKey||"").split("|");c.seasonId=pk[0]||"";c.phaseId=pk[1]||""}
  }else{
-  let c={id:uid("camp"),name:f.name,kind:f.kind,venue:f.venue||"",startDate:f.startDate,endDate:f.endDate,team:f.team||"",stageId:f.stageId||"",coaches:f.coaches||"",equipment:f.equipment||"",notes:f.notes||"",batches:[],rows:[],themes:{},attendance:{},createdAt:today()};
+  let c={id:uid("camp"),name:f.name,kind:f.kind,venue:f.venue||"",startDate:f.startDate,endDate:f.endDate,team:f.team||"",stageIds:fd0.getAll("stageIds"),seasonId:(f.phaseKey||"").split("|")[0]||"",phaseId:(f.phaseKey||"").split("|")[1]||"",coaches:f.coaches||"",equipment:f.equipment||"",notes:f.notes||"",batches:[],rows:[],themes:{},attendance:{},createdAt:today()};
   campAutoSplit(c,Number(f.batchCount)||1);
   if(c.batches.length===1)c.batches=[];
   db.camps.push(c);campOpenId=c.id;
@@ -8181,7 +8188,7 @@ function campBatchOfName(c,name){let b=(c.batches||[]).find(b=>b.names.includes(
 function campBatchesSheet(id){
  let c=campById(id);if(!c)return;let pool=campPool(c),bs=c.batches||[];
  modal(`<div class="sheetHead"><h2>Groups</h2><button class="x" onclick="closeM()">×</button></div>
- <p class="muted">Players come from ${esc(c.team||"all teams")}${c.stageId?" · "+esc((stagesList().find(s=>s.id===c.stageId)||{}).name||""):""}. Groups let two sets of players do different things at the same time.</p>
+ <p class="muted">Players come from ${esc(c.team||"all teams")}${campStageNames(c)?" · "+esc(campStageNames(c)):""}. Groups let two sets of players do different things at the same time.</p>
  <div class="card"><b>Auto-split by role</b><div style="display:flex;gap:8px;margin-top:8px"><select id="campSplitN" style="flex:1">${[1,2,3,4].map(n=>`<option value="${n}" ${n===(bs.length||2)?"selected":""}>${n===1?"One group":n+" groups"}</option>`).join("")}</select><button class="btn primary" onclick="campDoSplit('${id}')">Split</button></div><div class="muted" style="font-size:var(--fs-3);margin-top:6px">Spreads batters, bowlers and keepers evenly. You can fine-tune below.</div></div>
  ${bs.length?`<h2 class="section">Group names</h2><div class="card">${bs.map(b=>`<label>${b.names.length} player${b.names.length===1?"":"s"}<input value="${esc(b.name)}" onchange="campRenameBatch('${id}','${b.id}',this.value)"></label>`).join("")}</div>
  <h2 class="section">Players</h2><div class="list">${pool.map(p=>{let cur=campBatchOfName(c,p.name);return `<div class="item" style="align-items:center"><div style="flex:1;min-width:0"><b>${esc(p.name)}</b><div class="muted">${esc(p.role||"Player")}</div></div><select onchange="campAssign('${id}',this.dataset.n,this.value)" data-n="${esc(p.name)}" style="width:auto"><option value="">—</option>${bs.map(b=>`<option value="${b.id}" ${cur===b.id?"selected":""}>${esc(b.name)}</option>`).join("")}</select></div>`}).join("")||empty("No players in this camp's team and stage yet.")}</div>`:""}
@@ -8214,7 +8221,7 @@ function campRowForm(id,rowId,date){
  <form class="formgrid" onsubmit="campSaveRow(event)">
  <label>Starts<input type="time" name="start" value="${esc(r.start||"")}"></label><label>Ends <span class="muted" style="font-weight:400">(optional)</span><input type="time" name="end" value="${esc(r.end||"")}"></label>
  ${groups.length>1?`<label class="full" style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="whole" style="width:auto" ${r.whole?"checked":""}> Whole squad (one merged cell, e.g. practice match or rest)</label>`:""}
- <button class="btn primary full">${rowId?"Save":"Save & fill in"}</button>${rowId?`<button type="button" class="btn danger full" onclick="campDeleteRow()">Delete row</button>`:""}</form>
+ <button class="btn primary full">${rowId?"Save":"Save & fill in"}</button>${(rowId&&r.sessionId&&db.sessions.find(x=>x.id===r.sessionId&&!x.deletedAt))?`<button type="button" class="btn secondary full" onclick="campOpenSession()">Open linked session</button>`:""}${rowId?`<button type="button" class="btn danger full" onclick="campDeleteRow()">Delete row</button>`:""}</form>
  ${(rowId&&groups.length>1&&!r.whole)?`<div class="card" style="margin-top:14px"><b>Swap groups</b><div class="muted" style="font-size:var(--fs-3);margin:2px 0 8px">Adds another row on the same day where the groups switch activities, e.g. the afternoon session.</div><div style="display:flex;gap:8px"><input type="time" id="campSwapStart" value="${swapDef[0]}" style="flex:1"><input type="time" id="campSwapEnd" value="${swapDef[1]}" style="flex:1"></div><button class="btn secondary full" style="margin-top:8px" onclick="campSwapRow()">Add swapped row</button></div>`:""}`);
 }
 function campSaveRow(e){
@@ -8438,7 +8445,7 @@ function campCreateFromImport(){
  if(!requireWriteAccess()||!campImportParsed)return;let pr=campImportParsed;
  let name=(document.getElementById("campImpName").value||"").trim()||"Imported camp",team=document.getElementById("campImpTeam").value;
  let all=pr.dates.slice().sort();
- let c={id:uid("camp"),name,kind:"Camp",venue:"",startDate:all[0],endDate:all[all.length-1],team,stageId:"",coaches:"",equipment:"",notes:"",batches:[],rows:[],themes:{},attendance:{},createdAt:today()};
+ let c={id:uid("camp"),name,kind:"Camp",venue:"",startDate:all[0],endDate:all[all.length-1],team,stageIds:[],coaches:"",equipment:"",notes:"",batches:[],rows:[],themes:{},attendance:{},createdAt:today()};
  let n=pr.groups.length;
  if(n>1){
   if(team&&n<=4){campAutoSplit(c,n);c.batches.forEach((b,i)=>b.name=pr.groups[i])}
@@ -8453,6 +8460,81 @@ function campCreateFromImport(){
   if(Object.keys(row.cells).length)c.rows.push(row);
  });
  if(!Array.isArray(db.camps))db.camps=[];db.camps.push(c);campOpenId=c.id;closeM();save();
+}
+/* --- links: sessions, net plans, attendance, season phases --- */
+function campPhaseOf(c){
+ if(!c.phaseId)return null;let s=(db.seasons||[]).find(x=>x.id===c.seasonId);if(!s)return null;
+ let ph=(s.phases||[]).find(x=>x.id===c.phaseId);return ph?{season:s,phase:ph}:null;
+}
+function campPhaseOptions(c){
+ let out=[];(db.seasons||[]).forEach(s=>(s.phases||[]).forEach(ph=>{if(ph.id)out.push(`<option value="${s.id}|${ph.id}" ${(c.seasonId===s.id&&c.phaseId===ph.id)?"selected":""}>${esc(s.name)} · ${esc(ph.name)}${ph.startDate?" ("+esc(fmtDate(ph.startDate))+" → "+esc(fmtDate(ph.endDate)||"?")+")":""}</option>`)}));
+ return out.join("");
+}
+function campPhaseLinesHtml(phaseId){
+ let list=(db.camps||[]).filter(c=>c.phaseId===phaseId);if(!list.length)return "";
+ return list.map(c=>{let n=db.sessions.filter(s=>s.campId===c.id&&!s.deletedAt).length;return `<div class="muted" style="margin-top:4px;font-size:var(--fs-3)">Camp: <b>${esc(c.name)}</b> · ${campDays(c).length} day${campDays(c).length===1?"":"s"}${n?` · ${n} session${n===1?"":"s"} created`:""}</div>`}).join("");
+}
+function campRowDuration(r){if(r.start&&r.end){let a=r.start.split(":"),b=r.end.split(":"),m=(+b[0]*60+ +b[1])-(+a[0]*60+ +a[1]);if(m>0)return m}return 90}
+function campAllNames(c){let n=[];(c.batches||[]).forEach(b=>(b.names||[]).forEach(x=>{if(!n.includes(x))n.push(x)}));if(!n.length)campPool(c).forEach(p=>n.push(p.name));return n}
+function campRoleOf(name){let p=db.players.find(x=>x.name===name&&!x.deletedAt);return p?p.role:""}
+function campNetsFor(names,text,dur){
+ if(!names.length)return [];let batters=[],bowlers=[],flip=0;
+ names.slice().sort().forEach(n=>{let r=campRoleOf(n);if(r==="Bowler")bowlers.push(n);else if(r==="All-rounder"){(flip++%2===0?bowlers:batters).push(n)}else batters.push(n)});
+ if(!batters.length){batters=bowlers;bowlers=[]}
+ let k=Math.max(1,Math.ceil(batters.length/2)),nets=Array.from({length:k},()=>({batters:0,bowlers:"",duration:dur,battersNames:[],bowlersNames:[],focus:text||""}));
+ batters.forEach((n,i)=>nets[i%k].battersNames.push(n));bowlers.forEach((n,i)=>nets[i%k].bowlersNames.push(n));
+ nets.forEach(n=>{n.batters=n.battersNames.length;n.bowlers=n.bowlersNames.length?String(n.bowlersNames.length):""});
+ return nets.filter(n=>n.batters||n.bowlersNames.length);
+}
+function campBuildSession(c,r){
+ let groups=campGroups(c),multi=groups.length>1,whole=!!(r.whole&&multi),days=campDays(c),di=days.indexOf(r.date);
+ let parts=whole?[{g:{name:"Whole squad",names:campAllNames(c)},cell:r.cells&&r.cells["*"]}]:groups.map(g=>({g:{name:g.name,names:multi?(g.names||[]):campAllNames(c)},cell:r.cells&&r.cells[g.id]})).filter(x=>x.cell);
+ parts=parts.filter(x=>x.cell&&x.cell.text);if(!parts.length)return null;
+ let names=[];parts.forEach(x=>x.g.names.forEach(n=>{if(!names.includes(n))names.push(n)}));
+ let dur=campRowDuration(r),ph=campPhaseOf(c);
+ let main=parts.map(x=>(multi&&!whole?x.g.name+": ":"")+x.cell.text).join("\n");
+ let notes=parts.filter(x=>x.cell.note).map(x=>(multi&&!whole?x.g.name+": ":"")+x.cell.note);
+ let objectives=["Camp: "+c.name+(di>-1?" · Day "+(di+1):"")].concat(ph&&ph.phase.focus?["Phase focus ("+ph.phase.name+"): "+ph.phase.focus]:[],notes).join("\n");
+ let drills=[...new Set(parts.flatMap(x=>x.cell.drillIds||[]).filter(id=>db.drills.find(d=>d.id===id)))];
+ let nets=[];parts.forEach(x=>{if(x.cell.type==="bat")campNetsFor(x.g.names,multi&&!whole?x.g.name+": "+x.cell.text:x.cell.text,dur).forEach(n=>nets.push(n))});
+ return {date:r.date,time:r.start||"",title:c.name+(di>-1?" · D"+(di+1):"")+(r.start?" · "+campFmtT(r.start):""),sessionType:c.team?"team":"custom",squad:c.team||c.name,duration:String(dur),focus:"",venue:c.venue||"",attendees:names,objectiveTags:[],objectives,warmup:"",main,game:"",cueTags:[],successTags:[],mainDrillIds:drills,gameDrillIds:[],netPlan:nets.length?[{focus:"",nets}]:[],campId:c.id,campRowId:r.id,campNames:names.slice()};
+}
+function campSnap(s){return JSON.stringify([s.date,s.time,s.title,s.duration,s.main,s.objectives,s.mainDrillIds,s.netPlan,s.venue,s.squad])}
+function campRecalcAttendance(c,date){
+ let ss=db.sessions.filter(s=>s.campId===c.id&&s.date===date&&!s.deletedAt);if(!ss.length)return;
+ let u=[];ss.forEach(s=>(s.attendees||[]).forEach(n=>{if(!u.includes(n))u.push(n)}));
+ if(!c.attendance)c.attendance={};c.attendance[date]=u;
+}
+function campPushAttendance(c,date){
+ let att=(c.attendance&&c.attendance[date])||[];
+ db.sessions.filter(s=>s.campId===c.id&&s.date===date&&!s.deletedAt).forEach(s=>{let exp=s.campNames||[];s.attendees=att.filter(n=>!exp.length||exp.includes(n))});
+}
+function campSessionStats(c){let rows=(c.rows||[]).filter(r=>Object.keys(r.cells||{}).length),have=rows.filter(r=>r.sessionId&&db.sessions.find(s=>s.id===r.sessionId&&!s.deletedAt)).length;return{rows:rows.length,have}}
+function campSyncSessions(id){
+ if(!requireWriteAccess())return;let c=campById(id);if(!c)return;
+ let rows=(c.rows||[]).slice().sort((a,b)=>(a.date+(a.start||"")).localeCompare(b.date+(b.start||"")));
+ let st=campSessionStats(c);
+ if(!rows.length){alert("Add something to the schedule first.");return}
+ if(!st.have&&!confirm("Create a session for each schedule row? That is up to "+st.rows+" sessions in your Session Plans and Calendar, with the group's players as attendees and nets planned for batting blocks. You can edit them like any session."))return;
+ let created=0,updated=0,skipped=0,newDates=new Set();
+ rows.forEach(r=>{
+  let s=campBuildSession(c,r),ex=r.sessionId&&db.sessions.find(x=>x.id===r.sessionId&&!x.deletedAt);
+  if(!s){return}
+  if(!ex){s.id=uid("sess");s.campSnap=campSnap(s);db.sessions.push(s);r.sessionId=s.id;created++;newDates.add(r.date);return}
+  if(ex.campSnap!==campSnap(ex)){skipped++;return}
+  if(campSnap(s)===ex.campSnap)return;
+  ["date","time","title","duration","main","objectives","mainDrillIds","netPlan","venue","squad","sessionType"].forEach(k=>ex[k]=s[k]);
+  ex.campNames=s.campNames;ex.campSnap=campSnap(ex);updated++;
+ });
+ [...newDates].forEach(d=>{let ss=db.sessions.filter(x=>x.campId===c.id&&x.date===d&&!x.deletedAt);let cur=(c.attendance&&c.attendance[d])||[];if(cur.length){ss.forEach(x=>{if(x.campNames)x.attendees=cur.filter(n=>x.campNames.includes(n))})}else campRecalcAttendance(c,d)});
+ save();
+ modal(`<div class="sheetHead"><h2>Sessions updated</h2><button class="x" onclick="closeM()">×</button></div>
+ <div class="card"><p><b>${created}</b> created · <b>${updated}</b> updated${skipped?` · <b>${skipped}</b> skipped because you edited them`:""}</p><p class="muted">Each schedule row is now a session in Session Plans and the Calendar. Attendance is shared: ticking someone on the camp page or in the session updates both.</p></div>
+ <div class="toolbar" style="margin-top:12px"><button class="btn primary" onclick="closeM();go('sessions')">View sessions</button><button class="btn secondary" onclick="closeM()">Close</button></div>`);
+}
+function campOpenSession(){
+ if(!campCellCtx)return;let c=campById(campCellCtx.id);if(!c)return;let r=c.rows.find(x=>x.id===campCellCtx.rowId);if(!r||!r.sessionId)return;
+ closeM();go('sessions');editSession(r.sessionId);
 }
 /* ===== end camps ===== */
 
