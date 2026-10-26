@@ -5437,7 +5437,7 @@ function matchCardHtml(m){
  return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div><b>${esc(m.team||"My Team")} vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.date||"")} ${m.venue?"· "+esc(m.venue):""} ${m.format?"· "+esc(m.format):""}</div></div><span class="tag">${esc(matchResultOutcome(m))}</span></div><p>${esc(m.result||"No result recorded")}</p>${m.scoreLine?`<div class="muted"><b>${esc(m.scoreLine)}</b></div>`:""}${!m.scoreLine&&((m.battingReview&&m.battingReview.length)||(m.bowlingReview&&m.bowlingReview.length))?`<div class="muted">${(m.battingReview&&m.battingReview.length)?m.battingReview.length+" batting entries":""}${(m.battingReview&&m.battingReview.length)&&(m.bowlingReview&&m.bowlingReview.length)?" · ":""}${(m.bowlingReview&&m.bowlingReview.length)?m.bowlingReview.length+" bowling entries":""}</div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForMatch('${m.id}')">Reflection pending</span>`}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary" onclick="matchReportView('${m.id}')">Report</button><button class="btn secondary iconBtn" title="Edit" onclick="editMatch('${m.id}')">${icon("edit",17)}</button><button class="btn secondary iconBtn" title="Duplicate" onclick="duplicateMatch('${m.id}')">${icon("copy",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delMatch('${m.id}')">${icon("trash",17)}</button></div></div>`;
 }
 
-const DISMISSAL_TYPES=["Not out","Bowled","Caught","Caught and bowled","LBW","Run out","Stumped","Hit wicket","Retired hurt","Other"];
+const DISMISSAL_TYPES=["Not out","Bowled","Caught","Caught behind","Caught and bowled","LBW","Run out","Stumped","Hit wicket","Retired out","Retired hurt","Timed out","Obstructing the field","Handled the ball","Hit the ball twice","Other"];
 let battingNotesOpen=new WeakSet(),bowlingNotesOpen=new WeakSet();
 function currentXINames(){return [...document.querySelectorAll('input[name="playingXI"]:checked')].map(cb=>cb.value)}
 function nameOptionsHtml(currentName,xiNames,takenNames){
@@ -5642,14 +5642,20 @@ function qeNormDismissal(t){
  let s=String(t||"").trim().toLowerCase();
  if(!s)return "";
  if(/^(not out|batting|n\/o|no)\b/.test(s))return "Not out";
- if(/^(c\s*&\s*b|c and b)/.test(s))return "Caught and bowled";
+ if(/^(c\s*&\s*b|c and b|caught and bowled|caught & bowled)/.test(s))return "Caught and bowled";
+ if(/^(caught behind|ct\s|c\s*†|c\s*\+)/.test(s))return "Caught behind";
  if(/^c\s/.test(s)||s==="c")return "Caught";
  if(/^b\s/.test(s)||s==="b")return "Bowled";
  if(/^lbw/.test(s))return "LBW";
  if(/^run out/.test(s))return "Run out";
  if(/^(st\s|stumped)/.test(s))return "Stumped";
  if(/^hit wicket/.test(s))return "Hit wicket";
+ if(/^retired out/.test(s))return "Retired out";
  if(/^retired/.test(s))return "Retired hurt";
+ if(/^timed out/.test(s))return "Timed out";
+ if(/^obstruct/.test(s))return "Obstructing the field";
+ if(/^handled/.test(s))return "Handled the ball";
+ if(/^hit the ball twice/.test(s))return "Hit the ball twice";
  return String(t).trim();
 }
 function qeParse(text,pool){
@@ -5704,7 +5710,7 @@ function qeOpen(mode){
 function qeClose(){let ov=document.getElementById("qeOv");if(ov)ov.remove();qe=null}
 function qeTab(t){qe.tab=t;qeRender()}
 function qeSet(i,k,v){let r=qe[qe.tab][i];if(!r)return;r[k]=v;if(k==="name"){r.flag=false}qeTotals()}
-function qeIsOut(d){return !!d&&!/^(not out|did not bat|retired hurt)$/i.test(d)}
+function qeIsOut(d){return isOutText(d)}
 function qeTotals(){
  let el=document.getElementById("qeTot");if(!el||!qe)return;
  if(qe.tab==="bat"){let runs=0,w=0;qe.bat.forEach(r=>{if(r.dismissal===QE_DNB)return;runs+=+r.runs||0;if(qeIsOut(r.dismissal)&&(r.runs!==""||r.balls!==""))w++});
@@ -6145,7 +6151,7 @@ function assessmentCoverageHeatmapHtml(roster){
 
 /* ===== Real match figures for reports (replaces the old avg-rating cards) ===== */
 function ovToBalls(o){let t=String(o==null?"":o).trim();if(!t)return 0;let a=t.split(".");return(parseInt(a[0])||0)*6+(parseInt(a[1])||0)}
-function isOutText(d){d=String(d||"").trim();return !!d&&!/not out/i.test(d)}
+function isOutText(d){d=String(d||"").trim();return !!d&&!/^(not out|retired hurt|absent hurt|did not bat)/i.test(d)}
 function matchStatsAgg(matches,onlyName){
  let P={},T={runs:0,wkts:0,taken:0,missed:0,runouts:0,misfields:0,fieldN:0,forRuns:0,againstRuns:0,scoredN:0,decided:0,wins:0,hasBat:false,hasBowl:false};
  let g=n=>{let k=nameKey(n);return P[k]||(P[k]={name:String(n).trim(),mats:{},runs:0,balls:0,inns:0,outs:0,hs:0,hsNo:false,f50:0,f100:0,ob:0,rc:0,w:0,bw:-1,br:0,bowlInns:0})};
