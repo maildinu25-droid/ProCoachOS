@@ -3062,6 +3062,7 @@ function cascadePlayerRename(oldName,newName){
  db.matches.forEach(m=>{
   (m.battingReview||[]).forEach(r=>{if(r.name===oldName)r.name=newName});
   (m.bowlingReview||[]).forEach(r=>{if(r.name===oldName)r.name=newName});
+  (m.fieldingReview||[]).forEach(r=>{if(r.name===oldName)r.name=newName});
   if(Array.isArray(m.playingXI)){m.playingXI=m.playingXI.map(n=>n===oldName?newName:n)}
  });
  (db.camps||[]).forEach(c=>{if(c.review&&c.review[oldName]&&!c.review[newName]){c.review[newName]=c.review[oldName];delete c.review[oldName]}(c.batches||[]).forEach(b=>{b.names=(b.names||[]).map(n=>n===oldName?newName:n)});Object.keys(c.attendance||{}).forEach(d=>{c.attendance[d]=(c.attendance[d]||[]).map(n=>n===oldName?newName:n)})});
@@ -3222,7 +3223,7 @@ function playerAssessments(p){return db.assessments.filter(a=>a.player===p.name)
 function playerSessions(p){return activeSessions().filter(s=>Array.isArray(s.attendees)&&s.attendees.includes(p.name)).slice().sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a)))}
 function nameKey(n){return String(n||'').replace(/\s+/g,' ').trim().toLowerCase()}
 function sameName(a,b){return nameKey(a)===nameKey(b)}
-function playerMatches(p){return db.matches.filter(m=>(m.playingXI||[]).some(n=>sameName(n,p.name))||(m.battingReview||[]).some(r=>sameName(r.name,p.name))||(m.bowlingReview||[]).some(r=>sameName(r.name,p.name))).slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))}
+function playerMatches(p){return db.matches.filter(m=>(m.playingXI||[]).some(n=>sameName(n,p.name))||(m.battingReview||[]).some(r=>sameName(r.name,p.name))||(m.bowlingReview||[]).some(r=>sameName(r.name,p.name))||(m.fieldingReview||[]).some(r=>sameName(r.name,p.name))).slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))}
 function goalStatusInfo(g){
  if(g.achieved)return{text:"Achieved"+(g.achievedDate?" "+fmtDate(g.achievedDate):""),color:"var(--g)"};
  if(!g.targetDate)return{text:"No target date",color:"var(--muted)"};
@@ -5378,7 +5379,7 @@ function drills(){
 /* ===== End Drill Library ===== */
 /* ===== Match Centre ===== */
 let matchQuery="",matchFormatFilter="",matchResultFilter="",matchSearchFocused=false;
-let matchDraft={batting:[],bowling:[]},editingMatchId=null;
+let matchDraft={batting:[],bowling:[],fielding:[]},editingMatchId=null;
 const MATCH_FORMATS=["T20","ODI","One Day","Test/Multi-day","Friendly","Practice","League"];
 const BATTING_METRICS=["Shot Selection","Intent","Partnerships","Pressure Management","Game Awareness"];
 const BOWLING_METRICS=["Plan Execution","Pressure Creation","Good Streaks","Game Awareness","Wicket-Taking Threat"];
@@ -5392,7 +5393,7 @@ function toggleSkillAssessed(fieldName,checked){
 }
 function collectRatings(fd,prefix,metrics){let obj={};metrics.forEach((metric,i)=>{obj[metric]=Number(fd.get(`${prefix}_${i}`))||0});return obj}
 function avgRatingObj(obj){if(!obj)return 0;let vals=Object.values(obj).filter(v=>Number.isFinite(v)&&v>0);return vals.length?vals.reduce((a,b)=>a+b,0)/vals.length:0}
-function matchResultOutcome(m){let r=String(m.result||"").toLowerCase();if(/\bwin|\bwon\b/.test(r))return"Win";if(/\bloss|\blost\b/.test(r))return"Loss";if(/\bdraw\b/.test(r))return"Draw";if(/no result|abandon/.test(r))return"NR";return"Other"}
+function matchResultOutcome(m){let oc={Won:"Win",Lost:"Loss",Draw:"Draw",Tie:"Draw","No result":"NR"}[m.outcome];if(oc)return oc;let r=String(m.result||"").toLowerCase();if(/\bwin|\bwon\b/.test(r))return"Win";if(/\bloss|\blost\b/.test(r))return"Loss";if(/\bdraw\b/.test(r))return"Draw";if(/no result|abandon/.test(r))return"NR";return"Other"}
 function matches(){
  let list=db.matches.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
  if(matchQuery){let q=matchQuery.toLowerCase();list=list.filter(m=>[m.team,m.opp,m.venue,m.notes,m.actions,m.result,m.teamNotes,m.battingAssessmentNotes,m.bowlingAssessmentNotes].some(v=>String(v||"").toLowerCase().includes(q)))}
@@ -5400,6 +5401,7 @@ function matches(){
  if(matchResultFilter)list=list.filter(m=>matchResultOutcome(m)===matchResultFilter);
  document.getElementById("matches").innerHTML=head("Match Centre","Match details, foundation, team & individual reviews, and automatic reports.")+`<div class="toolbar noPrint"><button class="btn primary" onclick="newMatch()">+ New Match</button>${campMenu("mcAct","Actions ▾",[{label:"Print report",icon:"print",fn:"matchReport()"},{label:"Export Excel",icon:"share",fn:"exportExcel()"}])}</div>
  ${filterBarHtml("matches",`<input id="matchSearch" value="${esc(matchQuery)}" oninput="matchQuery=this.value;matches()" onfocus="matchSearchFocused=true" onblur="matchSearchFocused=false" placeholder="Search team, opposition, venue...">`,`<label>Format<select onchange="matchFormatFilter=this.value;matches()"><option value="">All formats</option>${MATCH_FORMATS.map(f=>`<option value="${f}" ${matchFormatFilter===f?"selected":""}>${f}</option>`).join("")}</select></label><label>Result<select onchange="matchResultFilter=this.value;matches()"><option value="">All results</option>${["Win","Loss","Draw","NR","Other"].map(f=>`<option value="${f}" ${matchResultFilter===f?"selected":""}>${f}</option>`).join("")}</select></label>`,(matchFormatFilter?1:0)+(matchResultFilter?1:0))}
+ ${missingScoresBanner()}
  <div id="scorerImportBox"></div>
  <h2 class="section">Match History (${list.length})</h2><div class="grid g2">${list.length?list.map(matchCardHtml).join(""):(db.matches.length?empty("No matches match your filters."):emptyRich("No matches yet","Record a match to get scorecards, reviews and player match history.","+ New Match","newMatch()"))}</div>`;
  refreshScorerImportBox();
@@ -5431,10 +5433,53 @@ async function importScoredMatches(){
  }
  if(n){save()}
 }
+function scoreSummaryHtml(m){
+ if(m.scorerInnings&&m.scorerInnings.length)return "";
+ let t=matchTotals(m);
+ return t?`<div style="margin-top:6px"><span class="tag" style="cursor:pointer" onclick="editMatchScores('${m.id}')">${totalsLine(m,t)} ✎</span></div>`:`<div style="margin-top:6px"><span class="tag" style="cursor:pointer;background:var(--goldTint);color:var(--gold)" onclick="editMatchScores('${m.id}')">+ Add team scores</span></div>`;
+}
+function editMatchScores(id){
+ let m=db.matches.find(x=>x.id===id);if(!m)return;
+ let f=(k,l,d)=>`<label>${l}<input id="ms_${k}" type="number" inputmode="${d||"numeric"}" ${d?'step="0.1" ':""}min="0" value="${esc(m[k]||"")}"></label>`;
+ modal(`<div class="sheetHead"><h2>Team scores</h2><button class="x" onclick="closeM()">×</button></div>
+ <div class="muted" style="margin-bottom:10px">${esc(m.team||"Us")} vs ${esc(m.opp||"Opposition")} · ${esc(fmtDate(m.date))}. Full totals including extras.</div>
+ <div class="formgrid">${f("ourRuns","Our runs")}${f("ourWkts","Our wickets lost")}${f("oppRuns","Opposition runs")}${f("oppWkts","Opposition wickets lost")}${f("ourOvers","Our overs","decimal")}${f("oppOvers","Opposition overs","decimal")}</div>
+ <div class="toolbar" style="margin-top:14px"><button class="btn secondary" onclick="closeM()">Cancel</button><button class="btn primary" onclick="saveMatchScores('${id}')">Save</button></div>`);
+}
+function saveMatchScores(id){
+ if(!requireWriteAccess())return;
+ let m=db.matches.find(x=>x.id===id);if(!m)return;
+ ["ourRuns","ourWkts","oppRuns","oppWkts","ourOvers","oppOvers"].forEach(k=>{m[k]=document.getElementById("ms_"+k).value});
+ closeM();save();
+}
+function matchesMissingScores(){return db.matches.filter(m=>!(m.scorerInnings&&m.scorerInnings.length)&&!matchTotals(m)).sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))}
+function missingScoresBanner(){
+ let n=matchesMissingScores().length;if(!n)return "";
+ return `<div class="card" style="margin-top:12px;padding:12px 14px;display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><span>${n} match${n!==1?"es":""} without team scores. Reports need them for runs and wickets for and against.</span><button class="btn secondary" onclick="fillScoresBulk()">Fill scores</button></div>`;
+}
+function fillScoresBulk(){
+ let list=matchesMissingScores();
+ if(!list.length){alert("All matches already have team scores.");return}
+ let inp=(i,k,ph)=>`<input id="bs_${i}_${k}" type="number" inputmode="${/vers/.test(k)?"decimal":"numeric"}" ${/vers/.test(k)?'step="0.1" ':""}min="0" placeholder="${ph}" style="width:100%;height:38px;text-align:center;min-width:0">`;
+ modal(`<div class="sheetHead"><h2>Fill team scores</h2><button class="x" onclick="closeM()">×</button></div>
+ <div class="muted" style="margin-bottom:10px;font-size:13px">Full totals including extras. Leave a match empty to skip it.</div>
+ ${list.map((m,i)=>`<div style="padding:10px 0;border-bottom:1px solid var(--line)"><b>${esc(m.team||"Us")} vs ${esc(m.opp||"Opposition")}</b> <span class="muted" style="font-size:12px">${esc(fmtDate(m.date))}</span>
+ <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-top:6px">${inp(i,"ourRuns","Our runs")}${inp(i,"ourWkts","Our wkts")}${inp(i,"ourOvers","Our overs")}${inp(i,"oppRuns","Opp runs")}${inp(i,"oppWkts","Opp wkts")}${inp(i,"oppOvers","Opp overs")}</div></div>`).join("")}
+ <div class="toolbar" style="margin-top:14px"><button class="btn secondary" onclick="closeM()">Cancel</button><button class="btn primary" onclick="saveScoresBulk()">Save</button></div>`);
+ window._bulkScoreIds=list.map(m=>m.id);
+}
+function saveScoresBulk(){
+ if(!requireWriteAccess())return;
+ (window._bulkScoreIds||[]).forEach((id,i)=>{let m=db.matches.find(x=>x.id===id);if(!m)return;
+  let v=k=>document.getElementById("bs_"+i+"_"+k).value;
+  if(v("ourRuns")===""&&v("oppRuns")==="")return;
+  ["ourRuns","ourWkts","oppRuns","oppWkts","ourOvers","oppOvers"].forEach(k=>{m[k]=v(k)})});
+ closeM();save();
+}
 function matchCardHtml(m){
  let linkedReflection=db.reflections.find(r=>r.matchId===m.id);
  let showReflectionStatus=(m.date||"")<=today();
- return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div><b>${esc(m.team||"My Team")} vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.date||"")} ${m.venue?"· "+esc(m.venue):""} ${m.format?"· "+esc(m.format):""}</div></div><span class="tag">${esc(matchResultOutcome(m))}</span></div><p>${esc(m.result||"No result recorded")}</p>${m.scoreLine?`<div class="muted"><b>${esc(m.scoreLine)}</b></div>`:""}${!m.scoreLine&&((m.battingReview&&m.battingReview.length)||(m.bowlingReview&&m.bowlingReview.length))?`<div class="muted">${(m.battingReview&&m.battingReview.length)?m.battingReview.length+" batting entries":""}${(m.battingReview&&m.battingReview.length)&&(m.bowlingReview&&m.bowlingReview.length)?" · ":""}${(m.bowlingReview&&m.bowlingReview.length)?m.bowlingReview.length+" bowling entries":""}</div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForMatch('${m.id}')">Reflection pending</span>`}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary" onclick="matchReportView('${m.id}')">Report</button><button class="btn secondary iconBtn" title="Edit" onclick="editMatch('${m.id}')">${icon("edit",17)}</button><button class="btn secondary iconBtn" title="Duplicate" onclick="duplicateMatch('${m.id}')">${icon("copy",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delMatch('${m.id}')">${icon("trash",17)}</button></div></div>`;
+ return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div><b>${esc(m.team||"My Team")} vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.date||"")} ${m.venue?"· "+esc(m.venue):""} ${m.format?"· "+esc(m.format):""}</div></div><span class="tag">${esc(matchResultOutcome(m))}</span></div><p>${esc(m.result||"No result recorded")}</p>${m.scoreLine?`<div class="muted"><b>${esc(m.scoreLine)}</b></div>`:""}${scoreSummaryHtml(m)}${!m.scoreLine&&((m.battingReview&&m.battingReview.length)||(m.bowlingReview&&m.bowlingReview.length))?`<div class="muted">${(m.battingReview&&m.battingReview.length)?m.battingReview.length+" batting entries":""}${(m.battingReview&&m.battingReview.length)&&(m.bowlingReview&&m.bowlingReview.length)?" · ":""}${(m.bowlingReview&&m.bowlingReview.length)?m.bowlingReview.length+" bowling entries":""}</div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForMatch('${m.id}')">Reflection pending</span>`}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary" onclick="matchReportView('${m.id}')">Report</button><button class="btn secondary iconBtn" title="Edit" onclick="editMatch('${m.id}')">${icon("edit",17)}</button><button class="btn secondary iconBtn" title="Duplicate" onclick="duplicateMatch('${m.id}')">${icon("copy",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delMatch('${m.id}')">${icon("trash",17)}</button></div></div>`;
 }
 
 const DISMISSAL_TYPES=["Not out","Bowled","Caught","Caught behind","Caught and bowled","LBW","Run out","Stumped","Hit wicket","Retired out","Retired hurt","Timed out","Obstructing the field","Handled the ball","Hit the ball twice","Other"];
@@ -5556,34 +5601,45 @@ ${matchSectionHead("details","Match Details",true)}
 <label>Venue<input name="venue" list="venueDatalist" value="${esc(m.venue||"")}"><datalist id="venueDatalist">${venueOptions()}</datalist></label>
 <label>Format<select name="format">${MATCH_FORMATS.map(f=>`<option ${m.format===f?"selected":""}>${f}</option>`).join("")}</select></label>
 <label>Tournament <span class="muted" style="font-weight:400">(optional)</span><select name="tournamentId"><option value="">None</option>${db.tournaments.map(t=>`<option value="${t.id}" ${m.tournamentId===t.id?"selected":""}>${esc(t.name)}</option>`).join("")}</select></label>
-<label class="full">Result<input name="result" value="${esc(m.result||"")}" placeholder="e.g. Won by 24 runs"></label>
-<div class="full" style="margin-top:4px"><b>Team scores</b> <span class="muted" style="font-weight:400">(full totals including extras)${m.scorerInnings?" · filled automatically from the Match Scorer":""}</span></div>
-<label>Our runs<input name="ourRuns" type="number" inputmode="numeric" value="${esc(m.ourRuns||"")}"></label>
-<label>Our wickets lost<input name="ourWkts" type="number" inputmode="numeric" min="0" max="10" value="${esc(m.ourWkts||"")}"></label>
-<label>Opposition runs<input name="oppRuns" type="number" inputmode="numeric" value="${esc(m.oppRuns||"")}"></label>
-<label>Opposition wickets lost<input name="oppWkts" type="number" inputmode="numeric" min="0" max="10" value="${esc(m.oppWkts||"")}"></label>
 </div>
-${matchSectionHead("foundation","Foundation",false)}
+${matchSectionHead("foundation","Toss & Conditions",false)}
 <div class="formgrid" id="matchSec-foundation" style="display:none;margin-top:10px">
 <label>Toss<select name="toss"><option ${m.toss==="Won"?"selected":""}>Won</option><option ${m.toss==="Lost"?"selected":""}>Lost</option></select></label>
 <label>Decision<select name="tossDecision"><option ${m.tossDecision==="Bat"?"selected":""}>Bat</option><option ${m.tossDecision==="Bowl"?"selected":""}>Bowl</option></select></label>
 <label class="full">Pitch / conditions<textarea name="conditions">${esc(m.conditions||"")}</textarea></label>
-</div>
-${matchSectionHead("teamreview","Team Review",false)}
-<div class="formgrid" id="matchSec-teamreview" style="display:none;margin-top:10px">
-<label>Overall team rating /10<input type="number" name="teamRating" min="1" max="10" value="${esc(m.teamRating||7)}"></label>
-<label class="full">Team performance notes<textarea name="teamNotes">${esc(m.teamNotes||"")}</textarea></label>
 </div>
 ${matchSectionHead("xi","Playing XI",false)}
 <div id="matchSec-xi" style="display:none;margin-top:10px">
 <div class="muted" style="font-size:var(--fs-3);margin-bottom:8px">Who actually played this match — so match counts in Player Reports are accurate even for players who fielded but didn't bat or bowl.</div>
 ${activePlayers().length?`<button type="button" class="btn secondary" style="margin-bottom:10px" onclick="copyLastPlayingXI()">Copy from last match</button><div class="skillPick">${activePlayers().map(p=>`<label style="${p.available==="no"?"opacity:.55":""}"><input type="checkbox" name="playingXI" value="${esc(p.name)}" onchange="renderBattingRows();renderBowlingRows()" ${(m.playingXI||[]).includes(p.name)?"checked":""}> ${esc(p.name)}${p.available==="no"?` <span class="muted">(unavailable)</span>`:""}</label>`).join("")}</div>`:`<div class="muted">No players yet — add players to select a Playing XI.</div>`}
 </div>
+${matchSectionHead("scorecard","Scorecard & Result",true)}
+<div id="matchSec-scorecard" style="margin-top:10px">
 <div class="toolbar" style="margin-top:14px"><button type="button" class="btn secondary" onclick="qeOpen('grid')">⚡ One-screen scorecard</button><button type="button" class="btn secondary" onclick="qeOpen('paste')">📋 Paste scorecard</button></div>
+<div class="card" style="padding:12px 14px;margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div id="battingSummary" style="flex:1"></div><button type="button" class="btn secondary" onclick="qeOpen('grid')">Edit</button></div></div>
+<div class="card" style="padding:12px 14px;margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div id="bowlingSummary" style="flex:1"></div><button type="button" class="btn secondary" onclick="qeOpen('grid');qeTab('bowl')">Edit</button></div></div>
+<div class="card" style="padding:12px 14px;margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div id="fieldingSummary" style="flex:1"></div><button type="button" class="btn secondary" onclick="qeOpen('grid');qeTab('field')">Edit</button></div></div>
+<div class="formgrid" style="margin-top:14px">
+<div class="full" style="margin-top:4px"><b>Team scores</b> <span class="muted" style="font-weight:400">(full totals including extras)${m.scorerInnings?" · filled automatically from the Match Scorer":""}</span></div>
+<div class="full" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+<label>Our runs<input name="ourRuns" type="number" inputmode="numeric" value="${esc(m.ourRuns||"")}"></label>
+<label>Our wickets lost<input name="ourWkts" type="number" inputmode="numeric" min="0" max="10" value="${esc(m.ourWkts||"")}"></label>
+<label>Opposition runs<input name="oppRuns" type="number" inputmode="numeric" value="${esc(m.oppRuns||"")}"></label>
+<label>Opposition wickets lost<input name="oppWkts" type="number" inputmode="numeric" min="0" max="10" value="${esc(m.oppWkts||"")}"></label>
+<label>Our overs<input name="ourOvers" type="number" inputmode="decimal" step="0.1" min="0" placeholder="e.g. 18.3" value="${esc(m.ourOvers||"")}"></label>
+<label>Opposition overs<input name="oppOvers" type="number" inputmode="decimal" step="0.1" min="0" placeholder="e.g. 20" value="${esc(m.oppOvers||"")}"></label>
+</div>
+<label>Outcome<select name="outcome"><option value="">— Select —</option>${[["Won","Won"],["Lost","Lost"],["Draw","Draw"],["Tie","Tie"],["No result","No result"]].map(([v,l])=>`<option value="${v}" ${((m.outcome||({Win:"Won",Loss:"Lost",Draw:"Draw",NR:"No result"}[m.result?matchResultOutcome({result:m.result}):""]))===v)?"selected":""}>${l}</option>`).join("")}</select></label>
+<label>Result details<input name="result" value="${esc(m.result||"")}" placeholder="e.g. Won by 24 runs"></label>
+</div>
+</div>
+${matchSectionHead("teamreview","Team Review",false)}
+<div class="formgrid" id="matchSec-teamreview" style="display:none;margin-top:10px">
+<label>Overall team rating /10<input type="number" name="teamRating" min="1" max="10" value="${esc(m.teamRating||7)}"></label>
+<label class="full">Team performance notes<textarea name="teamNotes">${esc(m.teamNotes||"")}</textarea></label>
+</div>
 ${matchSectionHead("batting","Batting Review",false)}
 <div id="matchSec-batting" style="display:none;margin-top:10px">
-<div id="battingSummary" class="card" style="padding:12px 14px"></div>
-<button type="button" class="btn secondary" style="margin:10px 0;width:100%" onclick="qeOpen('grid')">✏️ Edit batting scorecard</button>
 <div class="card" style="margin-top:10px">
 ${BATTING_METRICS.map((metric,i)=>sliderRow(metric,`batRating_${i}`,(m.battingRatings&&m.battingRatings[metric])||5)).join("")}
 </div>
@@ -5591,8 +5647,6 @@ ${BATTING_METRICS.map((metric,i)=>sliderRow(metric,`batRating_${i}`,(m.battingRa
 </div>
 ${matchSectionHead("bowling","Bowling Review",false)}
 <div id="matchSec-bowling" style="display:none;margin-top:10px">
-<div id="bowlingSummary" class="card" style="padding:12px 14px"></div>
-<button type="button" class="btn secondary" style="margin:10px 0;width:100%" onclick="qeOpen('grid');qeTab('bowl')">✏️ Edit bowling scorecard</button>
 <div class="card" style="margin-top:10px">
 ${BOWLING_METRICS.map((metric,i)=>sliderRow(metric,`bowlRating_${i}`,(m.bowlingRatings&&m.bowlingRatings[metric])||5)).join("")}
 </div>
@@ -5600,6 +5654,8 @@ ${BOWLING_METRICS.map((metric,i)=>sliderRow(metric,`bowlRating_${i}`,(m.bowlingR
 </div>
 ${matchSectionHead("fielding","Fielding Review",false)}
 <div id="matchSec-fielding" style="display:none;margin-top:10px">
+<div class="muted" style="font-size:var(--fs-3);margin-bottom:8px">Team fielding counts. Filled automatically from the Fielding tab of the one-screen scorecard; type them here if you only count team totals.</div>
+<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px"><label>Catches taken<input name="taken" type="number" inputmode="numeric" min="0" value="${esc(m.taken||"")}"></label><label>Catches dropped<input name="missed" type="number" inputmode="numeric" min="0" value="${esc(m.missed||"")}"></label><label>Run outs<input name="runouts" type="number" inputmode="numeric" min="0" value="${esc(m.runouts||"")}"></label><label>Stumpings<input name="stumpings" type="number" inputmode="numeric" min="0" value="${esc(m.stumpings||"")}"></label><label>Misfields<input name="misfields" type="number" inputmode="numeric" min="0" value="${esc(m.misfields||"")}"></label></div>
 <div class="card">
 ${FIELDING_METRICS.map((metric,i)=>sliderRow(metric,`fieldRating_${i}`,(m.fieldingRatings&&m.fieldingRatings[metric])||m.rating||5)).join("")}
 </div>
@@ -5615,11 +5671,11 @@ ${matchSectionHead("learnings","Key Learnings & Training Actions",false)}
 </form>`}
 
 function openMatchForm(existing,mode){
- matchDraft={batting:existing&&existing.battingReview?JSON.parse(JSON.stringify(existing.battingReview)):[],bowling:existing&&existing.bowlingReview?JSON.parse(JSON.stringify(existing.bowlingReview)):[]};
+ matchDraft={batting:existing&&existing.battingReview?JSON.parse(JSON.stringify(existing.battingReview)):[],bowling:existing&&existing.bowlingReview?JSON.parse(JSON.stringify(existing.bowlingReview)):[],fielding:existing&&existing.fieldingReview?JSON.parse(JSON.stringify(existing.fieldingReview)):[]};
  battingNotesOpen=new WeakSet();bowlingNotesOpen=new WeakSet();
  editingMatchId=mode==="edit"?existing.id:null;
  modal(matchFormHtml(existing,mode));
- renderBattingRows();renderBowlingRows();
+ renderBattingRows();renderBowlingRows();renderFieldingRows();
 }
 function newMatch(){openMatchForm(null,"new")}
 function logMatchFromFixture(tournamentId,fixtureId){
@@ -5697,17 +5753,23 @@ function qeParse(text,pool){
  });
  return {bat,bowl};
 }
+function fieldSums(a){let S={taken:0,missed:0,runouts:0,stumpings:0,misfields:0};(a||[]).forEach(r=>{S.taken+=+r.catches||0;S.missed+=+r.drops||0;S.runouts+=+r.runouts||0;S.stumpings+=+r.stumpings||0;S.misfields+=+r.misfields||0});return S}
+function syncTeamFielding(){let a=matchDraft.fielding||[];if(!a.length)return;let S=fieldSums(a);Object.keys(S).forEach(k=>{let el=document.querySelector('#matchForm input[name="'+k+'"]');if(el)el.value=S[k]})}
+function renderFieldingRows(){let el=document.getElementById("fieldingSummary");if(!el)return;let a=(matchDraft.fielding||[]).filter(r=>r.name);
+ if(!a.length){el.innerHTML='<span class="muted">No fielding yet. Add catches, drops and run outs per player, or type team counts in Fielding Review.</span>';return}
+ let S=fieldSums(a);el.innerHTML=`<b>${a.length}</b> fielders · <b>${S.taken}</b> catches · <b>${S.missed}</b> dropped · <b>${S.runouts}</b> run outs`+(S.stumpings?` · <b>${S.stumpings}</b> stumpings`:"")}
 function qeOpen(mode){
  let xi=currentXINames();
  let pool=[...new Set([...xi,...activePlayers().map(p=>p.name)])];
- if(mode==="grid"&&!xi.length&&!matchDraft.batting.length&&!matchDraft.bowling.length){alert("Tick the Playing XI first, then open the one-screen grid.");return}
+ if(mode==="grid"&&!xi.length&&!matchDraft.batting.length&&!matchDraft.bowling.length&&!(matchDraft.fielding||[]).length){alert("Tick the Playing XI first, then open the one-screen grid.");let b=document.getElementById("matchSec-xi"),h=document.getElementById("matchSecHead-xi");if(b)b.style.display="";if(h){h.classList.add("open");h.scrollIntoView({block:"start"})}return}
  let allN=[...xi];
- matchDraft.batting.concat(matchDraft.bowling).forEach(r=>{if(r.name&&!allN.includes(r.name))allN.push(r.name)});
+ matchDraft.batting.concat(matchDraft.bowling,matchDraft.fielding||[]).forEach(r=>{if(r.name&&!allN.includes(r.name))allN.push(r.name)});
  let ordered=(draft)=>{let o=draft.map(r=>r.name).filter(n=>n&&allN.includes(n));return [...new Set([...o,...allN])]};
  let batNames=ordered(matchDraft.batting),bowlNames=ordered(matchDraft.bowling);
  qe={tab:mode==="paste"?"paste":"bat",pool,note:"",
   bat:batNames.map(n=>{let e=matchDraft.batting.find(r=>r.name===n);return e?{name:n,runs:e.runs||"",balls:e.balls||"",dismissal:e.dismissal||"Not out"}:{name:n,runs:"",balls:"",dismissal:"Not out"}}),
-  bowl:bowlNames.map(n=>{let e=matchDraft.bowling.find(r=>r.name===n);return e?{name:n,overs:e.overs||"",runs:e.runs||"",wickets:e.wickets||""}:{name:n,overs:"",runs:"",wickets:""}})};
+  bowl:bowlNames.map(n=>{let e=matchDraft.bowling.find(r=>r.name===n);return e?{name:n,overs:e.overs||"",runs:e.runs||"",wickets:e.wickets||""}:{name:n,overs:"",runs:"",wickets:""}}),
+  field:allN.map(n=>{let e=(matchDraft.fielding||[]).find(r=>r.name===n);return e?{name:n,ct:e.catches||"",dr:e.drops||"",ro:e.runouts||"",st:e.stumpings||"",mf:e.misfields||""}:{name:n,ct:"",dr:"",ro:"",st:"",mf:""}})};
  let ov=document.getElementById("qeOv");if(ov)ov.remove();
  ov=document.createElement("div");ov.id="qeOv";
  ov.style.cssText="position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)";
@@ -5722,6 +5784,7 @@ function qeTotals(){
  if(qe.tab==="bat"){let runs=0,w=0;qe.bat.forEach(r=>{if(r.dismissal===QE_DNB)return;runs+=+r.runs||0;if(qeIsOut(r.dismissal)&&(r.runs!==""||r.balls!==""))w++});
   el.innerHTML=`Total by batters <b>${runs}</b> · Wickets <b>${w}</b>`}
  else if(qe.tab==="bowl"){let w=0,rc=0;qe.bowl.forEach(r=>{w+=+r.wickets||0;rc+=+r.runs||0});el.innerHTML=`Runs conceded <b>${rc}</b> · Wickets <b>${w}</b>`}
+ else if(qe.tab==="field"){let c=0,d=0,o=0,t=0;qe.field.forEach(r=>{c+=+r.ct||0;d+=+r.dr||0;o+=+r.ro||0;t+=+r.st||0});el.innerHTML=`Catches <b>${c}</b> · Dropped <b>${d}</b> · Run outs <b>${o}</b> · Stumpings <b>${t}</b>`}
  else el.innerHTML=""}
  function qeMove(i,d){let a=qe[qe.tab],j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];qeRender(true)}
 function qeOrderStart(){qe.ordering=true;qe.seq=[];qeRender()}
@@ -5743,7 +5806,7 @@ function qeRender(keep){
  let ov=document.getElementById("qeOv");if(!ov||!qe)return;
  let oldB=document.getElementById("qeBody"),st=keep&&oldB?oldB.scrollTop:0;
  let tab=qe.tab;
- let tabBtn=(k,l)=>`<button type="button" class="btn ${tab===k?"primary":"secondary"}" style="flex:1" onclick="qeTab('${k}')">${l}</button>`;
+ let tabBtn=(k,l)=>`<button type="button" class="btn ${tab===k?"primary":"secondary"}" style="flex:1;padding:11px 4px;font-size:13px" onclick="qeTab('${k}')">${l}</button>`;
  let inp=(i,k,v,w,step)=>`<input class="qeIn" type="number" inputmode="${step?"decimal":"numeric"}" ${step?'step="0.1"':""} enterkeyhint="next" value="${esc(v)}" placeholder="–" style="width:100%;height:40px;text-align:center;font-weight:700;font-size:15px;border-radius:10px;min-width:0" oninput="qeSet(${i},'${k}',this.value)" onkeydown="qeKey(event)">`;
  let body="";
  if(tab==="paste"){
@@ -5756,6 +5819,10 @@ function qeRender(keep){
   <div style="display:grid;grid-template-columns:22px 1.2fr .6fr .6fr 1fr 24px;gap:6px;padding:0 2px 4px" class="muted"><span></span><span style="font-size:11px;font-weight:700">PLAYER</span><span style="font-size:11px;font-weight:700;text-align:center">RUNS</span><span style="font-size:11px;font-weight:700;text-align:center">BALLS</span><span style="font-size:11px;font-weight:700">HOW OUT</span><span></span></div>
   ${qe.bat.map((r,i)=>{let std=DISMISSAL_TYPES.filter(d=>d!=="Other");let cur=r.dismissal||"Not out";let list=[...std,QE_DNB];if(!list.includes(cur))list.push(cur);
    return `<div style="display:grid;grid-template-columns:22px 1.2fr .6fr .6fr 1fr 24px;gap:6px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line);${r.dismissal===QE_DNB?"opacity:.6":""}"><div style="display:grid;gap:2px"><button type="button" onclick="qeMove(${i},-1)" style="height:19px;width:22px;padding:0;border:0;border-radius:5px;background:var(--surface2);color:var(--muted);font-size:10px">▲</button><button type="button" onclick="qeMove(${i},1)" style="height:19px;width:22px;padding:0;border:0;border-radius:5px;background:var(--surface2);color:var(--muted);font-size:10px">▼</button></div>${qeNameCell(r,i)}${inp(i,"runs",r.runs)}${inp(i,"balls",r.balls)}<select style="width:100%;height:40px;padding:0 4px;line-height:1.2;font-size:12px;border-radius:10px;${r.chk?"border:1px solid var(--gold)":""}" onchange="qeSet(${i},'dismissal',this.value);this.style.opacity=1">${list.map(d=>`<option ${d===cur?"selected":""}>${esc(d)}</option>`).join("")}</select><button type="button" class="miniBtn" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--line);background:var(--surface2);color:var(--muted)" onclick="qeRemove(${i})">×</button></div>`}).join("")||empty("No players. Tick the Playing XI first.")}`;
+ }else if(tab==="field"){
+  body=`<div class="muted" style="font-size:12px;margin-bottom:8px">CT catches · DR dropped · RO run outs · ST stumpings · MF misfields. Leave blank for no entry.</div>
+  <div style="display:grid;grid-template-columns:1.3fr repeat(5,.6fr);gap:5px;padding:0 2px 4px" class="muted"><span style="font-size:11px;font-weight:700">PLAYER</span>${["CT","DR","RO","ST","MF"].map(h=>`<span style="font-size:11px;font-weight:700;text-align:center">${h}</span>`).join("")}</div>
+  ${qe.field.map((r,i)=>`<div style="display:grid;grid-template-columns:1.3fr repeat(5,.6fr);gap:5px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line)">${qeNameCell(r,i)}${["ct","dr","ro","st","mf"].map(k=>inp(i,k,r[k])).join("")}</div>`).join("")||empty("No players.")}`;
  }else{
   body=`<button type="button" class="btn secondary" style="width:100%;margin-bottom:10px" onclick="qeOrderStart()">↕ Tap players in bowling order</button>
   <div style="display:grid;grid-template-columns:22px 1.2fr .7fr .6fr .6fr 24px;gap:6px;padding:0 2px 4px" class="muted"><span></span><span style="font-size:11px;font-weight:700">PLAYER</span><span style="font-size:11px;font-weight:700;text-align:center">OVERS</span><span style="font-size:11px;font-weight:700;text-align:center">RUNS</span><span style="font-size:11px;font-weight:700;text-align:center">WKTS</span><span></span></div>
@@ -5763,7 +5830,7 @@ function qeRender(keep){
   <div class="muted" style="font-size:12px;margin-top:8px">Leave a row empty if the player did not bowl.</div>`;
  }
  ov.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 14px 6px"><h2 style="margin:0;font-size:20px">Match scorecard</h2><button type="button" class="x" onclick="qeClose()">×</button></div>
- <div style="display:flex;gap:8px;padding:6px 14px 10px">${tabBtn("bat","Batting")}${tabBtn("bowl","Bowling")}${tabBtn("paste","Paste")}</div>
+ <div style="display:flex;gap:8px;padding:6px 14px 10px">${tabBtn("bat","Batting")}${tabBtn("bowl","Bowling")}${tabBtn("field","Fielding")}${tabBtn("paste","Paste")}</div>
  <div id="qeBody" style="flex:1;overflow:auto;padding:0 14px 12px">${qe.ordering&&tab!=="paste"?qeOrderHtml():body}</div>
  <div style="padding:10px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--surface)"><div id="qeTot" class="muted" style="font-size:13px;margin-bottom:8px"></div><button type="button" class="btn primary" style="width:100%" onclick="qeApply()">Done — add to match</button></div>`;
   qeTotals();let nb=document.getElementById("qeBody");if(nb&&st)nb.scrollTop=st;
@@ -5794,11 +5861,14 @@ function qeApply(){
  qe.bowl.forEach(r=>{let n=rowName(r);if(!n)return;
   if(String(r.overs)===""&&String(r.runs)===""&&String(r.wickets)==="")return;
   let old=oldBowl.find(x=>x.name===n);bowlOut.push({name:n,overs:r.overs,runs:r.runs,wickets:r.wickets,notes:old?old.notes||"":""})});
- matchDraft.batting=batOut;matchDraft.bowling=bowlOut;
- let used=new Set([...batOut,...bowlOut].map(r=>r.name));
+ let fldNames=new Set(qe.field.map(rowName).filter(Boolean));
+ let fldOut=(matchDraft.fielding||[]).filter(r=>!fldNames.has(r.name));
+ qe.field.forEach(r=>{let n=rowName(r);if(!n)return;if(![r.ct,r.dr,r.ro,r.st,r.mf].some(v=>String(v)!==""))return;fldOut.push({name:n,catches:r.ct,drops:r.dr,runouts:r.ro,stumpings:r.st,misfields:r.mf})});
+ matchDraft.batting=batOut;matchDraft.bowling=bowlOut;matchDraft.fielding=fldOut;
+ let used=new Set([...batOut,...bowlOut,...fldOut].map(r=>r.name));
  document.querySelectorAll('input[name="playingXI"]').forEach(cb=>{if(used.has(cb.value))cb.checked=true});
  ["batting","bowling"].forEach(id=>{let b=document.getElementById("matchSec-"+id),h=document.getElementById("matchSecHead-"+id);if(b)b.style.display="";if(h)h.classList.add("open")});
- renderBattingRows();renderBowlingRows();qeClose();
+ renderBattingRows();renderBowlingRows();renderFieldingRows();syncTeamFielding();qeClose();
 }
 function copyLastPlayingXI(){
  let matches=db.matches.filter(m=>m.id!==editingMatchId&&m.playingXI&&m.playingXI.length).slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
@@ -5823,7 +5893,10 @@ function saveMatch(e){
  delete m.teamSelect;delete m.teamCustom;
  m.battingReview=matchDraft.batting.filter(r=>r.name&&String(r.name).trim());
  m.bowlingReview=matchDraft.bowling.filter(r=>r.name&&String(r.name).trim());
+ m.fieldingReview=(matchDraft.fielding||[]).filter(r=>r.name&&String(r.name).trim());
+ if(m.fieldingReview.length){let S=fieldSums(m.fieldingReview);m.taken=S.taken;m.missed=S.missed;m.runouts=S.runouts;m.stumpings=S.stumpings;m.misfields=S.misfields}
  m.playingXI=fd.getAll("playingXI");
+ if(!String(m.result||"").trim()&&m.outcome)m.result=m.outcome==="Won"?"Won":m.outcome==="Lost"?"Lost":m.outcome;
  m.battingRatings=collectRatings(fd,"batRating",BATTING_METRICS);
  m.bowlingRatings=collectRatings(fd,"bowlRating",BOWLING_METRICS);
  m.fieldingRatings=collectRatings(fd,"fieldRating",FIELDING_METRICS);
@@ -5870,7 +5943,7 @@ function matchReportView(id){
  ${m.scorerInnings?"":`<h2>Bowling Review</h2>${bowlingRows?`<table class="reportTable"><tr><th>Bowler</th><th>Overs</th><th>Runs</th><th>Wickets</th><th>Notes</th></tr>${bowlingRows}</table>`:empty("No bowling entries recorded.")}`}
  ${m.bowlingRatings?`<div class="card" style="margin-top:10px"><b>Bowling Assessment · ${avgRatingObj(m.bowlingRatings).toFixed(1)}/10 avg</b>${metricRows(m.bowlingRatings)}${m.bowlingAssessmentNotes?`<p style="margin-top:8px">${esc(m.bowlingAssessmentNotes)}</p>`:""}</div>`:""}
  ${m.scorecardText&&!m.scorerInnings?`<h2>Full Scorecard</h2><div class="card"><pre style="white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit;font-size:var(--fs-2);line-height:1.5">${esc(m.scorecardText)}</pre></div>`:""}
- <h2>Fielding Review</h2><div class="card">${(m.taken||m.missed||m.runouts||m.misfields)?`<p>Chances taken ${esc(m.taken||0)} · Missed ${esc(m.missed||0)} · Run outs ${esc(m.runouts||0)} · Misfields ${esc(m.misfields||0)}</p>`:""}${m.fieldingRatings?`<b>Fielding Assessment · ${avgRatingObj(m.fieldingRatings).toFixed(1)}/10 avg</b>${metricRows(m.fieldingRatings)}`:""}<p style="margin-top:8px">${esc(m.notes||"—")}</p></div>
+ <h2>Fielding Review</h2><div class="card">${(m.taken||m.missed||m.runouts||m.misfields||m.stumpings)?`<p>Catches taken ${esc(m.taken||0)} · Dropped ${esc(m.missed||0)} · Run outs ${esc(m.runouts||0)} · Stumpings ${esc(m.stumpings||0)} · Misfields ${esc(m.misfields||0)}</p>`:""}${(m.fieldingReview||[]).length?`<table class="reportTable"><tr><th>Player</th><th>Catches</th><th>Dropped</th><th>Run outs</th><th>Stumpings</th><th>Misfields</th></tr>${m.fieldingReview.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.catches||"-")}</td><td>${esc(r.drops||"-")}</td><td>${esc(r.runouts||"-")}</td><td>${esc(r.stumpings||"-")}</td><td>${esc(r.misfields||"-")}</td></tr>`).join("")}</table>`:""}${m.fieldingRatings?`<b>Fielding Assessment · ${avgRatingObj(m.fieldingRatings).toFixed(1)}/10 avg</b>${metricRows(m.fieldingRatings)}`:""}<p style="margin-top:8px">${esc(m.notes||"—")}</p></div>
  <h2>Team Review</h2><div class="card"><p><b>Rating:</b> ${esc(m.teamRating||"—")}/10</p><p>${esc(m.teamNotes||"—")}</p></div>
  <h2>Key Learnings &amp; Training Actions</h2><div class="card"><p>${esc(m.actions||"—")}</p></div>`;
  reportShell(`${esc(m.team||"Team")} vs ${esc(m.opp||"Opposition")}`,`${esc(fmtDate(m.date))} · Automatic Match Report`,body);
@@ -6171,24 +6244,26 @@ function assessmentCoverageHeatmapHtml(roster){
 
 /* ===== Real match figures for reports (replaces the old avg-rating cards) ===== */
 function matchTotals(m){
- if(m.scorerInnings&&m.scorerInnings.length){let t={fr:0,fw:0,ar:0,aw:0};m.scorerInnings.forEach(i=>{if(i.team===m.team){t.fr+=+i.runs||0;t.fw+=+i.wkts||0}else{t.ar+=+i.runs||0;t.aw+=+i.wkts||0}});return t}
  let has=v=>v!==undefined&&v!==null&&String(v).trim()!=="";
+ if(m.scorerInnings&&m.scorerInnings.length){let t={fr:0,fw:0,ar:0,aw:0,fb:0,ab:0};m.scorerInnings.forEach(i=>{if(i.team===m.team){t.fr+=+i.runs||0;t.fw+=+i.wkts||0;t.fb+=ovToBalls(i.overs)}else{t.ar+=+i.runs||0;t.aw+=+i.wkts||0;t.ab+=ovToBalls(i.overs)}});return t}
  if(!(has(m.ourRuns)||has(m.oppRuns)))return null;
- return {fr:+m.ourRuns||0,fw:+m.ourWkts||0,ar:+m.oppRuns||0,aw:+m.oppWkts||0};
+ return {fr:+m.ourRuns||0,fw:+m.ourWkts||0,ar:+m.oppRuns||0,aw:+m.oppWkts||0,fb:ovToBalls(m.ourOvers),ab:ovToBalls(m.oppOvers)};
 }
+function totalsLine(m,t){return `${esc(m.team||"Us")} ${t.fr}/${t.fw}${t.fb?" ("+ballsToOv(t.fb)+")":""} · ${esc(m.opp||"Opposition")} ${t.ar}/${t.aw}${t.ab?" ("+ballsToOv(t.ab)+")":""}`}
 function ballsToOv(b){b=Math.round(b||0);return Math.floor(b/6)+(b%6?"."+(b%6):"")}
 function bowlAvgText(rc,w){return w?(rc/w).toFixed(1):"—"}
 function ovToBalls(o){let t=String(o==null?"":o).trim();if(!t)return 0;let a=t.split(".");return(parseInt(a[0])||0)*6+(parseInt(a[1])||0)}
 function isOutText(d){d=String(d||"").trim();return !!d&&!/^(not out|retired hurt|absent hurt|did not bat)/i.test(d)}
 function matchStatsAgg(matches,onlyName){
- let P={},T={rc:0,ob:0,runs:0,wkts:0,taken:0,missed:0,runouts:0,misfields:0,fieldN:0,forRuns:0,againstRuns:0,wLost:0,wTaken:0,scoredN:0,decided:0,wins:0,hasBat:false,hasBowl:false};
- let g=n=>{let k=nameKey(n);return P[k]||(P[k]={name:String(n).trim(),mats:{},runs:0,balls:0,inns:0,outs:0,hs:0,hsNo:false,f50:0,f100:0,ob:0,rc:0,w:0,bw:-1,br:0,bowlInns:0})};
+ let P={},T={rc:0,ob:0,runs:0,wkts:0,taken:0,missed:0,runouts:0,misfields:0,fieldN:0,forRuns:0,againstRuns:0,wLost:0,wTaken:0,stump:0,fB:0,fBR:0,aB:0,aBR:0,scoredN:0,decided:0,wins:0,hasBat:false,hasBowl:false};
+ let g=n=>{let k=nameKey(n);return P[k]||(P[k]={name:String(n).trim(),mats:{},runs:0,balls:0,inns:0,outs:0,hs:0,hsNo:false,f50:0,f100:0,ob:0,rc:0,w:0,bw:-1,br:0,bowlInns:0,ct:0,dr:0,ro:0,st:0,mf:0,fldInns:0})};
  matches.forEach(m=>{
   (m.battingReview||[]).forEach(r=>{if(!r||!r.name)return;if(onlyName&&!sameName(r.name,onlyName))return;let p=g(r.name),runs=+r.runs||0,out=isOutText(r.dismissal);p.mats[m.id]=1;p.inns++;p.runs+=runs;p.balls+=+r.balls||0;if(out)p.outs++;if(runs>p.hs||(runs===p.hs&&!out)){p.hs=runs;p.hsNo=!out}if(runs>=100)p.f100++;else if(runs>=50)p.f50++;T.runs+=runs;T.hasBat=true});
   (m.bowlingReview||[]).forEach(r=>{if(!r||!r.name)return;if(onlyName&&!sameName(r.name,onlyName))return;let p=g(r.name),w=+r.wickets||0,rc=+r.runs||0;p.mats[m.id]=1;p.bowlInns++;p.ob+=ovToBalls(r.overs);p.rc+=rc;p.w+=w;if(w>p.bw||(w===p.bw&&rc<p.br)){p.bw=w;p.br=rc}T.wkts+=w;T.rc+=rc;T.ob+=ovToBalls(r.overs);T.hasBowl=true});
+  (m.fieldingReview||[]).forEach(r=>{if(!r||!r.name)return;if(onlyName&&!sameName(r.name,onlyName))return;let p=g(r.name);p.mats[m.id]=1;p.fldInns++;p.ct+=+r.catches||0;p.dr+=+r.drops||0;p.ro+=+r.runouts||0;p.st+=+r.stumpings||0;p.mf+=+r.misfields||0});
   if(!onlyName){
-   if(m.taken||m.missed||m.runouts||m.misfields){T.taken+=+m.taken||0;T.missed+=+m.missed||0;T.runouts+=+m.runouts||0;T.misfields+=+m.misfields||0;T.fieldN++}
-   {let t=matchTotals(m);if(t){T.forRuns+=t.fr;T.againstRuns+=t.ar;T.wLost+=t.fw;T.wTaken+=t.aw;T.scoredN++}}
+   if(m.taken||m.missed||m.runouts||m.misfields||m.stumpings){T.stump+=+m.stumpings||0;T.taken+=+m.taken||0;T.missed+=+m.missed||0;T.runouts+=+m.runouts||0;T.misfields+=+m.misfields||0;T.fieldN++}
+   {let t=matchTotals(m);if(t){T.forRuns+=t.fr;T.againstRuns+=t.ar;T.wLost+=t.fw;T.wTaken+=t.aw;T.scoredN++;if(t.fb){T.fB+=t.fb;T.fBR+=t.fr}if(t.ab){T.aB+=t.ab;T.aBR+=t.ar}}}
    let oc=matchResultOutcome(m);if(oc==="Win"||oc==="Loss"||oc==="Draw"){T.decided++;if(oc==="Win")T.wins++}
   }
  });
@@ -6206,12 +6281,15 @@ function matchPerfHtml(matches){
  let catches=(T.taken+T.missed)?Math.round(T.taken/(T.taken+T.missed)*100)+"%":"—";
  let h=`<div class="grid g4">${statCardHtml("Win rate",winPct)}${statCardHtml("Runs for",T.scoredN?T.forRuns:"—")}${statCardHtml("Runs against",T.scoredN?T.againstRuns:"—")}${statCardHtml("Catch rate",catches)}</div>`;
  h+=`<div class="grid g3" style="margin-top:12px">${statCardHtml("Wickets taken",T.scoredN?T.wTaken:"—")}${statCardHtml("Wickets lost",T.scoredN?T.wLost:"—")}${statCardHtml("Matches with scores",T.scoredN)}</div>`;
+ if(T.fB||T.aB)h+=`<div class="grid g4" style="margin-top:12px">${statCardHtml("Overs faced",T.fB?ballsToOv(T.fB):"—")}${statCardHtml("Run rate for",T.fB?(T.fBR*6/T.fB).toFixed(2):"—")}${statCardHtml("Overs bowled (team)",T.aB?ballsToOv(T.aB):"—")}${statCardHtml("Run rate against",T.aB?(T.aBR*6/T.aB).toFixed(2):"—")}</div>`;
  if(!T.scoredN)h+=`<div class="muted" style="font-size:12px;margin-top:6px">Add team scores in the match form (or score the match in the Match Scorer) to see runs and wickets for and against.</div>`;
- if(T.hasBowl)h+=`<div class="grid g4" style="margin-top:12px">${statCardHtml("Bowlers: runs conceded",T.rc)}${statCardHtml("Overs bowled",ballsToOv(T.ob))}${statCardHtml("Bowling avg",bowlAvgText(T.rc,T.wkts))}${statCardHtml("Economy",T.ob?(T.rc*6/T.ob).toFixed(2):"—")}</div>`;
- if(T.fieldN)h+=`<div class="card" style="margin-top:12px"><span class="muted">Fielding</span><div style="margin-top:4px">Catches taken ${T.taken} · Missed ${T.missed} · Run outs ${T.runouts} · Misfields ${T.misfields}</div></div>`;
+ if(T.hasBowl)h+=`<div class="grid g4" style="margin-top:12px">${statCardHtml("Bowlers: runs conceded",T.rc)}${statCardHtml("Bowlers: overs",ballsToOv(T.ob))}${statCardHtml("Bowling avg",bowlAvgText(T.rc,T.wkts))}${statCardHtml("Economy",T.ob?(T.rc*6/T.ob).toFixed(2):"—")}</div>`;
+ if(T.fieldN)h+=`<div class="card" style="margin-top:12px"><span class="muted">Fielding</span><div style="margin-top:4px">Catches taken ${T.taken} · Missed ${T.missed} · Run outs ${T.runouts} · Misfields ${T.misfields}${T.stump?" · Stumpings "+T.stump:""}</div></div>`;
  let bats=pl.filter(p=>p.runs>0).sort((a,b)=>b.runs-a.runs).slice(0,3);
  let bowls=pl.filter(p=>p.w>0).sort((a,b)=>b.w-a.w||a.rc-b.rc).slice(0,3);
  if(bats.length)h+=`<div class="card" style="margin-top:12px"><span class="muted">Top run-scorers</span>${statRowsHtml(bats,p=>`${p.runs} runs · avg ${batAvgText(p)} · HS ${p.hs}${p.hsNo?"*":""}`)}</div>`;
+ let flds=pl.filter(p=>p.ct+p.ro+p.st>0).sort((a,b)=>(b.ct+b.ro+b.st)-(a.ct+a.ro+a.st)).slice(0,3);
+ if(flds.length)h+=`<div class="card" style="margin-top:12px"><span class="muted">Top fielders</span>${statRowsHtml(flds,p=>[p.ct?p.ct+(p.ct===1?" catch":" catches"):"",p.ro?p.ro+(p.ro===1?" run out":" run outs"):"",p.st?p.st+(p.st===1?" stumping":" stumpings"):""].filter(Boolean).join(" · "))}</div>`;
  if(bowls.length)h+=`<div class="card" style="margin-top:12px"><span class="muted">Top wicket-takers</span>${statRowsHtml(bowls,p=>`${p.w} wkts · ${ballsToOv(p.ob)} ov, ${p.rc} runs · best ${p.bw}/${p.br} · econ ${econText(p)}`)}</div>`;
  return h;
 }
@@ -6220,6 +6298,7 @@ function playerMatchStatsHtml(p,matches){
  let h="";
  if(s.inns)h+=`<h2>Batting Record</h2><div class="grid g4">${statCardHtml("Innings",s.inns)}${statCardHtml("Runs",s.runs)}${statCardHtml("Average",batAvgText(s))}${statCardHtml("Strike rate",batSrText(s))}</div><div class="card" style="margin-top:12px">Highest score ${s.hs}${s.hsNo?"*":""} · 50s ${s.f50} · 100s ${s.f100}</div>`;
  if(s.bowlInns)h+=`<h2>Bowling Record</h2><div class="grid g4">${statCardHtml("Matches",s.bowlInns)}${statCardHtml("Wickets",s.w)}${statCardHtml("Economy",econText(s))}${statCardHtml("Best",s.bw+"/"+s.br)}</div><div class="grid g3" style="margin-top:12px">${statCardHtml("Overs",ballsToOv(s.ob))}${statCardHtml("Runs conceded",s.rc)}${statCardHtml("Average",bowlAvgText(s.rc,s.w))}</div>`;
+ if(s.fldInns){let cp=(s.ct+s.dr)?Math.round(s.ct/(s.ct+s.dr)*100)+"%":"—";h+=`<h2>Fielding Record</h2><div class="grid g4">${statCardHtml("Matches",s.fldInns)}${statCardHtml("Catches",s.ct)}${statCardHtml("Catch rate",cp)}${statCardHtml("Run outs",s.ro)}</div>`+((s.st||s.dr||s.mf)?`<div class="card" style="margin-top:12px">Dropped ${s.dr} · Stumpings ${s.st} · Misfields ${s.mf}</div>`:"")}
  return h;
 }
 function matchHighlightHtml(m){
@@ -6228,7 +6307,7 @@ function matchHighlightHtml(m){
  let bw=pl.filter(p=>p.w>0).sort((a,b)=>b.w-a.w||a.rc-b.rc)[0];
  let L=[];
  if(m.scoreLine)L.push(`<p>${esc(m.scoreLine)}</p>`);
- else{let t=matchTotals(m);if(t)L.push(`<p>${esc(m.team||"Us")} ${t.fr}/${t.fw} · ${esc(m.opp||"Opposition")} ${t.ar}/${t.aw}</p>`)}
+ else{let t=matchTotals(m);if(t)L.push(`<p>${totalsLine(m,t)}</p>`)}
  if(m.result)L.push(`<p><b>Result:</b> ${esc(m.result)}</p>`);
  if(top||bw)L.push(`<p>${top?`Top score: ${esc(top.name)} ${top.runs}${top.hsNo?"*":""}(${top.balls||0})`:""}${top&&bw?" · ":""}${bw?`Best bowling: ${esc(bw.name)} ${bw.w}/${bw.rc} (${ballsToOv(bw.ob)} ov)`:""}</p>`);
  if(m.taken||m.missed||m.runouts||m.misfields)L.push(`<p>Fielding: catches taken ${esc(m.taken||0)} · missed ${esc(m.missed||0)} · run outs ${esc(m.runouts||0)} · misfields ${esc(m.misfields||0)}</p>`);
