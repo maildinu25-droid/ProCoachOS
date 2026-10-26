@@ -6283,7 +6283,6 @@ function matchPerfHtml(matches){
  h+=`<div class="grid g3" style="margin-top:12px">${statCardHtml("Wickets taken",T.scoredN?T.wTaken:"—")}${statCardHtml("Wickets lost",T.scoredN?T.wLost:"—")}${statCardHtml("Matches with scores",T.scoredN)}</div>`;
  if(T.fB||T.aB)h+=`<div class="grid g4" style="margin-top:12px">${statCardHtml("Overs faced",T.fB?ballsToOv(T.fB):"—")}${statCardHtml("Run rate for",T.fB?(T.fBR*6/T.fB).toFixed(2):"—")}${statCardHtml("Overs bowled (team)",T.aB?ballsToOv(T.aB):"—")}${statCardHtml("Run rate against",T.aB?(T.aBR*6/T.aB).toFixed(2):"—")}</div>`;
  if(!T.scoredN)h+=`<div class="muted" style="font-size:12px;margin-top:6px">Add team scores in the match form (or score the match in the Match Scorer) to see runs and wickets for and against.</div>`;
- if(T.hasBowl)h+=`<div class="grid g4" style="margin-top:12px">${statCardHtml("Bowlers: runs conceded",T.rc)}${statCardHtml("Bowlers: overs",ballsToOv(T.ob))}${statCardHtml("Bowling avg",bowlAvgText(T.rc,T.wkts))}${statCardHtml("Economy",T.ob?(T.rc*6/T.ob).toFixed(2):"—")}</div>`;
  if(T.fieldN)h+=`<div class="card" style="margin-top:12px"><span class="muted">Fielding</span><div style="margin-top:4px">Catches taken ${T.taken} · Missed ${T.missed} · Run outs ${T.runouts} · Misfields ${T.misfields}${T.stump?" · Stumpings "+T.stump:""}</div></div>`;
  let bats=pl.filter(p=>p.runs>0).sort((a,b)=>b.runs-a.runs).slice(0,3);
  let bowls=pl.filter(p=>p.w>0).sort((a,b)=>b.w-a.w||a.rc-b.rc).slice(0,3);
