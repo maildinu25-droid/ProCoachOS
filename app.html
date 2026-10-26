@@ -5473,7 +5473,9 @@ function toggleBattingNotes(i){
  if(battingNotesOpen.has(row))battingNotesOpen.delete(row);else battingNotesOpen.add(row);
  renderBattingRows();
 }
-function renderBattingRows(){document.getElementById("battingRows").innerHTML=matchDraft.batting.length?matchDraft.batting.map(battingRowHtml).join(""):`<tr><td colspan="5">${empty("No batting entries yet.")}</td></tr>`;enhanceTextareasWithVoice(document.getElementById("battingRows"))}
+function renderBattingRows(){let el=document.getElementById("battingSummary");if(!el)return;let rows=matchDraft.batting.filter(r=>r.name);if(!rows.length){el.innerHTML='<span class="muted">No batting scores yet. Use the one-screen scorecard or paste one.</span>';return}
+ let runs=rows.reduce((t,r)=>t+(+r.runs||0),0),top=rows.slice().sort((a,b)=>(+b.runs||0)-(+a.runs||0))[0];
+ el.innerHTML=`<b>${rows.length}</b> batters · <b>${runs}</b> runs<div class="muted" style="margin-top:4px;font-size:13px">Top: ${esc(top.name)} ${esc(top.runs||0)}${top.balls?"("+esc(top.balls)+")":""}</div>`}
 function addBattingRow(){matchDraft.batting.push({name:"",runs:"",balls:"",dismissal:"Not out",notes:""});renderBattingRows()}
 function removeBattingRow(i){matchDraft.batting.splice(i,1);renderBattingRows()}
 
@@ -5501,7 +5503,9 @@ function toggleBowlingNotes(i){
  if(bowlingNotesOpen.has(row))bowlingNotesOpen.delete(row);else bowlingNotesOpen.add(row);
  renderBowlingRows();
 }
-function renderBowlingRows(){document.getElementById("bowlingRows").innerHTML=matchDraft.bowling.length?matchDraft.bowling.map(bowlingRowHtml).join(""):`<tr><td colspan="5">${empty("No bowling entries yet.")}</td></tr>`;enhanceTextareasWithVoice(document.getElementById("bowlingRows"))}
+function renderBowlingRows(){let el=document.getElementById("bowlingSummary");if(!el)return;let rows=matchDraft.bowling.filter(r=>r.name);if(!rows.length){el.innerHTML='<span class="muted">No bowling figures yet. Use the one-screen scorecard or paste one.</span>';return}
+ let w=rows.reduce((t,r)=>t+(+r.wickets||0),0),top=rows.slice().sort((a,b)=>(+b.wickets||0)-(+a.wickets||0)||(+a.runs||0)-(+b.runs||0))[0];
+ el.innerHTML=`<b>${rows.length}</b> bowlers · <b>${w}</b> wickets<div class="muted" style="margin-top:4px;font-size:13px">Best: ${esc(top.name)} ${esc(top.wickets||0)}/${esc(top.runs||0)}</div>`}
 function addBowlingRow(){matchDraft.bowling.push({name:"",overs:"",runs:"",wickets:"",notes:""});renderBowlingRows()}
 function removeBowlingRow(i){matchDraft.bowling.splice(i,1);renderBowlingRows()}
 
@@ -5573,8 +5577,8 @@ ${activePlayers().length?`<button type="button" class="btn secondary" style="mar
 <div class="toolbar" style="margin-top:14px"><button type="button" class="btn secondary" onclick="qeOpen('grid')">⚡ One-screen scorecard</button><button type="button" class="btn secondary" onclick="qeOpen('paste')">📋 Paste scorecard</button></div>
 ${matchSectionHead("batting","Batting Review",false)}
 <div id="matchSec-batting" style="display:none;margin-top:10px">
-<div class="matchEntryWrap"><table class="matchEntryTable"><thead><tr><th style="width:44%">Batter</th><th style="width:15%">R</th><th style="width:15%">B</th><th style="width:20%">Dismissal</th><th style="width:34px"></th></tr></thead><tbody id="battingRows"></tbody></table></div>
-<button type="button" class="btn secondary" style="margin:10px 0" onclick="addBattingRow()">+ Add batter</button>
+<div id="battingSummary" class="card" style="padding:12px 14px"></div>
+<button type="button" class="btn secondary" style="margin:10px 0;width:100%" onclick="qeOpen('grid')">✏️ Edit batting scorecard</button>
 <div class="card" style="margin-top:10px">
 ${BATTING_METRICS.map((metric,i)=>sliderRow(metric,`batRating_${i}`,(m.battingRatings&&m.battingRatings[metric])||5)).join("")}
 </div>
@@ -5582,8 +5586,8 @@ ${BATTING_METRICS.map((metric,i)=>sliderRow(metric,`batRating_${i}`,(m.battingRa
 </div>
 ${matchSectionHead("bowling","Bowling Review",false)}
 <div id="matchSec-bowling" style="display:none;margin-top:10px">
-<div class="matchEntryWrap"><table class="matchEntryTable"><thead><tr><th style="width:38%">Bowler</th><th style="width:22%">Ov</th><th style="width:15%">R</th><th style="width:22%">W</th><th style="width:34px"></th></tr></thead><tbody id="bowlingRows"></tbody></table></div>
-<button type="button" class="btn secondary" style="margin:10px 0" onclick="addBowlingRow()">+ Add bowler</button>
+<div id="bowlingSummary" class="card" style="padding:12px 14px"></div>
+<button type="button" class="btn secondary" style="margin:10px 0;width:100%" onclick="qeOpen('grid');qeTab('bowl')">✏️ Edit bowling scorecard</button>
 <div class="card" style="margin-top:10px">
 ${BOWLING_METRICS.map((metric,i)=>sliderRow(metric,`bowlRating_${i}`,(m.bowlingRatings&&m.bowlingRatings[metric])||5)).join("")}
 </div>
@@ -5685,7 +5689,7 @@ function qeParse(text,pool){
 function qeOpen(mode){
  let xi=currentXINames();
  let pool=[...new Set([...xi,...activePlayers().map(p=>p.name)])];
- if(mode==="grid"&&!xi.length){alert("Tick the Playing XI first, then open the one-screen grid.");return}
+ if(mode==="grid"&&!xi.length&&!matchDraft.batting.length&&!matchDraft.bowling.length){alert("Tick the Playing XI first, then open the one-screen grid.");return}
  let names=[...xi];
  matchDraft.batting.forEach(r=>{if(r.name&&!names.includes(r.name))names.push(r.name)});
  matchDraft.bowling.forEach(r=>{if(r.name&&!names.includes(r.name))names.push(r.name)});
