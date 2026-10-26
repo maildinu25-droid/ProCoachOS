@@ -3220,7 +3220,9 @@ function players(){
 }
 function playerAssessments(p){return db.assessments.filter(a=>a.player===p.name).slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")))}
 function playerSessions(p){return activeSessions().filter(s=>Array.isArray(s.attendees)&&s.attendees.includes(p.name)).slice().sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a)))}
-function playerMatches(p){return db.matches.filter(m=>(m.playingXI||[]).includes(p.name)||(m.battingReview||[]).some(r=>r.name===p.name)||(m.bowlingReview||[]).some(r=>r.name===p.name)).slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))}
+function nameKey(n){return String(n||'').replace(/\s+/g,' ').trim().toLowerCase()}
+function sameName(a,b){return nameKey(a)===nameKey(b)}
+function playerMatches(p){return db.matches.filter(m=>(m.playingXI||[]).some(n=>sameName(n,p.name))||(m.battingReview||[]).some(r=>sameName(r.name,p.name))||(m.bowlingReview||[]).some(r=>sameName(r.name,p.name))).slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")))}
 function goalStatusInfo(g){
  if(g.achieved)return{text:"Achieved"+(g.achievedDate?" "+fmtDate(g.achievedDate):""),color:"var(--g)"};
  if(!g.targetDate)return{text:"No target date",color:"var(--muted)"};
@@ -3393,7 +3395,7 @@ function playerViewBody(p,forPrint){
  <h2 class="section">Assessment history (${assessments.length})</h2>${assessments.length?`<div class="card">${assessments.map(a=>`<div class="item"><div><b>${esc(fmtDate(a.date))}</b>${assessmentFormatTagsHtml(a)}<div class="muted">${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</div>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div></div>`).join("")}</div>`:empty("No assessments yet.")}
  <h2 class="section">Session attendance (${sessions.length})</h2>${sessions.length?`<div class="card">${sessions.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}${sessionFocusText(s)?" · "+esc(sessionFocusText(s)):""}</b><div class="muted">${esc(fmtDate(s.date))}${(s.campId&&campById(s.campId))?" · 🏕 "+esc(campById(s.campId).name):""}</div></div>${forPrint?"":`<button class="btn secondary" onclick="closeM();printSessionPlan('${s.id}')">View</button>`}</div>`).join("")}</div>`:empty("No recorded attendance yet.")}
  ${matchPatternsHtml(p)}
- <h2 class="section">Match history (${matches.length})</h2>${matches.length?`<div class="card">${matches.map(m=>{let bat=(m.battingReview||[]).find(r=>r.name===p.name);let bowl=(m.bowlingReview||[]).find(r=>r.name===p.name);return `<div class="item"><div><b>vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(fmtDate(m.date))}${bat?" · "+esc(bat.runs||0)+"("+esc(bat.balls||0)+")":""}${bowl?" · "+esc(bowl.wickets||0)+"/"+esc(bowl.runs||0):""}</div></div><button class="btn secondary" onclick="closeM();matchReportView('${m.id}')">Report</button></div>`}).join("")}</div>`:empty("No match entries yet.")}`;
+ <h2 class="section">Match history (${matches.length})</h2>${matches.length?`<div class="card">${matches.map(m=>{let bat=(m.battingReview||[]).find(r=>sameName(r.name,p.name));let bowl=(m.bowlingReview||[]).find(r=>sameName(r.name,p.name));return `<div class="item"><div><b>vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(fmtDate(m.date))}${bat?" · "+esc(bat.runs||0)+"("+esc(bat.balls||0)+")":""}${bowl?" · "+esc(bowl.wickets||0)+"/"+esc(bowl.runs||0):""}</div></div><button class="btn secondary" onclick="closeM();matchReportView('${m.id}')">Report</button></div>`}).join("")}</div>`:empty("No match entries yet.")}`;
 }
 function playerView(id){let p=db.players.find(x=>x.id===id);if(!p)return;modal(`<div class="sheetHead"><h2>${esc(p.name)}</h2><button class="x" onclick="closeM()">×</button></div>${playerViewBody(p)}<button class="btn secondary" style="margin-top:14px" onclick="playerProfileReport('${p.id}')">Print Profile</button>
  <button class="btn secondary" style="margin-top:8px" onclick="parentSummaryReport('${p.id}')">Parent / Player Summary</button>
@@ -5568,6 +5570,7 @@ ${matchSectionHead("xi","Playing XI",false)}
 <div class="muted" style="font-size:var(--fs-3);margin-bottom:8px">Who actually played this match — so match counts in Player Reports are accurate even for players who fielded but didn't bat or bowl.</div>
 ${activePlayers().length?`<button type="button" class="btn secondary" style="margin-bottom:10px" onclick="copyLastPlayingXI()">Copy from last match</button><div class="skillPick">${activePlayers().map(p=>`<label style="${p.available==="no"?"opacity:.55":""}"><input type="checkbox" name="playingXI" value="${esc(p.name)}" onchange="renderBattingRows();renderBowlingRows()" ${(m.playingXI||[]).includes(p.name)?"checked":""}> ${esc(p.name)}${p.available==="no"?` <span class="muted">(unavailable)</span>`:""}</label>`).join("")}</div>`:`<div class="muted">No players yet — add players to select a Playing XI.</div>`}
 </div>
+<div class="toolbar" style="margin-top:14px"><button type="button" class="btn secondary" onclick="qeOpen('grid')">⚡ One-screen scorecard</button><button type="button" class="btn secondary" onclick="qeOpen('paste')">📋 Paste scorecard</button></div>
 ${matchSectionHead("batting","Batting Review",false)}
 <div id="matchSec-batting" style="display:none;margin-top:10px">
 <div class="matchEntryWrap"><table class="matchEntryTable"><thead><tr><th style="width:44%">Batter</th><th style="width:15%">R</th><th style="width:15%">B</th><th style="width:20%">Dismissal</th><th style="width:34px"></th></tr></thead><tbody id="battingRows"></tbody></table></div>
@@ -5615,6 +5618,157 @@ function logMatchFromFixture(tournamentId,fixtureId){
  let f=(t.fixtures||[]).find(x=>x.id===fixtureId);if(!f)return;
  let squadNames=(t.squadPlayerIds||[]).map(id=>{let p=db.players.find(x=>x.id===id);return p?p.name:null}).filter(Boolean);
  openMatchForm({date:f.date||today(),opp:f.opponent||"",venue:f.venue||"",tournamentId:t.id,playingXI:squadNames},"new");
+}
+// ===== Match Centre quick entry: one-screen grid + paste-a-scorecard =====
+let qe=null;
+const QE_DNB="Did not bat";
+function qeToks(s){return String(s||"").toLowerCase().replace(/[^a-z0-9 ]/g," ").split(/\s+/).filter(Boolean)}
+function qeMatchName(raw,pool){
+ let ex=pool.find(n=>sameName(n,raw));if(ex)return ex;
+ let rt=qeToks(raw);if(!rt.length)return "";
+ let hits=pool.filter(n=>{let ct=qeToks(n);
+  let allIn=rt.every(t=>ct.some(c=>c===t||(t.length===1&&c[0]===t)));
+  let strong=rt.some(t=>t.length>1&&ct.includes(t));
+  return allIn&&strong});
+ if(hits.length===1)return hits[0];
+ if(!hits.length&&rt.length===1){let h2=pool.filter(n=>qeToks(n).includes(rt[0]));if(h2.length===1)return h2[0]}
+ return "";
+}
+function qeNormDismissal(t){
+ let s=String(t||"").trim().toLowerCase();
+ if(!s)return "";
+ if(/^(not out|batting|n\/o|no)\b/.test(s))return "Not out";
+ if(/^(c\s*&\s*b|c and b)/.test(s))return "Caught and bowled";
+ if(/^c\s/.test(s)||s==="c")return "Caught";
+ if(/^b\s/.test(s)||s==="b")return "Bowled";
+ if(/^lbw/.test(s))return "LBW";
+ if(/^run out/.test(s))return "Run out";
+ if(/^(st\s|stumped)/.test(s))return "Stumped";
+ if(/^hit wicket/.test(s))return "Hit wicket";
+ if(/^retired/.test(s))return "Retired hurt";
+ return String(t).trim();
+}
+function qeParse(text,pool){
+ let bat=[],bowl=[],mode="bat";
+ String(text||"").split(/\r?\n/).forEach(line=>{
+  let l=line.replace(/[\t ]+/g," ").replace(/^\s*\d+[.)]\s+/,"").trim();
+  if(!l)return;let low=l.toLowerCase();
+  if(/^(bowling|bowlers?)\b/.test(low)||/\bo\s+m\s+r\s+w\b/.test(low)){mode="bowl";return}
+  if(/^(batting|batters?|batsmen|batter)\b/.test(low)||/\br\s+b\s+4s\b/.test(low)){mode="bat";return}
+  if(/^(extras|total|fall of|did not bat|yet to bat|dnb|overs?\b|score|result|toss|innings|partnership|man of)/.test(low))return;
+  l=l.replace(/\((?:c|wk|vc|c\s*&\s*wk|c\s*&\s*wk)\)/ig," ").replace(/[†]/g," ");
+  if(mode==="bowl"){
+   let m=l.match(/^([^\d(]*?[A-Za-z.])\s*(\d+)\s*\/\s*(\d+)\s*\((\d+(?:\.\d)?)\)/);
+   let name,ov,rc,wk;
+   if(m){name=m[1];wk=m[2];rc=m[3];ov=m[4]}
+   else{let i=l.search(/\d/);if(i<1)return;name=l.slice(0,i);let nums=l.slice(i).match(/\d+(?:\.\d+)?/g)||[];
+    if(nums.length>=4){ov=nums[0];rc=nums[2];wk=nums[3]}else if(nums.length===3){ov=nums[0];rc=nums[1];wk=nums[2]}else return}
+   name=name.replace(/[*\s]+$/,"").trim();if(!name)return;
+   bowl.push({name:qeMatchName(name,pool)||name,flag:!qeMatchName(name,pool),overs:ov,runs:rc,wickets:wk});
+   return}
+  let i=l.search(/\d/);if(i<0)return;
+  let head=l.slice(0,i).trim(),rest=l.slice(i);
+  let name=head,dis="";
+  let km=head.match(/\s(not out|batting|c\s*&\s*b|c and b|c|b|lbw|run out|st|stumped|hit wicket|retired.*|absent.*)(?=\s|$)/i);
+  if(km){name=head.slice(0,km.index);dis=head.slice(km.index).trim()}
+  name=name.replace(/[*\s]+$/,"").trim();if(!name)return;
+  let runs,balls="";
+  let rm=rest.match(/^(\d+)(\*?)\s*\(\s*(\d+)\s*\)/);
+  let star=/^\d+\*/.test(rest)||/\*\s*$/.test(head);
+  if(rm){runs=rm[1];balls=rm[3]}else{let nums=rest.match(/\d+/g)||[];runs=nums[0];balls=nums[1]||""}
+  let d=qeNormDismissal(dis),chk=false;
+  if(!d){if(star)d="Not out";else{d="Not out";chk=true}}
+  bat.push({name:qeMatchName(name,pool)||name,flag:!qeMatchName(name,pool),runs,balls,dismissal:d,chk});
+ });
+ return {bat,bowl};
+}
+function qeOpen(mode){
+ let xi=currentXINames();
+ let pool=[...new Set([...xi,...activePlayers().map(p=>p.name)])];
+ if(mode==="grid"&&!xi.length){alert("Tick the Playing XI first, then open the one-screen grid.");return}
+ let names=[...xi];
+ matchDraft.batting.forEach(r=>{if(r.name&&!names.includes(r.name))names.push(r.name)});
+ matchDraft.bowling.forEach(r=>{if(r.name&&!names.includes(r.name))names.push(r.name)});
+ qe={tab:mode==="paste"?"paste":"bat",pool,note:"",
+  bat:names.map(n=>{let e=matchDraft.batting.find(r=>r.name===n);return e?{name:n,runs:e.runs||"",balls:e.balls||"",dismissal:e.dismissal||"Not out"}:{name:n,runs:"",balls:"",dismissal:"Not out"}}),
+  bowl:names.map(n=>{let e=matchDraft.bowling.find(r=>r.name===n);return e?{name:n,overs:e.overs||"",runs:e.runs||"",wickets:e.wickets||""}:{name:n,overs:"",runs:"",wickets:""}})};
+ let ov=document.getElementById("qeOv");if(ov)ov.remove();
+ ov=document.createElement("div");ov.id="qeOv";
+ ov.style.cssText="position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)";
+ document.body.appendChild(ov);qeRender();
+}
+function qeClose(){let ov=document.getElementById("qeOv");if(ov)ov.remove();qe=null}
+function qeTab(t){qe.tab=t;qeRender()}
+function qeSet(i,k,v){let r=qe[qe.tab][i];if(!r)return;r[k]=v;if(k==="name"){r.flag=false}qeTotals()}
+function qeIsOut(d){return !!d&&!/^(not out|did not bat|retired hurt)$/i.test(d)}
+function qeTotals(){
+ let el=document.getElementById("qeTot");if(!el||!qe)return;
+ if(qe.tab==="bat"){let runs=0,w=0;qe.bat.forEach(r=>{if(r.dismissal===QE_DNB)return;runs+=+r.runs||0;if(qeIsOut(r.dismissal)&&(r.runs!==""||r.balls!==""))w++});
+  el.innerHTML=`Total by batters <b>${runs}</b> · Wickets <b>${w}</b>`}
+ else if(qe.tab==="bowl"){let w=0,rc=0;qe.bowl.forEach(r=>{w+=+r.wickets||0;rc+=+r.runs||0});el.innerHTML=`Runs conceded <b>${rc}</b> · Wickets <b>${w}</b>`}
+ else el.innerHTML=""}
+function qeRemove(i){qe[qe.tab].splice(i,1);qeRender()}
+function qeKey(ev){if(ev.key!=="Enter")return;ev.preventDefault();let all=[...document.querySelectorAll("#qeOv .qeIn")];let k=all.indexOf(ev.target);if(k>-1&&all[k+1])all[k+1].focus();else ev.target.blur()}
+function qeNameCell(r,i){
+ if(!r.flag)return `<div style="font-weight:700;font-size:14px;line-height:1.2">${esc(r.name)}</div>`;
+ let opts=qe.pool.filter(n=>!qe[qe.tab].some((x,j)=>j!==i&&x.name===n)).map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
+ return `<select style="width:100%;padding:6px 4px;font-size:12px;border:1px solid var(--red);border-radius:8px" onchange="qeSet(${i},'name',this.value);${"qeRender()"}"><option value="${esc(r.name)}">? ${esc(r.name)}</option><option value="">— skip this row —</option>${opts}</select>`;
+}
+function qeRender(){
+ let ov=document.getElementById("qeOv");if(!ov||!qe)return;
+ let tab=qe.tab;
+ let tabBtn=(k,l)=>`<button type="button" class="btn ${tab===k?"primary":"secondary"}" style="flex:1" onclick="qeTab('${k}')">${l}</button>`;
+ let inp=(i,k,v,w,step)=>`<input class="qeIn" type="number" inputmode="${step?"decimal":"numeric"}" ${step?'step="0.1"':""} enterkeyhint="next" value="${esc(v)}" placeholder="–" style="width:100%;height:40px;text-align:center;font-weight:700;font-size:15px;border-radius:10px;min-width:0" oninput="qeSet(${i},'${k}',this.value)" onkeydown="qeKey(event)">`;
+ let body="";
+ if(tab==="paste"){
+  body=`<div class="muted" style="font-size:13px;margin-bottom:8px">Paste a scorecard (from CricHeroes, Cricbuzz, a WhatsApp message…). On a screenshot, long-press the text and tap Copy (Live Text / Google Lens), then paste here. Names are matched to your squad and you review everything before it is saved.</div>
+  <textarea id="qePaste" rows="11" style="width:100%;font-size:14px" placeholder="Arjun Mehta c Rao b Shah 54 40&#10;Karthik Rao not out 72 (60)&#10;&#10;Bowling&#10;Rahul Nair 4-0-23-2"></textarea>
+  <button type="button" class="btn primary" style="width:100%;margin-top:10px" onclick="qeRead()">Read scorecard</button>`;
+ }else if(tab==="bat"){
+  body=`${qe.note?`<div class="card" style="padding:10px 12px;margin-bottom:10px;font-size:13px">${qe.note}</div>`:""}
+  <div style="display:grid;grid-template-columns:1.3fr .6fr .6fr 1fr 26px;gap:6px;padding:0 2px 4px" class="muted"><span style="font-size:11px;font-weight:700">PLAYER</span><span style="font-size:11px;font-weight:700;text-align:center">RUNS</span><span style="font-size:11px;font-weight:700;text-align:center">BALLS</span><span style="font-size:11px;font-weight:700">HOW OUT</span><span></span></div>
+  ${qe.bat.map((r,i)=>{let std=DISMISSAL_TYPES.filter(d=>d!=="Other");let cur=r.dismissal||"Not out";let list=[...std,QE_DNB];if(!list.includes(cur))list.push(cur);
+   return `<div style="display:grid;grid-template-columns:1.3fr .6fr .6fr 1fr 26px;gap:6px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line);${r.dismissal===QE_DNB?"opacity:.6":""}">${qeNameCell(r,i)}${inp(i,"runs",r.runs)}${inp(i,"balls",r.balls)}<select style="width:100%;height:40px;padding:0 4px;line-height:1.2;font-size:12px;border-radius:10px;${r.chk?"border:1px solid var(--gold)":""}" onchange="qeSet(${i},'dismissal',this.value);this.style.opacity=1">${list.map(d=>`<option ${d===cur?"selected":""}>${esc(d)}</option>`).join("")}</select><button type="button" class="miniBtn" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--line);background:var(--surface2);color:var(--muted)" onclick="qeRemove(${i})">×</button></div>`}).join("")||empty("No players. Tick the Playing XI first.")}`;
+ }else{
+  body=`<div style="display:grid;grid-template-columns:1.3fr .7fr .6fr .6fr 26px;gap:6px;padding:0 2px 4px" class="muted"><span style="font-size:11px;font-weight:700">PLAYER</span><span style="font-size:11px;font-weight:700;text-align:center">OVERS</span><span style="font-size:11px;font-weight:700;text-align:center">RUNS</span><span style="font-size:11px;font-weight:700;text-align:center">WKTS</span><span></span></div>
+  ${qe.bowl.map((r,i)=>`<div style="display:grid;grid-template-columns:1.3fr .7fr .6fr .6fr 26px;gap:6px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line)">${qeNameCell(r,i)}${inp(i,"overs",r.overs,0,true)}${inp(i,"runs",r.runs)}${inp(i,"wickets",r.wickets)}<button type="button" class="miniBtn" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--line);background:var(--surface2);color:var(--muted)" onclick="qeRemove(${i})">×</button></div>`).join("")||empty("No players.")}
+  <div class="muted" style="font-size:12px;margin-top:8px">Leave a row empty if the player did not bowl.</div>`;
+ }
+ ov.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 14px 6px"><h2 style="margin:0;font-size:20px">Match scorecard</h2><button type="button" class="x" onclick="qeClose()">×</button></div>
+ <div style="display:flex;gap:8px;padding:6px 14px 10px">${tabBtn("bat","Batting")}${tabBtn("bowl","Bowling")}${tabBtn("paste","Paste")}</div>
+ <div style="flex:1;overflow:auto;padding:0 14px 12px">${body}</div>
+ <div style="padding:10px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--surface)"><div id="qeTot" class="muted" style="font-size:13px;margin-bottom:8px"></div><button type="button" class="btn primary" style="width:100%" onclick="qeApply()">Done — add to match</button></div>`;
+ qeTotals();
+}
+function qeRead(){
+ let t=(document.getElementById("qePaste")||{}).value||"";
+ if(!t.trim()){alert("Paste the scorecard text first.");return}
+ let res=qeParse(t,qe.pool);
+ if(!res.bat.length&&!res.bowl.length){alert("Couldn't find any scores in that text. Each line should look like: Name 54 (40) or Name 4-0-23-2.");return}
+ let merge=(list,rows,blank)=>rows.forEach(p=>{let j=list.findIndex(x=>x.name===p.name&&!p.flag);
+  if(j>-1){let keep=list[j];Object.assign(keep,p)}else list.push(p)});
+ merge(qe.bat,res.bat);merge(qe.bowl,res.bowl);
+ let unm=res.bat.concat(res.bowl).filter(r=>r.flag).length,chk=res.bat.filter(r=>r.chk).length;
+ qe.note=`Read <b>${res.bat.length}</b> batters and <b>${res.bowl.length}</b> bowlers.`+(unm?` <span style="color:var(--red)">${unm} name(s) not found in your squad (red) — pick the right player or skip.</span>`:"")+(chk?` <span style="color:var(--gold)">${chk} row(s) had no how-out in the text (amber) — check them, they are set to Not out.</span>`:"");
+ qe.tab="bat";qeRender();
+}
+function qeApply(){
+ let rowName=r=>String(r.name||"").trim();
+ let batNames=new Set(qe.bat.map(rowName).filter(Boolean)),bowlNames=new Set(qe.bowl.map(rowName).filter(Boolean));
+ let oldBat=matchDraft.batting,oldBowl=matchDraft.bowling;
+ let batOut=oldBat.filter(r=>!batNames.has(r.name));
+ qe.bat.forEach(r=>{let n=rowName(r);if(!n||r.dismissal===QE_DNB)return;
+  if(String(r.runs)===""&&String(r.balls)===""&&(!r.dismissal||r.dismissal==="Not out"))return;
+  let old=oldBat.find(x=>x.name===n);batOut.push({name:n,runs:r.runs,balls:r.balls,dismissal:r.dismissal||"Not out",notes:old?old.notes||"":""})});
+ let bowlOut=oldBowl.filter(r=>!bowlNames.has(r.name));
+ qe.bowl.forEach(r=>{let n=rowName(r);if(!n)return;
+  if(String(r.overs)===""&&String(r.runs)===""&&String(r.wickets)==="")return;
+  let old=oldBowl.find(x=>x.name===n);bowlOut.push({name:n,overs:r.overs,runs:r.runs,wickets:r.wickets,notes:old?old.notes||"":""})});
+ matchDraft.batting=batOut;matchDraft.bowling=bowlOut;
+ let used=new Set([...batOut,...bowlOut].map(r=>r.name));
+ document.querySelectorAll('input[name="playingXI"]').forEach(cb=>{if(used.has(cb.value))cb.checked=true});
+ ["batting","bowling"].forEach(id=>{let b=document.getElementById("matchSec-"+id),h=document.getElementById("matchSecHead-"+id);if(b)b.style.display="";if(h)h.classList.add("open")});
+ renderBattingRows();renderBowlingRows();qeClose();
 }
 function copyLastPlayingXI(){
  let matches=db.matches.filter(m=>m.id!==editingMatchId&&m.playingXI&&m.playingXI.length).slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
@@ -5984,6 +6138,61 @@ function assessmentCoverageHeatmapHtml(roster){
  <div class="muted" style="margin-top:8px;display:flex;gap:14px;flex-wrap:wrap"><span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--g)"></span> Within 30 days</span><span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--gold)"></span> 30–60 days</span><span><span style="display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--red)"></span> 60+ days or never</span></div>
  </div>`;
 }
+
+/* ===== Real match figures for reports (replaces the old avg-rating cards) ===== */
+function ovToBalls(o){let t=String(o==null?"":o).trim();if(!t)return 0;let a=t.split(".");return(parseInt(a[0])||0)*6+(parseInt(a[1])||0)}
+function isOutText(d){d=String(d||"").trim();return !!d&&!/not out/i.test(d)}
+function matchStatsAgg(matches,onlyName){
+ let P={},T={runs:0,wkts:0,taken:0,missed:0,runouts:0,misfields:0,fieldN:0,forRuns:0,againstRuns:0,scoredN:0,decided:0,wins:0,hasBat:false,hasBowl:false};
+ let g=n=>{let k=nameKey(n);return P[k]||(P[k]={name:String(n).trim(),mats:{},runs:0,balls:0,inns:0,outs:0,hs:0,hsNo:false,f50:0,f100:0,ob:0,rc:0,w:0,bw:-1,br:0,bowlInns:0})};
+ matches.forEach(m=>{
+  (m.battingReview||[]).forEach(r=>{if(!r||!r.name)return;if(onlyName&&!sameName(r.name,onlyName))return;let p=g(r.name),runs=+r.runs||0,out=isOutText(r.dismissal);p.mats[m.id]=1;p.inns++;p.runs+=runs;p.balls+=+r.balls||0;if(out)p.outs++;if(runs>p.hs||(runs===p.hs&&!out)){p.hs=runs;p.hsNo=!out}if(runs>=100)p.f100++;else if(runs>=50)p.f50++;T.runs+=runs;T.hasBat=true});
+  (m.bowlingReview||[]).forEach(r=>{if(!r||!r.name)return;if(onlyName&&!sameName(r.name,onlyName))return;let p=g(r.name),w=+r.wickets||0,rc=+r.runs||0;p.mats[m.id]=1;p.bowlInns++;p.ob+=ovToBalls(r.overs);p.rc+=rc;p.w+=w;if(w>p.bw||(w===p.bw&&rc<p.br)){p.bw=w;p.br=rc}T.wkts+=w;T.hasBowl=true});
+  if(!onlyName){
+   if(m.taken||m.missed||m.runouts||m.misfields){T.taken+=+m.taken||0;T.missed+=+m.missed||0;T.runouts+=+m.runouts||0;T.misfields+=+m.misfields||0;T.fieldN++}
+   if(m.scorerInnings&&m.scorerInnings.length){m.scorerInnings.forEach(i=>{if(i.team===m.team)T.forRuns+=+i.runs||0;else T.againstRuns+=+i.runs||0});T.scoredN++}
+   let oc=matchResultOutcome(m);if(oc==="Win"||oc==="Loss"||oc==="Draw"){T.decided++;if(oc==="Win")T.wins++}
+  }
+ });
+ return{players:Object.values(P).map(p=>({...p,matches:Object.keys(p.mats).length})),T};
+}
+function statCardHtml(l,v){return `<div class="card stat"><span>${l}</span><b>${v}</b></div>`}
+function statRowsHtml(arr,fmt){return arr.map(x=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0"><span>${esc(x.name)}</span><b style="text-align:right">${fmt(x)}</b></div>`).join("")}
+function batAvgText(p){return p.outs?(p.runs/p.outs).toFixed(1):(p.inns?"n/o":"—")}
+function batSrText(p){return p.balls?(p.runs*100/p.balls).toFixed(0):"—"}
+function econText(p){return p.ob?(p.rc*6/p.ob).toFixed(2):"—"}
+function matchPerfHtml(matches){
+ let A=matchStatsAgg(matches),T=A.T,pl=A.players;
+ if(!T.hasBat&&!T.hasBowl&&!T.fieldN&&!T.decided)return empty("No scorecard data here yet. Add batting and bowling entries to a match, or score it in the Match Scorer.");
+ let winPct=T.decided?Math.round(T.wins/T.decided*100)+"%":"—";
+ let catches=(T.taken+T.missed)?Math.round(T.taken/(T.taken+T.missed)*100)+"%":"—";
+ let h=`<div class="grid g4">${statCardHtml("Win rate",winPct)}${statCardHtml("Runs",T.hasBat?T.runs:"—")}${statCardHtml("Wickets",T.hasBowl?T.wkts:"—")}${statCardHtml("Catch rate",catches)}</div>`;
+ if(T.scoredN)h+=`<div class="grid g3" style="margin-top:12px">${statCardHtml("Runs for",T.forRuns)}${statCardHtml("Runs against",T.againstRuns)}${statCardHtml("Scored matches",T.scoredN)}</div>`;
+ if(T.fieldN)h+=`<div class="card" style="margin-top:12px"><span class="muted">Fielding</span><div style="margin-top:4px">Catches taken ${T.taken} · Missed ${T.missed} · Run outs ${T.runouts} · Misfields ${T.misfields}</div></div>`;
+ let bats=pl.filter(p=>p.runs>0).sort((a,b)=>b.runs-a.runs).slice(0,3);
+ let bowls=pl.filter(p=>p.w>0).sort((a,b)=>b.w-a.w||a.rc-b.rc).slice(0,3);
+ if(bats.length)h+=`<div class="card" style="margin-top:12px"><span class="muted">Top run-scorers</span>${statRowsHtml(bats,p=>`${p.runs} runs · avg ${batAvgText(p)} · HS ${p.hs}${p.hsNo?"*":""}`)}</div>`;
+ if(bowls.length)h+=`<div class="card" style="margin-top:12px"><span class="muted">Top wicket-takers</span>${statRowsHtml(bowls,p=>`${p.w} wkts · best ${p.bw}/${p.br} · econ ${econText(p)}`)}</div>`;
+ return h;
+}
+function playerMatchStatsHtml(p,matches){
+ let s=matchStatsAgg(matches,p.name).players[0];if(!s)return "";
+ let h="";
+ if(s.inns)h+=`<h2>Batting Record</h2><div class="grid g4">${statCardHtml("Innings",s.inns)}${statCardHtml("Runs",s.runs)}${statCardHtml("Average",batAvgText(s))}${statCardHtml("Strike rate",batSrText(s))}</div><div class="card" style="margin-top:12px">Highest score ${s.hs}${s.hsNo?"*":""} · 50s ${s.f50} · 100s ${s.f100}</div>`;
+ if(s.bowlInns)h+=`<h2>Bowling Record</h2><div class="grid g4">${statCardHtml("Matches",s.bowlInns)}${statCardHtml("Wickets",s.w)}${statCardHtml("Economy",econText(s))}${statCardHtml("Best",s.bw+"/"+s.br)}</div>`;
+ return h;
+}
+function matchHighlightHtml(m){
+ let pl=matchStatsAgg([m]).players;
+ let top=pl.filter(p=>p.runs>0).sort((a,b)=>b.runs-a.runs)[0];
+ let bw=pl.filter(p=>p.w>0).sort((a,b)=>b.w-a.w||a.rc-b.rc)[0];
+ let L=[];
+ if(m.scoreLine)L.push(`<p>${esc(m.scoreLine)}</p>`);
+ if(m.result)L.push(`<p><b>Result:</b> ${esc(m.result)}</p>`);
+ if(top||bw)L.push(`<p>${top?`Top score: ${esc(top.name)} ${top.runs}${top.hsNo?"*":""}(${top.balls||0})`:""}${top&&bw?" · ":""}${bw?`Best bowling: ${esc(bw.name)} ${bw.w}/${bw.rc}`:""}</p>`);
+ if(m.taken||m.missed||m.runouts||m.misfields)L.push(`<p>Fielding: catches taken ${esc(m.taken||0)} · missed ${esc(m.missed||0)} · run outs ${esc(m.runouts||0)} · misfields ${esc(m.misfields||0)}</p>`);
+ return L.join("");
+}
 function buildTeamReport(){
  let scope=scopeValues();
  let{from,to}=reportRangeValues();
@@ -6020,13 +6229,13 @@ function buildTeamReport(){
  reportShell(`Team Report — ${esc(scopeLabel(scope))}`,`${roster.length} player${roster.length!==1?"s":""} · ${matches.length} match${matches.length!==1?"es":""} · ${rangeLabel(from,to)}`,
  `<div class="grid g4"><div class="card stat"><span>Players</span><b>${roster.length}</b></div><div class="card stat"><span>Wins</span><b>${wins}</b></div><div class="card stat"><span>Losses</span><b>${losses}</b></div><div class="card stat"><span>Draws</span><b>${draws}</b></div></div>
  ${matches.length?`<div class="card" style="margin-top:15px"><span class="muted">Recent Form (oldest → newest)</span><div style="margin-top:8px">${recentForm}</div></div>`:""}
- <h2>Team Averages</h2><div class="grid g3"><div class="card stat"><span>Avg Batting</span><b>${avgOf(batAvgs)}</b></div><div class="card stat"><span>Avg Bowling</span><b>${avgOf(bowlAvgs)}</b></div><div class="card stat"><span>Avg Fielding</span><b>${avgOf(fieldAvgs)}</b></div></div>
+ <h2>Team Performance</h2>${matchPerfHtml(matches)}
  <div class="card" style="margin-top:12px"><span class="muted">Average Attendance</span><div style="margin-top:4px;font-size:20px;font-weight:800">${avgAttendance!==null?avgAttendance+"%":"No session data in this range"}</div></div>
  <h2>Roster — Match Performance</h2>${roster.length?roster.map(p=>{
   let pMatches=playerMatches(p).filter(m=>inRange(m.date,from,to));
   let runs=pMatches.reduce((sum,m)=>{let r=(m.battingReview||[]).find(x=>x.name===p.name);return sum+(r?(+r.runs||0):0)}, 0);
   let wickets=pMatches.reduce((sum,m)=>{let r=(m.bowlingReview||[]).find(x=>x.name===p.name);return sum+(r?(+r.wickets||0):0)}, 0);
-  return `<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span><p class="muted">${pMatches.length} match${pMatches.length!==1?"es":""} · ${runs} run${runs!==1?"s":""} · ${wickets} wicket${wickets!==1?"s":""}</p></div>`;
+  return `<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span><p class="muted">${pMatches.length} match${pMatches.length!==1?"es":""} · ${runs} run${runs!==1?"s":""} · ${wickets} wicket${wickets!==1?"s":""}${(()=>{let st=matchStatsAgg(pMatches,p.name).players[0];return st&&st.inns?` · avg ${batAvgText(st)} · SR ${batSrText(st)}`:""})()}</p></div>`;
  }).join(""):empty("No players in this scope.")}
  <h2>Match Results</h2>${matches.length?matches.map(m=>`<div class="card"><b>${esc(fmtDate(m.date))} · vs ${esc(m.opp||"Opposition")}</b><p>${esc(m.result||"—")}</p></div>`).join(""):empty("No matches recorded in this scope.")}`);
 }
@@ -6120,7 +6329,8 @@ function buildTournamentReport(){
  let avgOf=arr=>arr.length?(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1):"—";
  reportShell(`Tournament Report — ${esc(t.name)}`,`${esc(fmtDate(t.startDate)||"?")} → ${esc(fmtDate(t.endDate)||"?")} · ${matches.length} matches`,
  `<div class="grid g4"><div class="card stat"><span>Wins</span><b>${wins}</b></div><div class="card stat"><span>Losses</span><b>${losses}</b></div><div class="card stat"><span>Draws</span><b>${draws}</b></div><div class="card stat"><span>Matches</span><b>${matches.length}</b></div></div>
- <div class="grid g3" style="margin-top:15px"><div class="card stat"><span>Avg Batting</span><b>${avgOf(batAvgs)}</b></div><div class="card stat"><span>Avg Bowling</span><b>${avgOf(bowlAvgs)}</b></div><div class="card stat"><span>Avg Fielding</span><b>${avgOf(fieldAvgs)}</b></div></div>
+ <h2>Tournament Performance</h2>${matchPerfHtml(matches)}
+ ${(()=>{let u=(t.squadPlayerIds||[]).map(id=>db.players.find(p=>p.id===id)).filter(Boolean).map(p=>({name:p.name,n:playerMatches(p).filter(m=>m.tournamentId===tid).length}));return (u.length&&matches.length)?`<h2>Matches Played</h2><div class="card">${statRowsHtml(u.sort((a,b)=>b.n-a.n),x=>x.n+" of "+matches.length)}</div>`:""})()}
  ${t.notes?`<h2>Notes</h2><div class="card"><p>${esc(t.notes)}</p></div>`:""}
  ${(t.squadPlayerIds&&t.squadPlayerIds.length)?`<h2>Squad</h2><div class="card"><p>${t.squadPlayerIds.map(id=>db.players.find(p=>p.id===id)).filter(Boolean).map(p=>esc(p.name)).join(", ")}</p></div>`:""}
  ${(t.fixtures&&t.fixtures.length)?`<h2>Fixture Plan</h2>${t.fixtures.slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||""))).map(f=>{
@@ -6151,7 +6361,8 @@ function buildSeasonAnalyticsReport(){
  reportShell(`Season Analytics — ${esc(s.name)}`,`${esc(fmtDate(s.startDate))} → ${esc(fmtDate(s.endDate))}`,
  `<div class="grid g3"><div class="card stat"><span>Sessions</span><b>${seasonSessions.length}</b></div><div class="card stat"><span>Coaching Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Reflections</span><b>${seasonReflections.length}</b></div></div>
  <div class="grid g4" style="margin-top:15px"><div class="card stat"><span>Matches</span><b>${seasonMatches.length}</b></div><div class="card stat"><span>Wins</span><b>${wins}</b></div><div class="card stat"><span>Losses</span><b>${losses}</b></div><div class="card stat"><span>Draws</span><b>${draws}</b></div></div>
- <div class="card" style="margin-top:15px"><span class="muted">Avg Assessment Rating</span><b style="display:block;font-size:var(--fs-7);color:var(--g);margin-top:6px">${teamAvg}${teamAvg!=="—"?"/10":""}</b></div>
+ <div class="grid g3" style="margin-top:15px">${statCardHtml("Assessments",seasonAssessments.length)}${statCardHtml("Players assessed",new Set(seasonAssessments.map(a=>a.player)).size)}${statCardHtml("Camps",(db.camps||[]).filter(c=>c.startDate&&c.startDate>=s.startDate&&c.startDate<=s.endDate&&(!s.team||c.team===s.team)).length)}</div>
+ <h2>Match Performance</h2>${matchPerfHtml(seasonMatches)}
  ${(s.phases&&s.phases.length)?`<h2>Season Plan — Phase Breakdown</h2>${s.phases.slice().sort((a,b)=>String(a.startDate||"").localeCompare(String(b.startDate||""))).map(ph=>{
   let actual=activeSessions().filter(x=>ph.startDate&&ph.endDate&&x.date>=ph.startDate&&x.date<=ph.endDate&&x.sessionType!=="player"&&(!s.team||x.squad===s.team)).length;
   let target=Number(ph.sessionTarget)||0;
@@ -6886,7 +7097,7 @@ function monthlyReport(){
 function buildMonthlyReport(){
  let mk=(document.getElementById("monthlyReportMonth").value||today().slice(0,7));
  let ss=activeSessions().filter(x=>monthKey(x.date)===mk),aa=db.assessments.filter(x=>monthKey(x.date)===mk),rr=db.reflections.filter(x=>monthKey(x.date)===mk),mm=db.matches.filter(x=>monthKey(x.date)===mk),hrs=ss.reduce((a,s)=>a+(+s.duration||0),0)/60;
- reportShell("Monthly Coaching Report",fmtMonthKey(mk),`<div class="grid g4"><div class="card stat"><span>Sessions</span><b>${ss.length}</b></div><div class="card stat"><span>Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Assessments</span><b>${aa.length}</b></div><div class="card stat"><span>Reflections</span><b>${rr.length}</b></div></div><h2>Sessions</h2>${ss.length?ss.map(s=>`<div class="card"><b>${esc(fmtDate(s.date))} · ${esc(s.title||"—")}</b> <span class="tag">${esc(sessionTypeLabel(s.sessionType))}</span><p>${esc(s.objectives||"")}</p></div>`).join(""):empty("No sessions in this month.")}<h2>Assessments</h2>${aa.length?aa.map(a=>`<div class="card"><b>${esc(a.player)} · ${assessmentAvg(a)}/10</b><p>${esc(a.priority||"")}</p></div>`).join(""):empty("No assessments in this month.")}<h2>Match actions</h2>${mm.length?mm.map(m=>`<div class="card"><b>${esc(m.team)} vs ${esc(m.opp)}</b><p>${esc(m.actions||m.notes||"")}</p></div>`).join(""):empty("No match notes in this month.")}`)}
+ reportShell("Monthly Coaching Report",fmtMonthKey(mk),`<div class="grid g4"><div class="card stat"><span>Sessions</span><b>${ss.length}</b></div><div class="card stat"><span>Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Assessments</span><b>${aa.length}</b></div><div class="card stat"><span>Reflections</span><b>${rr.length}</b></div></div>${mm.length?`<h2>Match Performance</h2>${matchPerfHtml(mm)}`:""}<h2>Sessions</h2>${ss.length?ss.map(s=>`<div class="card"><b>${esc(fmtDate(s.date))} · ${esc(s.title||"—")}</b> <span class="tag">${esc(sessionTypeLabel(s.sessionType))}</span><p>${esc(s.objectives||"")}</p></div>`).join(""):empty("No sessions in this month.")}<h2>Assessments</h2>${aa.length?aa.map(a=>`<div class="card"><b>${esc(a.player)} · ${assessmentAvg(a)}/10</b><p>${esc(a.priority||"")}</p></div>`).join(""):empty("No assessments in this month.")}<h2>Match actions</h2>${mm.length?mm.map(m=>`<div class="card"><b>${esc(m.team)} vs ${esc(m.opp)}</b><p>${esc(m.actions||m.notes||"")}</p></div>`).join(""):empty("No match notes in this month.")}`)}
 function playerReport(){
  if(!activePlayers().length){alert("Add a player first.");return}
  modal(`<div class="sheetHead"><h2>Player Development Report</h2><button class="x" onclick="closeM()">×</button></div>
@@ -6912,8 +7123,8 @@ function buildPlayerReport(){
   });
  });
  let matches=playerMatches(p).filter(m=>inRange(m.date,from,to)).slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
- let battingEntries=matches.map(m=>(m.battingReview||[]).find(r=>r.name===p.name)).filter(Boolean);
- let bowlingEntries=matches.map(m=>(m.bowlingReview||[]).find(r=>r.name===p.name)).filter(Boolean);
+ let battingEntries=matches.map(m=>(m.battingReview||[]).find(r=>sameName(r.name,p.name))).filter(Boolean);
+ let bowlingEntries=matches.map(m=>(m.bowlingReview||[]).find(r=>sameName(r.name,p.name))).filter(Boolean);
  let totalRuns=battingEntries.reduce((s,r)=>s+(+r.runs||0),0);
  let totalWickets=bowlingEntries.reduce((s,r)=>s+(+r.wickets||0),0);
  let backToBackCount=0;
@@ -6973,6 +7184,7 @@ function buildPlayerReport(){
  ${Object.entries(disciplineTrend).some(([,t])=>t.count>=2)?`<h2>Development Trend</h2><div class="card">${Object.entries(disciplineTrend).filter(([,t])=>t.count>=2).map(([d,t])=>{let diff=(t.last-t.first).toFixed(1);let sign=t.last>=t.first?"+":"";let color=t.last>=t.first?"var(--g)":"var(--red)";return `<div style="margin-bottom:6px"><b>${esc(d)}:</b> ${t.first.toFixed(1)} → ${t.last.toFixed(1)} <span style="color:${color};font-weight:700">(${sign}${diff})</span></div>`}).join("")}</div>`:""}
  ${playerProgressPrintHtml(aa)}
  ${matches.length?`<h2>Match Performance</h2><div class="card"><p>${battingEntries.length?`Batting: ${totalRuns} run${totalRuns!==1?"s":""} across ${battingEntries.length} innings`:""}${battingEntries.length&&bowlingEntries.length?" · ":""}${bowlingEntries.length?`Bowling: ${totalWickets} wicket${totalWickets!==1?"s":""} across ${bowlingEntries.length} match${bowlingEntries.length!==1?"es":""}`:""}${!battingEntries.length&&!bowlingEntries.length?`Played in ${matches.length} match${matches.length!==1?"es":""}, no batting or bowling entries logged.`:""}</p>${backToBackCount>0?`<p style="margin-top:8px;color:var(--gold)"><b>⚠ Workload note:</b> ${backToBackCount} match${backToBackCount!==1?"es":""} played with a day or less rest before the next one.</p>`:""}</div>`:""}
+ ${playerMatchStatsHtml(p,matches)}
  ${matchTrendHtml}
  <h2>Assessment History</h2>${aa.length?aa.slice().reverse().map(a=>`<div class="card"><b>${esc(fmtDate(a.date))} · ${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</b><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d}${disciplineAvg(a,d)==="—"?"":" "+disciplineAvg(a,d)+"/10"}</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${assessmentDetailHTML(a)}${techAssessHtml(a)}</div>`).join(""):empty("No assessments for this player.")}`)}
 function seasonReport(){scopeAndRangeModal("Season / Full Report","buildSeasonReport")}
@@ -7010,6 +7222,7 @@ function buildSeasonReport(){
  ${avgAttendance!==null?`<div class="card" style="margin-top:12px"><span class="muted">Average Attendance</span><div style="font-size:22px;font-weight:800">${avgAttendance}%</div></div>`:""}
  ${categoryCounts.length?`<h2>Coaching Focus This Period</h2><div class="card">${categoryCounts.map(c=>`<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${esc(c.name)}</span><b>${c.count} session${c.count!==1?"s":""}</b></div>`).join("")}</div>`:""}
  ${mostImproved.length?`<h2>Most Improved</h2><div class="card">${mostImproved.map(m=>`<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${esc(m.name)}</span><b style="color:var(--g)">${m.first.toFixed(1)} → ${m.last.toFixed(1)} (+${m.diff.toFixed(1)})</b></div>`).join("")}</div>`:""}
+ ${matches.length?`<h2>Match Performance</h2>${matchPerfHtml(matches)}`:""}
  <h2>Players</h2>${roster.map(p=>`<div class="card"><b>${esc(p.name)} · ${esc(p.role||"")}</b><p>${esc(p.focus||"")}</p></div>`).join("")||empty("No players in this scope.")}
  <h2>Coach Reflections Summary</h2><div class="card"><p>${reflections.length} reflection${reflections.length!==1?"s":""} logged this period.</p></div>`)}
 function sessionReport(){reportRangeModal("Session Report","buildSessionReport")}
@@ -7031,9 +7244,9 @@ function buildMatchReport(){
  let bowlAvgs=matches.map(m=>avgRatingObj(m.bowlingRatings)).filter(v=>v>0);
  let fieldAvgs=matches.map(m=>avgRatingObj(m.fieldingRatings)).filter(v=>v>0);
  let avgOf=arr=>arr.length?(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1):"—";
- reportShell("Match Report",rangeLabel(from,to),
- `<div class="grid g4"><div class="card stat"><span>Avg Batting Score</span><b>${avgOf(batAvgs)}</b></div><div class="card stat"><span>Avg Bowling Score</span><b>${avgOf(bowlAvgs)}</b></div><div class="card stat"><span>Avg Fielding Score</span><b>${avgOf(fieldAvgs)}</b></div><div class="card stat"><span>Matches</span><b>${matches.length}</b></div></div>
- <h2>Match History</h2>${matches.map(m=>`<div class="card"><b>${esc(fmtDate(m.date))} · ${esc(m.team)} vs ${esc(m.opp)}</b><p>Fielding rating: ${esc(m.rating)}/10${(m.taken||m.missed||m.runouts||m.misfields)?` · Taken ${esc(m.taken||0)} · Missed ${esc(m.missed||0)} · Run outs ${esc(m.runouts||0)} · Misfields ${esc(m.misfields||0)}`:""}</p>${m.battingRatings||m.bowlingRatings?`<p>${m.battingRatings?`Batting ${avgRatingObj(m.battingRatings).toFixed(1)}/10`:""}${m.battingRatings&&m.bowlingRatings?" · ":""}${m.bowlingRatings?`Bowling ${avgRatingObj(m.bowlingRatings).toFixed(1)}/10`:""}</p>`:""}<p><b>Team Review:</b> ${esc(m.teamRating||"—")}/10 · ${esc(m.teamNotes||"—")}</p><p><b>Training actions:</b> ${esc(m.actions||"—")}</p></div>`).join("")||empty("No match notes.")}`);
+ reportShell("Match Report",rangeLabel(from,to)+" · "+matches.length+" match"+(matches.length!==1?"es":""),
+ `${matchPerfHtml(matches)}
+ <h2>Match History</h2>${matches.map(m=>`<div class="card"><b>${esc(fmtDate(m.date))} · ${esc(m.team)} vs ${esc(m.opp)}</b>${matchHighlightHtml(m)}<p><b>Team Review:</b> ${esc(m.teamRating||"—")}/10 · ${esc(m.teamNotes||"—")}</p><p><b>Training actions:</b> ${esc(m.actions||"—")}</p></div>`).join("")||empty("No match notes.")}`);
 }
 function coachReport(){reportRangeModal("Coach Development Report","buildCoachReport")}
 function buildCoachReport(){
@@ -9172,7 +9385,7 @@ function playerStandingHtml(p,assessments,sessions,matches){
  let cs=campOfPlayer(p).filter(c=>{let v=campRevOf(c,p.name);return v.r||v.rec})[0];
  if(cs){let v=campRevOf(cs,p.name),rc=CAMP_REV_REC.find(x=>x[0]===v.rec);items.push(box("Latest camp review",`${v.r?`<span style="color:#d97706">${campRevStars(v.r)}</span> `:""}${rc?`<span style="color:${rc[2]}">${rc[1]}</span>`:""}`,esc(cs.name)))}
  if(sessions.length)items.push(box("Sessions",sessions.length,"last "+esc(fmtDate(sessions[0].date))));
- if(matches.length){let m=matches[0],bat=(m.battingReview||[]).find(r=>r.name===p.name),bowl=(m.bowlingReview||[]).find(r=>r.name===p.name);items.push(box("Last match","vs "+esc(m.opp||"Opposition"),esc(fmtDate(m.date))+(bat?" · "+esc(bat.runs||0)+"("+esc(bat.balls||0)+")":"")+(bowl?" · "+esc(bowl.wickets||0)+"/"+esc(bowl.runs||0):"")))}
+ if(matches.length){let m=matches[0],bat=(m.battingReview||[]).find(r=>sameName(r.name,p.name)),bowl=(m.bowlingReview||[]).find(r=>sameName(r.name,p.name));items.push(box("Last match","vs "+esc(m.opp||"Opposition"),esc(fmtDate(m.date))+(bat?" · "+esc(bat.runs||0)+"("+esc(bat.balls||0)+")":"")+(bowl?" · "+esc(bowl.wickets||0)+"/"+esc(bowl.runs||0):"")))}
  return items.length?`<h2 class="section">Where they stand</h2><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">${items.join("")}</div>`:"";
 }
 function playerCampsInner(p,forPrint){
