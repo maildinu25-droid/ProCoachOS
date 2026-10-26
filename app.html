@@ -5557,6 +5557,11 @@ ${matchSectionHead("details","Match Details",true)}
 <label>Format<select name="format">${MATCH_FORMATS.map(f=>`<option ${m.format===f?"selected":""}>${f}</option>`).join("")}</select></label>
 <label>Tournament <span class="muted" style="font-weight:400">(optional)</span><select name="tournamentId"><option value="">None</option>${db.tournaments.map(t=>`<option value="${t.id}" ${m.tournamentId===t.id?"selected":""}>${esc(t.name)}</option>`).join("")}</select></label>
 <label class="full">Result<input name="result" value="${esc(m.result||"")}" placeholder="e.g. Won by 24 runs"></label>
+<div class="full" style="margin-top:4px"><b>Team scores</b> <span class="muted" style="font-weight:400">(full totals including extras)${m.scorerInnings?" · filled automatically from the Match Scorer":""}</span></div>
+<label>Our runs<input name="ourRuns" type="number" inputmode="numeric" value="${esc(m.ourRuns||"")}"></label>
+<label>Our wickets lost<input name="ourWkts" type="number" inputmode="numeric" min="0" max="10" value="${esc(m.ourWkts||"")}"></label>
+<label>Opposition runs<input name="oppRuns" type="number" inputmode="numeric" value="${esc(m.oppRuns||"")}"></label>
+<label>Opposition wickets lost<input name="oppWkts" type="number" inputmode="numeric" min="0" max="10" value="${esc(m.oppWkts||"")}"></label>
 </div>
 ${matchSectionHead("foundation","Foundation",false)}
 <div class="formgrid" id="matchSec-foundation" style="display:none;margin-top:10px">
@@ -6165,17 +6170,25 @@ function assessmentCoverageHeatmapHtml(roster){
 }
 
 /* ===== Real match figures for reports (replaces the old avg-rating cards) ===== */
+function matchTotals(m){
+ if(m.scorerInnings&&m.scorerInnings.length){let t={fr:0,fw:0,ar:0,aw:0};m.scorerInnings.forEach(i=>{if(i.team===m.team){t.fr+=+i.runs||0;t.fw+=+i.wkts||0}else{t.ar+=+i.runs||0;t.aw+=+i.wkts||0}});return t}
+ let has=v=>v!==undefined&&v!==null&&String(v).trim()!=="";
+ if(!(has(m.ourRuns)||has(m.oppRuns)))return null;
+ return {fr:+m.ourRuns||0,fw:+m.ourWkts||0,ar:+m.oppRuns||0,aw:+m.oppWkts||0};
+}
+function ballsToOv(b){b=Math.round(b||0);return Math.floor(b/6)+(b%6?"."+(b%6):"")}
+function bowlAvgText(rc,w){return w?(rc/w).toFixed(1):"—"}
 function ovToBalls(o){let t=String(o==null?"":o).trim();if(!t)return 0;let a=t.split(".");return(parseInt(a[0])||0)*6+(parseInt(a[1])||0)}
 function isOutText(d){d=String(d||"").trim();return !!d&&!/^(not out|retired hurt|absent hurt|did not bat)/i.test(d)}
 function matchStatsAgg(matches,onlyName){
- let P={},T={runs:0,wkts:0,taken:0,missed:0,runouts:0,misfields:0,fieldN:0,forRuns:0,againstRuns:0,scoredN:0,decided:0,wins:0,hasBat:false,hasBowl:false};
+ let P={},T={rc:0,ob:0,runs:0,wkts:0,taken:0,missed:0,runouts:0,misfields:0,fieldN:0,forRuns:0,againstRuns:0,wLost:0,wTaken:0,scoredN:0,decided:0,wins:0,hasBat:false,hasBowl:false};
  let g=n=>{let k=nameKey(n);return P[k]||(P[k]={name:String(n).trim(),mats:{},runs:0,balls:0,inns:0,outs:0,hs:0,hsNo:false,f50:0,f100:0,ob:0,rc:0,w:0,bw:-1,br:0,bowlInns:0})};
  matches.forEach(m=>{
   (m.battingReview||[]).forEach(r=>{if(!r||!r.name)return;if(onlyName&&!sameName(r.name,onlyName))return;let p=g(r.name),runs=+r.runs||0,out=isOutText(r.dismissal);p.mats[m.id]=1;p.inns++;p.runs+=runs;p.balls+=+r.balls||0;if(out)p.outs++;if(runs>p.hs||(runs===p.hs&&!out)){p.hs=runs;p.hsNo=!out}if(runs>=100)p.f100++;else if(runs>=50)p.f50++;T.runs+=runs;T.hasBat=true});
-  (m.bowlingReview||[]).forEach(r=>{if(!r||!r.name)return;if(onlyName&&!sameName(r.name,onlyName))return;let p=g(r.name),w=+r.wickets||0,rc=+r.runs||0;p.mats[m.id]=1;p.bowlInns++;p.ob+=ovToBalls(r.overs);p.rc+=rc;p.w+=w;if(w>p.bw||(w===p.bw&&rc<p.br)){p.bw=w;p.br=rc}T.wkts+=w;T.hasBowl=true});
+  (m.bowlingReview||[]).forEach(r=>{if(!r||!r.name)return;if(onlyName&&!sameName(r.name,onlyName))return;let p=g(r.name),w=+r.wickets||0,rc=+r.runs||0;p.mats[m.id]=1;p.bowlInns++;p.ob+=ovToBalls(r.overs);p.rc+=rc;p.w+=w;if(w>p.bw||(w===p.bw&&rc<p.br)){p.bw=w;p.br=rc}T.wkts+=w;T.rc+=rc;T.ob+=ovToBalls(r.overs);T.hasBowl=true});
   if(!onlyName){
    if(m.taken||m.missed||m.runouts||m.misfields){T.taken+=+m.taken||0;T.missed+=+m.missed||0;T.runouts+=+m.runouts||0;T.misfields+=+m.misfields||0;T.fieldN++}
-   if(m.scorerInnings&&m.scorerInnings.length){m.scorerInnings.forEach(i=>{if(i.team===m.team)T.forRuns+=+i.runs||0;else T.againstRuns+=+i.runs||0});T.scoredN++}
+   {let t=matchTotals(m);if(t){T.forRuns+=t.fr;T.againstRuns+=t.ar;T.wLost+=t.fw;T.wTaken+=t.aw;T.scoredN++}}
    let oc=matchResultOutcome(m);if(oc==="Win"||oc==="Loss"||oc==="Draw"){T.decided++;if(oc==="Win")T.wins++}
   }
  });
@@ -6188,23 +6201,25 @@ function batSrText(p){return p.balls?(p.runs*100/p.balls).toFixed(0):"—"}
 function econText(p){return p.ob?(p.rc*6/p.ob).toFixed(2):"—"}
 function matchPerfHtml(matches){
  let A=matchStatsAgg(matches),T=A.T,pl=A.players;
- if(!T.hasBat&&!T.hasBowl&&!T.fieldN&&!T.decided)return empty("No scorecard data here yet. Add batting and bowling entries to a match, or score it in the Match Scorer.");
+ if(!T.hasBat&&!T.hasBowl&&!T.fieldN&&!T.decided&&!T.scoredN)return empty("No scorecard data here yet. Add batting and bowling entries to a match, or score it in the Match Scorer.");
  let winPct=T.decided?Math.round(T.wins/T.decided*100)+"%":"—";
  let catches=(T.taken+T.missed)?Math.round(T.taken/(T.taken+T.missed)*100)+"%":"—";
- let h=`<div class="grid g4">${statCardHtml("Win rate",winPct)}${statCardHtml("Runs",T.hasBat?T.runs:"—")}${statCardHtml("Wickets",T.hasBowl?T.wkts:"—")}${statCardHtml("Catch rate",catches)}</div>`;
- if(T.scoredN)h+=`<div class="grid g3" style="margin-top:12px">${statCardHtml("Runs for",T.forRuns)}${statCardHtml("Runs against",T.againstRuns)}${statCardHtml("Scored matches",T.scoredN)}</div>`;
+ let h=`<div class="grid g4">${statCardHtml("Win rate",winPct)}${statCardHtml("Runs for",T.scoredN?T.forRuns:"—")}${statCardHtml("Runs against",T.scoredN?T.againstRuns:"—")}${statCardHtml("Catch rate",catches)}</div>`;
+ h+=`<div class="grid g3" style="margin-top:12px">${statCardHtml("Wickets taken",T.scoredN?T.wTaken:"—")}${statCardHtml("Wickets lost",T.scoredN?T.wLost:"—")}${statCardHtml("Matches with scores",T.scoredN)}</div>`;
+ if(!T.scoredN)h+=`<div class="muted" style="font-size:12px;margin-top:6px">Add team scores in the match form (or score the match in the Match Scorer) to see runs and wickets for and against.</div>`;
+ if(T.hasBowl)h+=`<div class="grid g4" style="margin-top:12px">${statCardHtml("Bowlers: runs conceded",T.rc)}${statCardHtml("Overs bowled",ballsToOv(T.ob))}${statCardHtml("Bowling avg",bowlAvgText(T.rc,T.wkts))}${statCardHtml("Economy",T.ob?(T.rc*6/T.ob).toFixed(2):"—")}</div>`;
  if(T.fieldN)h+=`<div class="card" style="margin-top:12px"><span class="muted">Fielding</span><div style="margin-top:4px">Catches taken ${T.taken} · Missed ${T.missed} · Run outs ${T.runouts} · Misfields ${T.misfields}</div></div>`;
  let bats=pl.filter(p=>p.runs>0).sort((a,b)=>b.runs-a.runs).slice(0,3);
  let bowls=pl.filter(p=>p.w>0).sort((a,b)=>b.w-a.w||a.rc-b.rc).slice(0,3);
  if(bats.length)h+=`<div class="card" style="margin-top:12px"><span class="muted">Top run-scorers</span>${statRowsHtml(bats,p=>`${p.runs} runs · avg ${batAvgText(p)} · HS ${p.hs}${p.hsNo?"*":""}`)}</div>`;
- if(bowls.length)h+=`<div class="card" style="margin-top:12px"><span class="muted">Top wicket-takers</span>${statRowsHtml(bowls,p=>`${p.w} wkts · best ${p.bw}/${p.br} · econ ${econText(p)}`)}</div>`;
+ if(bowls.length)h+=`<div class="card" style="margin-top:12px"><span class="muted">Top wicket-takers</span>${statRowsHtml(bowls,p=>`${p.w} wkts · ${ballsToOv(p.ob)} ov, ${p.rc} runs · best ${p.bw}/${p.br} · econ ${econText(p)}`)}</div>`;
  return h;
 }
 function playerMatchStatsHtml(p,matches){
  let s=matchStatsAgg(matches,p.name).players[0];if(!s)return "";
  let h="";
  if(s.inns)h+=`<h2>Batting Record</h2><div class="grid g4">${statCardHtml("Innings",s.inns)}${statCardHtml("Runs",s.runs)}${statCardHtml("Average",batAvgText(s))}${statCardHtml("Strike rate",batSrText(s))}</div><div class="card" style="margin-top:12px">Highest score ${s.hs}${s.hsNo?"*":""} · 50s ${s.f50} · 100s ${s.f100}</div>`;
- if(s.bowlInns)h+=`<h2>Bowling Record</h2><div class="grid g4">${statCardHtml("Matches",s.bowlInns)}${statCardHtml("Wickets",s.w)}${statCardHtml("Economy",econText(s))}${statCardHtml("Best",s.bw+"/"+s.br)}</div>`;
+ if(s.bowlInns)h+=`<h2>Bowling Record</h2><div class="grid g4">${statCardHtml("Matches",s.bowlInns)}${statCardHtml("Wickets",s.w)}${statCardHtml("Economy",econText(s))}${statCardHtml("Best",s.bw+"/"+s.br)}</div><div class="grid g3" style="margin-top:12px">${statCardHtml("Overs",ballsToOv(s.ob))}${statCardHtml("Runs conceded",s.rc)}${statCardHtml("Average",bowlAvgText(s.rc,s.w))}</div>`;
  return h;
 }
 function matchHighlightHtml(m){
@@ -6213,8 +6228,9 @@ function matchHighlightHtml(m){
  let bw=pl.filter(p=>p.w>0).sort((a,b)=>b.w-a.w||a.rc-b.rc)[0];
  let L=[];
  if(m.scoreLine)L.push(`<p>${esc(m.scoreLine)}</p>`);
+ else{let t=matchTotals(m);if(t)L.push(`<p>${esc(m.team||"Us")} ${t.fr}/${t.fw} · ${esc(m.opp||"Opposition")} ${t.ar}/${t.aw}</p>`)}
  if(m.result)L.push(`<p><b>Result:</b> ${esc(m.result)}</p>`);
- if(top||bw)L.push(`<p>${top?`Top score: ${esc(top.name)} ${top.runs}${top.hsNo?"*":""}(${top.balls||0})`:""}${top&&bw?" · ":""}${bw?`Best bowling: ${esc(bw.name)} ${bw.w}/${bw.rc}`:""}</p>`);
+ if(top||bw)L.push(`<p>${top?`Top score: ${esc(top.name)} ${top.runs}${top.hsNo?"*":""}(${top.balls||0})`:""}${top&&bw?" · ":""}${bw?`Best bowling: ${esc(bw.name)} ${bw.w}/${bw.rc} (${ballsToOv(bw.ob)} ov)`:""}</p>`);
  if(m.taken||m.missed||m.runouts||m.misfields)L.push(`<p>Fielding: catches taken ${esc(m.taken||0)} · missed ${esc(m.missed||0)} · run outs ${esc(m.runouts||0)} · misfields ${esc(m.misfields||0)}</p>`);
  return L.join("");
 }
