@@ -5696,12 +5696,13 @@ function qeOpen(mode){
  let xi=currentXINames();
  let pool=[...new Set([...xi,...activePlayers().map(p=>p.name)])];
  if(mode==="grid"&&!xi.length&&!matchDraft.batting.length&&!matchDraft.bowling.length){alert("Tick the Playing XI first, then open the one-screen grid.");return}
- let names=[...xi];
- matchDraft.batting.forEach(r=>{if(r.name&&!names.includes(r.name))names.push(r.name)});
- matchDraft.bowling.forEach(r=>{if(r.name&&!names.includes(r.name))names.push(r.name)});
+ let allN=[...xi];
+ matchDraft.batting.concat(matchDraft.bowling).forEach(r=>{if(r.name&&!allN.includes(r.name))allN.push(r.name)});
+ let ordered=(draft)=>{let o=draft.map(r=>r.name).filter(n=>n&&allN.includes(n));return [...new Set([...o,...allN])]};
+ let batNames=ordered(matchDraft.batting),bowlNames=ordered(matchDraft.bowling);
  qe={tab:mode==="paste"?"paste":"bat",pool,note:"",
-  bat:names.map(n=>{let e=matchDraft.batting.find(r=>r.name===n);return e?{name:n,runs:e.runs||"",balls:e.balls||"",dismissal:e.dismissal||"Not out"}:{name:n,runs:"",balls:"",dismissal:"Not out"}}),
-  bowl:names.map(n=>{let e=matchDraft.bowling.find(r=>r.name===n);return e?{name:n,overs:e.overs||"",runs:e.runs||"",wickets:e.wickets||""}:{name:n,overs:"",runs:"",wickets:""}})};
+  bat:batNames.map(n=>{let e=matchDraft.batting.find(r=>r.name===n);return e?{name:n,runs:e.runs||"",balls:e.balls||"",dismissal:e.dismissal||"Not out"}:{name:n,runs:"",balls:"",dismissal:"Not out"}}),
+  bowl:bowlNames.map(n=>{let e=matchDraft.bowling.find(r=>r.name===n);return e?{name:n,overs:e.overs||"",runs:e.runs||"",wickets:e.wickets||""}:{name:n,overs:"",runs:"",wickets:""}})};
  let ov=document.getElementById("qeOv");if(ov)ov.remove();
  ov=document.createElement("div");ov.id="qeOv";
  ov.style.cssText="position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;flex-direction:column;padding-top:env(safe-area-inset-top)";
@@ -5717,6 +5718,15 @@ function qeTotals(){
   el.innerHTML=`Total by batters <b>${runs}</b> · Wickets <b>${w}</b>`}
  else if(qe.tab==="bowl"){let w=0,rc=0;qe.bowl.forEach(r=>{w+=+r.wickets||0;rc+=+r.runs||0});el.innerHTML=`Runs conceded <b>${rc}</b> · Wickets <b>${w}</b>`}
  else el.innerHTML=""}
+ function qeMove(i,d){let a=qe[qe.tab],j=i+d;if(j<0||j>=a.length)return;[a[i],a[j]]=[a[j],a[i]];qeRender(true)}
+function qeOrderStart(){qe.ordering=true;qe.seq=[];qeRender()}
+function qeOrderTap(n){let k=qe.seq.indexOf(n);if(k>-1)qe.seq.splice(k,1);else qe.seq.push(n);qeRender()}
+function qeOrderApply(){let a=qe[qe.tab];let first=qe.seq.map(n=>a.find(r=>r.name===n)).filter(Boolean);let rest=a.filter(r=>!qe.seq.includes(r.name));qe[qe.tab]=[...first,...rest];qe.ordering=false;qeRender()}
+function qeOrderCancel(){qe.ordering=false;qeRender()}
+function qeOrderHtml(){let a=qe[qe.tab],label=qe.tab==="bat"?"batting":"bowling";
+ return `<div class="muted" style="font-size:13px;margin-bottom:10px">Tap players in ${label} order. Tap again to undo. Anyone not tapped goes below, in their current order.</div>
+ <div style="display:grid;gap:8px">${a.map(r=>{let k=qe.seq.indexOf(r.name);return `<button type="button" onclick="qeOrderTap(${esc(JSON.stringify(r.name)).replace(/"/g,"&quot;")})" style="display:flex;align-items:center;gap:12px;padding:12px;border-radius:12px;border:1px solid ${k>-1?"var(--g)":"var(--line)"};background:${k>-1?"var(--mint)":"var(--surface)"};color:var(--ink);font-weight:700;font-size:15px;text-align:left"><span style="width:28px;height:28px;border-radius:50%;display:grid;place-items:center;background:${k>-1?"var(--g)":"var(--surface2)"};color:${k>-1?"#fff":"var(--muted)"};font-size:13px">${k>-1?k+1:""}</span>${esc(r.name)}</button>`}).join("")}</div>
+ <div class="toolbar" style="margin-top:14px"><button type="button" class="btn secondary" onclick="qeOrderCancel()">Cancel</button><button type="button" class="btn primary" onclick="qeOrderApply()">Apply order</button></div>`}
 function qeRemove(i){qe[qe.tab].splice(i,1);qeRender()}
 function qeKey(ev){if(ev.key!=="Enter")return;ev.preventDefault();let all=[...document.querySelectorAll("#qeOv .qeIn")];let k=all.indexOf(ev.target);if(k>-1&&all[k+1])all[k+1].focus();else ev.target.blur()}
 function qeNameCell(r,i){
@@ -5724,8 +5734,9 @@ function qeNameCell(r,i){
  let opts=qe.pool.filter(n=>!qe[qe.tab].some((x,j)=>j!==i&&x.name===n)).map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join("");
  return `<select style="width:100%;padding:6px 4px;font-size:12px;border:1px solid var(--red);border-radius:8px" onchange="qeSet(${i},'name',this.value);${"qeRender()"}"><option value="${esc(r.name)}">? ${esc(r.name)}</option><option value="">— skip this row —</option>${opts}</select>`;
 }
-function qeRender(){
+function qeRender(keep){
  let ov=document.getElementById("qeOv");if(!ov||!qe)return;
+ let oldB=document.getElementById("qeBody"),st=keep&&oldB?oldB.scrollTop:0;
  let tab=qe.tab;
  let tabBtn=(k,l)=>`<button type="button" class="btn ${tab===k?"primary":"secondary"}" style="flex:1" onclick="qeTab('${k}')">${l}</button>`;
  let inp=(i,k,v,w,step)=>`<input class="qeIn" type="number" inputmode="${step?"decimal":"numeric"}" ${step?'step="0.1"':""} enterkeyhint="next" value="${esc(v)}" placeholder="–" style="width:100%;height:40px;text-align:center;font-weight:700;font-size:15px;border-radius:10px;min-width:0" oninput="qeSet(${i},'${k}',this.value)" onkeydown="qeKey(event)">`;
@@ -5735,20 +5746,22 @@ function qeRender(){
   <textarea id="qePaste" rows="11" style="width:100%;font-size:14px" placeholder="Arjun Mehta c Rao b Shah 54 40&#10;Karthik Rao not out 72 (60)&#10;&#10;Bowling&#10;Rahul Nair 4-0-23-2"></textarea>
   <button type="button" class="btn primary" style="width:100%;margin-top:10px" onclick="qeRead()">Read scorecard</button>`;
  }else if(tab==="bat"){
-  body=`${qe.note?`<div class="card" style="padding:10px 12px;margin-bottom:10px;font-size:13px">${qe.note}</div>`:""}
-  <div style="display:grid;grid-template-columns:1.3fr .6fr .6fr 1fr 26px;gap:6px;padding:0 2px 4px" class="muted"><span style="font-size:11px;font-weight:700">PLAYER</span><span style="font-size:11px;font-weight:700;text-align:center">RUNS</span><span style="font-size:11px;font-weight:700;text-align:center">BALLS</span><span style="font-size:11px;font-weight:700">HOW OUT</span><span></span></div>
+  body=`<button type="button" class="btn secondary" style="width:100%;margin-bottom:10px" onclick="qeOrderStart()">↕ Tap players in batting order</button>
+  ${qe.note?`<div class="card" style="padding:10px 12px;margin-bottom:10px;font-size:13px">${qe.note}</div>`:""}
+  <div style="display:grid;grid-template-columns:22px 1.2fr .6fr .6fr 1fr 24px;gap:6px;padding:0 2px 4px" class="muted"><span></span><span style="font-size:11px;font-weight:700">PLAYER</span><span style="font-size:11px;font-weight:700;text-align:center">RUNS</span><span style="font-size:11px;font-weight:700;text-align:center">BALLS</span><span style="font-size:11px;font-weight:700">HOW OUT</span><span></span></div>
   ${qe.bat.map((r,i)=>{let std=DISMISSAL_TYPES.filter(d=>d!=="Other");let cur=r.dismissal||"Not out";let list=[...std,QE_DNB];if(!list.includes(cur))list.push(cur);
-   return `<div style="display:grid;grid-template-columns:1.3fr .6fr .6fr 1fr 26px;gap:6px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line);${r.dismissal===QE_DNB?"opacity:.6":""}">${qeNameCell(r,i)}${inp(i,"runs",r.runs)}${inp(i,"balls",r.balls)}<select style="width:100%;height:40px;padding:0 4px;line-height:1.2;font-size:12px;border-radius:10px;${r.chk?"border:1px solid var(--gold)":""}" onchange="qeSet(${i},'dismissal',this.value);this.style.opacity=1">${list.map(d=>`<option ${d===cur?"selected":""}>${esc(d)}</option>`).join("")}</select><button type="button" class="miniBtn" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--line);background:var(--surface2);color:var(--muted)" onclick="qeRemove(${i})">×</button></div>`}).join("")||empty("No players. Tick the Playing XI first.")}`;
+   return `<div style="display:grid;grid-template-columns:22px 1.2fr .6fr .6fr 1fr 24px;gap:6px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line);${r.dismissal===QE_DNB?"opacity:.6":""}"><div style="display:grid;gap:2px"><button type="button" onclick="qeMove(${i},-1)" style="height:19px;width:22px;padding:0;border:0;border-radius:5px;background:var(--surface2);color:var(--muted);font-size:10px">▲</button><button type="button" onclick="qeMove(${i},1)" style="height:19px;width:22px;padding:0;border:0;border-radius:5px;background:var(--surface2);color:var(--muted);font-size:10px">▼</button></div>${qeNameCell(r,i)}${inp(i,"runs",r.runs)}${inp(i,"balls",r.balls)}<select style="width:100%;height:40px;padding:0 4px;line-height:1.2;font-size:12px;border-radius:10px;${r.chk?"border:1px solid var(--gold)":""}" onchange="qeSet(${i},'dismissal',this.value);this.style.opacity=1">${list.map(d=>`<option ${d===cur?"selected":""}>${esc(d)}</option>`).join("")}</select><button type="button" class="miniBtn" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--line);background:var(--surface2);color:var(--muted)" onclick="qeRemove(${i})">×</button></div>`}).join("")||empty("No players. Tick the Playing XI first.")}`;
  }else{
-  body=`<div style="display:grid;grid-template-columns:1.3fr .7fr .6fr .6fr 26px;gap:6px;padding:0 2px 4px" class="muted"><span style="font-size:11px;font-weight:700">PLAYER</span><span style="font-size:11px;font-weight:700;text-align:center">OVERS</span><span style="font-size:11px;font-weight:700;text-align:center">RUNS</span><span style="font-size:11px;font-weight:700;text-align:center">WKTS</span><span></span></div>
-  ${qe.bowl.map((r,i)=>`<div style="display:grid;grid-template-columns:1.3fr .7fr .6fr .6fr 26px;gap:6px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line)">${qeNameCell(r,i)}${inp(i,"overs",r.overs,0,true)}${inp(i,"runs",r.runs)}${inp(i,"wickets",r.wickets)}<button type="button" class="miniBtn" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--line);background:var(--surface2);color:var(--muted)" onclick="qeRemove(${i})">×</button></div>`).join("")||empty("No players.")}
+  body=`<button type="button" class="btn secondary" style="width:100%;margin-bottom:10px" onclick="qeOrderStart()">↕ Tap players in bowling order</button>
+  <div style="display:grid;grid-template-columns:22px 1.2fr .7fr .6fr .6fr 24px;gap:6px;padding:0 2px 4px" class="muted"><span></span><span style="font-size:11px;font-weight:700">PLAYER</span><span style="font-size:11px;font-weight:700;text-align:center">OVERS</span><span style="font-size:11px;font-weight:700;text-align:center">RUNS</span><span style="font-size:11px;font-weight:700;text-align:center">WKTS</span><span></span></div>
+  ${qe.bowl.map((r,i)=>`<div style="display:grid;grid-template-columns:22px 1.2fr .7fr .6fr .6fr 24px;gap:6px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line)"><div style="display:grid;gap:2px"><button type="button" onclick="qeMove(${i},-1)" style="height:19px;width:22px;padding:0;border:0;border-radius:5px;background:var(--surface2);color:var(--muted);font-size:10px">▲</button><button type="button" onclick="qeMove(${i},1)" style="height:19px;width:22px;padding:0;border:0;border-radius:5px;background:var(--surface2);color:var(--muted);font-size:10px">▼</button></div>${qeNameCell(r,i)}${inp(i,"overs",r.overs,0,true)}${inp(i,"runs",r.runs)}${inp(i,"wickets",r.wickets)}<button type="button" class="miniBtn" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--line);background:var(--surface2);color:var(--muted)" onclick="qeRemove(${i})">×</button></div>`).join("")||empty("No players.")}
   <div class="muted" style="font-size:12px;margin-top:8px">Leave a row empty if the player did not bowl.</div>`;
  }
  ov.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 14px 6px"><h2 style="margin:0;font-size:20px">Match scorecard</h2><button type="button" class="x" onclick="qeClose()">×</button></div>
  <div style="display:flex;gap:8px;padding:6px 14px 10px">${tabBtn("bat","Batting")}${tabBtn("bowl","Bowling")}${tabBtn("paste","Paste")}</div>
- <div style="flex:1;overflow:auto;padding:0 14px 12px">${body}</div>
+ <div id="qeBody" style="flex:1;overflow:auto;padding:0 14px 12px">${qe.ordering&&tab!=="paste"?qeOrderHtml():body}</div>
  <div style="padding:10px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--surface)"><div id="qeTot" class="muted" style="font-size:13px;margin-bottom:8px"></div><button type="button" class="btn primary" style="width:100%" onclick="qeApply()">Done — add to match</button></div>`;
- qeTotals();
+  qeTotals();let nb=document.getElementById("qeBody");if(nb&&st)nb.scrollTop=st;
 }
 function qeRead(){
  let t=(document.getElementById("qePaste")||{}).value||"";
@@ -5758,6 +5771,8 @@ function qeRead(){
  let merge=(list,rows,blank)=>rows.forEach(p=>{let j=list.findIndex(x=>x.name===p.name&&!p.flag);
   if(j>-1){let keep=list[j];Object.assign(keep,p)}else list.push(p)});
  merge(qe.bat,res.bat);merge(qe.bowl,res.bowl);
+ let reorder=(list,rows)=>{let ns=rows.map(x=>x.name);let first=ns.map(n=>list.find(x=>x.name===n)).filter((x,i,a)=>x&&a.indexOf(x)===i);return [...first,...list.filter(x=>!first.includes(x))]};
+ qe.bat=reorder(qe.bat,res.bat);qe.bowl=reorder(qe.bowl,res.bowl);
  let unm=res.bat.concat(res.bowl).filter(r=>r.flag).length,chk=res.bat.filter(r=>r.chk).length;
  qe.note=`Read <b>${res.bat.length}</b> batters and <b>${res.bowl.length}</b> bowlers.`+(unm?` <span style="color:var(--red)">${unm} name(s) not found in your squad (red) — pick the right player or skip.</span>`:"")+(chk?` <span style="color:var(--gold)">${chk} row(s) had no how-out in the text (amber) — check them, they are set to Not out.</span>`:"");
  qe.tab="bat";qeRender();
