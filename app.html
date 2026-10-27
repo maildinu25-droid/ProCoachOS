@@ -1859,6 +1859,7 @@ function dashboard(){
  <div class="homeScroll">
  ${todayHeroHtml}
  ${campDashHtml()}
+ ${smartSuggestionsHtml()}
  ${isNewUser?`<div class="homeSection">
  <div class="card glass">
  <div class="homeGreeting" style="font-size:var(--fs-5)">Welcome to ProCoach OS 👋</div>
@@ -1949,7 +1950,7 @@ function sessions(){
   let linkedReflection=db.reflections.find(r=>r.sessionId===s.id);
   let showReflectionStatus=s.date<=today();
   let thumbDrill=mainDrills.concat(gameDrills).find(d=>d.fieldSteps&&d.fieldSteps.length);
-  return `<div class="item">${thumbDrill?`<div class="sessThumb">${fieldStepsPreviewHtml(thumbDrill.fieldSteps.slice(0,1),76)}</div>`:""}<div><b>${esc(sessionLabel(s))}${sessionFocusText(s)?" · "+esc(sessionFocusText(s)):""}</b><div class="muted" style="font-size:var(--fs-3)">${esc(fmtDate(s.date))}${s.time?" · "+esc(fmtTime(s.time)):""}${s.duration?" · "+esc(s.duration)+"m":""} · ${esc(sessionTypeLabel(s.sessionType))}</div><small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.concat(gameDrills).map(d=>`<span class="tag" style="cursor:pointer" onclick="viewDrill('${d.id}')">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px">${s.attachment.dataUrl?`<a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a>`:`<span class="muted" style="font-size:var(--fs-3)">📎 ${esc(s.attachment.name)} (archived)</span>`}</div>`:""}${(s.campId&&campById(s.campId))?`<div style="margin-top:6px"><span class="tag" style="cursor:pointer" onclick="go('camps');openCamp('${s.campId}')">🏕 ${esc(campById(s.campId).name)}</span></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="printSessionPlan('${s.id}')">View</button>${kebabMenu("s"+s.id,[{label:"Edit",icon:"edit",fn:`editSession('${s.id}')`},{label:"Start timer",icon:"clock",fn:`timerSetup('${s.id}')`},{label:"Remind me (calendar)",icon:"bell",fn:`remindSheet('${s.id}')`},{label:"Share on WhatsApp",icon:"share",fn:`shareSessionSummary('${s.id}')`},{label:"Copy text",icon:"copy",fn:`copySessionSummary('${s.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delSession('${s.id}')`}])}</div></div>`;
+  return `<div class="item">${thumbDrill?`<div class="sessThumb">${fieldStepsPreviewHtml(thumbDrill.fieldSteps.slice(0,1),76)}</div>`:""}<div><b>${esc(sessionLabel(s))}${sessionFocusText(s)?" · "+esc(sessionFocusText(s)):""}</b><div class="muted" style="font-size:var(--fs-3)">${esc(fmtDate(s.date))}${s.time?" · "+esc(fmtTime(s.time)):""}${s.duration?" · "+esc(s.duration)+"m":""} · ${esc(sessionTypeLabel(s.sessionType))}</div>${sessMetaTagsHtml(s)}<small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.concat(gameDrills).map(d=>`<span class="tag" style="cursor:pointer" onclick="viewDrill('${d.id}')">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px">${s.attachment.dataUrl?`<a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a>`:`<span class="muted" style="font-size:var(--fs-3)">📎 ${esc(s.attachment.name)} (archived)</span>`}</div>`:""}${(s.campId&&campById(s.campId))?`<div style="margin-top:6px"><span class="tag" style="cursor:pointer" onclick="go('camps');openCamp('${s.campId}')">🏕 ${esc(campById(s.campId).name)}</span></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="printSessionPlan('${s.id}')">View</button>${kebabMenu("s"+s.id,[{label:"Edit",icon:"edit",fn:`editSession('${s.id}')`},{label:"Start timer",icon:"clock",fn:`timerSetup('${s.id}')`},{label:"Remind me (calendar)",icon:"bell",fn:`remindSheet('${s.id}')`},{label:"Share on WhatsApp",icon:"share",fn:`shareSessionSummary('${s.id}')`},{label:"Copy text",icon:"copy",fn:`copySessionSummary('${s.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delSession('${s.id}')`}])}</div></div>`;
  }).join("")}</div>`:empty("No sessions match your search.")}</div>`;
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -2029,6 +2030,147 @@ function toggleSessionType(val){
  renderNetPlanBuilder();
 }
 
+/* ===== v90: debrief, measurable goals, suggestions engine ===== */
+function sessMetaTagsHtml(s){
+ let t=[];if(s.intensity)t.push(`${esc(s.intensity)} intensity`);if(s.ledBy)t.push(`Led by ${esc(s.ledByName||s.ledBy)}`);
+ return t.length?`<div style="margin-top:6px">${t.map(x=>`<span class="tag">${x}</span>`).join("")}</div>`:""}
+/* debrief for sessions led by someone else */
+function debriefBlockHtml(x){
+ x=x||{};let type=x.type==="match"?"match":"session",on=!!x.debriefMode;
+ const sel=(n,opts)=>`<select name="${n}"><option value="">—</option>${opts.map(o=>`<option ${x[n]===o?"selected":""}>${o}</option>`).join("")}</select>`;
+ return `<div class="full" id="reflDebriefWrap" style="${type==="match"?"display:none":""}"><label style="display:flex;gap:8px;align-items:center"><input type="checkbox" name="debriefMode" value="1" style="width:auto" ${on?"checked":""} onchange="reflToggleDebrief(this.checked)"> This session was led by someone else. Use the debrief instead of self-reflection.</label>
+ <div id="reflDebriefBlock" class="formgrid" style="padding:0;margin:8px 0 0;${on?"":"display:none"}">
+  <label>Led by<input name="debriefBy" value="${esc(x.debriefBy||"")}" placeholder="e.g. S&C trainer, Sam"></label>
+  <label>How it went<select name="debriefDone"><option value="">—</option>${["Completed as planned","Partly completed","Changed on the day","Not run"].map(o=>`<option ${x.debriefDone===o?"selected":""}>${o}</option>`).join("")}</select></label>
+  <label>Player energy and response${sel("debriefEnergy",["Low","OK","High"]).replace(/^<select/,"<select")}</label>
+  <label>Fit with the cricket plan${sel("debriefFit",["Good","OK","Poor"])}</label>
+  <label class="full">Feedback from the person who led it<textarea name="debriefFeedback">${esc(x.debriefFeedback||"")}</textarea></label>
+  <label class="full">Players flagged or struggling<textarea name="debriefFlagged" placeholder="Names and what was seen">${esc(x.debriefFlagged||"")}</textarea></label>
+  <label class="full">Niggles or concerns reported<textarea name="debriefNiggles">${esc(x.debriefNiggles||"")}</textarea></label>
+  <label class="full">Follow-up actions<textarea name="debriefActions" placeholder="e.g. Rest Rahul for the next nets. Lower intensity before Saturday.">${esc(x.debriefActions||"")}</textarea></label>
+ </div></div>`}
+function reflToggleDebrief(on){
+ let b=document.getElementById("reflDebriefBlock");if(b)b.style.display=on?"":"none";
+ ["wentWell","betterReasons","takeaway","nextFocus"].forEach(id=>{let h=document.getElementById("formSecHead-"+id);if(h&&h.parentElement)h.parentElement.style.display=on?"none":""})}
+function debriefSummaryText(x){return [x.debriefFeedback,x.debriefActions?"Follow-up: "+x.debriefActions:"",x.debriefNiggles?"Concerns: "+x.debriefNiggles:""].filter(Boolean).join(" · ")||(x.debriefDone||"Debrief")}
+function latestDebriefFor(team){
+ let cut=new Date(new Date(today()+"T00:00:00Z").getTime()-21*86400000).toISOString().slice(0,10);
+ return db.reflections.filter(r=>r.debriefMode&&(r.debriefActions||r.debriefNiggles)&&String(r.date||"")>=cut&&(()=>{let s=db.sessions.find(x=>x.id===r.sessionId);return !team||!s||s.squad===team})()).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]||null}
+/* measurable goals */
+const GOAL_MATCH_METRICS=[["bat|avg","Batting average (recent matches)",true,1],["bowl|econ","Bowling economy (recent matches)",false,2],["fld|catches","Catches per match (recent matches)",true,2],["att|rate","Training attendance %",true,0]];
+function goalMetricOptions(){
+ let o='<option value="">No measure (text goal only)</option><optgroup label="Match and training numbers">'+GOAL_MATCH_METRICS.map(m=>`<option value="${m[0]}">${m[1]}</option>`).join("")+'</optgroup>';
+ Object.keys(skillSets).forEach(d=>{let sk=allSkillsFor(d);if(!sk.length)return;o+=`<optgroup label="${esc(d)} assessment"><option value="disc|${esc(d)}">${esc(d)} overall average</option>${sk.map(n=>`<option value="skill|${esc(d)}|${esc(n)}">${esc(n)}</option>`).join("")}</optgroup>`});
+ return o}
+function goalMetricInfo(m){let f=GOAL_MATCH_METRICS.find(x=>x[0]===m);if(f)return{label:f[1].replace(/ \(recent matches\)/,""),hib:f[2],dp:f[3]};
+ if(String(m).startsWith("disc|"))return{label:m.split("|")[1]+" assessment average",hib:true,dp:1};
+ if(String(m).startsWith("skill|")){let a=m.split("|");return{label:a[2]+" rating",hib:true,dp:1}}
+ return{label:m,hib:true,dp:1}}
+function goalValue(p,metric,upTo){
+ if(!metric)return null;let up=upTo||"9999-12-31";
+ let aa=playerAssessments(p).filter(a=>String(a.date||"")<=up);
+ if(metric.startsWith("disc|")){let d=metric.split("|")[1],a=aa.filter(x=>assessmentDisciplines(x).includes(d)).pop();if(!a)return null;let v=Number(disciplineAvg(a,d));return Number.isFinite(v)?v:null}
+ if(metric.startsWith("skill|")){let [_,d,n]=metric.split("|"),i=allSkillsFor(d).indexOf(n);if(i<0)return null;let v=null;aa.forEach(a=>{let r=a.ratings&&a.ratings[d]&&Number(a.ratings[d][i]);if(r>0)v=r});return v}
+ let ms=uspByDate(playerMatches(p).filter(m=>String(m.date||"")<=up)).slice(-5);
+ if(metric==="bat|avg"){let rows=ms.map(m=>(m.battingReview||[]).find(r=>sameName(r.name,p.name))).filter(Boolean);if(rows.length<2)return null;let r=0,o=0;rows.forEach(x=>{r+=+x.runs||0;if(isOutText(x.dismissal))o++});return o?r/o:r/rows.length}
+ if(metric==="bowl|econ"){let rows=ms.map(m=>(m.bowlingReview||[]).find(r=>sameName(r.name,p.name))).filter(Boolean);if(rows.length<2)return null;let b=0,r=0;rows.forEach(x=>{b+=ovToBalls(x.overs);r+=+x.runs||0});return b?r*6/b:null}
+ if(metric==="fld|catches"){let rows=ms.map(m=>(m.fieldingReview||[]).find(r=>sameName(r.name,p.name))).filter(Boolean);if(rows.length<2)return null;return rows.reduce((a,x)=>a+(+x.catches||0),0)/rows.length}
+ if(metric==="att|rate"){let from=new Date(new Date(up==="9999-12-31"?today():up).getTime()-30*86400000).toISOString().slice(0,10);let ts=p.team?activeSessions().filter(s=>s.squad===p.team&&s.sessionType!=="player"&&s.date>=from&&s.date<=(up==="9999-12-31"?today():up)):[];if(ts.length<3)return null;return ts.filter(s=>(s.attendees||[]).includes(p.name)).length/ts.length*100}
+ return null}
+function goalMeasure(p,g){
+ if(!g||!g.metric||g.target===""||g.target==null)return null;
+ let mi=goalMetricInfo(g.metric),tgt=+g.target;if(!Number.isFinite(tgt))return null;
+ let cur=goalValue(p,g.metric),base=(g.baseline===""||g.baseline==null)?null:+g.baseline,fx=v=>v.toFixed(mi.dp);
+ let res={label:mi.label,cur,base,tgt,fx};
+ if(cur==null){res.state="nodata";res.text=`${mi.label}: target ${fx(tgt)}. Not enough data yet to measure.`;res.color="var(--muted)";return res}
+ if(mi.hib?cur>=tgt:cur<=tgt){res.state="reached";res.text=`${mi.label}: now ${fx(cur)}, target ${fx(tgt)} reached.`;res.color="var(--g)";return res}
+ let txt=`${mi.label}: now ${fx(cur)}${base!=null?`, from ${fx(base)}`:""}, target ${fx(tgt)}.`;
+ if(base!=null&&base!==tgt){
+  let pct=Math.max(0,Math.min(1,(cur-base)/(tgt-base)));txt+=` ${Math.round(pct*100)}% of the way.`;
+  if(g.targetDate&&g.createdDate&&g.targetDate>g.createdDate){let t0=new Date(g.createdDate).getTime(),t1=new Date(g.targetDate).getTime(),now=new Date(today()).getTime(),exp=Math.max(0,Math.min(1,(now-t0)/(t1-t0)));
+   if(exp>=0.2&&pct<exp-0.15){res.state="behind";res.text=txt+" Behind the pace needed for the target date.";res.color="var(--red)";return res}
+   res.state="track";res.text=txt+" On pace.";res.color="var(--g)";return res}}
+ res.state="open";res.text=txt;res.color="var(--muted)";return res}
+function playerGoalsReportHtml(p){
+ let gs=(p.goals||[]).filter(g=>!g.achieved);if(!gs.length)return "";
+ return `<h2>Goals</h2><div class="card">${gs.map(g=>{let m=goalMeasure(p,g);return `<div style="padding:4px 0"><b>${esc(g.text)}</b>${g.targetDate?` <span class="muted">· target ${esc(fmtDate(g.targetDate))}</span>`:""}${m?`<div style="color:${m.color}">${esc(m.text)}</div>`:""}</div>`}).join("")}</div>`}
+/* suggestions engine */
+function sugDismissed(id){let d=(db.settings&&db.settings.dismissedSugg)||{};return !!d[id]}
+function sugDismiss(id){db.settings.dismissedSugg=db.settings.dismissedSugg||{};db.settings.dismissedSugg[id]=today();save()}
+function sugTeamMatches(team,n){return uspByDate(db.matches.filter(m=>!team||m.team===team)).slice(-(n||8))}
+function smartSuggestions(){
+ let out=[],t=today(),dayMs=86400000,plus=d=>new Date(new Date(t+"T00:00:00Z").getTime()+d*dayMs).toISOString().slice(0,10);
+ // upcoming match with nothing planned
+ db.matches.filter(m=>m.date>=t&&m.date<=plus(3)).forEach(m=>{
+  let has=activeSessions().some(s=>s.date>=t&&s.date<m.date&&(!m.team||s.squad===m.team));
+  if(!has)out.push({id:"nomatchprep-"+m.id,pr:1,text:`${m.opp?"Match vs "+m.opp:"A match"} on ${fmtDate(m.date)} and no session planned before it.`,action:"go('sessions');newSession()"})});
+ // delegated sessions with no debrief
+ activeSessions().filter(s=>s.ledBy&&s.date<t&&s.date>=plus(-14)&&!db.reflections.some(r=>r.sessionId===s.id)).slice(0,2).forEach(s=>
+  out.push({id:"nodebrief-"+s.id,pr:2,text:`${s.ledByName||s.ledBy}'s session on ${fmtDate(s.date)} has no debrief yet.`,action:"go('reflections');newReflection()"}));
+ let db1=latestDebriefFor("");if(db1&&(db1.debriefActions||db1.debriefNiggles))out.push({id:"debrief-"+db1.id,pr:2,text:`From the ${fmtDate(db1.date)} debrief: ${(db1.debriefActions||db1.debriefNiggles).slice(0,110)}`,action:"go('reflections')"});
+ // goals behind
+ activePlayers().forEach(p=>(p.goals||[]).filter(g=>!g.achieved).forEach(g=>{let m=goalMeasure(p,g);if(m&&m.state==="behind")out.push({id:"goal-"+g.id+"-"+t.slice(0,7),pr:3,text:`${p.name}'s goal "${g.text}" is behind pace (${m.label.toLowerCase()} ${m.fx(m.cur)} vs target ${m.fx(m.tgt)}).`,action:`playerView('${p.id}')`})}));
+ // attendance
+ let from=plus(-30);
+ activePlayers().forEach(p=>{if(!p.team||p.available==="no")return;let ts=activeSessions().filter(s=>s.squad===p.team&&s.sessionType!=="player"&&s.date>=from&&s.date<=t);if(ts.length<4)return;let n=ts.filter(s=>(s.attendees||[]).includes(p.name)).length;if(n/ts.length<0.5)out.push({id:"att-"+p.id+"-"+t.slice(0,7),pr:4,text:`${p.name} attended ${n} of the last ${ts.length} team sessions.`,action:`playerView('${p.id}')`})});
+ // team-level match patterns
+ let teams=[...new Set(db.matches.map(m=>m.team).filter(Boolean))];if(!teams.length)teams=[""];
+ teams.slice(0,3).forEach(team=>{
+  let ms=sugTeamMatches(team,6),tn=team?team+": ":"";if(ms.length<3)return;
+  let T=matchStatsAgg(ms.slice(-3)).T,ch=T.taken+T.missed;
+  if(ch>=5&&T.taken/ch<0.6)out.push({id:"catch-"+team+"-"+ms[ms.length-1].id,pr:5,text:`${tn}catch rate ${Math.round(T.taken/ch*100)}% over the last 3 matches (${T.taken} of ${ch}). A fielding session may help.`,action:"go('sessions');newSession()"});
+  if(ms.length>=6){let ec=a=>{let P=matchStatsAgg(a).players,r=0,o=0;P.forEach(p=>{r+=p.rc;o+=p.ob});return o?r*6/o:null},e1=ec(ms.slice(0,3)),e2=ec(ms.slice(3));if(e1&&e2&&e2>e1*1.1)out.push({id:"econ-"+team+"-"+ms[ms.length-1].id,pr:5,text:`${tn}economy rose from ${e1.toFixed(2)} to ${e2.toFixed(2)} across the last 6 matches. Consider a bowling session.`,action:"go('sessions');newSession()"})}
+  let rows=[];ms.forEach(m=>(m.battingReview||[]).forEach(r=>{if(r&&r.name)rows.push(r)}));let outs=rows.map(r=>dismissalCat(r.dismissal)).filter(Boolean);
+  if(outs.length>=8){let c={};outs.forEach(x=>c[x]=(c[x]||0)+1);let [k,n]=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];if(n/outs.length>=0.5)out.push({id:"dis-"+team+"-"+k+"-"+ms[ms.length-1].id,pr:6,text:`${tn}${n} of ${outs.length} recent dismissals were ${k.toLowerCase()}.`,action:"go('sessions');newSession()"})}});
+ // data quality
+ let noBat=db.matches.filter(m=>m.date>=plus(-30)&&m.date<=t&&(m.ourRuns||m.scorerInnings)&&!(m.battingReview||[]).length).length;
+ if(noBat)out.push({id:"nobat-"+t.slice(0,7)+"-"+noBat,pr:7,text:`${noBat} recent match${noBat!==1?"es have":" has"} scores but no batting entries, so player stats will be missing.`,action:"go('matches')"});
+ let noAtt=activeSessions().filter(s=>s.date<t&&s.date>=plus(-14)&&s.sessionType!=="player"&&!(s.attendees||[]).length).length;
+ if(noAtt>=2)out.push({id:"noatt-"+t.slice(0,7)+"-"+noAtt,pr:7,text:`${noAtt} recent sessions have no attendance marked.`,action:"go('sessions')"});
+ return out.filter(x=>!sugDismissed(x.id)).sort((a,b)=>a.pr-b.pr).slice(0,5)}
+function smartSuggestionsHtml(){
+ let list=[];try{list=smartSuggestions()}catch(e){console.warn(e)}
+ if(!list.length)return "";
+ return `<div class="homeSection"><div class="card"><div class="homeSectionTitle" style="margin-bottom:6px">Suggestions</div>${list.map(x=>`<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--line)"><span style="cursor:pointer;flex:1" onclick="${x.action}">${esc(x.text)}</span><button class="btn secondary" style="padding:2px 8px" aria-label="Dismiss" onclick="sugDismiss('${esc(x.id)}')">×</button></div>`).join("")}<div class="muted" style="font-size:12px;margin-top:6px">Each line comes from your recent data. Tap to open, × to hide.</div></div></div>`}
+/* planner suggestions */
+function focusSuggestions(type,team,playerName){
+ let out=[],pl=playerName?db.players.find(p=>p.name===playerName):null;
+ let ms=pl?uspByDate(playerMatches(pl)).slice(-8):sugTeamMatches(type==="team"?team:"",8);
+ let last=activeSessions().filter(s=>(type==="team"?s.squad===team:true)&&s.date<=today()).sort((a,b)=>sessionDateTimeKey(b).localeCompare(sessionDateTimeKey(a)))[0],lastFocus=last?uspFocusList(last)[0]:"";
+ if(ms.length>=3){
+  let rec=ms.slice(-3),T=matchStatsAgg(rec,pl?pl.name:undefined).T,P=matchStatsAgg(rec,pl?pl.name:undefined).players;
+  if(pl){let ct=P.reduce((a,p)=>a+p.ct,0),dr=P.reduce((a,p)=>a+p.dr,0);if(ct+dr>=3&&ct/(ct+dr)<0.6)out.push({focus:["Fielding"],tag:"Technical improvement",why:`Catching: ${ct} taken, ${dr} dropped in the last 3 matches.`})}
+  else{let ch=T.taken+T.missed;if(ch>=5&&T.taken/ch<0.6)out.push({focus:["Fielding"],tag:"Technical improvement",why:`Catch rate ${Math.round(T.taken/ch*100)}% in the last 3 matches.`})}
+  let all=ms,ec=a=>{let Q=matchStatsAgg(a,pl?pl.name:undefined).players,r=0,o=0;Q.forEach(p=>{r+=p.rc;o+=p.ob});return o?r*6/o:null};
+  if(all.length>=6){let e1=ec(all.slice(0,Math.floor(all.length/2))),e2=ec(all.slice(Math.floor(all.length/2)));if(e1&&e2&&e2>e1*1.1)out.push({focus:["Bowling"],tag:"Technical improvement",why:`Economy rose from ${e1.toFixed(2)} to ${e2.toFixed(2)}.`})}
+  let rows=[];ms.forEach(m=>(m.battingReview||[]).forEach(r=>{if(r&&r.name&&(!pl||sameName(r.name,pl.name)))rows.push(r)}));let outs=rows.map(r=>dismissalCat(r.dismissal)).filter(Boolean);
+  if(outs.length>=6){let c={};outs.forEach(x=>c[x]=(c[x]||0)+1);let [k,n]=Object.entries(c).sort((a,b)=>b[1]-a[1])[0];if(n/outs.length>=0.5&&DISMISSAL_FIX[k])out.push({focus:["Batting"],tag:"Technical improvement",why:`${n} of ${outs.length} dismissals were ${k.toLowerCase()}. Work on ${DISMISSAL_FIX[k]}.`})}}
+ // weakest skill from latest assessments
+ let names=pl?[pl.name]:(type==="team"?activePlayers().filter(p=>p.team===team).map(p=>p.name):[]);
+ if(names.length){let acc={};names.forEach(n=>{let aa=uspByDate(db.assessments.filter(a=>a.player===n));let sk=playerSkillSeries(aa);sk.forEach(x=>{(acc[x.d+"|"+x.name]=acc[x.d+"|"+x.name]||[]).push(x.last)})});
+  let low=Object.entries(acc).filter(([k,v])=>v.length>=Math.min(3,names.length)).map(([k,v])=>({k,v:uspMean(v)})).sort((a,b)=>a.v-b.v)[0];
+  if(low&&low.v<=5.5){let [d,n]=low.k.split("|");if(["Batting","Bowling","Fielding","Wicketkeeping"].includes(d))out.push({focus:[d],tag:"Specific skill development",why:`Lowest-rated skill: ${n} (${low.v.toFixed(1)}/10).`})}}
+ // match coming
+ let nm=db.matches.filter(m=>m.date>=today()&&(!team||!m.team||m.team===team)).sort((a,b)=>a.date.localeCompare(b.date))[0];
+ if(nm){let d=Math.round((new Date(nm.date)-new Date(today()))/86400000);if(d<=3)out.push({focus:["Match simulation"],tag:"Match preparation",why:`A match is ${d===0?"today":"in "+d+" day"+(d!==1?"s":"")}.`})}
+ let seen=new Set();return out.filter(x=>{let k=x.focus[0];if(seen.has(k))return false;seen.add(k);return true}).slice(0,3).map(x=>({...x,repeat:x.focus[0]===lastFocus}))}
+function sessionSuggestHtml(type,team,playerName){
+ let l=[];try{l=focusSuggestions(type,team,playerName)}catch(e){console.warn(e)}
+ if(!l.length)return "";
+ return `<div class="card"><b>Suggested focus</b> <span class="muted" style="font-size:12px">· from recent matches and assessments</span>${l.map((x,i)=>`<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:5px 0"><span>${esc(x.focus.join(" + "))}${x.repeat?` <span class="muted">(same as your last session)</span>`:""}<div class="muted" style="font-size:13px">${esc(x.why)}</div></div><button type="button" class="btn secondary" style="padding:4px 10px" onclick="sessionApplySuggestion(${i})">Use</button></div>`).join("")}</div>`}
+let _sessSug=[];
+function sessionApplySuggestion(i){
+ let x=_sessSug[i];if(!x)return;
+ let cur=focusSelected();x.focus.forEach(f=>{if(!cur.includes(f))cur.push(f)});focusSetSelected(cur);
+ let form=document.querySelector('form[onsubmit*="saveSession"]');if(form&&x.tag){let cb=form.querySelector(`input[name="objectiveTags"][value="${x.tag}"]`);if(cb){cb.checked=true;updateFormSectionCount("objectiveTags","selected")}}}
+function sessionSuggestRefresh(){
+ let host=document.getElementById("sessionSuggest");if(!host)return;
+ let t=document.getElementById("sessionTypeSelect"),type=t?t.value:"team",team="",pl="";
+ if(type==="team"){let e=document.querySelector('select[name="squadTeam"]');team=e?e.value:""}
+ if(type==="player"){let e=document.querySelector('select[name="sessionPlayerId"]'),p=e&&db.players.find(x=>x.id===e.value);pl=p?p.name:""}
+ try{_sessSug=focusSuggestions(type,team,pl)}catch(e){_sessSug=[]}
+ host.innerHTML=sessionSuggestHtml(type,team,pl)}
+
 /* ===== Session planner helpers: net plan visibility, next-focus reminder ===== */
 const NETPLAN_FOCUS=["Nets","Centre wicket practice","Match simulation","Practice match","Batting","Bowling","Mixed"];
 function sessionNetPlanShow(focus,plan){
@@ -2046,15 +2188,19 @@ function nextFocusFor(type,team,player){
 function nextFocusReminderHtml(s,type){
  let team=type==="team"?(s.squad||(db.teams[0]&&db.teams[0].name)||""):"",pl=null;
  if(type==="player"){let p=db.players.find(x=>x.id===s.sessionPlayerId)||activePlayers()[0];pl=p?p.name:""}
- let n=nextFocusFor(type,team,pl);if(!n)return "";
- return `<div class="card" style="border-left:4px solid var(--g)"><b>Next focus from your last report</b> <span class="muted" style="font-size:12px">· saved ${esc(fmtDate(n.date))}</span><div style="margin-top:4px;white-space:pre-line">${esc(n.text)}</div></div>`}
+ return nextFocusCardsHtml(nextFocusFor(type,team,pl),type==="team"?team:"")}
+function nextFocusCardsHtml(n,team){
+ let d=latestDebriefFor(team),h="";
+ if(n)h+=`<div class="card" style="border-left:4px solid var(--g)"><b>Next focus from your last report</b> <span class="muted" style="font-size:12px">· saved ${esc(fmtDate(n.date))}</span><div style="margin-top:4px;white-space:pre-line">${esc(n.text)}</div></div>`;
+ if(d)h+=`<div class="card" style="border-left:4px solid var(--g);margin-top:8px"><b>Follow-up from the ${esc(fmtDate(d.date))} debrief</b>${d.debriefActions?`<div style="margin-top:4px;white-space:pre-line">${esc(d.debriefActions)}</div>`:""}${d.debriefNiggles?`<div class="muted" style="margin-top:4px;white-space:pre-line">Concerns: ${esc(d.debriefNiggles)}</div>`:""}</div>`;
+ return h}
 function sessionNextFocusRefresh(){
  let host=document.getElementById("sessionNextFocus");if(!host)return;
  let t=document.getElementById("sessionTypeSelect"),type=t?t.value:"team",team="",pl="";
  if(type==="team"){let e=document.querySelector('select[name="squadTeam"]');team=e?e.value:""}
  if(type==="player"){let e=document.querySelector('select[name="sessionPlayerId"]'),p=e&&db.players.find(x=>x.id===e.value);pl=p?p.name:""}
- let n=nextFocusFor(type,team,pl);
- host.innerHTML=n?`<div class="card" style="border-left:4px solid var(--g)"><b>Next focus from your last report</b> <span class="muted" style="font-size:12px">· saved ${esc(fmtDate(n.date))}</span><div style="margin-top:4px;white-space:pre-line">${esc(n.text)}</div></div>`:""}
+ host.innerHTML=nextFocusCardsHtml(nextFocusFor(type,team,pl),type==="team"?team:"");
+ try{sessionSuggestRefresh()}catch(e){}}
 function rptSaveNext(btn){
  let card=btn.closest(".rptNext");if(!card)return;
  let key=(card.dataset.key||"").trim().toLowerCase(),txt=(card.querySelector("[contenteditable]")||{}).innerText||"";
@@ -2072,6 +2218,7 @@ function sessionFormHtml(s,mode){
  ${mode==="new"&&activeSessions().length?`<button type="button" class="btn secondary full" onclick="copyLastSessionPlan()">Copy last session's plan</button>`:""}
  <form class="formgrid" onsubmit="saveSession(event)">
  <div class="full" id="sessionNextFocus">${nextFocusReminderHtml(s,sType)}</div>
+ <div class="full" id="sessionSuggest"></div>
  <label>Date<input type="date" name="date" value="${esc(s.date||today())}" required></label>
  <label>Session time<input type="time" name="time" value="${esc(s.time||"")}"></label>
  <label>Duration (minutes)<input type="number" name="duration" value="${esc(s.duration||90)}"></label>
@@ -2186,6 +2333,7 @@ function openSessionForm(existing,mode){
  netPlanExpandedKeys=new Set();
  editingSessionId=mode==="edit"?existing.id:null;
  modal(sessionFormHtml(existing,mode));
+ try{sessionSuggestRefresh()}catch(e){}
  renderDrillLinks("main");renderDrillLinks("game");renderSessionAttachmentPreview();renderNetPlanBuilder();
  updateFormSectionCount("attendance","marked present");updateFormSectionCount("objectiveTags","selected");updateMsdCount("cueTags");updateMsdCount("successTags");
 }
@@ -2660,6 +2808,7 @@ function copyLastSessionPlan(){
  } else if(lastType==="player"){
   setVal("sessionPlayerId",last.sessionPlayerId);
  }
+ setVal("intensity",last.intensity);setVal("ledBy",last.ledBy);setVal("ledByName",last.ledByName);setVal("equipment",last.equipment);{let w=document.getElementById("sessionLedByNameWrap");if(w)w.style.display=last.ledBy?"":"none"}
  setVal("duration",last.duration);setVal("focus",last.focus);focusSetSelected(focusSelected());setVal("venue",last.venue);
  setVal("objectives",last.objectives);setVal("warmup",last.warmup);setVal("main",last.main);
  setVal("game",last.game);setVal("cues",last.cues);setVal("success",last.success);
@@ -2678,6 +2827,7 @@ function applySessionTemplate(templateId){
  let form=document.querySelector('form[onsubmit*="saveSession"]');
  if(!form)return;
  let setVal=(name,val)=>{let el=form.querySelector(`[name="${name}"]`);if(el)el.value=val||""};
+ setVal("intensity",t.intensity);setVal("ledBy",t.ledBy);setVal("ledByName",t.ledByName);setVal("equipment",t.equipment);{let w=document.getElementById("sessionLedByNameWrap");if(w)w.style.display=t.ledBy?"":"none"}
  setVal("duration",t.duration);setVal("focus",t.focus);focusSetSelected(focusSelected());setVal("venue",t.venue);
  setVal("objectives",t.objectives);setVal("warmup",t.warmup);setVal("main",t.main);
  setVal("game",t.game);setVal("cues",t.cues);setVal("success",t.success);
@@ -2697,7 +2847,7 @@ function saveAsTemplate(){
  let fd=new FormData(form);
  let t={
   id:uid("tmpl"),name:name.trim(),
-  duration:fd.get("duration")||"",focus:fd.get("focus")||"",venue:fd.get("venue")||"",
+  duration:fd.get("duration")||"",focus:fd.get("focus")||"",venue:fd.get("venue")||"",intensity:fd.get("intensity")||"",ledBy:fd.get("ledBy")||"",ledByName:fd.get("ledByName")||"",equipment:fd.get("equipment")||"",
   objectives:fd.get("objectives")||"",objectiveTags:fd.getAll("objectiveTags"),
   warmup:fd.get("warmup")||"",main:fd.get("main")||"",game:fd.get("game")||"",
   cues:fd.get("cues")||"",success:fd.get("success")||"",cueTags:fd.getAll("cueTags"),successTags:fd.getAll("successTags"),
@@ -2728,7 +2878,7 @@ function reflections(){
  +`<button class="btn primary" onclick="newReflection()">+ New Reflection</button>
  ${filterBarHtml("reflections",`<input id="reflectionSearch" value="${esc(reflectionQuery)}" oninput="reflectionQuery=this.value;reflections()" onfocus="reflectionSearchFocused=true" onblur="reflectionSearchFocused=false" placeholder="Search reflections...">`,`<label>Type<select onchange="reflectionTypeFilter=this.value;reflections()"><option value="">All</option><option value="session" ${reflectionTypeFilter==="session"?"selected":""}>Practice Session</option><option value="match" ${reflectionTypeFilter==="match"?"selected":""}>Match</option></select></label>`,reflectionTypeFilter?1:0)}
  <h2 class="section">Reflection history (${list.length})</h2>
- <div class="card">${list.length?list.map(x=>`<div class="item"><div><b>${esc(fmtDate(x.date))} · ${esc(x.session||"Reflection")}</b> <span class="tag">${x.type==="match"?"Match":"Session"}</span><div class="muted">Rating ${esc(x.rating)}/5</div><small>${esc(reflectionWentWellText(x))}</small>${x.momentIds&&x.momentIds.length?`<div class="vmThumbs" data-ids="${esc(x.momentIds.join(","))}"></div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editReflection('${x.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delReflection('${x.id}')">${icon("trash",17)}</button></div></div>`).join(""):(db.reflections.length?empty("No reflections match your filters."):emptyRich("No reflections yet","A two-minute note after each session or match is how coaches improve fastest.","+ New Reflection","newReflection()"))}</div>
+ <div class="card">${list.length?list.map(x=>`<div class="item"><div><b>${esc(fmtDate(x.date))} · ${esc(x.session||"Reflection")}</b> <span class="tag">${x.type==="match"?"Match":"Session"}</span>${x.debriefMode?`<span class="tag">Debrief</span>`:""}<div class="muted">Rating ${esc(x.rating)}/5</div><small>${esc(x.debriefMode?debriefSummaryText(x):reflectionWentWellText(x))}</small>${x.momentIds&&x.momentIds.length?`<div class="vmThumbs" data-ids="${esc(x.momentIds.join(","))}"></div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editReflection('${x.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delReflection('${x.id}')">${icon("trash",17)}</button></div></div>`).join(""):(db.reflections.length?empty("No reflections match your filters."):emptyRich("No reflections yet","A two-minute note after each session or match is how coaches improve fastest.","+ New Reflection","newReflection()"))}</div>
  ${recurringThemesCardHtml()}`;
  vmFillThumbs();
  let sEl=document.getElementById("reflectionSearch");if(sEl&&reflectionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
@@ -2756,6 +2906,7 @@ function reflectionFormHtml(x,mode){
   ${ratingSelectRow("tacticalDecisions","Tactical decisions",x.tacticalDecisions)}
   ${ratingSelectRow("playerManagement","Player management / rotation calls",x.playerManagement)}
  </div>
+ ${debriefBlockHtml(x)}
  ${ratingSelectRow("rating","Overall rating",x.rating)}
  <div class="full"><label>Video moments <span class="muted" style="font-weight:400">(optional — tap to attach)</span></label><input type="hidden" name="momentIds" id="reflMomIds" value="${esc((x.momentIds||[]).join(","))}"><div id="reflMoments" class="muted small">Loading…</div></div>
  <div class="full">${formSectionHead("wentWell","What went well?",false)}
@@ -2788,6 +2939,7 @@ function reflectionFormHtml(x,mode){
 // selection could get submitted alongside the visible one. saveReflection()
 // also strips any leftover fields that don't belong to the final chosen type.
 function setReflectionType(type){
+ {let w=document.getElementById("reflDebriefWrap");if(w){w.style.display=type==="match"?"none":"";if(type==="match"){let c=w.querySelector("input[name=debriefMode]");if(c&&c.checked){c.checked=false;reflToggleDebrief(false)}}}}
  let input=document.getElementById("reflectionTypeInput");if(input)input.value=type;
  let sessBtn=document.getElementById("reflTypeSessionBtn"),matchBtn=document.getElementById("reflTypeMatchBtn");
  if(sessBtn)sessBtn.className="btn "+(type!=="match"?"primary":"secondary");
@@ -2812,6 +2964,7 @@ function onReflectionSessionPick(sel){
  let s=db.sessions.find(x=>x.id===sel.value);if(!s)return;
  let labelEl=document.getElementById("reflectionSessionLabel");
  if(labelEl&&!labelEl.value)labelEl.value=sessionLabel(s);
+ if(s.ledBy){let f=sel.closest("form"),c=f.querySelector("input[name=debriefMode]");if(c&&!c.checked){c.checked=true;reflToggleDebrief(true)}let by=f.querySelector("[name=debriefBy]");if(by&&!by.value)by.value=(s.ledByName?s.ledByName+" · ":"")+s.ledBy}
  let dateEl=sel.closest("form").querySelector('[name="date"]');
  if(dateEl&&s.date)dateEl.value=s.date;
 }
@@ -3340,10 +3493,12 @@ function deleteFitnessTest(playerId,testId){
 function playerGoalsHtml(p){
  let goals=(p.goals||[]).slice().sort((a,b)=>String(a.achieved).localeCompare(String(b.achieved))||String(a.targetDate||"").localeCompare(String(b.targetDate||"")));
  return `<h2 class="section">Goals</h2><div class="card">
- ${goals.length?goals.map(g=>{let st=goalStatusInfo(g);return `<div class="item"><div><b style="${g.achieved?"text-decoration:line-through;opacity:.7":""}">${esc(g.text)}</b><div style="color:${st.color};font-size:var(--fs-2);font-weight:600">${esc(st.text)}</div></div><div class="toolbar"><button class="btn secondary" onclick="togglePlayerGoal('${p.id}','${g.id}')">${g.achieved?"Reopen":"Mark done"}</button><button class="btn danger iconBtn" title="Delete" onclick="deletePlayerGoal('${p.id}','${g.id}')">${icon("trash",17)}</button></div></div>`}).join(""):`<div class="muted" style="margin-bottom:10px">No goals yet — add one below, e.g. a skill to improve by a date.</div>`}
+ ${goals.length?goals.map(g=>{let st=goalStatusInfo(g);return `<div class="item"><div><b style="${g.achieved?"text-decoration:line-through;opacity:.7":""}">${esc(g.text)}</b><div style="color:${st.color};font-size:var(--fs-2);font-weight:600">${esc(st.text)}</div>${(()=>{let m=goalMeasure(p,g);return m?`<div style="color:${m.color};font-size:var(--fs-2)">${esc(m.text)}</div>`:""})()}</div><div class="toolbar"><button class="btn secondary" onclick="togglePlayerGoal('${p.id}','${g.id}')">${g.achieved?"Reopen":"Mark done"}</button><button class="btn danger iconBtn" title="Delete" onclick="deletePlayerGoal('${p.id}','${g.id}')">${icon("trash",17)}</button></div></div>`}).join(""):`<div class="muted" style="margin-bottom:10px">No goals yet — add one below, e.g. a skill to improve by a date.</div>`}
  <form onsubmit="addPlayerGoal(event,'${p.id}')" class="formgrid" style="margin-top:10px;padding:0">
  <input name="text" placeholder="e.g. Improve off-side batting" required>
  <label>Target date (optional)<input type="date" name="targetDate"></label>
+ <label>Measure it (optional)<select name="metric">${goalMetricOptions()}</select></label>
+ <label>Target value<input type="number" step="any" name="target" placeholder="e.g. 7 or 25"></label>
  <button class="btn primary full" style="margin-top:4px">+ Add Goal</button>
  </form></div>`;
 }
@@ -3355,7 +3510,7 @@ function addPlayerGoal(e,playerId){
  let text=String(fd.get("text")||"").trim();
  if(!text)return;
  if(!p.goals)p.goals=[];
- p.goals.push({id:uid("goal"),text,targetDate:fd.get("targetDate")||"",createdDate:today(),achieved:false,achievedDate:""});
+ {let metric=fd.get("metric")||"",tg=fd.get("target"),ok=metric&&tg!==""&&Number.isFinite(+tg),bl=ok?goalValue(p,metric):null;p.goals.push({id:uid("goal"),text,targetDate:fd.get("targetDate")||"",createdDate:today(),achieved:false,achievedDate:"",metric:ok?metric:"",target:ok?+tg:"",baseline:bl==null?"":bl})}
  save();playerView(playerId);
 }
 function togglePlayerGoal(playerId,goalId){
@@ -7136,7 +7291,7 @@ function shareSessionSummary(id){
 // reflection just because of which field its text happens to live in.
 function reflectionSearchableText(r){
  return[
-  r.session,r.well,r.next,
+  r.session,r.well,r.next,r.debriefFeedback,r.debriefActions,r.debriefNiggles,r.debriefFlagged,
   (r.betterReasons&&r.betterReasons.length)?r.betterReasons.join(" "):"",
   r.betterDetail!==undefined?r.betterDetail:r.better,
   r.learnings!==undefined?r.learnings:[r.players,r.change].filter(Boolean).join(" "),
@@ -7697,7 +7852,7 @@ function buildPlayerReport(){
  <div class="grid g2" style="margin-top:15px"><div class="card"><b>Squad</b><div>${esc(p.group||"—")}</div></div><div class="card"><b>Current goal</b><div>${esc(p.focus||"—")}</div></div></div>
  ${goalProgressHtml}
  <h2>Profile</h2><div class="card"><b>Strengths</b><p>${esc(p.strengths||"—")}</p><b>Development areas</b><p>${esc(p.areas||"—")}</p></div>
- ${_plFocus}${playerWhatWorkedHtml(p)}${dismissalPatternHtml(_S.bat,"")}${_plSkill}${playerJourneyHtml(p,true)}
+ ${_plFocus}${playerGoalsReportHtml(p)}${playerWhatWorkedHtml(p)}${dismissalPatternHtml(_S.bat,"")}${_plSkill}${playerJourneyHtml(p,true)}
  ${Object.entries(disciplineTrend).some(([,t])=>t.count>=2)?`<h2>Development Trend</h2><div class="card">${Object.entries(disciplineTrend).filter(([,t])=>t.count>=2).map(([d,t])=>{let diff=(t.last-t.first).toFixed(1);let sign=t.last>=t.first?"+":"";let color=t.last>=t.first?"var(--g)":"var(--red)";return `<div style="margin-bottom:6px"><b>${esc(d)}:</b> ${t.first.toFixed(1)} → ${t.last.toFixed(1)} <span style="color:${color};font-weight:700">(${sign}${diff})</span></div>`}).join("")}</div>`:""}
  ${playerProgressPrintHtml(aa)}
  ${(()=>{let parts=[];if(!battingEntries.length&&!bowlingEntries.length)parts.push(`<p>Played in ${matches.length} match${matches.length!==1?"es":""}, no batting or bowling entries logged.</p>`);if(backToBackCount>0)parts.push(`<p style="color:var(--gold)"><b>⚠ Workload note:</b> ${backToBackCount} match${backToBackCount!==1?"es":""} played with a day or less rest before the next one.</p>`);return (matches.length&&parts.length)?`<h2>Match Performance</h2><div class="card">${parts.join("")}</div>`:""})()}
