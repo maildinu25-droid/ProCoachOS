@@ -920,7 +920,7 @@ function focusSetSelected(arr){
  if(el)el.value=arr.join(" + ");if(!b)return;
  let sc=document.getElementById("sheet"),outer=sc?sc.scrollTop:0,pn=b.querySelector(".fpPanel"),inner=pn?pn.scrollTop:0;
  b.style.minHeight=b.offsetHeight+"px";
- b.innerHTML=focusPickerInner(el?el.value:"");
+ b.innerHTML=focusPickerInner(el?el.value:"");try{sessionNetPlanRefresh()}catch(e){}
  let np=b.querySelector(".fpPanel");if(np)np.scrollTop=inner;
  if(sc)sc.scrollTop=outer;
  b.style.minHeight="";
@@ -2007,11 +2007,13 @@ function updateAttendanceForTeam(teamName){
  updateFormSectionCount("attendance","marked present");
 }
 function onSessionTeamChange(teamName){
+ try{sessionNextFocusRefresh()}catch(e){}
  refreshSessionStageCounts();
  updateAttendanceForTeam(teamName);
  renderNetPlanBuilder();
 }
 function toggleSessionType(val){
+ try{sessionNextFocusRefresh()}catch(e){}
  document.getElementById("sessionTypeTeamWrap").style.display=val==="team"?"":"none";
  document.getElementById("sessionTypePlayerWrap").style.display=val==="player"?"":"none";
  document.getElementById("sessionTypeCustomWrap").style.display=val==="custom"?"":"none";
@@ -2026,6 +2028,40 @@ function toggleSessionType(val){
  }
  renderNetPlanBuilder();
 }
+
+/* ===== Session planner helpers: net plan visibility, next-focus reminder ===== */
+const NETPLAN_FOCUS=["Nets","Centre wicket practice","Match simulation","Practice match","Batting","Bowling","Mixed"];
+function sessionNetPlanShow(focus,plan){
+ if(Array.isArray(plan)&&plan.length)return true;
+ let f=String(focus||"").split(" + ").map(x=>x.trim()).filter(Boolean);
+ return !f.length||f.some(x=>NETPLAN_FOCUS.includes(x)||(focusCustomList()||[]).includes(x))}
+function sessionNetPlanRefresh(){
+ let w=document.getElementById("netPlanWrap"),el=document.querySelector('#focusPicker input[name="focus"]');
+ if(w)w.style.display=sessionNetPlanShow(el?el.value:"",sessionNetPlanDraft)?"":"none"}
+function nextFocusFor(type,team,player){
+ let m=(db.settings&&db.settings.nextFocus)||{};
+ if(type==="player"&&player&&m["player: "+player.toLowerCase()])return m["player: "+player.toLowerCase()];
+ if(type==="team"&&team&&m["team: "+team.toLowerCase()])return m["team: "+team.toLowerCase()];
+ return null}
+function nextFocusReminderHtml(s,type){
+ let team=type==="team"?(s.squad||(db.teams[0]&&db.teams[0].name)||""):"",pl=null;
+ if(type==="player"){let p=db.players.find(x=>x.id===s.sessionPlayerId)||activePlayers()[0];pl=p?p.name:""}
+ let n=nextFocusFor(type,team,pl);if(!n)return "";
+ return `<div class="card" style="border-left:4px solid var(--g)"><b>Next focus from your last report</b> <span class="muted" style="font-size:12px">· saved ${esc(fmtDate(n.date))}</span><div style="margin-top:4px;white-space:pre-line">${esc(n.text)}</div></div>`}
+function sessionNextFocusRefresh(){
+ let host=document.getElementById("sessionNextFocus");if(!host)return;
+ let t=document.getElementById("sessionTypeSelect"),type=t?t.value:"team",team="",pl="";
+ if(type==="team"){let e=document.querySelector('select[name="squadTeam"]');team=e?e.value:""}
+ if(type==="player"){let e=document.querySelector('select[name="sessionPlayerId"]'),p=e&&db.players.find(x=>x.id===e.value);pl=p?p.name:""}
+ let n=nextFocusFor(type,team,pl);
+ host.innerHTML=n?`<div class="card" style="border-left:4px solid var(--g)"><b>Next focus from your last report</b> <span class="muted" style="font-size:12px">· saved ${esc(fmtDate(n.date))}</span><div style="margin-top:4px;white-space:pre-line">${esc(n.text)}</div></div>`:""}
+function rptSaveNext(btn){
+ let card=btn.closest(".rptNext");if(!card)return;
+ let key=(card.dataset.key||"").trim().toLowerCase(),txt=(card.querySelector("[contenteditable]")||{}).innerText||"";
+ if(!/^(team|player): /.test(key)){alert("Reminders can be saved from a team or player report.");return}
+ db.settings.nextFocus=db.settings.nextFocus||{};
+ db.settings.nextFocus[key]={text:txt.trim(),date:today()};
+ btn.textContent="Saved. It will show when you plan a session";save()}
 function sessionFormHtml(s,mode){
  s=s||{};
  sessionStageDraft=Array.isArray(s.stageFilter)?s.stageFilter.slice():(mode==="new"?sessionStageDefaultIds():[]);
@@ -2035,39 +2071,50 @@ function sessionFormHtml(s,mode){
  ${mode==="new"&&db.sessionTemplates.length?`<label class="full">Start from a template <span class="muted" style="font-weight:400">(optional)</span><select onchange="applySessionTemplate(this.value)"><option value="">— Blank session —</option>${db.sessionTemplates.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></label>`:""}
  ${mode==="new"&&activeSessions().length?`<button type="button" class="btn secondary full" onclick="copyLastSessionPlan()">Copy last session's plan</button>`:""}
  <form class="formgrid" onsubmit="saveSession(event)">
+ <div class="full" id="sessionNextFocus">${nextFocusReminderHtml(s,sType)}</div>
  <label>Date<input type="date" name="date" value="${esc(s.date||today())}" required></label>
  <label>Session time<input type="time" name="time" value="${esc(s.time||"")}"></label>
+ <label>Duration (minutes)<input type="number" name="duration" value="${esc(s.duration||90)}"></label>
+ <label>Intensity<select name="intensity"><option value="">—</option>${["Low","Medium","High"].map(o=>`<option value="${o}" ${s.intensity===o?"selected":""}>${o}</option>`).join("")}</select></label>
+ <label>Venue<input name="venue" list="venueDatalist" value="${esc(s.venue||"")}"><datalist id="venueDatalist">${venueOptions()}</datalist></label>
  <label>Session title <span class="muted" style="font-weight:400">(optional)</span><input name="title" value="${esc(s.title||"")}" placeholder="Leave blank to show time + squad instead"></label>
- <label class="full">Session type<select name="sessionType" id="sessionTypeSelect" onchange="toggleSessionType(this.value)"><option value="team" ${sType==="team"?"selected":""}>Team / Squad session</option><option value="player" ${sType==="player"?"selected":""}>Individual Player (1-on-1)</option><option value="custom" ${sType==="custom"?"selected":""}>Custom Group</option></select></label>
- ${mode==="new"?`<div class="full"><span class="fpLabel">Same session on more days <span class="muted" style="font-weight:400">(e.g. a 3-day match)</span></span><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button type="button" class="btn secondary" style="padding:5px 10px" onclick="sessionNextDays(1)">+ Next day</button><button type="button" class="btn secondary" style="padding:5px 10px" onclick="sessionNextDays(2)">+ Next 2 days</button><input type="date" id="sessionExtraInput" style="flex:1;min-width:140px"><button type="button" class="btn secondary" style="padding:5px 10px" onclick="sessionAddExtraInput()">Add date</button></div><div id="sessionExtraList" style="margin-top:8px">${sessionExtraHtml()}</div></div>
- <div class="full"><label><input type="checkbox" id="sessionRepeatCheck" onchange="document.getElementById('sessionRepeatWeeksWrap').style.display=this.checked?'':'none'" style="width:auto;margin-right:6px">Repeat this session weekly</label><div id="sessionRepeatWeeksWrap" style="display:none;margin-top:8px"><label>For how many weeks (including this one)<input type="number" id="sessionRepeatWeeks" min="2" max="26" value="4"></label></div></div>`:""}
+ <label>Session type<select name="sessionType" id="sessionTypeSelect" onchange="toggleSessionType(this.value)"><option value="team" ${sType==="team"?"selected":""}>Team / Squad session</option><option value="player" ${sType==="player"?"selected":""}>Individual Player (1-on-1)</option><option value="custom" ${sType==="custom"?"selected":""}>Custom Group</option></select></label>
+ <label>Led by<select name="ledBy" id="sessionLedBy" onchange="document.getElementById('sessionLedByNameWrap').style.display=this.value?'':'none'"><option value="">Me</option>${["Assistant coach","S&C trainer","Physio","External / guest"].map(o=>`<option value="${o}" ${s.ledBy===o?"selected":""}>${o}</option>`).join("")}</select></label>
+ <div class="full" id="sessionLedByNameWrap" style="${s.ledBy?"":"display:none"}"><label>Name of person leading <span class="muted" style="font-weight:400">(optional)</span><input name="ledByName" value="${esc(s.ledByName||"")}"></label></div>
  <div class="full" id="sessionTypeTeamWrap" style="${sType==="team"?"":"display:none"}"><label>Team<select name="squadTeam" onchange="onSessionTeamChange(this.value)">${db.teams.length?db.teams.map(t=>`<option value="${esc(t.name)}" ${s.squad===t.name?"selected":""}>${esc(t.name)}</option>`).join(""):`<option value="">No teams yet — add one in Teams & Seasons</option>`}</select></label></div>
- <div class="full" id="sessionTypePlayerWrap" style="${sType==="player"?"":"display:none"}"><label>Player<select name="sessionPlayerId">${activePlayers().length?activePlayers().map(p=>`<option value="${p.id}" ${s.sessionPlayerId===p.id?"selected":""}>${esc(p.name)}</option>`).join(""):`<option value="">No players yet — add one in Players</option>`}</select></label></div>
+ <div class="full" id="sessionTypePlayerWrap" style="${sType==="player"?"":"display:none"}"><label>Player<select name="sessionPlayerId" onchange="sessionNextFocusRefresh()">${activePlayers().length?activePlayers().map(p=>`<option value="${p.id}" ${s.sessionPlayerId===p.id?"selected":""}>${esc(p.name)}</option>`).join(""):`<option value="">No players yet — add one in Players</option>`}</select></label></div>
  <div class="full" id="sessionTypeCustomWrap" style="${sType==="custom"?"":"display:none"}"><label>Group name<input name="squadCustom" value="${esc(squadCustomVal)}" placeholder="e.g. Weekend intensive group"></label></div>
  <div class="full" id="sessionStageHost" style="${sType==="player"?"display:none":""}">${sessionStageChipsHtml()}</div>
- <label>Duration (minutes)<input type="number" name="duration" value="${esc(s.duration||90)}"></label>
  <div class="full" id="focusPicker"><input type="hidden" name="focus" value="${esc(s.focus||"")}"><span class="fpLabel">Session focus <span class="muted" style="font-weight:400">(tick one or more — the first is primary)</span></span><div id="focusPickerBody">${focusPickerInner(s.focus||"")}</div></div>
- <label>Venue<input name="venue" list="venueDatalist" value="${esc(s.venue||"")}"><datalist id="venueDatalist">${venueOptions()}</datalist></label>
- <div class="full" id="sessionAttendanceWrap" style="${sType==="player"?"display:none":""}">${formSectionHead("attendance","Attendance",false)}
- <div id="formSec-attendance" style="display:none;margin-top:10px"><div id="attendanceListInner">${attendanceOptionsHtml(s,sType==="team"?(s.squad||(db.teams[0]&&db.teams[0].name)||""):"",null,mode==="new")}</div></div>
- </div>
  <div class="full">${formSectionHead("objectiveTags","Objective Categories",false)}
  <div id="formSec-objectiveTags" style="display:none;margin-top:10px"><div class="chipGrid2">${OBJECTIVE_CATEGORIES.map(c=>`<label><input type="checkbox" name="objectiveTags" value="${esc(c)}" ${(s.objectiveTags||[]).includes(c)?"checked":""} onchange="updateFormSectionCount('objectiveTags','selected')"> ${esc(c)}</label>`).join("")}</div></div>
  </div>
- <div class="full">${formSectionHead("netPlan","Net Plan",false)}
- <div id="formSec-netPlan" style="display:none;margin-top:10px"><div class="muted" style="font-size:var(--fs-3);margin-bottom:10px">Build your nets rotation here instead of a separate document — e.g. Set 1: Net 1, 2 batters &amp; 4-5 bowlers, 30 mins.</div><div id="netPlanBuilderBody"></div></div>
- </div>
  <label class="full">Objectives <span class="muted" style="font-weight:400">(specifics for this session, beyond the categories above)</span><textarea name="objectives">${esc(s.objectives||"")}</textarea></label>
+ <label class="full">Equipment needed <span class="muted" style="font-weight:400">(optional)</span><input name="equipment" value="${esc(s.equipment||"")}" placeholder="e.g. 2 bowling machines, cones, 20 balls"></label>
  <label class="full">Warm-up / Preparation<textarea name="warmup">${esc(s.warmup||"")}</textarea></label>
  <label class="full">Main Skill Block<textarea name="main">${esc(s.main||"")}</textarea></label>
  ${drillPickerHtml("main")}
+ <div class="full" id="netPlanWrap" style="${sessionNetPlanShow(s.focus||"",s.netPlan)?"":"display:none"}">
+ <div>${formSectionHead("netPlan","Net Plan",false)}
+ <div id="formSec-netPlan" style="display:none;margin-top:10px"><div class="muted" style="font-size:var(--fs-3);margin-bottom:10px">Build your nets rotation here instead of a separate document — e.g. Set 1: Net 1, 2 batters &amp; 4-5 bowlers, 30 mins.</div><div id="netPlanBuilderBody"></div></div>
+ </div>
+ </div>
  <label class="full">Competitive / Game Block<textarea name="game">${esc(s.game||"")}</textarea></label>
  ${drillPickerHtml("game")}
  ${multiDropdownHtml("cueTags","Coaching Cues",CUE_PRESETS,s.cueTags)}
 ${s.cues?`<input type="hidden" name="cues" value="${esc(s.cues)}"><div class="full muted" style="font-size:var(--fs-2);margin-top:-6px">Earlier notes kept: ${esc(s.cues)}</div>`:""}
  ${multiDropdownHtml("successTags","Success Criteria",SUCCESS_PRESETS,s.successTags)}
 ${s.success?`<input type="hidden" name="success" value="${esc(s.success)}"><div class="full muted" style="font-size:var(--fs-2);margin-top:-6px">Earlier notes kept: ${esc(s.success)}</div>`:""}
+ <div class="full" id="sessionAttendanceWrap" style="${sType==="player"?"display:none":""}">${formSectionHead("attendance","Attendance",false)}
+ <div id="formSec-attendance" style="display:none;margin-top:10px"><div id="attendanceListInner">${attendanceOptionsHtml(s,sType==="team"?(s.squad||(db.teams[0]&&db.teams[0].name)||""):"",null,mode==="new")}</div></div>
+ </div>
+ <div class="full">${formSectionHead("moreOpts","More options",false)}
+ <div id="formSec-moreOpts" style="display:none;margin-top:10px;display:none">
+ ${mode==="new"?`<div class="full"><span class="fpLabel">Same session on more days <span class="muted" style="font-weight:400">(e.g. a 3-day match)</span></span><div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:6px"><button type="button" class="btn secondary" style="padding:5px 10px" onclick="sessionNextDays(1)">+ Next day</button><button type="button" class="btn secondary" style="padding:5px 10px" onclick="sessionNextDays(2)">+ Next 2 days</button><input type="date" id="sessionExtraInput" style="flex:1;min-width:140px"><button type="button" class="btn secondary" style="padding:5px 10px" onclick="sessionAddExtraInput()">Add date</button></div><div id="sessionExtraList" style="margin-top:8px">${sessionExtraHtml()}</div></div>
+ <div class="full"><label><input type="checkbox" id="sessionRepeatCheck" onchange="document.getElementById('sessionRepeatWeeksWrap').style.display=this.checked?'':'none'" style="width:auto;margin-right:6px">Repeat this session weekly</label><div id="sessionRepeatWeeksWrap" style="display:none;margin-top:8px"><label>For how many weeks (including this one)<input type="number" id="sessionRepeatWeeks" min="2" max="26" value="4"></label></div></div>`:""}
  <div class="full"><label style="margin-bottom:6px">Attachment (optional)</label><div class="muted" style="font-size:var(--fs-3);margin-bottom:8px">Upload a Word, Excel, PDF or image version of this session plan (under 2MB) — only if you have one.</div><input id="sessionAttachmentInput" type="file" accept=".doc,.docx,.xls,.xlsx,.pdf,image/*" onchange="handleSessionAttachment(this)"><div id="sessionAttachmentPreview" style="margin-top:8px"></div></div>
+ </div>
+ </div>
  <button class="btn primary">Save Session</button>
  ${mode==="new"?`<button type="button" class="btn secondary" style="margin-top:8px" onclick="saveAsTemplate()">Save as Template (without saving this session)</button>`:""}
  </form>`;
@@ -2512,6 +2559,7 @@ function printSessionPlan(id){
    <div class="card stat"><span>Type</span><b style="font-size:var(--fs-6)">${esc(sessionTypeLabel(s.sessionType))}</b></div>
   </div>
   ${s.venue?`<div class="card" style="margin-top:16px"><b>Venue:</b> ${esc(s.venue)}</div>`:""}
+  ${(s.intensity||s.ledBy||s.equipment)?`<div class="card">${s.intensity?`<div><b>Intensity:</b> ${esc(s.intensity)}</div>`:""}${s.ledBy?`<div><b>Led by:</b> ${esc(s.ledBy)}${s.ledByName?" · "+esc(s.ledByName):""}</div>`:""}${s.equipment?`<div><b>Equipment:</b> ${esc(s.equipment)}</div>`:""}</div>`:""}
   ${(s.attendees&&s.attendees.length)?`<h2>Attendance (${s.attendees.length})</h2><div class="card">${s.attendees.map(a=>esc(a)).join(", ")}</div>`:""}
   ${(s.objectiveTags&&s.objectiveTags.length)?`<h2>Objective Categories</h2><div class="card">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}
   ${s.objectives?`<h2>Objectives</h2><div class="card">${esc(s.objectives)}</div>`:""}
@@ -6405,7 +6453,7 @@ function reportCoverHtml(o){
  return `<div class="card rptCover" style="margin-top:14px;border-left:4px solid var(--g)"><div class="muted" style="font-size:12px">${esc(o.label||"")}${o.period?" · "+esc(o.period):""}</div><div style="font-size:19px;font-weight:800;margin:4px 0 6px">${d.headline}</div>${d.lines.length?`<div class="muted" style="margin-bottom:2px">Key takeaways</div><ul style="margin:4px 0 0 18px;padding:0">${d.lines.slice(0,5).map(x=>`<li style="margin:3px 0">${x}</li>`).join("")}</ul>`:""}${o.extra||""}</div>`}
 function reportNextHtml(o){
  let d=rptCoverData(o),lines=d.next.length?d.next.slice(0,3):["No clear weak area in this data. Keep the current plan and keep entering scores."];
- return `<div class="card rptNext" style="margin-top:18px"><b>Next focus</b> <span class="muted noPrint" style="font-size:12px">· tap the text to edit before printing</span><div contenteditable="true" spellcheck="false" style="margin-top:6px;outline:none">${lines.map(x=>`<p style="margin:4px 0">${x}</p>`).join("")}</div></div>`}
+ return `<div class="card rptNext" data-key="${esc(o.label||"")}" style="margin-top:18px"><b>Next focus</b> <span class="muted noPrint" style="font-size:12px">· tap the text to edit before printing</span><div contenteditable="true" spellcheck="false" style="margin-top:6px;outline:none">${lines.map(x=>`<p style="margin:4px 0">${x}</p>`).join("")}</div><button type="button" class="btn secondary noPrint" style="margin-top:8px;padding:5px 10px" onclick="rptSaveNext(this)">Remind me when planning a session</button></div>`}
 function campPathwayHtml(roster){
  let camps=(db.camps||[]).filter(c=>c.review);if(!camps.length||!roster.length)return "";
  let rows=[];roster.forEach(p=>{let hits=[];camps.forEach(c=>{let v=c.review[p.name];if(v&&(v.rec||v.r))hits.push(`${esc(c.name)}: ${v.rec==="in"?"In":v.rec==="maybe"?"Maybe":v.rec==="out"?"Out":"Reviewed"}${v.r?" ("+v.r+"/5)":""}`)});if(hits.length)rows.push({p,hits})});
@@ -6475,7 +6523,7 @@ function playerCoverNext(p,latest,matches,S,aa){
  if(S.declined.length)nx.push(`Slipping: ${esc(S.declined[0].name)} fell from ${S.declined[0].first} to ${S.declined[0].last}. Revisit it in the next sessions.`);
  if(p.focus)nx.push(`Goal: ${esc(p.focus)}.`);
  if(!nx.length)nx.push("No clear weak area in this data. Keep the current plan.");
- let next=`<div class="card rptNext" style="margin-top:18px"><b>Next focus</b> <span class="muted noPrint" style="font-size:12px">· tap the text to edit before printing</span><div contenteditable="true" spellcheck="false" style="margin-top:6px;outline:none">${nx.slice(0,3).map(x=>`<p style="margin:4px 0">${x}</p>`).join("")}</div></div>`;
+ let next=`<div class="card rptNext" data-key="Player: ${esc(p.name)}" style="margin-top:18px"><b>Next focus</b> <span class="muted noPrint" style="font-size:12px">· tap the text to edit before printing</span><div contenteditable="true" spellcheck="false" style="margin-top:6px;outline:none">${nx.slice(0,3).map(x=>`<p style="margin:4px 0">${x}</p>`).join("")}</div><button type="button" class="btn secondary noPrint" style="margin-top:8px;padding:5px 10px" onclick="rptSaveNext(this)">Remind me when planning a session</button></div>`;
  return {cover,next}}
 /* ===== USP insights: what worked, dismissal patterns, journey, selection evidence, season story ===== */
 function uspFocusList(s){return String(s.focus||"").split(" + ").map(x=>x.trim()).filter(Boolean)}
