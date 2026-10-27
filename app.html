@@ -6307,6 +6307,19 @@ function matchPerfHtml(matches){
  if(T.fieldN){let cr=(T.taken+T.missed)?Math.round(T.taken/(T.taken+T.missed)*100)+"%":"—";h+=`<div class="card" style="margin-top:12px"><span class="muted">Fielding</span><div style="margin-top:4px">Catches taken ${T.taken} · Dropped ${T.missed} · Run outs ${T.runouts}${T.stump?" · Stumpings "+T.stump:""} · Misfields ${T.misfields}</div><div class="muted" style="margin-top:4px">Catch rate <b>${cr}</b> · ${(T.taken/T.fieldN).toFixed(1)} catches per match</div></div>`}
  return h;
 }
+function playerPerfCardsHtml(roster,matches){
+ let A=matchStatsAgg(matches).players,N=matches.length;
+ let rows=roster.map(p=>{let a=A.find(x=>sameName(x.name,p.name))||null;
+  let played=matches.filter(m=>(m.playingXI||[]).some(n=>sameName(n,p.name))||(m.battingReview||[]).some(r=>sameName(r.name,p.name))||(m.bowlingReview||[]).some(r=>sameName(r.name,p.name))||(m.fieldingReview||[]).some(r=>sameName(r.name,p.name))).length;
+  return {p,a,played}});
+ rows.sort((x,y)=>y.played-x.played||((y.a?y.a.runs:0)-(x.a?x.a.runs:0))||((y.a?y.a.w:0)-(x.a?x.a.w:0)));
+ let line=(l,t)=>`<div class="muted" style="margin-top:4px"><span>${l}:</span> ${t}</div>`;
+ return rows.map(({p,a,played})=>{
+  let L="";
+  if(a&&a.inns)L+=line("Batting",`${a.inns} inns · ${a.runs} runs · HS ${a.hs}${a.hsNo?"*":""} · avg ${batAvgText(a)} · SR ${batSrText(a)}`);
+  if(a&&a.bowlInns)L+=line("Bowling",`${a.w} wkts · ${ballsToOv(a.ob)} ov · ${a.rc} runs · econ ${econText(a)} · best ${a.bw}/${a.br}`);
+  if(a&&a.fldInns&&(a.ct+a.dr+a.ro+a.st+a.mf>0))L+=line("Fielding",[a.ct?a.ct+(a.ct===1?" catch":" catches"):"",a.dr?a.dr+" dropped":"",a.ro?a.ro+(a.ro===1?" run out":" run outs"):"",a.st?a.st+(a.st===1?" stumping":" stumpings"):"",a.mf?a.mf+" misfield"+(a.mf===1?"":"s"):""].filter(Boolean).join(" · "));
+  return `<div class="card" style="margin-bottom:10px"><b>${esc(p.name)}</b>${p.role?` <span class="tag">${esc(p.role)}</span>`:""} <span class="muted">· Played ${played} of ${N}</span>${L}</div>`}).join("")}
 function playerMatchStatsHtml(p,matches){
  let s=matchStatsAgg(matches,p.name).players[0];if(!s)return "";
  let h="";
@@ -6369,12 +6382,7 @@ function buildTeamReport(){
  `<div class="grid g4"><div class="card stat"><span>Players</span><b>${roster.length}</b></div><div class="card stat"><span>Wins</span><b>${wins}</b></div><div class="card stat"><span>Losses</span><b>${losses}</b></div><div class="card stat"><span>Draws</span><b>${draws}</b></div></div>
  ${matches.length?`<div class="card" style="margin-top:15px"><span class="muted">Recent Form (oldest → newest)</span><div style="margin-top:8px">${recentForm}</div></div>`:""}
  <h2>Team Performance</h2>${matchPerfHtml(matches)}
- <h2>Roster — Match Performance</h2>${roster.length?roster.map(p=>{
-  let pMatches=playerMatches(p).filter(m=>inRange(m.date,from,to));
-  let runs=pMatches.reduce((sum,m)=>{let r=(m.battingReview||[]).find(x=>x.name===p.name);return sum+(r?(+r.runs||0):0)}, 0);
-  let wickets=pMatches.reduce((sum,m)=>{let r=(m.bowlingReview||[]).find(x=>x.name===p.name);return sum+(r?(+r.wickets||0):0)}, 0);
-  return `<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span><p class="muted">${pMatches.length} match${pMatches.length!==1?"es":""} · ${runs} run${runs!==1?"s":""} · ${wickets} wicket${wickets!==1?"s":""}${(()=>{let st=matchStatsAgg(pMatches,p.name).players[0];return st&&st.inns?` · avg ${batAvgText(st)} · SR ${batSrText(st)}`:""})()}</p></div>`;
- }).join(""):empty("No players in this scope.")}
+ <h2>Player Performance</h2>${roster.length?playerPerfCardsHtml(roster,matches):empty("No players in this scope.")}
  <div class="card" style="margin-top:12px"><span class="muted">Average Attendance</span><div style="margin-top:4px;font-size:20px;font-weight:800">${avgAttendance!==null?avgAttendance+"%":"No session data in this range"}</div></div>
  <h2>Match Results</h2>${matches.length?matches.map(m=>`<div class="card"><b>${esc(fmtDate(m.date))} · vs ${esc(m.opp||"Opposition")}</b><p>${esc(m.result||"—")}</p>${matchScoreText(m)?`<div class="muted">${matchScoreText(m)}</div>`:""}</div>`).join(""):empty("No matches recorded in this scope.")}`);
 }
@@ -6469,7 +6477,7 @@ function buildTournamentReport(){
  reportShell(`Tournament Report — ${esc(t.name)}`,`${(t.startDate||t.endDate)?esc(fmtDate(t.startDate)||"?")+" → "+esc(fmtDate(t.endDate)||"?")+" · ":""}${matches.length} match${matches.length!==1?"es":""}`,
  `<div class="grid g4"><div class="card stat"><span>Wins</span><b>${wins}</b></div><div class="card stat"><span>Losses</span><b>${losses}</b></div><div class="card stat"><span>Draws</span><b>${draws}</b></div><div class="card stat"><span>Matches</span><b>${matches.length}</b></div></div>
  <h2>Tournament Performance</h2>${matchPerfHtml(matches)}
- ${(()=>{let u=(t.squadPlayerIds||[]).map(id=>db.players.find(p=>p.id===id)).filter(Boolean).map(p=>({name:p.name,n:playerMatches(p).filter(m=>m.tournamentId===tid).length}));return (u.length&&matches.length)?`<h2>Matches Played</h2><div class="card">${statRowsHtml(u.sort((a,b)=>b.n-a.n),x=>x.n+" of "+matches.length)}</div>`:""})()}
+ ${(()=>{let u=(t.squadPlayerIds||[]).map(id=>db.players.find(p=>p.id===id)).filter(Boolean);return (u.length&&matches.length)?`<h2>Player Performance</h2>${playerPerfCardsHtml(u,matches)}`:""})()}
  ${t.notes?`<h2>Notes</h2><div class="card"><p>${esc(t.notes)}</p></div>`:""}
  ${(t.squadPlayerIds&&t.squadPlayerIds.length)?`<h2>Squad</h2><div class="card"><p>${t.squadPlayerIds.map(id=>db.players.find(p=>p.id===id)).filter(Boolean).map(p=>esc(p.name)).join(", ")}</p></div>`:""}
  ${(t.fixtures&&t.fixtures.length)?`<h2>Fixture Plan</h2>${t.fixtures.slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||""))).map(f=>{
