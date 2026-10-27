@@ -6274,7 +6274,7 @@ function matchStatsAgg(matches,onlyName){
  return{players:Object.values(P).map(p=>({...p,matches:Object.keys(p.mats).length})),T};
 }
 function statCardHtml(l,v){return `<div class="card stat"><span>${l}</span><b>${v}</b></div>`}
-function statRowsHtml(arr,fmt,boldFirst){return arr.map((x,i)=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0${boldFirst&&i===0?";font-weight:800":""}"><span${boldFirst&&i===0?' style="font-weight:800"':""}>${esc(x.name)}</span><b style="text-align:right">${fmt(x)}</b></div>`).join("")}
+function statRowsHtml(arr,fmt,plain){return arr.map(x=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0"><span>${esc(x.name)}</span>${plain?`<span style="text-align:right">${fmt(x)}</span>`:`<b style="text-align:right">${fmt(x)}</b>`}</div>`).join("")}
 function batAvgText(p){return p.outs?(p.runs/p.outs).toFixed(1):(p.inns?"n/o":"—")}
 function batSrText(p){return p.balls?(p.runs*100/p.balls).toFixed(0):"—"}
 function econText(p){return p.ob?(p.rc*6/p.ob).toFixed(2):"—"}
