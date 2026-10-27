@@ -6258,7 +6258,7 @@ function bowlAvgText(rc,w){return w?(rc/w).toFixed(1):"—"}
 function ovToBalls(o){let t=String(o==null?"":o).trim();if(!t)return 0;let a=t.split(".");return(parseInt(a[0])||0)*6+(parseInt(a[1])||0)}
 function isOutText(d){d=String(d||"").trim();return !!d&&!/^(not out|retired hurt|absent hurt|did not bat)/i.test(d)}
 function matchStatsAgg(matches,onlyName){
- let P={},T={rc:0,ob:0,runs:0,wkts:0,taken:0,missed:0,runouts:0,misfields:0,fieldN:0,forRuns:0,againstRuns:0,wLost:0,wTaken:0,stump:0,hi:null,lo:null,rows:[],bfN:0,bfW:0,chN:0,chW:0,fB:0,fBR:0,aB:0,aBR:0,scoredN:0,decided:0,wins:0,hasBat:false,hasBowl:false};
+ let P={},T={rc:0,ob:0,runs:0,wkts:0,taken:0,missed:0,runouts:0,misfields:0,fieldN:0,forRuns:0,againstRuns:0,wLost:0,wTaken:0,stump:0,hi:null,lo:null,rows:[],bfN:0,bfW:0,chN:0,chW:0,fB:0,fBR:0,aB:0,aBR:0,scoredN:0,decided:0,losses:0,draws:0,wins:0,hasBat:false,hasBowl:false};
  let g=n=>{let k=nameKey(n);return P[k]||(P[k]={name:String(n).trim(),mats:{},runs:0,balls:0,inns:0,outs:0,hs:0,hsNo:false,f50:0,f100:0,ob:0,rc:0,w:0,bw:-1,br:0,bowlInns:0,ct:0,dr:0,ro:0,st:0,mf:0,fldInns:0})};
  matches.forEach(m=>{
   (m.battingReview||[]).forEach(r=>{if(!r||!r.name)return;if(onlyName&&!sameName(r.name,onlyName))return;let p=g(r.name),runs=+r.runs||0,out=isOutText(r.dismissal);p.mats[m.id]=1;p.inns++;p.runs+=runs;p.balls+=+r.balls||0;if(out)p.outs++;if(runs>p.hs||(runs===p.hs&&!out)){p.hs=runs;p.hsNo=!out}if(runs>=100)p.f100++;else if(runs>=50)p.f50++;T.runs+=runs;T.hasBat=true});
@@ -6268,7 +6268,7 @@ function matchStatsAgg(matches,onlyName){
    if(m.taken||m.missed||m.runouts||m.misfields||m.stumpings){T.stump+=+m.stumpings||0;T.taken+=+m.taken||0;T.missed+=+m.missed||0;T.runouts+=+m.runouts||0;T.misfields+=+m.misfields||0;T.fieldN++}
    {let t=matchTotals(m);if(t){T.forRuns+=t.fr;T.againstRuns+=t.ar;T.wLost+=t.fw;T.wTaken+=t.aw;T.scoredN++;if(t.fb){T.fB+=t.fb;T.fBR+=t.fr}if(t.ab){T.aB+=t.ab;T.aBR+=t.ar}if(T.hi===null||t.fr>T.hi)T.hi=t.fr;if(T.lo===null||t.fr<T.lo)T.lo=t.fr;T.rows.push({date:m.date,opp:m.opp,oc:matchResultOutcome(m),t})}}
    {let bf=matchBattedFirst(m),oc=matchResultOutcome(m);if(bf!==null&&(oc==="Win"||oc==="Loss"||oc==="Draw")){if(bf){T.bfN++;if(oc==="Win")T.bfW++}else{T.chN++;if(oc==="Win")T.chW++}}}
-   let oc=matchResultOutcome(m);if(oc==="Win"||oc==="Loss"||oc==="Draw"){T.decided++;if(oc==="Win")T.wins++}
+   let oc=matchResultOutcome(m);if(oc==="Win"||oc==="Loss"||oc==="Draw"){T.decided++;if(oc==="Win")T.wins++;else if(oc==="Loss")T.losses++;else T.draws++}
   }
  });
  return{players:Object.values(P).map(p=>({...p,matches:Object.keys(p.mats).length})),T};
@@ -6286,7 +6286,7 @@ function matchPerfHtml(matches){
  let h="";
  let cards=[statCardHtml("Win rate",pc(T.wins,T.decided))];
  if(T.bfN||T.chN){cards.push(statCardHtml("Batting first ("+T.bfN+")",pc(T.bfW,T.bfN)));cards.push(statCardHtml("Chasing ("+T.chN+")",pc(T.chW,T.chN)))}
- else cards.push(statCardHtml("Matches decided",T.decided));
+ else cards.push(statCardHtml("Matches with result",T.decided));
  h+=`<div class="grid ${cards.length===3?"g3":"g2"}">${cards.join("")}</div>`;
  if(T.scoredN){
   h+=sub("SCOREBOARD · "+T.scoredN+" MATCH"+(T.scoredN!==1?"ES":"")+" WITH SCORES");
@@ -6374,7 +6374,7 @@ function rptAttendance(roster,sessions){
 function rptCoverData(o){
  let ms=o.matches||[],M=rptMetrics(ms),T=M.T,P=M.P,out={lines:[],next:[],headline:""};
  let pc=x=>Math.round(x)+"%";
- if(T.decided)out.headline=`Won ${T.wins} of ${T.decided} decided match${T.decided!==1?"es":""} (${pc(T.wins/T.decided*100)})`+(T.scoredN?` · ${T.forRuns} runs scored, ${T.againstRuns} conceded`:"");
+ if(T.decided)out.headline=`Win rate ${pc(T.wins/T.decided*100)} · ${T.wins} won, ${T.losses} lost`+(T.draws?`, ${T.draws} drawn`:"")+(T.scoredN?` · ${T.forRuns} runs scored, ${T.againstRuns} conceded`:"");
  else if(ms.length)out.headline=`${ms.length} match${ms.length!==1?"es":""} played`;
  else if((o.sessions||[]).length){let h=o.sessions.reduce((a,s)=>a+(+s.duration||0),0)/60;out.headline=`${o.sessions.length} session${o.sessions.length!==1?"s":""} · ${h.toFixed(1)} hours`}
  else out.headline="No matches or sessions in this period";
