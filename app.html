@@ -9809,9 +9809,88 @@ async function campShareImage(id){
 
 /* --- camp player review (tap to rate, tap to recommend; evidence fills in by itself) --- */
 const CAMP_REV_REC=[["in","In","#1f8a4c"],["maybe","Maybe","#d97706"],["out","Out","#dc2626"]];
-const CAMP_REV_TAGS=[["Strong technique",1],["Match-ready",1],["Great attitude",1],["Leader",1],["Coachable",1],["Fit",1],["Technique work",0],["Fitness",0],["Match temperament",0],["Consistency",0],["Fielding",0],
- ["Big hitter",1],["Good timing",1],["Cricket brain",1],["Calm under pressure",1],["Hard worker",1],["Accurate bowler",1],["Safe hands",1],["Athletic",1],
- ["Shot selection",0],["Footwork",0],["Bowling accuracy",0],["Concentration",0],["Confidence",0],["Communication",0],["Discipline",0],["Strength",0]];
+const CAMP_REV_TAGS=[
+ ["Strong technique",1,"General"],
+ ["Match-ready",1,"General"],
+ ["Big hitter",1,"Batting"],
+ ["Good timing",1,"Batting"],
+ ["Sound defence",1,"Batting"],
+ ["Strong off-side play",1,"Batting"],
+ ["Strong leg-side play",1,"Batting"],
+ ["Plays spin well",1,"Batting"],
+ ["Plays pace and bounce well",1,"Batting"],
+ ["Rotates the strike well",1,"Batting"],
+ ["Good running between the wickets",1,"Batting"],
+ ["Finishes innings well",1,"Batting"],
+ ["Accurate bowler",1,"Bowling"],
+ ["Good line and length",1,"Bowling"],
+ ["Good rhythm and action",1,"Bowling"],
+ ["Effective variations",1,"Bowling"],
+ ["Seam or swing movement",1,"Bowling"],
+ ["Controls the over",1,"Bowling"],
+ ["Safe hands",1,"Fielding and keeping"],
+ ["Strong, accurate throw",1,"Fielding and keeping"],
+ ["Quick in the field",1,"Fielding and keeping"],
+ ["Reliable catcher",1,"Fielding and keeping"],
+ ["Reliable wicketkeeping",1,"Fielding and keeping"],
+ ["Fit",1,"Physical"],
+ ["Athletic",1,"Physical"],
+ ["Good speed and agility",1,"Physical"],
+ ["Good mobility",1,"Physical"],
+ ["Great attitude",1,"Mind and character"],
+ ["Leader",1,"Mind and character"],
+ ["Coachable",1,"Mind and character"],
+ ["Cricket brain",1,"Mind and character"],
+ ["Calm under pressure",1,"Mind and character"],
+ ["Hard worker",1,"Mind and character"],
+ ["Competitive",1,"Mind and character"],
+ ["Quick learner",1,"Mind and character"],
+ ["Resilient",1,"Mind and character"],
+ ["Team player",1,"Mind and character"],
+ ["Positive body language",1,"Mind and character"],
+ ["Takes responsibility",1,"Mind and character"],
+ ["Technique work",0,"General"],
+ ["Consistency",0,"General"],
+ ["Shot selection",0,"Batting"],
+ ["Footwork",0,"Batting"],
+ ["Defensive technique",0,"Batting"],
+ ["Playing spin",0,"Batting"],
+ ["Playing pace and bounce",0,"Batting"],
+ ["Playing the short ball",0,"Batting"],
+ ["Strike rotation",0,"Batting"],
+ ["Running between the wickets",0,"Batting"],
+ ["Finishing innings",0,"Batting"],
+ ["Judging length",0,"Batting"],
+ ["Bowling accuracy",0,"Bowling"],
+ ["Line and length",0,"Bowling"],
+ ["Run-up and rhythm",0,"Bowling"],
+ ["Variations",0,"Bowling"],
+ ["Bowling under pressure",0,"Bowling"],
+ ["Front-foot no-balls",0,"Bowling"],
+ ["Fielding",0,"Fielding and keeping"],
+ ["Catching",0,"Fielding and keeping"],
+ ["Ground fielding",0,"Fielding and keeping"],
+ ["Throwing accuracy",0,"Fielding and keeping"],
+ ["Wicketkeeping basics",0,"Fielding and keeping"],
+ ["Fitness",0,"Physical"],
+ ["Strength",0,"Physical"],
+ ["Speed and agility",0,"Physical"],
+ ["Endurance",0,"Physical"],
+ ["Flexibility and mobility",0,"Physical"],
+ ["Match temperament",0,"Mind and character"],
+ ["Concentration",0,"Mind and character"],
+ ["Confidence",0,"Mind and character"],
+ ["Communication",0,"Mind and character"],
+ ["Discipline",0,"Mind and character"],
+ ["Decision-making",0,"Mind and character"],
+ ["Game awareness",0,"Mind and character"],
+ ["Handling pressure",0,"Mind and character"],
+ ["Focus in the field",0,"Mind and character"],
+ ["Effort and attitude",0,"Mind and character"],
+ ["Time-keeping",0,"Mind and character"],
+ ["Applying feedback",0,"Mind and character"]];
+const CAMP_TAG_GROUPS=["General", "Batting", "Bowling", "Fielding and keeping", "Physical", "Mind and character"];
+function campTagGroupsHtml(L,tagRow){return CAMP_TAG_GROUPS.map(g=>{let items=L.filter(x=>x[2]===g);return items.length?`<div style="font-size:10.5px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:var(--muted);margin:8px 0 2px 8px">${g}</div>`+items.map(tagRow).join(""):""}).join("")}
 function campTagSplit(tags){let g=(tags||[]).filter(t=>(CAMP_REV_TAGS.find(x=>x[0]===t)||[0,1])[1]),w=(tags||[]).filter(t=>!g.includes(t));return{g,w}}
 function campTagsHtml(tags,chips){
  let{g,w}=campTagSplit(tags);if(!g.length&&!w.length)return "";
@@ -9834,7 +9913,7 @@ function campRevStars(r){return "★".repeat(r)+"☆".repeat(5-r)}
 function campRevRowHtml(c,name){
  let v=campRevOf(c,name),pl=db.players.find(p=>p.name===name&&!p.deletedAt),ev=campEvidence(c,name),open=!!campRevOpen[name]||(v.tags.length||v.note)&&campRevOpen[name]!==false&&false;
  let tagRow=([t,good])=>{let on=v.tags.includes(t),col=good?"#1f8a4c":"#d97706";return `<button type="button" data-t="${esc(t)}" onclick="campRevTag(this)" style="display:flex;gap:8px;align-items:flex-start;width:100%;text-align:left;border:0;background:${on?col+"22":"transparent"};color:var(--text,inherit);padding:6px 8px;border-radius:8px;font-size:13px;line-height:1.25"><span style="flex:0 0 16px;height:16px;margin-top:1px;border:2px solid ${col};border-radius:4px;background:${on?col:"transparent"};color:#fff;font-size:11px;line-height:12px;text-align:center">${on?"✓":""}</span><span style="min-width:0;overflow-wrap:anywhere;${on?"font-weight:600":""}">${esc(t)}</span></button>`};
- let col=(lab,good,colr)=>{let L=CAMP_REV_TAGS.filter(x=>x[1]===good),n=L.filter(x=>v.tags.includes(x[0])).length;return `<div style="min-width:0"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:${colr};margin:0 0 4px 2px">${lab}${n?" ("+n+")":""}</div><div class="tagBox" style="max-height:158px;overflow-y:auto;border:1px solid ${colr}55;border-radius:10px;padding:2px">${L.map(tagRow).join("")}</div></div>`};
+ let col=(lab,good,colr)=>{let L=CAMP_REV_TAGS.filter(x=>x[1]===good),n=L.filter(x=>v.tags.includes(x[0])).length;return `<div style="min-width:0"><div style="font-size:11px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:${colr};margin:0 0 4px 2px">${lab}${n?" ("+n+")":""}</div><div class="tagBox" style="max-height:260px;overflow-y:auto;border:1px solid ${colr}55;border-radius:10px;padding:2px">${campTagGroupsHtml(L,tagRow)}</div></div>`};
  let tagBtns=`<div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:8px">${col("Strengths",1,"#1f8a4c")}${col("Areas to improve",0,"#d97706")}</div>`;
  return `<div class="card campRevRow" data-n="${esc(name)}" style="padding:10px 12px;margin-top:8px">
  <div style="display:flex;justify-content:space-between;gap:8px;align-items:baseline;flex-wrap:wrap"><div>${pl?`<b style="cursor:pointer;border-bottom:1px dotted var(--muted)" onclick="playerView('${pl.id}')">${esc(name)}</b>`:`<b>${esc(name)}</b>`} <span class="muted">${esc((pl&&pl.role)||"")}</span></div>${ev?`<span class="muted" style="font-size:var(--fs-3)">${esc(ev)}</span>`:""}</div>
