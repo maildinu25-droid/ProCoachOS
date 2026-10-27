@@ -6603,11 +6603,11 @@ function playerStoryText(p,matches,sessions,from,to){
  if(low)S.push(`Next: ${esc(low.name)} (${low.last}/10).`);else if(p.focus)S.push(`Goal: ${esc(p.focus)}.`);
  let ts=(sessions||[]).filter(s=>p.team&&s.squad===p.team&&s.sessionType!=="player");
  if(ts.length>=3){let n=ts.filter(s=>(s.attendees||[]).includes(p.name)).length;S.push(`Attended ${Math.round(n/ts.length*100)}% of team sessions.`)}
- return S.length>=2?S.join(" "):""}
+ return S.length?S.join(" "):"No assessments or matches recorded in this period."}
 function seasonStoryHtml(o){
  let cd=rptCoverData(o),from=o.from,to=o.to,team=[];
  if(cd.headline)team.push(cd.headline+".");cd.lines.slice(0,3).forEach(x=>team.push(x));
- let ps=(o.roster||[]).map(p=>({p,t:playerStoryText(p,o.matches||[],o.sessions||[],from,to)})).filter(x=>x.t).slice(0,15);
+ let ps=(o.roster||[]).map(p=>({p,t:playerStoryText(p,o.matches||[],o.sessions||[],from,to)})).filter(x=>x.t);
  if(!team.length&&!ps.length)return "";
  return `<h2>Season Story</h2><div class="card"><span class="muted noPrint" style="font-size:12px">Drafted from the data. Tap the text to edit before printing or sharing.</span><div contenteditable="true" spellcheck="false" style="margin-top:6px;outline:none">${team.length?`<p style="margin:4px 0"><b>The team.</b> ${team.join(" ")}</p>`:""}${ps.map(x=>`<p style="margin:8px 0 4px"><b>${esc(x.p.name)}.</b> ${x.t}</p>`).join("")}</div></div>`}
 
