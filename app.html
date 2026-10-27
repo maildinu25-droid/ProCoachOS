@@ -181,7 +181,7 @@ html,body{margin:0!important;padding:0!important;background:#fff!important;width
 body>*{display:none!important}
 #modal{display:block!important;position:static!important;inset:auto!important;width:100%!important;height:auto!important;min-height:0!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important}
 #sheet{display:block!important;position:static!important;width:100%!important;max-width:none!important;height:auto!important;max-height:none!important;min-height:0!important;margin:0!important;padding:0!important;border:0!important;border-radius:0!important;box-shadow:none!important;overflow:visible!important;background:#fff!important}
-.sheetHead,.reportActions,.noPrint,.sumEdit{display:none!important}
+.sheetHead,.reportActions,.noPrint,.sumEdit,.rptOff{display:none!important}
 .printOnly{display:block!important}
 .report{display:block!important;position:static!important;width:100%!important;max-width:none!important;margin:0!important;padding:0!important;background:#fff!important;overflow:visible!important}
 .fieldStepPreviewWrap{gap:14mm!important}
@@ -278,6 +278,7 @@ h3{font-family:'Sora',sans-serif;font-size:16px;font-weight:700;line-height:1.3}
 
 .report{box-sizing:border-box;padding:0 3px}.report .grid>*{min-width:0}
 @media print{.report{padding:0}}
+.rptOff{opacity:.35}
 
 .stageChips{display:flex;gap:6px;overflow-x:auto;padding:2px 0 10px;margin:10px 0 0;-webkit-overflow-scrolling:touch}.stageChip{flex:0 0 auto;background:var(--surface2);border:1px solid var(--line);color:var(--ink);border-radius:999px;padding:7px 12px;font-size:var(--fs-3);font-weight:600;cursor:pointer;display:inline-flex;gap:6px;align-items:center}.stageChip b{color:var(--g)}.stageChip.on{background:var(--g);border-color:var(--g);color:#04130d}.stageChip.on b{color:#04130d}
 
@@ -6400,10 +6401,10 @@ function rptCoverData(o){
  return out}
 function reportCoverHtml(o){
  let d=rptCoverData(o);
- return `<div class="card" style="margin-top:14px;border-left:4px solid var(--g)"><div class="muted" style="font-size:12px">${esc(o.label||"")}${o.period?" · "+esc(o.period):""}</div><div style="font-size:19px;font-weight:800;margin:4px 0 6px">${d.headline}</div>${d.lines.length?`<div class="muted" style="margin-bottom:2px">Key takeaways</div><ul style="margin:4px 0 0 18px;padding:0">${d.lines.slice(0,5).map(x=>`<li style="margin:3px 0">${x}</li>`).join("")}</ul>`:""}${o.extra||""}</div>`}
+ return `<div class="card rptCover" style="margin-top:14px;border-left:4px solid var(--g)"><div class="muted" style="font-size:12px">${esc(o.label||"")}${o.period?" · "+esc(o.period):""}</div><div style="font-size:19px;font-weight:800;margin:4px 0 6px">${d.headline}</div>${d.lines.length?`<div class="muted" style="margin-bottom:2px">Key takeaways</div><ul style="margin:4px 0 0 18px;padding:0">${d.lines.slice(0,5).map(x=>`<li style="margin:3px 0">${x}</li>`).join("")}</ul>`:""}${o.extra||""}</div>`}
 function reportNextHtml(o){
  let d=rptCoverData(o),lines=d.next.length?d.next.slice(0,3):["No clear weak area in this data. Keep the current plan and keep entering scores."];
- return `<div class="card" style="margin-top:18px"><b>Next focus</b> <span class="muted noPrint" style="font-size:12px">· tap the text to edit before printing</span><div contenteditable="true" spellcheck="false" style="margin-top:6px;outline:none">${lines.map(x=>`<p style="margin:4px 0">${x}</p>`).join("")}</div></div>`}
+ return `<div class="card rptNext" style="margin-top:18px"><b>Next focus</b> <span class="muted noPrint" style="font-size:12px">· tap the text to edit before printing</span><div contenteditable="true" spellcheck="false" style="margin-top:6px;outline:none">${lines.map(x=>`<p style="margin:4px 0">${x}</p>`).join("")}</div></div>`}
 function campPathwayHtml(roster){
  let camps=(db.camps||[]).filter(c=>c.review);if(!camps.length||!roster.length)return "";
  let rows=[];roster.forEach(p=>{let hits=[];camps.forEach(c=>{let v=c.review[p.name];if(v&&(v.rec||v.r))hits.push(`${esc(c.name)}: ${v.rec==="in"?"In":v.rec==="maybe"?"Maybe":v.rec==="out"?"Out":"Reviewed"}${v.r?" ("+v.r+"/5)":""}`)});if(hits.length)rows.push({p,hits})});
@@ -6467,13 +6468,13 @@ function playerFocusEvidenceHtml(p,latest,S){
 function playerCoverNext(p,latest,matches,S,aa){
  let runs=S.bat.reduce((a,r)=>a+(+r.runs||0),0),wk=S.bowl.reduce((a,r)=>a+(+r.wickets||0),0);
  let head=[latest&&assessmentAvg(latest)!=="—"?`Latest assessment ${assessmentAvg(latest)}/10`:"",matches.length?`${matches.length} match${matches.length!==1?"es":""}`:"",S.bat.length?`${runs} runs`:"",S.bowl.length?`${wk} wicket${wk!==1?"s":""}`:""].filter(Boolean).join(" · ")||"No assessments or matches in this period";
- let cover=`<div class="card" style="margin-top:14px;border-left:4px solid var(--g)"><div class="muted" style="font-size:12px">${esc(p.name)}${p.role?" · "+esc(p.role):""}</div><div style="font-size:19px;font-weight:800;margin:4px 0 6px">${head}</div>${S.L.length?`<div class="muted">Key takeaways</div><ul style="margin:4px 0 0 18px;padding:0">${S.L.slice(0,5).map(x=>`<li style="margin:3px 0">${x}</li>`).join("")}</ul>`:""}</div>`;
+ let cover=`<div class="card rptCover" style="margin-top:14px;border-left:4px solid var(--g)"><div class="muted" style="font-size:12px">${esc(p.name)}${p.role?" · "+esc(p.role):""}</div><div style="font-size:19px;font-weight:800;margin:4px 0 6px">${head}</div>${S.L.length?`<div class="muted">Key takeaways</div><ul style="margin:4px 0 0 18px;padding:0">${S.L.slice(0,5).map(x=>`<li style="margin:3px 0">${x}</li>`).join("")}</ul>`:""}</div>`;
  let nx=[];
  if(S.lowest.length)nx.push(`Skills: work on ${S.lowest.slice(0,2).map(x=>esc(x.name)+" ("+x.last+"/10)").join(" and ")}.`);
  if(S.declined.length)nx.push(`Slipping: ${esc(S.declined[0].name)} fell from ${S.declined[0].first} to ${S.declined[0].last}. Revisit it in the next sessions.`);
  if(p.focus)nx.push(`Goal: ${esc(p.focus)}.`);
  if(!nx.length)nx.push("No clear weak area in this data. Keep the current plan.");
- let next=`<div class="card" style="margin-top:18px"><b>Next focus</b> <span class="muted noPrint" style="font-size:12px">· tap the text to edit before printing</span><div contenteditable="true" spellcheck="false" style="margin-top:6px;outline:none">${nx.slice(0,3).map(x=>`<p style="margin:4px 0">${x}</p>`).join("")}</div></div>`;
+ let next=`<div class="card rptNext" style="margin-top:18px"><b>Next focus</b> <span class="muted noPrint" style="font-size:12px">· tap the text to edit before printing</span><div contenteditable="true" spellcheck="false" style="margin-top:6px;outline:none">${nx.slice(0,3).map(x=>`<p style="margin:4px 0">${x}</p>`).join("")}</div></div>`;
  return {cover,next}}
 /* ===== USP insights: what worked, dismissal patterns, journey, selection evidence, season story ===== */
 function uspFocusList(s){return String(s.focus||"").split(" + ").map(x=>x.trim()).filter(Boolean)}
@@ -7099,7 +7100,40 @@ function reflectionWentWellText(r){return[(r.wentWellThemes||[]).join(", "),r.we
 function reflectionTakeawayText(r){return[(r.takeawayThemes||[]).join(", "),r.learnings!==undefined?r.learnings:[r.players,r.change].filter(Boolean).join(" ")].filter(Boolean).join(" — ")}
 function reflectionNextFocusText(r){return[(r.nextFocusThemes||[]).join(", "),r.next].filter(Boolean).join(" — ")}
 function venueOptions(){let venues=[...new Set([...activeSessions().map(s=>s.venue),...db.matches.map(m=>m.venue)].filter(Boolean))];return venues.map(v=>`<option value="${esc(v)}">`).join("")}
-function reportShell(title,sub,body,onClose){let _x=_rptExtras;setPrintTitle(title);modal(`<div class="sheetHead noPrint"><h2>${title}</h2><button class="x" onclick="${onClose||"closeM()"}">×</button></div><div class="report"><h1>${title}</h1><div class="muted">${sub}</div>${_rptExtras?_rptExtras.cover:""}${body}${_rptExtras?_rptExtras.next:""}<div class="reportActions noPrint"><button class="btn primary" onclick="printReport()">Print / Save PDF</button></div></div>`);_rptExtras=null}
+function reportShell(title,sub,body,onClose){let _x=_rptExtras;setPrintTitle(title);modal(`<div class="sheetHead noPrint"><h2>${title}</h2><button class="x" onclick="${onClose||"closeM()"}">×</button></div><div class="report"><h1>${title}</h1><div class="muted">${sub}</div>${_rptExtras?_rptExtras.cover:""}${body}${_rptExtras?_rptExtras.next:""}<div class="reportActions noPrint"><button class="btn primary" onclick="printReport()">Print / Save PDF</button></div></div>`);try{rptPrintPicker()}catch(e){console.warn(e)}_rptExtras=null}
+/* ===== Print options: choose which sections print (all reports) ===== */
+const RPT_SUMMARY_KEEP=/^(overview|key takeaways|season story|match performance|tournament performance|team performance|compared|goal progress|focus and evidence|what worked|training and results|skill changes|selection notes|most improved|next focus|camp pathway|after the camp|selection outcome)/i;
+function rptPrefKey(){let h=sheet.querySelector(".report h1");return h?h.textContent.split(" — ")[0].trim():"report"}
+function rptPrefsLoad(){try{return JSON.parse(localStorage.getItem("rptPrintPrefs")||"{}")}catch(e){return {}}}
+function rptPrefsSave(key,off){try{let p=rptPrefsLoad();if(off.length)p[key]=off;else delete p[key];localStorage.setItem("rptPrintPrefs",JSON.stringify(p))}catch(e){}}
+function rptPrintPicker(){
+ let r=sheet.querySelector(".report");if(!r||r.querySelector(".rptPick"))return;
+ let kids=[...r.children],groups=[],cur=null,sub=null;
+ kids.forEach(n=>{
+  if(n.tagName==="H1"||n.classList.contains("rptCover")||n.classList.contains("reportActions"))return;
+  if(!sub&&n.classList.contains("muted")){sub=n;return}
+  if(n.classList.contains("rptNext")){cur={title:"Next focus",nodes:[n]};groups.push(cur);cur=null;return}
+  if(n.tagName==="H2"){cur={title:n.textContent.replace(/\s+/g," ").trim(),nodes:[n]};groups.push(cur);return}
+  if(!cur){cur={title:"Overview",nodes:[]};groups.push(cur)}
+  cur.nodes.push(n)});
+ groups=groups.filter(g=>g.nodes.length);
+ if(groups.length<3)return;
+ let key=rptPrefKey(),off=new Set(rptPrefsLoad()[key]||[]);
+ groups.forEach((g,i)=>{let w=document.createElement("div");w.className="rptSec";w.dataset.i=i;g.nodes[0].before(w);g.nodes.forEach(n=>w.appendChild(n));g.el=w;w.classList.toggle("rptOff",off.has(g.title))});
+ let box=document.createElement("details");box.className="card noPrint rptPick";box.style.margin="10px 0";
+ let draw=()=>{
+  let n=groups.filter(g=>!g.el.classList.contains("rptOff")).length;
+  box.innerHTML=`<summary style="cursor:pointer"><b>Print options</b> <span class="muted">· ${n} of ${groups.length} sections will print</span></summary>
+  <div style="display:flex;gap:8px;margin:8px 0;flex-wrap:wrap"><button type="button" class="btn secondary" data-p="full">Full report</button><button type="button" class="btn secondary" data-p="sum">Summary only</button></div>
+  ${groups.map((g,i)=>`<label style="display:flex;gap:8px;align-items:center;padding:3px 0"><input type="checkbox" style="width:auto" data-i="${i}" ${g.el.classList.contains("rptOff")?"":"checked"}> ${esc(g.title)}</label>`).join("")}
+  <div class="muted" style="font-size:12px;margin-top:6px">The title, headline and key takeaways always print. Unticked sections are faded here and left out of the printout. Your choice is remembered for this report type on this device.</div>`;
+  box.open=box.dataset.open==="1";
+  box.querySelector("summary").onclick=()=>{box.dataset.open=box.open?"0":"1"};
+  box.querySelectorAll("input[data-i]").forEach(c=>c.onchange=()=>{box.dataset.open="1";groups[+c.dataset.i].el.classList.toggle("rptOff",!c.checked);commit()});
+  box.querySelectorAll("button[data-p]").forEach(b=>b.onclick=()=>{box.dataset.open="1";groups.forEach(g=>g.el.classList.toggle("rptOff",b.dataset.p==="sum"&&!RPT_SUMMARY_KEEP.test(g.title)));commit()})};
+ let commit=()=>{rptPrefsSave(key,groups.filter(g=>g.el.classList.contains("rptOff")).map(g=>g.title));draw()};
+ draw();(sub||r.querySelector("h1")).after(box)}
+
 /* ===== Business Tools: Invoices, Payment Reminders, Match Narrative, Reflection Themes, Custom Reports, Certificates ===== */
 function invoiceNoDisplay(n){return "INV-"+String(n||1).padStart(4,"0")}
 function invoiceTotal(inv){return (inv.items||[]).reduce((a,it)=>a+((Number(it.qty)||0)*(Number(it.rate)||0)),0)}
