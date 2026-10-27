@@ -912,7 +912,7 @@ function isStandaloneMode(){
  return window.navigator.standalone===true||window.matchMedia("(display-mode: standalone)").matches;
 }
 /* ===== Session focus picker ===== */
-const FOCUS_BASE=["Batting","Bowling","Fielding","Wicketkeeping","Team","Fitness","Nets","Match simulation","Practice match","Tactics / strategy","Mental skills","Recovery","Mixed"];
+const FOCUS_BASE=["Batting","Bowling","Fielding","Wicketkeeping","Team","Fitness","Nets","Centre wicket practice","Match simulation","Practice match","Tactics / strategy","Mental skills","Recovery","Mixed"];
 function focusCustomList(){let c=db.settings&&db.settings.customFocus;return Array.isArray(c)?c:[]}
 function focusSelected(){let el=document.querySelector('#focusPicker input[name="focus"]');return el&&el.value?el.value.split(" + ").map(x=>x.trim()).filter(Boolean):[]}
 function focusSetSelected(arr){
