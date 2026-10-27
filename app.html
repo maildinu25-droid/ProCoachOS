@@ -6274,7 +6274,7 @@ function matchStatsAgg(matches,onlyName){
  return{players:Object.values(P).map(p=>({...p,matches:Object.keys(p.mats).length})),T};
 }
 function statCardHtml(l,v){return `<div class="card stat"><span>${l}</span><b>${v}</b></div>`}
-function statRowsHtml(arr,fmt){return arr.map(x=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0"><span>${esc(x.name)}</span><b style="text-align:right">${fmt(x)}</b></div>`).join("")}
+function statRowsHtml(arr,fmt,boldFirst){return arr.map((x,i)=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:4px 0${boldFirst&&i===0?";font-weight:800":""}"><span${boldFirst&&i===0?' style="font-weight:800"':""}>${esc(x.name)}</span><b style="text-align:right">${fmt(x)}</b></div>`).join("")}
 function batAvgText(p){return p.outs?(p.runs/p.outs).toFixed(1):(p.inns?"n/o":"—")}
 function batSrText(p){return p.balls?(p.runs*100/p.balls).toFixed(0):"—"}
 function econText(p){return p.ob?(p.rc*6/p.ob).toFixed(2):"—"}
@@ -6300,10 +6300,10 @@ function matchPerfHtml(matches){
  let bats=pl.filter(p=>p.runs>0).sort((a,b)=>b.runs-a.runs).slice(0,3);
  let bowls=pl.filter(p=>p.w>0).sort((a,b)=>b.w-a.w||a.rc-b.rc).slice(0,3);
  let flds=pl.filter(p=>p.ct+p.ro+p.st>0).sort((a,b)=>(b.ct+b.ro+b.st)-(a.ct+a.ro+a.st)).slice(0,3);
- if(bats.length||bowls.length||flds.length)h+=sub("LEADERS");
- if(bats.length)h+=`<div class="card"><span class="muted">Top run-scorers</span>${statRowsHtml(bats,p=>`${p.runs} runs · avg ${batAvgText(p)} · HS ${p.hs}${p.hsNo?"*":""}`)}</div>`;
- if(bowls.length)h+=`<div class="card" style="margin-top:12px"><span class="muted">Top wicket-takers</span>${statRowsHtml(bowls,p=>`${p.w} wkts · ${ballsToOv(p.ob)} ov, ${p.rc} runs · best ${p.bw}/${p.br} · econ ${econText(p)}`)}</div>`;
- if(flds.length)h+=`<div class="card" style="margin-top:12px"><span class="muted">Top fielders</span>${statRowsHtml(flds,p=>[p.ct?p.ct+(p.ct===1?" catch":" catches"):"",p.ro?p.ro+(p.ro===1?" run out":" run outs"):"",p.st?p.st+(p.st===1?" stumping":" stumpings"):""].filter(Boolean).join(" · "))}</div>`;
+ if(bats.length||bowls.length||flds.length)h+=`<div style="margin:18px 0 6px;font-size:15px;font-weight:800;letter-spacing:.6px">LEADERS</div>`;
+ if(bats.length)h+=`<div class="card"><b>Top run-scorers</b>${statRowsHtml(bats,p=>`${p.runs} runs · avg ${batAvgText(p)} · HS ${p.hs}${p.hsNo?"*":""}`,true)}</div>`;
+ if(bowls.length)h+=`<div class="card" style="margin-top:12px"><b>Top wicket-takers</b>${statRowsHtml(bowls,p=>`${p.w} wkts · ${ballsToOv(p.ob)} ov, ${p.rc} runs · best ${p.bw}/${p.br} · econ ${econText(p)}`,true)}</div>`;
+ if(flds.length)h+=`<div class="card" style="margin-top:12px"><b>Top fielders</b>${statRowsHtml(flds,p=>[p.ct?p.ct+(p.ct===1?" catch":" catches"):"",p.ro?p.ro+(p.ro===1?" run out":" run outs"):"",p.st?p.st+(p.st===1?" stumping":" stumpings"):""].filter(Boolean).join(" · "),true)}</div>`;
  if(T.fieldN){let cr=(T.taken+T.missed)?Math.round(T.taken/(T.taken+T.missed)*100)+"%":"—";h+=`<div class="card" style="margin-top:12px"><span class="muted">Fielding</span><div style="margin-top:4px">Catches taken ${T.taken} · Dropped ${T.missed} · Run outs ${T.runouts}${T.stump?" · Stumpings "+T.stump:""} · Misfields ${T.misfields}</div><div class="muted" style="margin-top:4px">Catch rate <b>${cr}</b> · ${(T.taken/T.fieldN).toFixed(1)} catches per match</div></div>`}
  return h;
 }
@@ -6508,7 +6508,7 @@ function buildSeasonAnalyticsReport(){
   return `<div class="card"><b>${esc(ph.name)}</b><div class="muted">${esc(fmtDate(ph.startDate)||"?")} → ${esc(fmtDate(ph.endDate)||"?")}</div>${ph.focus?`<p style="margin-top:6px">${esc(ph.focus)}</p>`:""}<p style="margin-top:6px"><b>${target>0?`${actual}/${target} sessions${actual>=target?" ✓":""}`:`${actual} session${actual!==1?"s":""} logged`}</b></p>${campPhaseLinesHtml(ph.id)}</div>`;
  }).join("")}`:""}
  ${s.notes?`<h2>Notes</h2><div class="card"><p>${esc(s.notes)}</p></div>`:""}
- <h2>Sessions</h2>${seasonSessions.length?seasonSessions.map(x=>`<div class="card"><b>${esc(fmtDate(x.date))} · ${esc(sessionLabel(x))}</b></div>`).join(""):empty("No sessions in this season.")}
+ <h2>Sessions</h2>${seasonSessions.length?seasonSessions.map(x=>`<div class="card"><b>${esc(fmtDate(x.date))} · ${esc(sessionLabel(x))}</b>${sessFocusHtml(x)?`<div style="margin-top:4px">${sessFocusHtml(x)}</div>`:""}</div>`).join(""):empty("No sessions in this season.")}
  <h2>Matches</h2>${seasonMatches.length?seasonMatches.map(m=>`<div class="card"><b>${esc(fmtDate(m.date))} · vs ${esc(m.opp||"Opposition")}</b><p>${esc(m.result||"—")}</p></div>`).join(""):empty("No matches in this season.")}`);
 }
 const REPORT_GROUPS=[
@@ -6746,6 +6746,7 @@ function sessionFocusText(s){
  let f=String(s.focus||"").split(" + ").map(x=>x.trim()).filter(Boolean)[0]||"";
  return f.length>60?f.slice(0,57)+"…":f;
 }
+function sessFocusHtml(s){let f=String(s.focus||"").split(" + ").map(x=>x.trim()).filter(Boolean).slice(0,4);return f.map(x=>`<span class="tag">${esc(x.length>30?x.slice(0,29)+"…":x)}</span>`).join("")}
 function sessionLabel(s){if(s.title)return s.title;let parts=[];if(s.time)parts.push(fmtTime(s.time));parts.push(s.squad||"Session");return parts.join(" · ")}
 // Generates a short, parent-group-ready recap of a session from data
 // that's already entered — nothing new to fill in, just a readable
@@ -7134,7 +7135,7 @@ function buildCustomReport(){
  let sections=[];
  if(document.getElementById("crbSessions").checked){
   let list=sessionsInScope(scope,from,to);
-  sections.push(`<h2>Sessions (${list.length})</h2>${list.length?list.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div></div></div>`).join(""):empty("No sessions in this scope/range.")}`);
+  sections.push(`<h2>Sessions (${list.length})</h2>${list.length?list.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${esc(fmtDate(s.date))}${s.duration?" · "+esc(s.duration)+" min":""}</div>${sessFocusHtml(s)?`<div style="margin-top:4px">${sessFocusHtml(s)}</div>`:""}</div></div>`).join(""):empty("No sessions in this scope/range.")}`);
  }
  if(document.getElementById("crbMatches").checked){
   let list=matchesInScope(scope,roster,from,to);
@@ -7236,7 +7237,7 @@ function monthlyReport(){
 function buildMonthlyReport(){
  let mk=(document.getElementById("monthlyReportMonth").value||today().slice(0,7));
  let ss=activeSessions().filter(x=>monthKey(x.date)===mk),aa=db.assessments.filter(x=>monthKey(x.date)===mk),rr=db.reflections.filter(x=>monthKey(x.date)===mk),mm=db.matches.filter(x=>monthKey(x.date)===mk),hrs=ss.reduce((a,s)=>a+(+s.duration||0),0)/60;
- reportShell("Monthly Coaching Report",fmtMonthKey(mk),`<div class="grid g4"><div class="card stat"><span>Sessions</span><b>${ss.length}</b></div><div class="card stat"><span>Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Assessments</span><b>${aa.length}</b></div><div class="card stat"><span>Reflections</span><b>${rr.length}</b></div></div>${mm.length?`<h2>Match Performance</h2>${matchPerfHtml(mm)}`:""}<h2>Sessions</h2>${ss.length?ss.map(s=>`<div class="card"><b>${esc(fmtDate(s.date))} · ${esc(s.title||"—")}</b> <span class="tag">${esc(sessionTypeLabel(s.sessionType))}</span><p>${esc(s.objectives||"")}</p></div>`).join(""):empty("No sessions in this month.")}<h2>Assessments</h2>${aa.length?aa.map(a=>`<div class="card"><b>${esc(a.player)} · ${assessmentAvg(a)}/10</b><p>${esc(a.priority||"")}</p></div>`).join(""):empty("No assessments in this month.")}<h2>Match actions</h2>${mm.filter(m=>m.actions||m.notes).length?mm.filter(m=>m.actions||m.notes).map(m=>`<div class="card"><b>${esc(m.team)} vs ${esc(m.opp)}</b><p>${esc(m.actions||m.notes||"")}</p></div>`).join(""):empty("No match notes in this month.")}`)}
+ reportShell("Monthly Coaching Report",fmtMonthKey(mk),`<div class="grid g4"><div class="card stat"><span>Sessions</span><b>${ss.length}</b></div><div class="card stat"><span>Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Assessments</span><b>${aa.length}</b></div><div class="card stat"><span>Reflections</span><b>${rr.length}</b></div></div>${mm.length?`<h2>Match Performance</h2>${matchPerfHtml(mm)}`:""}<h2>Sessions</h2>${ss.length?ss.map(s=>`<div class="card"><b>${esc(fmtDate(s.date))} · ${esc(s.title||sessionLabel(s))}</b> <span class="tag">${esc(sessionTypeLabel(s.sessionType))}</span>${sessFocusHtml(s)}<p>${esc(s.objectives||"")}</p></div>`).join(""):empty("No sessions in this month.")}<h2>Assessments</h2>${aa.length?aa.map(a=>`<div class="card"><b>${esc(a.player)} · ${assessmentAvg(a)}/10</b><p>${esc(a.priority||"")}</p></div>`).join(""):empty("No assessments in this month.")}<h2>Match actions</h2>${mm.filter(m=>m.actions||m.notes).length?mm.filter(m=>m.actions||m.notes).map(m=>`<div class="card"><b>${esc(m.team)} vs ${esc(m.opp)}</b><p>${esc(m.actions||m.notes||"")}</p></div>`).join(""):empty("No match notes in this month.")}`)}
 function playerReport(){
  if(!activePlayers().length){alert("Add a player first.");return}
  modal(`<div class="sheetHead"><h2>Player Development Report</h2><button class="x" onclick="closeM()">×</button></div>
@@ -7558,7 +7559,7 @@ function openCalDay(ds){
  let items=calItemsForDate(ds);
  let body=`<div class="sheetHead"><h2>${esc(fmtCalDate(ds))}</h2><button class="x" onclick="closeM()">×</button></div>
  ${calCampBlockHtml(ds,items)}
- <h2 class="section"${items.camps.length?"":' style="margin-top:0"'}>Training Sessions</h2><div class="card">${items.sessions.length?items.sessions.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${s.duration?esc(s.duration)+" min":""}</div><small>${esc(s.objectives||"")}</small></div></div>`).join(""):empty("No sessions.")}</div>
+ <h2 class="section"${items.camps.length?"":' style="margin-top:0"'}>Training Sessions</h2><div class="card">${items.sessions.length?items.sessions.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}</b><div class="muted">${s.duration?esc(s.duration)+" min":""}</div>${sessFocusHtml(s)?`<div style="margin-top:4px">${sessFocusHtml(s)}</div>`:""}<small>${esc(s.objectives||"")}</small></div></div>`).join(""):empty("No sessions.")}</div>
  <h2 class="section">Matches</h2><div class="card">${items.matches.length?items.matches.map(m=>`<div class="item"><div><b>${esc(m.team||"My Team")} vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.result||"")}</div></div><button class="btn secondary" onclick="closeM();matchReportView('${m.id}')">Report</button></div>`).join(""):empty("No matches.")}</div>
  <h2 class="section">Reminders &amp; Events</h2><div class="card">${items.events.length?items.events.map(e=>`<div class="item"><div><b>${esc(e.title)}</b><div class="muted">${e.time?esc(e.time)+" · ":""}${esc(e.type||"Event")}</div><small>${esc(e.notes||"")}</small></div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editCalEvent('${e.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delCalEvent('${e.id}')">${icon("trash",17)}</button></div></div>`).join(""):empty("No reminders or events.")}</div>
  <button class="btn primary" style="margin-top:10px" onclick="newCalEvent('${ds}')">+ Add Reminder / Event for this day</button>`;
@@ -7583,7 +7584,7 @@ function calMonthReport(){
  let ee=db.events.filter(e=>String(e.date||"").slice(0,7)===mk).sort((a,b)=>String(a.date).localeCompare(String(b.date)));
  let label=new Date(calYear,calMonth,1).toLocaleDateString(undefined,{month:"long",year:"numeric"});
  reportShell(`Calendar — ${label}`,`${ss.length} sessions · ${mm.length} matches · ${ee.length} reminders/events`,
- `<h2>Training Sessions</h2>${ss.length?ss.map(s=>`<div class="card"><b>${esc(fmtDate(s.date))} · ${esc(sessionLabel(s))}</b><p>${esc(s.objectives||"")}</p></div>`).join(""):empty("No sessions this month.")}
+ `<h2>Training Sessions</h2>${ss.length?ss.map(s=>`<div class="card"><b>${esc(fmtDate(s.date))} · ${esc(sessionLabel(s))}</b>${sessFocusHtml(s)?`<div style="margin-top:4px">${sessFocusHtml(s)}</div>`:""}<p>${esc(s.objectives||"")}</p></div>`).join(""):empty("No sessions this month.")}
  <h2>Matches</h2>${mm.length?mm.map(m=>`<div class="card"><b>${esc(fmtDate(m.date))} · ${esc(m.team||"My Team")} vs ${esc(m.opp||"Opposition")}</b><p>${esc(m.result||"")}</p></div>`).join(""):empty("No matches this month.")}
  <h2>Reminders &amp; Events</h2>${ee.length?ee.map(e=>`<div class="card"><b>${esc(fmtDate(e.date))}${e.time?" "+esc(e.time):""} · ${esc(e.title)}</b><p>${esc(e.notes||"")}</p></div>`).join(""):empty("No reminders or events this month.")}`);
 }
