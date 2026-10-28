@@ -280,6 +280,21 @@ p{orphans:3;widows:3}
 .report .rcR{display:flex;align-items:center;gap:8px;margin-bottom:7px}.report .rcR b{font-size:19px}.report .rcD{display:flex;gap:3px}.report .rcD i{width:10px;height:10px;border-radius:50%;background:#e1e8ef;-webkit-print-color-adjust:exact;print-color-adjust:exact}.report .rcD i.f{background:#f59e0b}
 .report .rcE{font-size:11.5px;color:#51667a;margin-bottom:6px}.report .rcE span{background:#f1f5f9;border-radius:6px;padding:2px 6px;margin-right:4px;display:inline-block;margin-bottom:3px}
 .report h3.rsub{font-size:12px;font-weight:800;letter-spacing:.08em;text-transform:uppercase;color:#334155;margin:16px 0 8px}
+.report .rcGrid.c3{grid-template-columns:1fr 1fr 1fr;gap:8px}
+@media(max-width:640px){.report .rcGrid.c3{grid-template-columns:1fr 1fr}}
+.report .cc{border:1px solid #e1e8ef;border-left:4px solid #94a3b8;border-radius:8px;padding:6px 8px;font-size:11.5px;line-height:1.4;break-inside:avoid;background:#fff;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.report .cc.in{border-left-color:#16a34a}.report .cc.maybe{border-left-color:#d97706}.report .cc.out{border-left-color:#dc2626}
+.report .cc .t{display:flex;justify-content:space-between;align-items:center;gap:6px;margin-bottom:2px}.report .cc .t b{font-size:12.5px;overflow-wrap:anywhere}.report .cc .t small{color:#51667a;font-size:10.5px;font-weight:500}
+.report .cc.in .rcP{background:#16a34a}.report .cc.maybe .rcP{background:#d97706}.report .cc.out .rcP{background:#dc2626}.report .cc .rcP{font-size:10px;padding:2px 7px}
+.report .cc .rt{color:#b45309;font-weight:800}.report .cc .rt .e{color:#64748b;font-weight:500;font-size:10.5px}.report .cc .s{color:#065f46}.report .cc .w{color:#92400e}.report .cc .n{font-style:italic;color:#475b6e;margin-top:2px}
+.report table.rrt{width:100%;border-collapse:collapse;font-size:12px;background:#fff}.report table.rrt th{text-align:left;font-size:10px;letter-spacing:.07em;text-transform:uppercase;color:#51667a;padding:5px 5px;border-bottom:2px solid #d1fae5;background:none}
+.report table.rrt td{padding:5px 5px;border-bottom:1px solid #eef2f6;vertical-align:top;line-height:1.35;background:none}.report table.rrt tr{break-inside:avoid}
+.report table.rrt td.nm{font-weight:700}.report table.rrt td.nm small{font-weight:500;color:#64748b}.report table.rrt td.ev{color:#51667a;font-size:11px}.report table.rrt td.s{color:#065f46}.report table.rrt td.w{color:#92400e}
+.report table.rrt tr.nt td{font-style:italic;color:#475b6e;font-size:11.5px;padding:0 5px 5px 16px}
+.report table.rrt .rcP{font-size:10px;padding:2px 7px;color:#fff;border-radius:999px;font-weight:800;white-space:nowrap;display:inline-block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.report table.rrt tr.in .rcP{background:#16a34a}.report table.rrt tr.maybe .rcP{background:#d97706}.report table.rrt tr.out .rcP{background:#dc2626}.report table.rrt tr.und .rcP{background:#94a3b8}
+.report .rrScroll{overflow-x:auto}
+@media print{.report .rcGrid.c3{grid-template-columns:1fr 1fr 1fr!important}}
 .report .rcQ{font-style:italic;color:#475b6e;font-size:12.5px;border-left:3px solid #e1e8ef;padding-left:8px;margin-top:5px}
 .report .csChip{-webkit-print-color-adjust:exact;print-color-adjust:exact}
 @media print{.report .rptMast{padding:5mm 6mm!important;border-radius:3mm!important}.report .rptMast .rptT{font-size:20pt!important;color:#fff!important}.report .rptMast small,.report .rptMast p{color:#fff!important}.report .rptMast p{font-size:10.5pt!important}
@@ -7404,7 +7419,7 @@ function rptPrefKey(){let h=sheet.querySelector(".report h1");return h?h.textCon
 function rptPrefsLoad(){try{return JSON.parse(localStorage.getItem("rptPrintPrefs")||"{}")}catch(e){return {}}}
 function rptPrefsSave(key,off){try{let p=rptPrefsLoad();if(off.length)p[key]=off;else delete p[key];localStorage.setItem("rptPrintPrefs",JSON.stringify(p))}catch(e){}}
 function rptPrintPicker(){
- let r=sheet.querySelector(".report");if(!r||r.querySelector(".rptPick"))return;
+ let lay=_rptLayoutCtl||"";_rptLayoutCtl="";let r=sheet.querySelector(".report");if(!r||r.querySelector(".rptPick"))return;
  let kids=[...r.children],groups=[],cur=null,sub=null;
  kids.forEach(n=>{
   if(n.tagName==="H1"||n.classList.contains("rptCover")||n.classList.contains("reportActions"))return;
@@ -7423,12 +7438,13 @@ function rptPrintPicker(){
   box.innerHTML=`<summary style="cursor:pointer"><b>Print options</b> <span class="muted">· ${n} of ${groups.length} sections will print</span></summary>
   <div style="display:flex;gap:8px;margin:8px 0;flex-wrap:wrap"><button type="button" class="btn secondary" data-p="full">Full report</button><button type="button" class="btn secondary" data-p="sum">Summary only</button></div>
   ${groups.map((g,i)=>`<label style="display:flex;gap:8px;align-items:center;padding:3px 0"><input type="checkbox" style="width:auto" data-i="${i}" ${g.el.classList.contains("rptOff")?"":"checked"}> ${esc(g.title)}</label>`).join("")}
-  <div class="muted" style="font-size:12px;margin-top:6px">The title, headline and key takeaways always print. Unticked sections are faded here and left out of the printout. Your choice is remembered for this report type on this device.</div>`;
+  ${lay}<div class="muted" style="font-size:12px;margin-top:6px">The title, headline and key takeaways always print. Unticked sections are faded here and left out of the printout. Your choice is remembered for this report type on this device.</div>`;
   box.open=box.dataset.open==="1";
   box.querySelector("summary").onclick=()=>{box.dataset.open=box.open?"0":"1"};
   box.querySelectorAll("input[data-i]").forEach(c=>c.onchange=()=>{box.dataset.open="1";groups[+c.dataset.i].el.classList.toggle("rptOff",!c.checked);commit()});
   box.querySelectorAll("button[data-p]").forEach(b=>b.onclick=()=>{box.dataset.open="1";groups.forEach(g=>g.el.classList.toggle("rptOff",b.dataset.p==="sum"&&!RPT_SUMMARY_KEEP.test(g.title)));commit()})};
  let commit=()=>{rptPrefsSave(key,groups.filter(g=>g.el.classList.contains("rptOff")).map(g=>g.title));draw()};
+ if(_rptOpenBox){box.dataset.open="1";_rptOpenBox=false}
  draw();(sub||r.querySelector(".rptMast")||r.querySelector("h1")).after(box)}
 
 /* ===== Business Tools: Invoices, Payment Reminders, Match Narrative, Reflection Themes, Custom Reports, Certificates ===== */
@@ -10056,6 +10072,26 @@ function campRevUndo(id){
  if(u.all)c.review=u.data;else{if(!c.review)c.review={};if(u.v)c.review[u.n]=u.v;else delete c.review[u.n]}
  campQuiet();campRevRefreshAll();
 }
+function campPrintLayout(){try{let v=localStorage.getItem("campPrintLayout");return["cards","compact","rows"].includes(v)?v:"compact"}catch(e){return "compact"}}
+let _rptLayoutCtl="",_rptOpenBox=false,_rptRedo=null;
+function campLayoutCtlHtml(){let cur=campPrintLayout();return `<div class="noPrint" style="margin:10px 0 4px"><b style="font-size:13px">Player layout</b> <span class="muted" style="font-size:12px">· on screen and in print</span><div style="display:flex;gap:6px;margin-top:6px;flex-wrap:wrap">${[["cards","Cards"],["compact","Compact"],["rows","Rows"]].map(([k,l])=>`<button type="button" class="btn ${cur===k?"primary":"secondary"}" style="padding:5px 12px;font-size:13px" onclick="campSetPrintLayout('${k}')">${l}</button>`).join("")}</div></div>`}
+function campSetPrintLayout(k){try{localStorage.setItem("campPrintLayout",k)}catch(e){}_rptOpenBox=true;if(_rptRedo)_rptRedo()}
+function campLayoutAttach(){_rptOpenBox=false;let sh=document.getElementById("sheet");if(!sh||sh.querySelector(".rptPick"))return;let m=sh.querySelector(".rptMast");if(m)m.insertAdjacentHTML("afterend",campLayoutCtlHtml())}
+function campRoleShort(r){return ({"Batter":"Bat","Batsman":"Bat","Bowler":"Bowl","All-rounder":"AR","Allrounder":"AR","Keeper":"WK","Wicketkeeper":"WK","Wicket-keeper":"WK"})[r]||r||""}
+function campPlayerCompactHtml(c,n,showNote){
+ let v=campRevOf(c,n),pl=db.players.find(p=>p.name===n&&!p.deletedAt),ev=campEvidenceParts(c,n),rec=v.rec||"",rl={in:"IN",maybe:"MAYBE",out:"OUT"}[rec]||"UNDECIDED",sp=campTagSplit(v.tags),role=campRoleShort(pl&&pl.role);
+ return `<div class="cc ${rec}"><div class="t"><b>${esc(n)}${role?` <small>${esc(role)}</small>`:""}</b><span class="rcP">${rl}</span></div>${(v.r||ev.length)?`<div class="rt">${v.r?v.r+".0 ★":""}${ev.length?` <span class="e">${v.r?"· ":""}${ev.map(esc).join(" · ")}</span>`:""}</div>`:""}${sp.g.length?`<div class="s">+ ${sp.g.map(esc).join(", ")}</div>`:""}${sp.w.length?`<div class="w">– ${sp.w.map(esc).join(", ")}</div>`:""}${showNote&&v.note?`<div class="n">${esc(v.note)}</div>`:""}</div>`;
+}
+function campPlayerRowsHtml(c,list,showNote){
+ let data=list.map(n=>{let v=campRevOf(c,n);return{n,v,pl:db.players.find(p=>p.name===n&&!p.deletedAt),ev:campEvidenceParts(c,n),sp:campTagSplit(v.tags)}});
+ let hasEv=data.some(x=>x.ev.length),cols=hasEv?6:5;
+ return `<div class="rrScroll"><table class="rrt"><thead><tr><th>Player</th><th>Rate</th>${hasEv?"<th>Evidence</th>":""}<th>Strengths</th><th>Work-ons</th><th></th></tr></thead><tbody>${data.map(x=>{let rec=x.v.rec||"",rl={in:"IN",maybe:"MAYBE",out:"OUT"}[rec]||"UNDECIDED";return `<tr class="${rec||"und"}"><td class="nm">${esc(x.n)}${x.pl&&x.pl.role?` <small>${esc(campRoleShort(x.pl.role))}</small>`:""}</td><td>${x.v.r?x.v.r+".0":"—"}</td>${hasEv?`<td class="ev">${x.ev.map(esc).join(" · ")}</td>`:""}<td class="s">${x.sp.g.map(esc).join(", ")}</td><td class="w">${x.sp.w.map(esc).join(", ")}</td><td><span class="rcP">${rl}</span></td></tr>${showNote&&x.v.note?`<tr class="nt ${rec||"und"}"><td colspan="${cols}">${esc(x.v.note)}</td></tr>`:""}`}).join("")}</tbody></table></div>`;
+}
+function campPlayersLayoutHtml(c,list,showNote){
+ let L=campPrintLayout();
+ if(L==="rows")return campPlayerRowsHtml(c,list,showNote);
+ return `<div class="rcGrid${L==="compact"?" c3":""}">${list.map(n=>L==="compact"?campPlayerCompactHtml(c,n,showNote):campPlayerCardHtml(c,n,showNote)).join("")}</div>`;
+}
 function campPlayerCardHtml(c,n,showNote){
  let chip=(t,good)=>`<span class="csChip ${good?"g":"a"}">${esc(t)}</span>`;
  let v=campRevOf(c,n),pl=db.players.find(p=>p.name===n&&!p.deletedAt),ev=campEvidenceParts(c,n),rec=v.rec||"",rl={in:"IN",maybe:"MAYBE",out:"OUT"}[rec]||"UNDECIDED",sp=campTagSplit(v.tags),ini=n.trim().split(/\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase();
@@ -10065,12 +10101,13 @@ function campReviewReport(id){
  let c=campById(id);if(!c)return;let names=campRevNames(c),k=campRevCounts(c);
  let order={in:0,maybe:1,out:2,"":3},sorted=names.slice().sort((a,b)=>{let x=campRevOf(c,a),y=campRevOf(c,b);return (order[x.rec||""]-order[y.rec||""])||(y.r-x.r)||a.localeCompare(b)});
  let card=n=>campPlayerCardHtml(c,n,true);
- let sec=(label,key)=>{let l=sorted.filter(n=>(campRevOf(c,n).rec||"")===key);return l.length?`<h2 class="rsh">${label} (${l.length})</h2><div class="rcGrid">${l.map(card).join("")}</div>`:""};
+ let sec=(label,key)=>{let l=sorted.filter(n=>(campRevOf(c,n).rec||"")===key);return l.length?`<h2 class="rsh">${label} (${l.length})</h2>${campPlayersLayoutHtml(c,l,true)}`:""};
  let avg=campRevAvg(c),tt=campTagTally(c);
  let board=names.length?`<h2 class="rsh">Selection board</h2><div class="rboard"><div><div class="csK">Recommendation</div>${campSelBarHtml(k,true)}<div style="margin-top:12px;font-size:36px;font-weight:800;line-height:1">${avg===null?"—":avg.toFixed(1)} <span style="font-size:13px;color:#51667a;font-weight:600">/ 5 avg rating</span></div></div><div>${tt.good.length?`<div class="csK">Camp strengths</div>${tt.good.map(x=>`<span class="csChip g">${esc(x[0])} ×${x[1]}</span>`).join("")}`:""}${tt.bad.length?`<div class="csK" style="margin-top:6px">Work-ons</div>${tt.bad.map(x=>`<span class="csChip a">${esc(x[0])} ×${x[1]}</span>`).join("")}`:""}</div></div>`:"";
- _rptMast={k:"Camp report"+(c.team?" · "+esc(c.team):""),t:esc(c.name)};
+ _rptMast={k:"Camp report"+(c.team?" · "+esc(c.team):""),t:esc(c.name)};_rptLayoutCtl=campLayoutCtlHtml();_rptRedo=()=>campReviewReport(id);
  reportShell(esc(c.name)+" — Camp Report",`${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""} · ${names.length} players reviewed · In ${k.in} · Maybe ${k.maybe} · Out ${k.out}${k.none?" · Not decided "+k.none:""}`,
   board+sec("In","in")+sec("Maybe","maybe")+sec("Out","out")+sec("Not decided","")||empty("No players."));
+ campLayoutAttach();
 }
 function campSelectSquad(id){
  let c=campById(id);if(!c)return;let L=stagesList(),open=L.filter(s=>!s.released);
@@ -10179,7 +10216,7 @@ function campSummaryReport(id){
  if(o.names){
   names=[["in","In"],["maybe","Maybe"],["out","Out"],["","Not decided"]].map(([key,lab])=>{
    let l=d.names.filter(n=>(campRevOf(c,n).rec||"")===key).sort((a,b)=>campRevOf(c,b).r-campRevOf(c,a).r||a.localeCompare(b));
-   return l.length?`<h3 class="rsub">${lab} (${l.length})</h3><div class="rcGrid">${l.map(n=>campPlayerCardHtml(c,n,o.notes)).join("")}</div>`:""}).join("");
+   return l.length?`<h3 class="rsub">${lab} (${l.length})</h3>${campPlayersLayoutHtml(c,l,o.notes)}`:""}).join("");
  }
  let optsHtml=`<div class="noPrint sumEdit" style="margin:10px 0;padding:10px 12px;border:1px solid var(--border,#8884);border-radius:12px"><b>Include in this report</b> <span class="muted" style="font-size:12.5px">(only you see this)</span>${sw("names","Player names, ratings and tags")}${sw("notes","My notes on each player",!o.names)}${sw("sched","The schedule at the end")}</div>`;
  let body=`<div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px">${stat("Days",d.days)}${stat("Players",d.P)}${stat("Sessions",d.sessionsHeld||"—")}${stat("Activity hours",h.total?Math.round(h.total):"—")}</div>
@@ -10198,9 +10235,10 @@ function campSummaryReport(id){
  <h2>Next steps</h2><div class="sumEdit noPrint"><textarea rows="3" placeholder="Optional: what happens next, e.g. Camp 2 squad announced on 5 Nov." onchange="campSumSave('${c.id}','sumNext',this)" style="width:100%">${esc(c.sumNext||"")}</textarea></div><p class="printOnly" id="sum_sumNext" style="white-space:pre-wrap">${esc(c.sumNext||"")}</p>
  ${o.sched?`<h2>Schedule</h2>${campSheetTable(c)}`:""}
  <div class="noPrint" style="margin-top:12px"><button class="btn secondary" onclick="campSumShare('${c.id}')">Share / copy as text</button></div>`;
- body=body.replace(/<h2>/g,'<h2 class="rsh">');_rptMast={k:"Camp summary"+(c.team?" · "+esc(c.team):""),t:esc(c.name)};
+ body=body.replace(/<h2>/g,'<h2 class="rsh">');_rptMast={k:"Camp summary"+(c.team?" · "+esc(c.team):""),t:esc(c.name)};_rptLayoutCtl=o.names?campLayoutCtlHtml():"";_rptRedo=()=>campSummaryReport(id);
  reportShell(esc(c.name)+" — Camp Summary",`${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""}${campVenues(c).length?" · "+esc(campVenues(c).join(" / ")):""}${c.team?" · "+esc(c.team):""}${c.coaches?" · Coaches: "+esc(c.coaches):""}`,body);
  let rep=document.querySelector("#sheet .report");if(rep)rep.insertAdjacentHTML("beforebegin",optsHtml);
+ if(o.names)campLayoutAttach();
 }
 /* ===== end camps ===== */
 function campSetPrefill(id,v){let c=campById(id);if(!c)return;c.prefillAttendees=!!v;campQuiet()}
