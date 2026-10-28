@@ -248,6 +248,7 @@ p{orphans:3;widows:3}
 .campTabs button{flex:1 1 0;min-width:0;background:none;border:0;border-radius:11px;color:var(--muted);font-weight:700;font-size:var(--fs-4,16px);padding:12px 6px;cursor:pointer;white-space:nowrap}
 .campTabs button.on{background:var(--g);color:#fff;box-shadow:0 2px 8px rgba(0,0,0,.25)}.campTabs button small{font-weight:800;margin-left:4px;opacity:.9}
 .campTools .btn{padding:6px 12px;font-size:13px}
+.campStrip{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:10px 0;cursor:pointer;font-size:var(--fs-3)}.campStrip .cs1{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}.campStrip .cs2{color:var(--g);font-weight:700;white-space:nowrap}
 .csBar{display:flex;height:14px;border-radius:8px;overflow:hidden;margin:10px 0 8px;background:rgba(128,128,128,.25)}.csBar i{display:block;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .csLeg{display:flex;gap:14px;flex-wrap:wrap;font-size:var(--fs-3)}.csDot{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:5px}
 .csStats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:12px}.csStats div{background:rgba(128,128,128,.12);border-radius:10px;padding:8px 4px;text-align:center}.csStats b{display:block;font-size:18px}.csStats span{font-size:10.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--muted)}
@@ -9053,7 +9054,7 @@ const CAMP_BLOCK_TYPES=[
  {id:"meet",label:"Meeting / feedback",c:"#ca8a04"},{id:"brk",label:"Rest / recovery / meal",c:"#94a3b8"},
  {id:"oth",label:"Other",c:"#64748b"}];
 const CAMP_QUICK=[["Nets","bat"],["Combined Nets","bat"],["Fielding","fld"],["S&C","fit"],["Drills","oth"],["Fitness Test","fit"],["Physio","fit"],["Practice Match","mat"],["Match Simulation","mat"],["Video Analysis","meet"],["Video Shoot","oth"],["Meeting","meet"],["Recovery","brk"],["Rest","brk"]];
-let campTab="overview",campTabFor=null;let campLinkedRows={},campDayOpen={};let campOpenId=null,campEditingId=null,campCellCtx=null,campImportParsed=null;
+let campTab="overview",campTabFor=null,campInfoOpen=false;let campLinkedRows={},campDayOpen={};let campOpenId=null,campEditingId=null,campCellCtx=null,campImportParsed=null;
 function campById(id){return(db.camps||[]).find(c=>c.id===id)}
 function campType(id){return CAMP_BLOCK_TYPES.find(t=>t.id===id)||CAMP_BLOCK_TYPES[CAMP_BLOCK_TYPES.length-1]}
 function campGuessType(t){
@@ -9157,13 +9158,17 @@ function campDetailHtml(c){
  let unassigned=pool.filter(p=>!(c.batches||[]).some(b=>b.names.includes(p.name)));
  let po=campPhaseOf(c),st=campSessionStats(c);
  const info=(l,v)=>v?`<div><div class="l">${l}</div><b>${v}</b></div>`:"";
+  const infoBox=`<div class="card" style="margin:-2px 0 10px"><div class="campInfo">${info(campVenues(c).length>1?"Venues":"Venue",esc(campVenues(c).join(" · ")))}${info("Team / stage",esc([c.team,stName].filter(Boolean).join(" · ")||"Everyone"))}${info("Season phase",po?esc(po.season.name+" · "+po.phase.name):"")}${info("Players",pool.length+(unassigned.length&&(c.batches||[]).length>1?` <span class="muted" style="font-weight:400">(${unassigned.length} not in a group)</span>`:""))}${info("Coaches",esc(c.coaches||""))}</div>
+ ${(c.batches||[]).length>1?`<div style="margin-top:12px">${c.batches.map(b=>`<span class="tag">${esc(b.name)} · ${b.names.length}</span>`).join(" ")}</div>`:""}</div>`;
+  const vns=campVenues(c),stLabel=[c.team,stName].filter(Boolean).join(" · ")||"Everyone";
+  const strip=`<div class="card campStrip noPrint" onclick="campToggleInfo()"><span class="cs1">${[(vns[0]||"")+(vns.length>1?" +"+(vns.length-1):""),stLabel,pool.length+" player"+(pool.length===1?"":"s")].filter(Boolean).map(esc).join(" · ")}</span><span class="cs2">${campInfoOpen?"Hide ▴":"Details ▾"}</span></div>${campInfoOpen?infoBox:""}`;
  return `<button class="backBtn noPrint" onclick="closeCamp()">${icon("chevronLeft",13)} All camps</button>
  <div class="hero"><h1>${esc(c.name)} <span class="tag" style="font-size:12px;vertical-align:middle">${esc(c.kind||"Camp")}</span></h1><div class="muted">${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""} · ${days.length} day${days.length===1?"":"s"}</div></div>
+ <div class="toolbar noPrint campTools" style="margin-top:10px"><button class="btn secondary" onclick="editCamp('${c.id}')">Edit</button><button class="btn secondary" onclick="campBatchesSheet('${c.id}')">Groups</button>${campMenu("cmShare","Print / Share ▾",[{label:"Print sheet",icon:"print",fn:`campSheetReport('${c.id}')`},{label:"Share as image",icon:"share",fn:`campShareImage('${c.id}')`},{label:"Player review report",icon:"print",fn:`campReviewReport('${c.id}')`},{label:"Camp summary report",icon:"print",fn:`campSummaryReport('${c.id}')`}],"secondary")}${kebabMenu("cmMore",[{label:"Copy camp",icon:"copy",fn:`campCopyForm('${c.id}')`},{label:"Save as template",icon:"edit",fn:`campSaveTemplate('${c.id}')`}])}</div>
+  ${strip}
  <div class="campTabs noPrint">${[["overview","Overview"],["schedule","Schedule"],["players","Players"+(campRevNames(c).length?` <small>${campRevNames(c).length}</small>`:"")],["report","Report"]].map(([k,l])=>`<button type="button" class="${campTab===k?"on":""}" onclick="campSetTab('${k}')">${l}</button>`).join("")}</div>
- <div class="toolbar noPrint campTools" style="margin-top:0"><button class="btn secondary" onclick="editCamp('${c.id}')">Edit</button><button class="btn secondary" onclick="campBatchesSheet('${c.id}')">Groups</button>${campMenu("cmShare","Print / Share ▾",[{label:"Print sheet",icon:"print",fn:`campSheetReport('${c.id}')`},{label:"Share as image",icon:"share",fn:`campShareImage('${c.id}')`},{label:"Player review report",icon:"print",fn:`campReviewReport('${c.id}')`},{label:"Camp summary report",icon:"print",fn:`campSummaryReport('${c.id}')`}],"secondary")}${kebabMenu("cmMore",[{label:"Copy camp",icon:"copy",fn:`campCopyForm('${c.id}')`},{label:"Save as template",icon:"edit",fn:`campSaveTemplate('${c.id}')`}])}</div>
  ${campTab==="overview"?campTodayHtml(c):""}
- ${campTab==="overview"?`${campSelHtml(c)} <div class="card" style="margin-top:14px"><div class="campInfo">${info(campVenues(c).length>1?"Venues":"Venue",esc(campVenues(c).join(" · ")))}${info("Team / stage",esc([c.team,stName].filter(Boolean).join(" · ")||"Everyone"))}${info("Season phase",po?esc(po.season.name+" · "+po.phase.name):"")}${info("Players",pool.length+(unassigned.length&&(c.batches||[]).length>1?` <span class="muted" style="font-weight:400">(${unassigned.length} not in a group)</span>`:""))}${info("Coaches",esc(c.coaches||""))}</div>
- ${(c.batches||[]).length>1?`<div style="margin-top:12px">${c.batches.map(b=>`<span class="tag">${esc(b.name)} · ${b.names.length}</span>`).join(" ")}</div>`:""}</div>
+ ${campTab==="overview"?`${campSelHtml(c)} 
 ${(c.equipment||c.notes)?`<div class="grid g2" style="margin-top:16px">${c.equipment?`<div class="card"><b>Equipment</b><ul style="margin:6px 0 0 18px;padding:0">${c.equipment.split("\n").map(x=>x.trim()).filter(Boolean).map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>`:""}${c.notes?`<div class="card"><b>Notes</b><p style="white-space:pre-wrap;margin:6px 0 0">${esc(c.notes)}</p></div>`:""}</div>`:""}`:""}
  ${campTab==="schedule"?` <div class="campSec" id="campSecSess">Sessions</div>
  <div class="card"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap"><div class="muted" style="font-size:var(--fs-3);flex:1;min-width:160px">${st.have?st.have+" of "+st.rows+" schedule rows are sessions":"Turn each schedule row into a session with its date, time, venue and focus"}</div><button class="btn primary" onclick="campSyncSessions('${c.id}')">${st.have?"Update sessions":"Create sessions"}</button></div>${campSessionOptsHtml(c)}</div>
@@ -9807,6 +9812,7 @@ function campTodayHtml(c){
  return `<div class="card noPrint" style="margin-top:12px;border-left:5px solid var(--g)"><div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap"><div><b>Today · Day ${n.day+1} of ${n.total}</b>${n.theme?` <span class="muted">· ${esc(n.theme)}</span>`:""}</div><button class="btn secondary" style="padding:5px 12px" onclick="campJumpToday()">Jump to today</button></div>
  ${n.rows.length?(line("Now",n.cur)||`<div class="muted" style="margin-top:6px">Nothing in progress right now.</div>`)+line("Next",n.next):`<div class="muted" style="margin-top:6px">Nothing scheduled today.</div>`}</div>`;
 }
+function campToggleInfo(){campInfoOpen=!campInfoOpen;camps()}
 function campSetTab(t){campTab=t;camps();window.scrollTo(0,0)}
 function campJumpToday(){if(campTab!=="schedule"){campTab="schedule";camps()}let el=document.getElementById("campDay-"+today());if(el)el.scrollIntoView({behavior:"smooth",block:"start"})}
 
