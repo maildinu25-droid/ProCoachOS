@@ -302,6 +302,11 @@ p{orphans:3;widows:3}
 .report .fbCard .rcR{margin-bottom:6px}.report .fbCard .rcR b{font-size:32px}.report .fbCard .rcD i{width:15px;height:15px}
 .report .fbCard .csChip{font-size:13.5px;padding:5px 12px}
 .report .fbCard .rcQ{font-size:14.5px;line-height:1.5}
+.report .fbShort{background:#f4f8f6;border-left:5px solid #10b981;border-radius:10px;padding:11px 13px;font-size:14.5px;line-height:1.55;color:#18211e;white-space:pre-wrap;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.report .fbWork{background:#f4f8f6;border-left:5px solid #10b981;border-radius:8px;padding:9px 12px 9px 30px;margin:8px 0 0;font-size:13.5px;line-height:1.5;-webkit-print-color-adjust:exact;print-color-adjust:exact}.report .fbWork:empty{display:none}
+.report .fbTiles{display:flex;gap:10px;flex-wrap:wrap}.report .fbTile{flex:1;min-width:130px;background:#f4f8f6;border:1px solid #dcebe4;border-radius:11px;padding:9px;text-align:center;-webkit-print-color-adjust:exact;print-color-adjust:exact}.report .fbTile b{display:block;font-size:19px}.report .fbTile span{font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#51667a;font-weight:700}
+.report .fbSk{display:flex;align-items:center;gap:8px;margin:6px 0;font-size:13px}.report .fbSk .l{width:120px;flex:none}.report .fbSk .tr{flex:1;height:10px;background:#e5eaf0;border-radius:5px;position:relative;overflow:hidden;-webkit-print-color-adjust:exact;print-color-adjust:exact}.report .fbSk .tr i{position:absolute;top:0;bottom:0;display:block}.report .fbSk b{width:92px;text-align:right;font-size:12.5px;flex:none}
+.report .fbGoal{border:1px solid #e1e8ef;border-radius:10px;padding:8px 10px;margin-bottom:6px;font-size:13.5px;display:flex;justify-content:space-between;align-items:center;gap:8px}.report .fbPill{font-size:10.5px;font-weight:800;border-radius:99px;padding:2px 9px;color:#fff;white-space:nowrap;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .report .fbNext{border-radius:10px;padding:10px 12px;font-size:14px;font-weight:600;border-left:5px solid #94a3b8;background:#f4f7fa;-webkit-print-color-adjust:exact;print-color-adjust:exact}
 .report .fbNext.in{border-left-color:#16a34a;background:#ecfdf3}.report .fbNext.maybe{border-left-color:#d97706;background:#fffbeb}.report .fbNext.out{border-left-color:#dc2626;background:#fef2f2}
 .report .fbFoot{margin-top:18px;padding-top:8px;border-top:1px dashed #cbd5e1;font-size:11.5px;color:#64748b}
@@ -10006,38 +10011,150 @@ function campReportTabHtml(c){
  ${has?`<div class="campSec">After the camp</div><div class="toolbar noPrint"><button class="btn secondary" onclick="campSelectSquad('${c.id}')">Select squad from review</button><button class="btn secondary" onclick="campToTournament('${c.id}')">Send to tournament squad</button><button class="btn secondary" onclick="campAssess('${c.id}')">Assess players</button></div>`:""}`;
 }
 let campFbFilter="";
+const CAMP_FB_PRACTICE={
+"Technique work":"Short daily technique session: 20 minutes on one fault, checked in a mirror or on video.",
+"Consistency":"Repeat the same drill every day and count how many balls in a row are done correctly.",
+"Shot selection":"Net session: say the shot you will play before each ball, then review the choices.",
+"Footwork":"Front-foot and back-foot movement drill, 3 × 10 balls without a bat, then with a bat.",
+"Defensive technique":"Forward and back defence, 5 sets of 6 balls with eyes on the ball.",
+"Playing spin":"Front-foot drill against spin, 3 × 10 balls.",
+"Playing pace and bounce":"Throwdowns at pace, 3 × 10 balls, with a still head and back-foot play.",
+"Playing the short ball":"Short-ball throwdowns, 3 × 8 balls: pick the pull, duck or leave early.",
+"Strike rotation":"Net session aiming for singles off good balls: 20 balls, 12 singles.",
+"Running between the wickets":"Running between cones: 10 sprints of 3 runs, with calls and sharp turns.",
+"Finishing innings":"Scenario practice: chase 20 off 12 balls in the nets, 3 times a week.",
+"Judging length":"Throwdowns: call front foot or back foot before the ball bounces.",
+"Bowling accuracy":"Bowl 30 balls at a target on a good length and count the hits.",
+"Line and length":"Bowl 6 overs at a stump target and log how many land in the area.",
+"Run-up and rhythm":"Rhythm run-ups: 10 steady approaches without bowling, then 10 with.",
+"Variations":"Practise one variation, 3 × 6 balls, then use it in a net session.",
+"Bowling under pressure":"Bowl the last 2 overs of a game scenario while defending a target.",
+"Front-foot no-balls":"Mark the crease and bowl 24 balls with the aim of zero no-balls.",
+"Fielding":"15 minutes of fielding drills a day: catching, ground fielding and throws.",
+"Catching":"Catching, 3 sets of 10 high and flat catches, daily.",
+"Ground fielding":"Ground-ball drill, 3 × 10 balls: get low, clean pick-up and throw.",
+"Throwing accuracy":"Throw at a single stump from 20 metres, 3 × 10 throws.",
+"Wicketkeeping basics":"Keeping drill: stance, take and low glove work, 3 × 10 balls.",
+"Fitness":"Three short fitness sessions a week: running, core and mobility.",
+"Strength":"Bodyweight strength twice a week: squats, lunges, push-ups and core.",
+"Speed and agility":"Agility ladder and shuttle runs, 3 times a week.",
+"Endurance":"Steady 20 to 30 minute runs, 2 to 3 times a week.",
+"Flexibility and mobility":"10 minutes of stretching and mobility after every session.",
+"Match temperament":"Use the same routine between balls in every net so it is ready for a match.",
+"Concentration":"Concentration drill: face 5 overs and reset after every ball.",
+"Confidence":"After each session, write down three things that went well.",
+"Communication":"Call loudly in every fielding and running drill.",
+"Discipline":"Arrive early, pack the kit the night before and follow the routine.",
+"Decision-making":"Scenario nets: decide the plan before each over, then review it.",
+"Game awareness":"Watch a match and note the field and the plan for each over.",
+"Handling pressure":"Pressure nets: set a target for the last overs and use a breathing routine.",
+"Focus in the field":"Reset after every ball in the field and watch the bat on each delivery.",
+"Effort and attitude":"Set one effort goal per session and tell the coach how it went.",
+"Time-keeping":"Plan the arrival time and be ready 10 minutes early.",
+"Applying feedback":"Take one point from the last session and repeat it in the next."};
 function campFbCoach(){try{let n=(coachDisplayName()||"").trim();return n==="Coach"?"":n}catch(e){return ""}}
-function campFbOpts(){let d={decision:false,rating:true,evidence:true,note:true};try{return Object.assign(d,JSON.parse(localStorage.getItem("campFbOpts")||"{}"))}catch(e){return d}}
+function campFbOpts(){let d={summary:true,rating:true,progress:true,skills:true,goals:true,note:true,decision:false};try{return Object.assign(d,JSON.parse(localStorage.getItem("campFbOpts")||"{}"))}catch(e){return d}}
 function campFbToggle(k,v){let o=campFbOpts();o[k]=v;try{localStorage.setItem("campFbOpts",JSON.stringify(o))}catch(e){}if(_rptRedo)_rptRedo()}
 function campFbSetFilter(v){campFbFilter=v;if(_rptRedo)_rptRedo()}
 const CAMP_FB_NEXT={in:"Selected for the next squad. Well done.",maybe:"Under consideration for the next squad. A final decision will follow.",out:"Not selected for the next squad this time. Work on the points above and we will review again."};
+function campFbData(c,n){
+ let end=c.endDate||c.startDate,d={avg0:null,avg1:null,skills:[],best:null,low:null,att:null,goals:[]};
+ let as=db.assessments.filter(a=>a.player===n&&(a.campId?a.campId===c.id:(a.date&&a.date>=c.startDate&&a.date<=end))).sort((x,y)=>String(x.date).localeCompare(String(y.date)));
+ let av=as.map(a=>Number(assessmentAvg(a))).filter(Number.isFinite);
+ if(av.length){d.avg1=av[av.length-1];if(av.length>1)d.avg0=av[0]}
+ let sk={};as.forEach(a=>{try{assessmentDisciplines(a).forEach(dn=>{let vals=(a.ratings&&a.ratings[dn])||[],labels=(dn==="Bowling"&&vals.length===10)?legacyBowlingSkills:allSkillsFor(dn);vals.forEach((x,i)=>{x=Number(x);if(x>0&&labels[i])(sk[labels[i]]=sk[labels[i]]||[]).push(x)})})}catch(e){}});
+ let all=Object.entries(sk).map(([k,v])=>({k,a:v[0],b:v[v.length-1],multi:v.length>1,d:v[v.length-1]-v[0]}));
+ let gain=all.filter(x=>x.multi&&x.d>=0.2).sort((x,y)=>y.d-x.d),pick=gain.slice(0,3),has=x=>pick.some(y=>y.k===x.k);
+ all.slice().sort((x,y)=>x.b-y.b).forEach(x=>{if(pick.length<5&&!has(x))pick.push(x)});
+ d.skills=pick;d.best=gain[0]||null;d.low=all.slice().sort((x,y)=>x.b-y.b)[0]||null;
+ let ss=db.sessions.filter(x=>x.campId===c.id&&!x.deletedAt&&x.date<=today()&&(x.attendees||[]).length);
+ if(ss.length)d.att={a:ss.filter(x=>x.attendees.includes(n)).length,t:ss.length};
+ let p=db.players.find(x=>x.name===n&&!x.deletedAt);
+ if(p)d.goals=(p.goals||[]).filter(g=>!g.achieved).map(g=>({g,m:goalMeasure(p,g)}));
+ return d;
+}
+function campFbSummaryAuto(c,n){
+ let v=campRevOf(c,n),d=campFbData(c,n),fn=n.trim().split(/\s+/)[0],sp=campTagSplit(v.tags);
+ const low=t=>/^[A-Z][a-z]/.test(t)?t[0].toLowerCase()+t.slice(1):t,join=a=>a.length>1?a.slice(0,-1).join(", ")+" and "+a[a.length-1]:(a[0]||"");
+ if(!(v.r||d.avg1!==null||sp.g.length||sp.w.length||d.att))return "";
+ let word=v.r>=4?"a strong camp":v.r===3?"a solid camp":v.r>=1?"a developing camp":"",s1=word?`${fn} had ${word}`:`${fn} took part in the camp`;
+ if(d.avg1!==null){
+  if(d.avg0!==null){let df=d.avg1-d.avg0;s1+=Math.abs(df)<0.05?` with assessments holding at ${d.avg1.toFixed(1)}`:df>0?` and improved from ${d.avg0.toFixed(1)} to ${d.avg1.toFixed(1)} on assessments`:` with the assessment average moving from ${d.avg0.toFixed(1)} to ${d.avg1.toFixed(1)}`}
+  else s1+=` with an assessment average of ${d.avg1.toFixed(1)}`;
+ }else if(v.r)s1+=`, rated ${v.r} out of 5`;
+ if(d.best)s1+=`, with the biggest gain in ${d.best.k.toLowerCase()} (${d.best.a.toFixed(1)} → ${d.best.b.toFixed(1)})`;
+ let L=[s1+"."];
+ if(d.att)L.push(d.att.a===d.att.t?`${fn} attended every session.`:`${fn} attended ${d.att.a} of ${d.att.t} sessions.`);
+ if(sp.g.length)L.push(`Strengths included ${join(sp.g.slice(0,2).map(low))}.`);
+ let wk=sp.w.slice(0,2).map(low);if(!wk.length&&d.low&&d.low.b<3)wk=[d.low.k.toLowerCase()];
+ if(wk.length)L.push(wk.length>1?`The main areas to work on next are ${join(wk)}.`:`The main area to work on next is ${wk[0]}.`);
+ return L.join(" ");
+}
+function campFbSummary(c,n){let st=c.fbSum&&c.fbSum[n];return st!==undefined?st:campFbSummaryAuto(c,n)}
+function campFbWorkLines(c,n){
+ let st=c.fbWork&&c.fbWork[n];if(st!==undefined)return String(st).split("\n").map(x=>x.trim()).filter(Boolean);
+ return campTagSplit(campRevOf(c,n).tags).w.slice(0,3).map(t=>CAMP_FB_PRACTICE[t]).filter(Boolean);
+}
+function campFbSave(el,id,kind){
+ let c=campById(id);if(!c)return;let n=el.dataset.n;
+ if(kind==="sum"){if(!c.fbSum)c.fbSum={};c.fbSum[n]=el.value.trim()}else{if(!c.fbWork)c.fbWork={};c.fbWork[n]=el.value}
+ campQuiet();
+ let sec=el.closest(".fbSec");if(!sec)return;let box=sec.querySelector(".fbBox");
+ if(kind==="sum"){let t=el.value.trim();box.textContent=t;sec.classList.toggle("noPrint",!t)}
+ else{let L=el.value.split("\n").map(x=>x.trim()).filter(Boolean);box.innerHTML=L.map(x=>`<li>${esc(x)}</li>`).join("");sec.classList.toggle("noPrint",!L.length&&!sec.querySelector(".csChip"))}
+}
+function campFbReset(btn,id,kind){
+ let c=campById(id);if(!c)return;let sec=btn.closest(".fbSec"),ta=sec.querySelector("textarea"),n=ta.dataset.n;
+ if(kind==="sum"){if(c.fbSum)delete c.fbSum[n];ta.value=campFbSummaryAuto(c,n)}else{if(c.fbWork)delete c.fbWork[n];ta.value=campFbWorkLines(c,n).join("\n")}
+ campFbSave(ta,id,kind);
+ if(kind==="sum"){if(c.fbSum)delete c.fbSum[n]}else{if(c.fbWork)delete c.fbWork[n]}campQuiet();
+}
 function campFbCtlHtml(c,all){
  let o=campFbOpts(),cb=(k,l)=>`<label style="display:flex;gap:8px;align-items:center;margin:4px 0;font-size:13.5px"><input type="checkbox" style="width:auto" ${o[k]?"checked":""} onchange="campFbToggle('${k}',this.checked)"> ${l}</label>`;
  let k=campRevCounts(c),fl=all?`<div style="margin:8px 0 2px;font-size:13px"><b>Players</b></div><div style="display:flex;gap:6px;flex-wrap:wrap">${[["","All "+campRevNames(c).length],["in","In "+k.in],["maybe","Maybe "+k.maybe],["out","Out "+k.out]].map(([v,l])=>`<button type="button" class="btn ${campFbFilter===v?"primary":"secondary"}" style="padding:4px 12px;font-size:13px" onclick="campFbSetFilter('${v}')">${l}</button>`).join("")}</div>`:"";
- return `<div class="card noPrint" style="margin:10px 0"><b style="font-size:13.5px">Include on the card</b> <span class="muted" style="font-size:12px">(only you see this)</span>${cb("rating","Overall rating")}${cb("evidence","Attendance and assessment")}${cb("note","My comment")}${cb("decision","Selection decision (In / Maybe / Out)")}<div class="muted" style="font-size:12px">The decision is off by default, so a card can be shared with a player or parent before selections are final.</div>${fl}</div>`;
+ return `<details class="card noPrint" style="margin:10px 0" ${all?"":""}><summary style="cursor:pointer"><b style="font-size:13.5px">Include on the card</b> <span class="muted" style="font-size:12px">(only you see this)</span></summary>${cb("summary","In short (written summary)")}${cb("rating","Overall rating")}${cb("progress","Progress during the camp")}${cb("skills","Skill snapshot")}${cb("goals","Your goals")}${cb("note","My comment")}${cb("decision","Selection decision (In / Maybe / Out)")}<div class="muted" style="font-size:12px">The decision is off by default, so a card can be shared before selections are final. Blocks with no data are left out automatically.</div>${fl}</details>${all?"":""}`;
 }
-function campFbCardHtml(c,n,o){
- let v=campRevOf(c,n),pl=db.players.find(p=>p.name===n&&!p.deletedAt),ev=campEvidenceParts(c,n),sp=campTagSplit(v.tags),rec=v.rec||"",coach=campFbCoach();
+function campFbCardHtml(c,n,o,edit){
+ let v=campRevOf(c,n),pl=db.players.find(p=>p.name===n&&!p.deletedAt),sp=campTagSplit(v.tags),rec=v.rec||"",coach=campFbCoach(),d=campFbData(c,n);
  let ini=n.trim().split(/\s+/).map(x=>x[0]).slice(0,2).join("").toUpperCase(),chip=(t,g)=>`<span class="csChip ${g?"g":"a"}">${esc(t)}</span>`;
- let showR=o.rating&&v.r,showEv=o.evidence&&ev.length,showN=o.note&&v.note,showD=o.decision&&rec;
- let any=showR||showEv||sp.g.length||sp.w.length||showN||showD;
  let dates=esc(fmtDate(c.startDate))+(c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):"");
- return `<div class="fbCard"><div class="fbHead"><div class="rcAv">${esc(ini)}</div><div><b class="fbName">${esc(n)}</b><small>${esc([pl&&pl.role,c.team].filter(Boolean).join(" · "))}</small></div></div>
- ${(showR||showEv)?`<div class="fbSh">Overall</div>${showR?`<div class="rcR"><b>${v.r}.0</b><span class="rcD">${[1,2,3,4,5].map(i=>`<i class="${v.r>=i?"f":""}"></i>`).join("")}</span><span style="color:#51667a;font-size:13px">out of 5</span></div>`:""}${showEv?`<div class="rcE">${ev.map(x=>`<span>${esc(x)}</span>`).join("")}</div>`:""}`:""}
- ${sp.g.length?`<div class="fbSh">What you did well</div><div>${sp.g.map(t=>chip(t,1)).join("")}</div>`:""}
- ${sp.w.length?`<div class="fbSh">What to work on next</div><div>${sp.w.map(t=>chip(t,0)).join("")}</div>`:""}
- ${showN?`<div class="fbSh">Coach's comment</div><div class="rcQ">${esc(v.note)}</div>`:""}
- ${showD?`<div class="fbSh">Next step</div><div class="fbNext ${rec}">${esc(CAMP_FB_NEXT[rec]||"")}</div>`:""}
- ${any?"":`<div class="muted">Nothing is recorded for this player yet. Add a rating, tags or a comment in the Players tab.</div>`}
- <div class="fbFoot">${esc(c.name)} · ${dates}${coach?" · Coach: "+esc(coach):""}</div></div>`;
+ const f1=x=>x.toFixed(1),arrow=(a,b)=>b-a>=0.05?`<span style="color:#16a34a">▲</span>`:a-b>=0.05?`<span style="color:#dc2626">▼</span>`:"=";
+ let any=false,out=[];
+ // in short
+ if(o.summary){let t=campFbSummary(c,n);
+  if(t||edit){any=any||!!t;out.push(`<div class="fbSec${t?"":" noPrint"}"><div class="fbSh">In short</div><div class="fbBox fbShort">${esc(t)}</div>${edit?`<details class="noPrint" style="margin-top:6px"><summary class="muted" style="cursor:pointer;font-size:12.5px">Edit text</summary><textarea rows="4" data-n="${esc(n)}" style="width:100%;margin-top:6px" onchange="campFbSave(this,'${c.id}','sum')">${esc(t)}</textarea><div class="muted" style="font-size:12px">Written from the camp data. <a href="#" onclick="campFbReset(this,'${c.id}','sum');return false">Reset to auto text</a></div></details>`:""}</div>`)}}
+ // overall
+ if(o.rating&&v.r){any=true;out.push(`<div class="fbSh">Overall</div><div class="rcR"><b>${v.r}.0</b><span class="rcD">${[1,2,3,4,5].map(i=>`<i class="${v.r>=i?"f":""}"></i>`).join("")}</span><span style="color:#51667a;font-size:13px">out of 5</span></div>`)}
+ // progress
+ if(o.progress&&(d.avg1!==null||d.att)){any=true;
+  let t1=d.avg1===null?"":d.avg0!==null?`<div class="fbTile"><b>${f1(d.avg0)} → ${f1(d.avg1)} ${arrow(d.avg0,d.avg1)}</b><span>Assessment average</span></div>`:`<div class="fbTile"><b>${f1(d.avg1)}</b><span>Assessment average</span></div>`;
+  let t2=d.att?`<div class="fbTile"><b>${d.att.a} of ${d.att.t}</b><span>Sessions attended</span></div>`:"";
+  out.push(`<div class="fbSh">Progress during the camp</div><div class="fbTiles">${t1}${t2}</div>`)}
+ // skills
+ if(o.skills&&d.skills.length){any=true;
+  out.push(`<div class="fbSh">Skill snapshot</div>${d.skills.map(x=>{let lo=Math.min(x.a,x.b)/5*100,df=Math.abs(x.b-x.a)/5*100,up=x.b>x.a;return `<div class="fbSk"><span class="l">${esc(x.k)}</span><div class="tr"><i style="left:0;width:${x.multi?lo:x.b/5*100}%;background:#cbd5e1"></i>${x.multi&&Math.abs(x.b-x.a)>=0.05?`<i style="left:${lo}%;width:${df}%;background:${up?"#10b981":"#fca5a5"}"></i>`:""}</div><b>${x.multi?`${f1(x.a)} → ${f1(x.b)} ${arrow(x.a,x.b)}`:f1(x.b)}</b></div>`}).join("")}`)}
+ // strengths
+ if(sp.g.length){any=true;out.push(`<div class="fbSh">What you did well</div><div>${sp.g.map(t=>chip(t,1)).join("")}</div>`)}
+ // areas to work on: chips + lines
+ let lines=campFbWorkLines(c,n),hasW=sp.w.length||lines.length;
+ if(hasW||edit){any=any||!!hasW;out.push(`<div class="fbSec${hasW?"":" noPrint"}"><div class="fbSh">Areas to work on</div>${sp.w.length?`<div>${sp.w.map(t=>chip(t,0)).join("")}</div>`:""}<div class="fbWorkBox"><ul class="fbBox fbWork">${lines.map(x=>`<li>${esc(x)}</li>`).join("")}</ul></div>${edit?`<details class="noPrint" style="margin-top:6px"><summary class="muted" style="cursor:pointer;font-size:12.5px">Edit practice lines</summary><textarea rows="4" data-n="${esc(n)}" placeholder="One practice line per row" style="width:100%;margin-top:6px" onchange="campFbSave(this,'${c.id}','work')">${esc(lines.join("\n"))}</textarea><div class="muted" style="font-size:12px">Suggested from the areas above. <a href="#" onclick="campFbReset(this,'${c.id}','work');return false">Reset to suggestions</a></div></details>`:""}</div>`)}
+ // goals
+ if(o.goals&&d.goals.length){any=true;
+  out.push(`<div class="fbSh">Your goals</div>${d.goals.map(({g,m})=>{let st=m?m.state:"",pill=st==="reached"?["Reached","#16a34a"]:st==="track"?["On track","#d97706"]:(st==="behind"||st==="open")?["In progress","#64748b"]:null,val=m&&m.cur!=null?" · "+m.fx(m.cur):"";return `<div class="fbGoal"><span>${esc(g.text)}</span>${pill?`<span class="fbPill" style="background:${pill[1]}">${pill[0]}${val}</span>`:""}</div>`}).join("")}`)}
+ // comment
+ if(o.note&&v.note){any=true;out.push(`<div class="fbSh">Coach's comment</div><div class="rcQ">${esc(v.note)}</div>`)}
+ if(o.decision&&rec){any=true;out.push(`<div class="fbSh">Next step</div><div class="fbNext ${rec}">${esc(CAMP_FB_NEXT[rec]||"")}</div>`)}
+ if(!any)out.push(`<div class="muted" style="margin-top:10px">Nothing is recorded for this player yet. Add a rating, tags or a comment in the Players tab.</div>`);
+ return `<div class="fbCard"><div class="fbHead"><div class="rcAv">${esc(ini)}</div><div><b class="fbName">${esc(n)}</b><small>${esc([pl&&pl.role,c.team].filter(Boolean).join(" · "))}</small></div></div>${out.join("\n")}<div class="fbFoot">${esc(c.name)} · ${dates}${coach?" · Coach: "+esc(coach):""}</div></div>`;
 }
 function campFbText(c,n){
- let o=campFbOpts(),v=campRevOf(c,n),ev=campEvidenceParts(c,n),sp=campTagSplit(v.tags),rec=v.rec||"",coach=campFbCoach();
+ let o=campFbOpts(),v=campRevOf(c,n),sp=campTagSplit(v.tags),rec=v.rec||"",coach=campFbCoach(),sum=o.summary?campFbSummary(c,n):"",lines=campFbWorkLines(c,n);
  let L=["Camp feedback: "+n,c.name+" ("+fmtDate(c.startDate)+(c.endDate&&c.endDate!==c.startDate?" to "+fmtDate(c.endDate):"")+")",""];
+ if(sum)L.push(sum,"");
  if(o.rating&&v.r)L.push("Overall rating: "+v.r+" out of 5");
- if(o.evidence&&ev.length)L.push(ev.join(" · "));
- if(sp.g.length)L.push("","What you did well: "+sp.g.join(", "));
- if(sp.w.length)L.push("","What to work on next: "+sp.w.join(", "));
+ if(sp.g.length)L.push("What you did well: "+sp.g.join(", "));
+ if(sp.w.length)L.push("Areas to work on: "+sp.w.join(", "));
+ if(lines.length)L.push("Practice:",...lines.map(x=>"- "+x));
  if(o.note&&v.note)L.push("","Coach's comment: "+v.note);
  if(o.decision&&rec)L.push("","Next step: "+CAMP_FB_NEXT[rec]);
  if(coach)L.push("","- "+coach);
@@ -10052,14 +10169,14 @@ function campFbAttach(c,all){let sh=document.getElementById("sheet");if(!sh)retu
 function campFeedbackCard(id,name){
  let c=campById(id);if(!c||!name)return;let o=campFbOpts();
  _rptMast={k:"Player feedback"+(c.team?" · "+esc(c.team):""),t:esc(c.name)};_rptRedo=()=>campFeedbackCard(id,name);
- reportShell(esc(name)+" — Feedback",`${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""}`,`<div class="fbWrap">${campFbCardHtml(c,name,o)}</div><div class="noPrint" style="margin-top:4px"><button class="btn secondary" onclick="campFbShare('${c.id}',this.dataset.n)" data-n="${esc(name)}">Share / copy as text</button></div>`);
+ reportShell(esc(name)+" — Feedback",`${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""}`,`<div class="fbWrap">${campFbCardHtml(c,name,o,true)}</div><div class="noPrint" style="margin-top:4px"><button class="btn secondary" onclick="campFbShare('${c.id}',this.dataset.n)" data-n="${esc(name)}">Share / copy as text</button></div>`);
  campFbAttach(c,false);
 }
 function campFeedbackAll(id){
  let c=campById(id);if(!c)return;let o=campFbOpts();
  let order={in:0,maybe:1,out:2,"":3},names=campRevNames(c).filter(n=>!campFbFilter||(campRevOf(c,n).rec||"")===campFbFilter).sort((a,b)=>{let x=campRevOf(c,a),y=campRevOf(c,b);return (order[x.rec||""]-order[y.rec||""])||(y.r-x.r)||a.localeCompare(b)});
  _rptMast={k:"Player feedback cards"+(c.team?" · "+esc(c.team):""),t:esc(c.name)};_rptRedo=()=>campFeedbackAll(id);
- reportShell(esc(c.name)+" — Player Feedback",`${names.length} card${names.length===1?"":"s"} · one per page when printed`,`<div class="fbWrap">${names.map(n=>campFbCardHtml(c,n,o)).join("")||empty("No players.")}</div>`);
+ reportShell(esc(c.name)+" — Player Feedback",`${names.length} card${names.length===1?"":"s"} · one per page when printed`,`<div class="fbWrap">${names.map(n=>campFbCardHtml(c,n,o,false)).join("")||empty("No players.")}</div>`);
  campFbAttach(c,true);
 }
 let campRevFilter="",campRevOpen={};
