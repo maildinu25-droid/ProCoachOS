@@ -296,6 +296,8 @@ p{orphans:3;widows:3}
 .report table.rrt tr.in .rcP{background:#16a34a}.report table.rrt tr.maybe .rcP{background:#d97706}.report table.rrt tr.out .rcP{background:#dc2626}.report table.rrt tr.und .rcP{background:#94a3b8}
 .report .rrScroll{overflow-x:auto}
 @media print{.report .rcGrid.c3{grid-template-columns:1fr 1fr 1fr!important}}
+.maChk{width:20px!important;height:20px!important;min-width:20px;flex:0 0 20px!important;padding:0!important;margin:2px 0 0!important}
+.onlyPrint{display:none}@media print{.onlyPrint{display:block!important}}
 .report .fbCard{border:1px solid #e1e8ef;border-radius:14px;padding:16px 18px;margin:0 0 16px;background:#fff}
 .report .fbHead{display:flex;gap:12px;align-items:center;margin-bottom:6px}.report .fbHead .rcAv{width:46px;height:46px;font-size:16px;background:#dcfce7;color:#166534}.report .fbName{font-size:20px;font-weight:800;display:block;overflow-wrap:anywhere}.report .fbHead small{color:#51667a;font-size:13px}
 .report .fbSh{margin:16px 0 8px;font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:#047857;display:flex;gap:10px;align-items:center}.report .fbSh:after{content:"";flex:1;height:2px;background:#d1fae5}
@@ -1856,6 +1858,7 @@ function dashboard(){
  }).length;
  let workloadCount=workloadFlagPlayerNames().length;
  let thisMonthKey=today().slice(0,7);
+ let openMatchActs=openMatchActions(),overdueMatchActs=openMatchActs.filter(x=>x.a.due&&x.a.due<today()).length;
  let lastMonthDateObj=new Date();lastMonthDateObj.setMonth(lastMonthDateObj.getMonth()-1);
  let lastMonthKey=localISO(lastMonthDateObj).slice(0,7);
  let thisMonthRatings=db.reflections.filter(r=>monthKey(r.date)===thisMonthKey).map(r=>Number(r.rating)).filter(Number.isFinite);
@@ -1966,6 +1969,7 @@ function dashboard(){
  <div class="taskItem"><div class="taskDot ${assessmentToday?"done":""}">${assessmentToday?icon("check",10):""}</div><div class="taskText"><b>Log a player assessment</b><span>${assessmentToday?"Done today":"None logged today"}</span></div></div>
  ${overdueReflections>0?`<div class="taskItem" style="cursor:pointer" onclick="reflectPendingSessions()"><div class="taskDot"></div><div class="taskText"><b>${overdueReflections} item${overdueReflections!==1?"s":""} awaiting reflection</b><span>Past sessions &amp; matches</span></div></div>`:""}
  ${reassessDueCount>0?`<div class="taskItem" style="cursor:pointer" onclick="reassessDuePlayers()"><div class="taskDot"></div><div class="taskText"><b>${reassessDueCount} player${reassessDueCount!==1?"s":""} due for reassessment</b><span>30+ days since last assessment</span></div></div>`:""}
+ ${openMatchActs.length?`<div class="taskItem" style="cursor:pointer" onclick="showOpenMatchActions()"><div class="taskDot"></div><div class="taskText"><b>${openMatchActs.length} open match action${openMatchActs.length!==1?"s":""}</b><span>${overdueMatchActs?overdueMatchActs+" overdue · ":""}Training follow-ups from match reviews</span></div></div>`:""}
  ${workloadCount>0?`<div class="taskItem" style="cursor:pointer" onclick="showWorkloadFlags()"><div class="taskDot"></div><div class="taskText"><b>${workloadCount} player${workloadCount!==1?"s":""} with back-to-back match workload</b><span>Matches on consecutive days recently</span></div></div>`:""}
  ${reflectionTrendPct!==null?`<div class="taskItem"><div class="taskDot done">${icon("check",10)}</div><div class="taskText"><b>Reflection ratings ${reflectionTrendPct>=0?"up":"down"} ${Math.abs(reflectionTrendPct)}%</b><span>Compared to last month</span></div></div>`:""}
  ${(daysSinceBackup!==null&&daysSinceBackup>=7)||(daysSinceBackup===null&&(activeSessions().length||db.players.length))?`<div class="taskItem" style="cursor:pointer" onclick="exportBackup()"><div class="taskDot"></div><div class="taskText"><b>${daysSinceBackup!==null?`${daysSinceBackup} days since your last backup`:"You haven't backed up yet"}</b><span>Tap to export a backup now</span></div></div>`:""}
@@ -2315,14 +2319,16 @@ function focusSuggestions(type,team,playerName){
  if(names.length){let acc={};names.forEach(n=>{let aa=uspByDate(db.assessments.filter(a=>a.player===n));let sk=playerSkillSeries(aa);sk.forEach(x=>{(acc[x.d+"|"+x.name]=acc[x.d+"|"+x.name]||[]).push(x.last)})});
   let low=Object.entries(acc).filter(([k,v])=>v.length>=Math.min(3,names.length)).map(([k,v])=>({k,v:uspMean(v)})).sort((a,b)=>a.v-b.v)[0];
   if(low&&low.v<=5.5){let [d,n]=low.k.split("|");if(["Batting","Bowling","Fielding","Wicketkeeping"].includes(d))out.push({focus:[d],tag:"Specific skill development",why:`Lowest-rated skill: ${n} (${low.v.toFixed(1)}/10).`})}}
+ // open actions from match reviews
+ try{let acts=openMatchActions().filter(x=>{let o=x.a.owner,team0=!o||o==="Team";if(pl)return o===pl.name||(team0&&(!pl.team||x.m.team===pl.team));if(type==="team")return team0&&(!team||x.m.team===team);return false}).slice(0,3).map(x=>({focus:[matchActionFocus(x.a.tag)],tag:x.a.tag?"Specific skill development":"Technical improvement",why:`Open action from the ${fmtDate(x.m.date)} match vs ${x.m.opp||"opposition"}: ${x.a.text}${x.a.due&&x.a.due<today()?" (overdue)":""}`,drills:matchActionDrills(x.a.tag,2).map(d=>d.name),fromAction:true}));out=acts.concat(out)}catch(e){console.warn(e)}
  // match coming
  let nm=db.matches.filter(m=>m.date>=today()&&(!team||!m.team||m.team===team)).sort((a,b)=>a.date.localeCompare(b.date))[0];
  if(nm){let d=Math.round((new Date(nm.date)-new Date(today()))/86400000);if(d<=3)out.push({focus:["Match simulation"],tag:"Match preparation",why:`A match is ${d===0?"today":"in "+d+" day"+(d!==1?"s":"")}.`})}
- let seen=new Set();return out.filter(x=>{let k=x.focus[0];if(seen.has(k))return false;seen.add(k);return true}).slice(0,3).map(x=>({...x,repeat:x.focus[0]===lastFocus}))}
+ let seen=new Set();return out.filter(x=>{let k=x.focus[0];if(seen.has(k))return false;seen.add(k);return true}).slice(0,4).map(x=>({...x,repeat:x.focus[0]===lastFocus}))}
 function sessionSuggestHtml(type,team,playerName){
  let l=[];try{l=focusSuggestions(type,team,playerName)}catch(e){console.warn(e)}
  if(!l.length)return "";
- return `<div class="card"><b>Suggested focus</b> <span class="muted" style="font-size:12px">· from recent matches and assessments</span>${l.map((x,i)=>`<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:5px 0"><span>${esc(x.focus.join(" + "))}${x.repeat?` <span class="muted">(same as your last session)</span>`:""}<div class="muted" style="font-size:13px">${esc(x.why)}</div></div><button type="button" class="btn secondary" style="padding:4px 10px" onclick="sessionApplySuggestion(${i})">Use</button></div>`).join("")}</div>`}
+ return `<div class="card"><b>Suggested focus</b> <span class="muted" style="font-size:12px">· from recent matches and assessments</span>${l.map((x,i)=>`<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:5px 0"><span>${esc(x.focus.join(" + "))}${x.repeat?` <span class="muted">(same as your last session)</span>`:""}<div class="muted" style="font-size:13px">${esc(x.why)}</div>${x.drills&&x.drills.length?`<div class="muted" style="font-size:13px">Drills: ${x.drills.map(esc).join(" · ")}</div>`:""}</div><button type="button" class="btn secondary" style="padding:4px 10px" onclick="sessionApplySuggestion(${i})">Use</button></div>`).join("")}</div>`}
 let _sessSug=[];
 function sessionApplySuggestion(i){
  let x=_sessSug[i];if(!x)return;
@@ -6218,7 +6224,7 @@ function avgRatingObj(obj){if(!obj)return 0;let vals=Object.values(obj).filter(v
 function matchResultOutcome(m){let oc={Won:"Win",Lost:"Loss",Draw:"Draw",Tie:"Draw","No result":"NR"}[m.outcome];if(oc)return oc;let r=String(m.result||"").toLowerCase();if(/\bwin|\bwon\b/.test(r))return"Win";if(/\bloss|\blost\b/.test(r))return"Loss";if(/\bdraw\b/.test(r))return"Draw";if(/no result|abandon/.test(r))return"NR";return"Other"}
 function matches(){
  let list=db.matches.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
- if(matchQuery){let q=matchQuery.toLowerCase();list=list.filter(m=>[m.team,m.opp,m.venue,m.notes,m.actions,m.result,m.teamNotes,m.battingAssessmentNotes,m.bowlingAssessmentNotes].some(v=>String(v||"").toLowerCase().includes(q)))}
+ if(matchQuery){let q=matchQuery.toLowerCase();list=list.filter(m=>[m.team,m.opp,m.venue,m.notes,m.actions,...matchActionItems(m).map(a=>a.text),m.result,m.teamNotes,m.battingAssessmentNotes,m.bowlingAssessmentNotes].some(v=>String(v||"").toLowerCase().includes(q)))}
  if(matchFormatFilter)list=list.filter(m=>m.format===matchFormatFilter);
  if(matchResultFilter)list=list.filter(m=>matchResultOutcome(m)===matchResultFilter);
  document.getElementById("matches").innerHTML=head("Match Centre","Match details, foundation, team & individual reviews, and automatic reports.")+`<div class="toolbar noPrint"><button class="btn primary" onclick="newMatch()">+ New Match</button>${campMenu("mcAct","Actions ▾",[{label:"Print report",icon:"print",fn:"matchReport()"},{label:"Export Excel",icon:"share",fn:"exportExcel()"}])}</div>
@@ -6301,7 +6307,7 @@ function saveScoresBulk(){
 function matchCardHtml(m){
  let linkedReflection=db.reflections.find(r=>r.matchId===m.id);
  let showReflectionStatus=(m.date||"")<=today();
- return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div><b>${esc(m.team||"My Team")} vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.endDate&&m.endDate>m.date?matchDateStr(m):(m.date||""))}${matchDayCount(m)>1?" · "+matchDayCount(m)+" days":""} ${m.venue?"· "+esc(m.venue):""} ${m.format?"· "+esc(m.format):""}</div></div><span class="tag">${esc(matchResultOutcome(m))}</span></div><p>${esc(m.result||"No result recorded")}</p>${m.scoreLine?`<div class="muted"><b>${esc(m.scoreLine)}</b></div>`:""}${scoreSummaryHtml(m)}${!m.scoreLine&&((m.battingReview&&m.battingReview.length)||(m.bowlingReview&&m.bowlingReview.length))?`<div class="muted">${(m.battingReview&&m.battingReview.length)?m.battingReview.length+" batting entries":""}${(m.battingReview&&m.battingReview.length)&&(m.bowlingReview&&m.bowlingReview.length)?" · ":""}${(m.bowlingReview&&m.bowlingReview.length)?m.bowlingReview.length+" bowling entries":""}</div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForMatch('${m.id}')">Reflection pending</span>`}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary" onclick="matchReportView('${m.id}')">Report</button><button class="btn secondary iconBtn" title="Edit" onclick="editMatch('${m.id}')">${icon("edit",17)}</button><button class="btn secondary iconBtn" title="Duplicate" onclick="duplicateMatch('${m.id}')">${icon("copy",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delMatch('${m.id}')">${icon("trash",17)}</button></div></div>`;
+ return `<div class="card"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:flex-start"><div><b>${esc(m.team||"My Team")} vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(m.endDate&&m.endDate>m.date?matchDateStr(m):(m.date||""))}${matchDayCount(m)>1?" · "+matchDayCount(m)+" days":""} ${m.venue?"· "+esc(m.venue):""} ${m.format?"· "+esc(m.format):""}</div></div><span class="tag">${esc(matchResultOutcome(m))}</span></div><p>${esc(m.result||"No result recorded")}</p>${(()=>{let L=matchActionItems(m).filter(a=>a.text),o=L.filter(a=>!a.done).length;return L.length?`<div class="muted" style="font-size:var(--fs-3)">${o?o+" of "+L.length+" training action"+(L.length!==1?"s":"")+" open":"All "+L.length+" training action"+(L.length!==1?"s":"")+" done"}</div>`:""})()}${m.scoreLine?`<div class="muted"><b>${esc(m.scoreLine)}</b></div>`:""}${scoreSummaryHtml(m)}${!m.scoreLine&&((m.battingReview&&m.battingReview.length)||(m.bowlingReview&&m.bowlingReview.length))?`<div class="muted">${(m.battingReview&&m.battingReview.length)?m.battingReview.length+" batting entries":""}${(m.battingReview&&m.battingReview.length)&&(m.bowlingReview&&m.bowlingReview.length)?" · ":""}${(m.bowlingReview&&m.bowlingReview.length)?m.bowlingReview.length+" bowling entries":""}</div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForMatch('${m.id}')">Reflection pending</span>`}</div>`:""}<div class="toolbar" style="margin-top:10px"><button class="btn secondary" onclick="matchReportView('${m.id}')">Report</button><button class="btn secondary iconBtn" title="Edit" onclick="editMatch('${m.id}')">${icon("edit",17)}</button><button class="btn secondary iconBtn" title="Duplicate" onclick="duplicateMatch('${m.id}')">${icon("copy",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delMatch('${m.id}')">${icon("trash",17)}</button></div></div>`;
 }
 
 const DISMISSAL_TYPES=["Not out","Bowled","Caught","Caught behind","Caught and bowled","LBW","Run out","Stumped","Hit wicket","Retired out","Retired hurt","Timed out","Obstructing the field","Handled the ball","Hit the ball twice","Other"];
@@ -6412,6 +6418,49 @@ function updateFormSectionCount(id,suffix){
  let checked=box.querySelectorAll('input[type="checkbox"]:checked').length;
  countEl.textContent=total?`(${checked} ${suffix})`:"";
 }
+/* ===== Match training actions: tagged, owned, dated, linked to drills, dashboard and session planning ===== */
+var matchActionDraft=[];
+function matchActionItems(m){return m&&Array.isArray(m.actionItems)?m.actionItems:[]}
+function openMatchActions(){let out=[];db.matches.forEach(m=>matchActionItems(m).forEach(a=>{if(a&&a.text&&!a.done)out.push({m,a})}));out.sort((x,y)=>(x.a.due||"9999-12-31").localeCompare(y.a.due||"9999-12-31"));return out}
+function matchActionWorkTags(){return CAMP_REV_TAGS.filter(t=>!t[1])}
+function matchActionFocus(tag){let t=CAMP_REV_TAGS.find(x=>x[0]===tag);if(!t)return "Mixed";let g=t[2];if(g==="Batting")return "Batting";if(g==="Bowling")return "Bowling";if(g==="Fielding and keeping")return /keeping/i.test(tag)?"Wicketkeeping":"Fielding";if(g==="Physical")return "Fitness";if(g==="Mind and character")return "Mental skills";return "Mixed"}
+function matchActionDrills(tag,n){
+ if(!tag)return [];let out=[],seen={};
+ db.drills.filter(d=>!d.deletedAt&&drillTagList(d).includes(tag)).forEach(d=>{if(out.length<n&&!seen[d.id]){seen[d.id]=1;out.push({id:d.id,name:d.name})}});
+ BUILTIN_DRILLS.filter(d=>drillTagList(d).includes(tag)).forEach(d=>{if(out.length>=n||seen[d.id])return;let own=db.drills.find(x=>x.fromId===d.id);if(own)return;seen[d.id]=1;out.push({id:d.id,name:d.name})});
+ return out.slice(0,n)}
+function matchActionDrillLinks(tag,n){let L=matchActionDrills(tag,n||3);return L.length?`<div class="muted noPrint" style="font-size:var(--fs-3);margin-top:4px">Drills: ${L.map(d=>`<a href="#" style="color:var(--g)" onclick="event.preventDefault();viewDrill('${esc(d.id)}')">${esc(d.name)}</a>`).join(" · ")}</div><div class="onlyPrint muted" style="font-size:12px">Drills: ${L.map(d=>esc(d.name)).join(", ")}</div>`:""}
+function matchActionMeta(a,withDue){let parts=[];if(a.tag)parts.push(esc(a.tag));parts.push(esc(a.owner&&a.owner!=="Team"?a.owner:"Whole team"));if(a.due){let late=!a.done&&a.due<today();parts.push(`<span style="${late?"color:var(--red);font-weight:700":""}">${late?"Overdue · ":"Due "}${esc(fmtDate(a.due))}</span>`)}if(a.done&&a.doneAt)parts.push("Done "+esc(fmtDate(a.doneAt)));return parts.join(" · ")}
+function newMatchActionId(){return "ma_"+Date.now().toString(36)+Math.random().toString(36).slice(2,6)}
+function addMatchAction(){let d=new Date();d.setDate(d.getDate()+7);matchActionDraft.push({id:newMatchActionId(),text:"",tag:"",owner:"Team",due:localISO(d),done:false});renderMatchActions();let r=document.querySelectorAll("#matchActionRows input[data-f=text]");if(r.length)r[r.length-1].focus()}
+function delMatchAction(i){matchActionDraft.splice(i,1);renderMatchActions()}
+function updMatchAction(i,f,v){if(!matchActionDraft[i])return;matchActionDraft[i][f]=v;if(f==="done"){if(v)matchActionDraft[i].doneAt=today();else delete matchActionDraft[i].doneAt}if(f==="tag")renderMatchActions()}
+function renderMatchActions(){
+ let host=document.getElementById("matchActionRows");if(!host)return;
+ let team=matchFormTeam(),names=matchRosterFor(team,[],false).map(p=>p.name);
+ let groups=CAMP_TAG_GROUPS.map(g=>{let L=matchActionWorkTags().filter(t=>t[2]===g);return L.length?`<optgroup label="${esc(g)}">${L.map(t=>`<option value="${esc(t[0])}">${esc(t[0])}</option>`).join("")}</optgroup>`:""}).join("");
+ if(!matchActionDraft.length){host.innerHTML=`<div class="muted" style="font-size:var(--fs-3);margin-bottom:8px">No actions yet. Add one for each thing the team or a player should work on after this match.</div>`;return}
+ host.innerHTML=matchActionDraft.map((a,i)=>{let ownerOpts=`<option value="Team">Whole team</option>`+[...new Set([...(a.owner&&a.owner!=="Team"?[a.owner]:[]),...names])].map(n=>`<option value="${esc(n)}" ${a.owner===n?"selected":""}>${esc(n)}</option>`).join("");
+  return `<div class="item" style="display:grid;gap:8px;margin-bottom:8px"><input data-f="text" placeholder="e.g. Practise playing the short ball" value="${esc(a.text||"")}" oninput="updMatchAction(${i},'text',this.value)">
+  <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:center"><select style="flex:1 1 150px;min-width:0" onchange="updMatchAction(${i},'tag',this.value)"><option value="">Skill to work on (optional)</option>${groups.replace(`value="${esc(a.tag||"__")}"`,`value="${esc(a.tag||"__")}" selected`)}</select>
+  <select style="flex:1 1 130px;min-width:0" onchange="updMatchAction(${i},'owner',this.value)">${ownerOpts}</select>
+  <input type="date" style="flex:1 1 130px;min-width:0" value="${esc(a.due||"")}" onchange="updMatchAction(${i},'due',this.value)">
+  <label style="display:flex;gap:5px;align-items:center;font-weight:400"><input type="checkbox" class="maChk" ${a.done?"checked":""} onchange="updMatchAction(${i},'done',this.checked)"> Done</label>
+  <button type="button" class="btn danger" style="flex:0 0 auto;padding:6px 10px" onclick="delMatchAction(${i})" aria-label="Remove action">×</button></div>${matchActionDrillLinks(a.tag,3)}</div>`}).join("")}
+function toggleMatchAction(mid,aid,ctx){
+ let m=db.matches.find(x=>x.id===mid);if(!m)return;let a=matchActionItems(m).find(x=>x.id===aid);if(!a)return;
+ a.done=!a.done;if(a.done)a.doneAt=today();else delete a.doneAt;
+ save();if(ctx==="dash")showOpenMatchActions();else if(ctx==="report")matchReportView(mid)}
+function showOpenMatchActions(){
+ let L=openMatchActions(),t=today();
+ let row=x=>`<div class="item" style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" class="maChk" onchange="toggleMatchAction('${x.m.id}','${x.a.id}','dash')"><div style="min-width:0;flex:1;cursor:pointer" onclick="closeM();matchReportView('${x.m.id}')"><b>${esc(x.a.text)}</b><div class="muted" style="font-size:var(--fs-3)">${matchActionMeta(x.a)}</div><div class="muted" style="font-size:var(--fs-3)">${esc(x.m.team||"Team")} vs ${esc(x.m.opp||"Opposition")} · ${esc(matchDateStr(x.m))}</div></div></div>`;
+ let late=L.filter(x=>x.a.due&&x.a.due<t),rest=L.filter(x=>!(x.a.due&&x.a.due<t));
+ modal(`<div class="sheetHead"><h2>Open match actions</h2><button class="x" onclick="closeM()">×</button></div><div class="muted" style="margin-bottom:10px">Tick an action when it has been worked on. Tap its text to open the match report.</div>${late.length?`<h3 style="color:var(--red);margin:10px 0 6px">Overdue (${late.length})</h3><div class="list">${late.map(row).join("")}</div>`:""}${rest.length?`<h3 style="margin:14px 0 6px">${late.length?"Upcoming":"Open"} (${rest.length})</h3><div class="list">${rest.map(row).join("")}</div>`:""}${L.length?"":empty("No open match actions. Add them under Key Learnings & Training Actions in a match.")}`)}
+function matchActionsReportHtml(m){
+ let L=matchActionItems(m).filter(a=>a.text);
+ let list=L.length?`<div>${L.map(a=>`<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #e2e8e4"><input type="checkbox" class="maChk" ${a.done?"checked":""} onchange="toggleMatchAction('${m.id}','${a.id}','report')"><div style="min-width:0;flex:1"><div style="${a.done?"text-decoration:line-through;opacity:.65":"font-weight:600"}">${esc(a.text)}</div><div class="muted" style="font-size:var(--fs-3)">${matchActionMeta(a)}</div>${a.done?"":matchActionDrillLinks(a.tag,3)}</div></div>`).join("")}</div>`:"";
+ let notes=m.actions?`<p style="${L.length?"margin-top:10px":""}">${L.length?`<b>Notes:</b> `:""}${esc(m.actions)}</p>`:"";
+ return `<div class="card">${list}${notes}${!list&&!notes?"<p>—</p>":""}</div>`}
 var matchXiShowAll=false;
 function MULTI_DAY_FMT(f){return /multi|test/i.test(f||"")}
 function matchDateStr(m){if(!m)return "";let a=fmtDate(m.date||""),b=m.endDate&&m.endDate>(m.date||"")?fmtDate(m.endDate):"";return b?a+" to "+b:a}
@@ -6422,7 +6471,7 @@ function matchFormatChanged(f){let e=document.getElementById("matchEndDate"),st=
 function matchFormTeam(){let sel=document.getElementById("matchTeamSelect");if(!sel)return "";if(sel.value==="__custom__"){let c=document.querySelector('#matchForm input[name="teamCustom"]');return c?c.value.trim():""}return sel.value}
 function matchRosterFor(team,keep,showAll){let all=activePlayers();if(showAll||!team)return all;let t=all.filter(p=>p.team===team||(keep||[]).includes(p.name));return t.some(p=>p.team===team)?t:all}
 function matchXiListHtml(team,keep,showAll){return matchRosterFor(team,keep,showAll).map(p=>`<label style="${p.available==="no"?"opacity:.55":""}"><input type="checkbox" name="playingXI" value="${esc(p.name)}" onchange="renderBattingRows();renderBowlingRows()" ${(keep||[]).includes(p.name)?"checked":""}> ${esc(p.name)}${p.available==="no"?` <span class="muted">(unavailable)</span>`:""}${p.team&&p.team!==team?` <span class="muted">(${esc(p.team)})</span>`:""}</label>`).join("")}
-function refreshMatchXI(){let box=document.getElementById("matchXiList");if(!box)return;let all=document.getElementById("matchXiAll");matchXiShowAll=!!(all&&all.checked);let keep=[...document.querySelectorAll('input[name="playingXI"]:checked')].map(c=>c.value);let team=matchFormTeam();box.innerHTML=matchXiListHtml(team,keep,matchXiShowAll);let note=document.getElementById("matchXiNote"),cnt=activePlayers().filter(p=>p.team===team).length;if(note)note.textContent=matchXiShowAll||!team?"Showing the full roster.":cnt?`Showing ${team} (${cnt} players). Tick Show all players to pick someone from another squad.`:`No players are assigned to "${team}", so the full roster is shown.`;renderBattingRows();renderBowlingRows()}
+function refreshMatchXI(){let box=document.getElementById("matchXiList");if(!box)return;let all=document.getElementById("matchXiAll");matchXiShowAll=!!(all&&all.checked);let keep=[...document.querySelectorAll('input[name="playingXI"]:checked')].map(c=>c.value);let team=matchFormTeam();box.innerHTML=matchXiListHtml(team,keep,matchXiShowAll);let note=document.getElementById("matchXiNote"),cnt=activePlayers().filter(p=>p.team===team).length;if(note)note.textContent=matchXiShowAll||!team?"Showing the full roster.":cnt?`Showing ${team} (${cnt} players). Tick Show all players to pick someone from another squad.`:`No players are assigned to "${team}", so the full roster is shown.`;renderBattingRows();renderBowlingRows();renderMatchActions()}
 function matchFormHtml(m,mode){m=m||{};return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Match":"New Match"}</h2><button class="x" onclick="closeM()">×</button></div>
 <form id="matchForm" onsubmit="saveMatch(event)">
 ${matchSectionHead("details","Match Details",true)}
@@ -6498,20 +6547,24 @@ ${FIELDING_METRICS.map((metric,i)=>sliderRow(metric,`fieldRating_${i}`,(m.fieldi
 <label class="full">Fielding notes<textarea name="notes">${esc(m.notes||"")}</textarea></label>
 </div>
 </div>
-${matchSectionHead("learnings","Key Learnings & Training Actions",false)}
-<div id="matchSec-learnings" style="display:none;margin-top:10px">
-<div class="formgrid"><label class="full">Action items for training<textarea name="actions">${esc(m.actions||"")}</textarea></label></div>
+${matchSectionHead("learnings","Key Learnings & Training Actions",(m.actionItems||[]).length>0)}
+<div id="matchSec-learnings" style="${(m.actionItems||[]).length?"":"display:none;"}margin-top:10px">
+<div class="muted" style="font-size:var(--fs-3);margin-bottom:8px">Each action can be linked to a skill to work on, given an owner and a due date. Open actions show on your dashboard, suggest drills, and feed the Suggested focus when you plan a session.</div>
+<div id="matchActionRows"></div>
+<button type="button" class="btn secondary" style="margin-bottom:12px" onclick="addMatchAction()">+ Add action</button>
+<div class="formgrid"><label class="full">Other training notes<textarea name="actions">${esc(m.actions||"")}</textarea></label></div>
 </div>
 <button class="btn primary" style="margin-top:15px">Save Match</button>
 </form>`}
 
 function openMatchForm(existing,mode){
  matchXiShowAll=false;
+ matchActionDraft=existing&&Array.isArray(existing.actionItems)?JSON.parse(JSON.stringify(existing.actionItems)):[];
  matchDraft={batting:existing&&existing.battingReview?JSON.parse(JSON.stringify(existing.battingReview)):[],bowling:existing&&existing.bowlingReview?JSON.parse(JSON.stringify(existing.bowlingReview)):[],fielding:existing&&existing.fieldingReview?JSON.parse(JSON.stringify(existing.fieldingReview)):[]};
  battingNotesOpen=new WeakSet();bowlingNotesOpen=new WeakSet();
  editingMatchId=mode==="edit"?existing.id:null;
  modal(matchFormHtml(existing,mode));
- renderBattingRows();renderBowlingRows();renderFieldingRows();refreshMatchXI();
+ renderBattingRows();renderBowlingRows();renderFieldingRows();refreshMatchXI();renderMatchActions();
 }
 function newMatch(){openMatchForm(null,"new")}
 function logMatchFromFixture(tournamentId,fixtureId){
@@ -6714,7 +6767,7 @@ function copyLastPlayingXI(){
  renderBattingRows();renderBowlingRows();
 }
 function editMatch(id){let m=db.matches.find(x=>x.id===id);if(!m)return;openMatchForm(m,"edit")}
-function duplicateMatch(id){let src=db.matches.find(x=>x.id===id);if(!src)return;let m=JSON.parse(JSON.stringify(src));delete m.id;let span=src.endDate&&src.date?Math.round((new Date(src.endDate)-new Date(src.date))/86400000):0;m.date=today();if(span){let d=new Date(m.date);d.setDate(d.getDate()+span);m.endDate=d.toISOString().slice(0,10)}else delete m.endDate;openMatchForm(m,"duplicate")}
+function duplicateMatch(id){let src=db.matches.find(x=>x.id===id);if(!src)return;let m=JSON.parse(JSON.stringify(src));delete m.id;let span=src.endDate&&src.date?Math.round((new Date(src.endDate)-new Date(src.date))/86400000):0;m.date=today();if(span){let d=new Date(m.date);d.setDate(d.getDate()+span);m.endDate=d.toISOString().slice(0,10)}else delete m.endDate;delete m.actionItems;openMatchForm(m,"duplicate")}
 function toggleMatchTeamCustom(val){
  let wrap=document.getElementById("matchTeamCustomWrap");
  if(wrap)wrap.style.display=val==="__custom__"?"":"none";
@@ -6732,6 +6785,7 @@ function saveMatch(e){
  m.fieldingReview=(matchDraft.fielding||[]).filter(r=>r.name&&String(r.name).trim());
  if(m.fieldingReview.length){let S=fieldSums(m.fieldingReview);m.taken=S.taken;m.missed=S.missed;m.runouts=S.runouts;m.stumpings=S.stumpings;m.misfields=S.misfields}
  m.playingXI=fd.getAll("playingXI");
+ m.actionItems=(matchActionDraft||[]).filter(a=>a&&String(a.text||"").trim()).map(a=>({...a,text:String(a.text).trim()}));if(!m.actionItems.length)delete m.actionItems;
  if(m.endDate&&m.endDate<m.date){alert("The end date cannot be before the start date.");return}
  if(!m.endDate||m.endDate===m.date)delete m.endDate;
  if(!String(m.result||"").trim()&&m.outcome)m.result=m.outcome==="Won"?"Won":m.outcome==="Lost"?"Lost":m.outcome;
@@ -6783,7 +6837,7 @@ function matchReportView(id){
  ${m.scorecardText&&!m.scorerInnings?`<h2>Full Scorecard</h2><div class="card"><pre style="white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit;font-size:var(--fs-2);line-height:1.5">${esc(m.scorecardText)}</pre></div>`:""}
  <h2>Fielding Review</h2><div class="card">${(m.taken||m.missed||m.runouts||m.misfields||m.stumpings)?`<p>Catches taken ${esc(m.taken||0)} · Dropped ${esc(m.missed||0)} · Run outs ${esc(m.runouts||0)} · Stumpings ${esc(m.stumpings||0)} · Misfields ${esc(m.misfields||0)}</p>`:""}${(m.fieldingReview||[]).length?`<table class="reportTable"><tr><th>Player</th><th>Catches</th><th>Dropped</th><th>Run outs</th><th>Stumpings</th><th>Misfields</th></tr>${m.fieldingReview.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.catches||"-")}</td><td>${esc(r.drops||"-")}</td><td>${esc(r.runouts||"-")}</td><td>${esc(r.stumpings||"-")}</td><td>${esc(r.misfields||"-")}</td></tr>`).join("")}</table>`:""}${m.fieldingRatings?`<b style="display:block;margin:10px 0 2px">Fielding Assessment · ${avgRatingObj(m.fieldingRatings).toFixed(1)}/10 avg</b>${metricRows(m.fieldingRatings)}`:""}<p style="margin-top:8px">${esc(m.notes||"—")}</p></div>
  <h2>Team Review</h2><div class="card"><p><b>Rating:</b> ${esc(m.teamRating||"—")}/10</p><p>${esc(m.teamNotes||"—")}</p></div>
- <h2>Key Learnings &amp; Training Actions</h2><div class="card"><p>${esc(m.actions||"—")}</p></div>`;
+ <h2>Key Learnings &amp; Training Actions</h2>${matchActionsReportHtml(m)}`;
  reportShell(`${esc(m.team||"Team")} vs ${esc(m.opp||"Opposition")}`,`${esc(matchDateStr(m))}${matchDayCount(m)>1?" ("+matchDayCount(m)+" days)":""} · Automatic Match Report`,body);
 }
 /* ===== End Match Centre ===== */
@@ -8400,7 +8454,7 @@ function buildMonthlyReport(){
   let rows=[["Sessions",rptArrow(ps.length,ss.length,true,x=>x.toFixed(0))],["Hours",rptArrow(ph,hrs,true)],["Assessments",rptArrow(pa.length,aa.length,true,x=>x.toFixed(0))],["Matches",rptArrow(pm.length,mm.length,true,x=>x.toFixed(0))],["Win rate",rptArrow(wr(pm),wr(mm),true,x=>Math.round(x),"%")]].filter(x=>x[1]);
   let extra=(ps.length||pa.length||pm.length)&&rows.length?`<div class="muted" style="margin-top:10px">Compared with ${esc(fmtMonthKey(pk))}</div>${rows.map(x=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0"><span>${x[0]}</span><span>${x[1]}</span></div>`).join("")}`:"";
   let o={label:"Monthly Coaching Report",period:fmtMonthKey(mk),matches:mm,sessions:ss,extra};setReportExtras(reportCoverHtml(o),reportNextHtml(o))}
- reportShell("Monthly Coaching Report",fmtMonthKey(mk),`<div class="grid g4"><div class="card stat"><span>Sessions</span><b>${ss.length}</b></div><div class="card stat"><span>Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Assessments</span><b>${aa.length}</b></div><div class="card stat"><span>Reflections</span><b>${rr.length}</b></div></div>${mm.length?`<h2>Match Performance</h2>${matchPerfHtml(mm)}${trainingResultsHtml(ss,mm)}`:""}<h2>Sessions</h2>${ss.length?ss.map(s=>`<div class="card"><b>${esc(fmtDate(s.date))} · ${esc(s.title||sessionLabel(s))}</b> <span class="tag">${esc(sessionTypeLabel(s.sessionType))}</span>${sessFocusHtml(s)}<p>${esc(s.objectives||"")}</p></div>`).join(""):empty("No sessions in this month.")}<h2>Assessments</h2>${aa.length?aa.map(a=>`<div class="card"><b>${esc(a.player)} · ${assessmentAvg(a)}/10</b><p>${esc(a.priority||"")}</p></div>`).join(""):empty("No assessments in this month.")}<h2>Match actions</h2>${mm.filter(m=>m.actions||m.notes).length?mm.filter(m=>m.actions||m.notes).map(m=>`<div class="card"><b>${esc(m.team)} vs ${esc(m.opp)}</b><p>${esc(m.actions||m.notes||"")}</p></div>`).join(""):empty("No match notes in this month.")}`)}
+ reportShell("Monthly Coaching Report",fmtMonthKey(mk),`<div class="grid g4"><div class="card stat"><span>Sessions</span><b>${ss.length}</b></div><div class="card stat"><span>Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Assessments</span><b>${aa.length}</b></div><div class="card stat"><span>Reflections</span><b>${rr.length}</b></div></div>${mm.length?`<h2>Match Performance</h2>${matchPerfHtml(mm)}${trainingResultsHtml(ss,mm)}`:""}<h2>Sessions</h2>${ss.length?ss.map(s=>`<div class="card"><b>${esc(fmtDate(s.date))} · ${esc(s.title||sessionLabel(s))}</b> <span class="tag">${esc(sessionTypeLabel(s.sessionType))}</span>${sessFocusHtml(s)}<p>${esc(s.objectives||"")}</p></div>`).join(""):empty("No sessions in this month.")}<h2>Assessments</h2>${aa.length?aa.map(a=>`<div class="card"><b>${esc(a.player)} · ${assessmentAvg(a)}/10</b><p>${esc(a.priority||"")}</p></div>`).join(""):empty("No assessments in this month.")}<h2>Match actions</h2>${mm.filter(m=>m.actions||m.notes||matchActionItems(m).length).length?mm.filter(m=>m.actions||m.notes||matchActionItems(m).length).map(m=>`<div class="card"><b>${esc(m.team)} vs ${esc(m.opp)}</b><p>${esc(m.actions||m.notes||"")}</p></div>`).join(""):empty("No match notes in this month.")}`)}
 function playerReport(){
  if(!activePlayers().length){alert("Add a player first.");return}
  modal(`<div class="sheetHead"><h2>Player Development Report</h2><button class="x" onclick="closeM()">×</button></div>
@@ -8641,7 +8695,7 @@ function exportExcel(){
     fieldingRating:m.rating,
     fieldingAssessmentDetail:Object.entries(m.fieldingRatings||{}).map(([k,v])=>`${k}:${v}`).join('; '),
     taken:m.taken,missed:m.missed,runouts:m.runouts,misfields:m.misfields,
-    notes:m.notes,actions:m.actions
+    notes:m.notes,actions:m.actions,actionItems:matchActionItems(m).map(a=>(a.done?"[x] ":"[ ] ")+a.text+(a.tag?" ("+a.tag+")":"")+(a.owner&&a.owner!=="Team"?" - "+a.owner:"")+(a.due?" - due "+a.due:"")).join("; ")
   })),
   Drills:db.drills.map(d=>({
     name:d.name,category:d.cat,players:d.players,duration:d.duration,equipment:d.equipment,
@@ -9543,7 +9597,7 @@ function globalSearchResultsHtml(){
  let playerHits=db.players.filter(p=>[p.name,p.team,p.group,p.role,p.strengths,p.areas,p.focus,p.notes].some(hit));
  let drillHits=db.drills.filter(d=>[d.name,d.cat,d.equipment,d.points,d.progressions,d.regressions].some(hit));
  let assessmentHits=db.assessments.filter(a=>[a.player,a.priority,a.comments,...(a.disciplines||[])].some(hit));
- let matchHits=db.matches.filter(m=>[m.team,m.opp,m.venue,m.result,m.conditions,m.teamNotes,m.notes,m.actions,m.battingAssessmentNotes,m.bowlingAssessmentNotes,...(m.battingReview||[]).map(r=>r.name),...(m.bowlingReview||[]).map(r=>r.name)].some(hit));
+ let matchHits=db.matches.filter(m=>[m.team,m.opp,m.venue,m.result,m.conditions,m.teamNotes,m.notes,m.actions,...matchActionItems(m).map(a=>a.text),m.battingAssessmentNotes,m.bowlingAssessmentNotes,...(m.battingReview||[]).map(r=>r.name),...(m.bowlingReview||[]).map(r=>r.name)].some(hit));
  let eventHits=db.events.filter(e=>[e.title,e.notes,e.type].some(hit));
  let teamHits=db.teams.filter(t=>[t.name,t.category,t.notes].some(hit));
  let tournamentHits=db.tournaments.filter(t=>[t.name,t.notes].some(hit));
