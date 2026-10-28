@@ -2143,7 +2143,8 @@ function goalOpenFor(p,metric){return (p.goals||[]).find(g=>!g.achieved&&g.metri
 function goalSkillName(metric){return String(metric).split("|").slice(-1)[0]}
 function goalSourceLabel(g){if(g.source==="camp"){let c=g.campId&&db.camps.find(x=>x.id===g.campId);return "From camp review"+(c?" · "+c.name:"")}return g.source==="assessment"?"From assessment":""}
 function goalDefaultDate(){let t=today(),n=(db.camps||[]).filter(c=>c.startDate>t&&!c.deletedAt).sort((a,b)=>a.startDate.localeCompare(b.startDate))[0];if(n)return{d:n.startDate,why:"Next camp date"};return{d:new Date(new Date(t+"T00:00:00Z").getTime()+56*86400000).toISOString().slice(0,10),why:"8 weeks from today"}}
-function goalDialogFromBtn(b){_goalBackAid=b.dataset.a||"";goalDialog(b.dataset.p,b.dataset.m,b.dataset.s,b.dataset.c,b.dataset.b)}
+let _goalBackSq=null;
+function goalDialogFromBtn(b){_goalBackAid=b.dataset.a||"";_goalBackSq=b.dataset.q?b.dataset.m.split("|"):null;goalDialog(b.dataset.p,b.dataset.m,b.dataset.s,b.dataset.c,b.dataset.b)}
 function goalDialog(pid,metric,src,campId,baseOver){
  let p=db.players.find(x=>x.id===pid);if(!p)return;
  let sk=goalSkillName(metric),d=metric.split("|")[1],base=(baseOver!==undefined&&baseOver!==""&&Number.isFinite(+baseOver))?+baseOver:goalValue(p,metric),tg=goalTargetSuggest(base),dd=goalDefaultDate();
@@ -2169,6 +2170,7 @@ function goalDialogSave(e,pid,metric,src,campId){
  save();closeM();
  if(src==="camp")campRevRefreshAll();
  if(src==="assessment"&&_goalBackAid){let a=_goalBackAid;_goalBackAid="";goalAssessmentPicker(a)}
+ else if(src==="assessment"&&_goalBackSq){let m=_goalBackSq;_goalBackSq=null;sqDrill(m[1],m[2])}
 }
 function goalFormMetric(sel,pid){
  let f=sel.closest("form"),t=f.querySelector('[name="target"]'),h=f.querySelector(".goalHint"),p=db.players.find(x=>x.id===pid);if(!t||!p)return;
@@ -10089,13 +10091,82 @@ function campSelBarHtml(k,cls){
  return `<div class="${cls?"rbar":"csBar"}">${seg.map(x=>`<i style="width:${x[0]/n*100}%;background:${x[1]}"></i>`).join("")}</div><div class="${cls?"rleg":"csLeg"}">${leg.map(x=>`<span><i class="${cls?"rdot":"csDot"}" style="background:${x[2]}"></i><b>${x[1]}</b> ${x[0]}</span>`).join("")}</div>`;
 }
 function campRevAvg(c){let r=campRevNames(c).map(n=>campRevOf(c,n).r).filter(x=>x>0);return r.length?r.reduce((a,b)=>a+b,0)/r.length:null}
+
+/* squad strengths */
+const SQ_MIN=3,SQ_LOW=5;let _sq={mode:"team",team:"",cid:"",disc:"",since:30};
+function sqVal(name,d,k,from,upTo){
+ let idx=allSkillsFor(d).indexOf(k);if(idx<0)return null;let v=null,best="";
+ db.assessments.forEach(a=>{if(a.player!==name)return;let dt=String(a.date||"");if((from&&dt<from)||(upTo&&dt>upTo))return;if(!assessmentDisciplines(a).includes(d))return;let r=a.ratings&&a.ratings[d];if(!Array.isArray(r)||(d==="Bowling"&&r.length===10))return;let x=Number(r[idx]);if(x>0&&dt>=best){best=dt;v=x}});
+ return v}
+function sqNames(){
+ if(_sq.mode==="camp"){let c=campById(_sq.cid);return c?campRevNames(c):[]}
+ return activePlayers().filter(p=>p.team===_sq.team&&!isReleased(p)).map(p=>p.name)}
+function sqWindow(){
+ let t=today(),day=n=>new Date(new Date(t+"T00:00:00Z").getTime()-n*86400000).toISOString().slice(0,10);
+ if(_sq.mode==="camp"){let c=campById(_sq.cid);if(!c)return{from:"",up:t,base:""};let st=c.startDate,pre=new Date(new Date(st+"T00:00:00Z").getTime()-86400000).toISOString().slice(0,10);return{from:st,up:c.endDate||st,base:pre}}
+ return{from:"",up:t,base:_sq.since?day(_sq.since):""}}
+function sqData(names,w){
+ let rows=[],assessed=new Set();
+ Object.keys(skillSets).forEach(d=>{allSkillsFor(d).forEach(k=>{
+  let cur=[],dl=[];
+  names.forEach(n=>{let v=sqVal(n,d,k,w.from,w.up);if(v==null)return;cur.push({n,v});assessed.add(n);if(w.base){let o=sqVal(n,d,k,"",w.base);if(o!=null)dl.push(v-o)}});
+  if(cur.length<SQ_MIN)return;
+  rows.push({d,k,n:cur.length,avg:cur.reduce((a,x)=>a+x.v,0)/cur.length,low:cur.filter(x=>x.v<SQ_LOW).length,delta:dl.length>=SQ_MIN?dl.reduce((a,x)=>a+x,0)/dl.length:null,rows:cur})})});
+ return{skills:rows,assessed:assessed.size,total:names.length}}
+function sqArrow(d){if(d==null)return "";let c=d>=0.05?"#34d399":d<=-0.05?"#f87171":"#94a3b8";return `<span style="font-size:11.5px;color:${c}">${d>=0.05?"▲":d<=-0.05?"▼":"="} ${Math.abs(d).toFixed(1)}</span>`}
+function sqLbl(x,all){return esc(x.k)+(all.filter(y=>y.k===x.k).length>1?` <span class="muted" style="font-size:11px">${esc(x.d)}</span>`:"")}
+function sqTop(sk,n){let a=sk.slice().sort((x,y)=>x.avg-y.avg);return{weak:a.slice(0,n),strong:a.slice(-n).reverse()}}
+function squadStrengths(team){_sq={mode:"team",team,cid:"",disc:"",since:_sq.since||30};sqRender()}
+function squadStrengthsCamp(id){let c=campById(id);if(!c)return;_sq={mode:"camp",team:c.team||"",cid:id,disc:"",since:30};sqRender()}
+function sqSetDisc(d){_sq.disc=d;sqRender()}
+function sqSetSince(v){_sq.since=+v;sqRender()}
+function sqBack(){if(_sq.mode==="team"&&_sq.team)teamOverview(_sq.team);else closeM()}
+function sqTitle(){if(_sq.mode==="camp"){let c=campById(_sq.cid);return (c?c.name:"Camp")}return _sq.team||"Squad"}
+function sqRender(){
+ let names=sqNames(),w=sqWindow(),D=sqData(names,w),discs=Object.keys(skillSets).filter(d=>D.skills.some(x=>x.d===d));
+ if(!_sq.disc||!discs.includes(_sq.disc))_sq.disc=discs[0]||"";
+ let head=`<div class="sheetHead"><h2>Squad strengths</h2><button class="x" onclick="closeM()">×</button></div><div class="muted" style="margin-bottom:8px">${esc(sqTitle())} · ${_sq.mode==="camp"?"assessments during the camp":"latest assessment per player"} · ${D.assessed} of ${D.total} players assessed</div>`;
+ if(D.assessed<SQ_MIN||!D.skills.length){modal(head+`<div class="card muted">Squad strengths needs assessments for at least ${SQ_MIN} players${_sq.mode==="camp"?" during the camp dates":""}. Add assessments and this fills in.</div><button type="button" class="btn secondary full" style="margin-top:12px" onclick="sqBack()">${_sq.mode==="team"?"Back":"Close"}</button>`);return}
+ let tp=sqTop(D.skills,3),li=x=>`<b>${sqLbl(x,D.skills)}</b> ${x.avg.toFixed(1)}`;
+ let list=D.skills.filter(x=>x.d===_sq.disc).sort((a,b)=>a.avg-b.avg);
+ let sinceCtl=_sq.mode==="camp"?`<span class="muted" style="margin-left:auto;font-size:12px">Since camp start</span>`:`<select onchange="sqSetSince(this.value)" style="margin-left:auto;width:auto;font-size:12px;padding:3px 6px">${[[30,"Since 30 days ago"],[60,"Since 60 days ago"],[90,"Since 90 days ago"],[0,"No comparison"]].map(([v,l])=>`<option value="${v}" ${_sq.since===v?"selected":""}>${l}</option>`).join("")}</select>`;
+ modal(head+`<div class="card" style="margin:0 0 10px;padding:10px 12px"><div style="display:flex;gap:10px"><div style="flex:1"><div class="csK" style="color:#34d399">Strongest</div><div style="font-size:13.5px;line-height:1.5">${tp.strong.map(li).join("<br>")}</div></div><div style="flex:1"><div class="csK" style="color:#fbbf24">Needs work</div><div style="font-size:13.5px;line-height:1.5">${tp.weak.map(li).join("<br>")}</div></div></div></div>
+ <div style="display:flex;gap:6px;margin-bottom:8px;align-items:center;flex-wrap:wrap">${discs.map(d=>`<button type="button" class="csChip ${d===_sq.disc?"g":""}" onclick="sqSetDisc('${d}')" style="margin:0;border:0;cursor:pointer;font-family:inherit;${d===_sq.disc?"":"background:#33415555;color:#94a3b8"}">${esc(d)}</button>`).join("")}${sinceCtl}</div>
+ <div class="card" style="margin:0;padding:2px 12px">${list.map(x=>`<div data-d="${esc(x.d)}" data-k="${esc(x.k)}" onclick="sqDrillBtn(this)" style="padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer"><div style="display:flex;justify-content:space-between;font-size:13.5px"><b>${esc(x.k)}</b><span><b>${x.avg.toFixed(1)}</b> ${sqArrow(x.delta)}</span></div><div style="display:flex;align-items:center;gap:8px;margin-top:5px"><div style="flex:1;height:8px;border-radius:5px;background:#33415566;overflow:hidden"><i style="display:block;height:100%;width:${x.avg*10}%;background:${x.avg<6?"#f59e0b":"#10b981"}"></i></div><span class="muted" style="font-size:11.5px;width:64px;text-align:right;white-space:nowrap">${x.low} of ${x.n} low</span></div></div>`).join("")}</div>
+ <div class="muted" style="font-size:12px;margin:8px 2px">Tap a skill to see each player and set goals. Low means below ${SQ_LOW}. Players without an assessment are left out.</div>
+ <div style="display:flex;gap:8px;margin-top:10px"><button type="button" class="btn secondary" onclick="sqReport()">Print / PDF</button><button type="button" class="btn secondary" onclick="sqBack()">${_sq.mode==="team"?"Back":"Close"}</button></div>`);
+}
+function sqDrillBtn(el){sqDrill(el.dataset.d,el.dataset.k)}
+function sqDrill(d,k){
+ let names=sqNames(),w=sqWindow(),x=sqData(names,w).skills.find(y=>y.d===d&&y.k===k);if(!x){sqRender();return}
+ let m="skill|"+d+"|"+k,rows=x.rows.slice().sort((a,b)=>a.v-b.v);
+ modal(`<div class="sheetHead"><h2>${esc(k)}</h2><button class="x" onclick="closeM()">×</button></div>
+ <div class="muted" style="margin-bottom:8px">${esc(sqTitle())} · ${esc(d)} · squad average ${x.avg.toFixed(1)} · ${x.low} of ${x.n} low. Lowest first.</div>
+ <div class="card" style="padding:4px 10px;margin:0">${rows.map(r=>{let pl=db.players.find(p=>p.name===r.n&&!p.deletedAt),open=pl&&goalOpenFor(pl,m);return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)"><span style="min-width:0"><b>${esc(r.n)}</b> <span class="muted" style="font-size:12px">${r.v}/10</span></span>${!pl?"":open?`<span class="muted" style="font-size:12px;white-space:nowrap">Goal set ✓</span>`:r.v<SQ_LOW?`<button type="button" class="btn secondary" style="padding:3px 10px;font-size:12px;flex:none" data-p="${esc(pl.id)}" data-m="${esc(m)}" data-s="assessment" data-c="" data-b="${r.v}" data-a="" data-q="1" onclick="goalDialogFromBtn(this)">+ Goal</button>`:""}</div>`}).join("")}</div>
+ <button type="button" class="btn secondary full" style="margin-top:12px" onclick="sqRender()">Back to squad strengths</button>`);
+}
+function sqReport(){
+ let names=sqNames(),w=sqWindow(),D=sqData(names,w),discs=Object.keys(skillSets).filter(d=>D.skills.some(x=>x.d===d));
+ _rptMast={k:"Squad strengths",t:esc(sqTitle())};_rptRedo=sqReport;
+ let tp=sqTop(D.skills,3);
+ reportShell(esc(sqTitle())+" — Squad strengths",`${D.assessed} of ${D.total} players assessed`,
+ `<div class="rgrid2"><div class="rbox"><div class="csK">Strongest</div>${tp.strong.map(x=>`<div><b>${sqLbl(x,D.skills)}</b> ${x.avg.toFixed(1)}</div>`).join("")}</div><div class="rbox"><div class="csK">Needs work</div>${tp.weak.map(x=>`<div><b>${sqLbl(x,D.skills)}</b> ${x.avg.toFixed(1)}</div>`).join("")}</div></div>`+
+ discs.map(d=>`<h2 class="rsh">${esc(d)}</h2><table class="rrt"><tr><th>Skill</th><th>Average</th><th>Low (below ${SQ_LOW})</th>${_sq.mode==="camp"||_sq.since?"<th>Change</th>":""}</tr>${D.skills.filter(x=>x.d===d).sort((a,b)=>a.avg-b.avg).map(x=>`<tr><td>${esc(x.k)}</td><td>${x.avg.toFixed(1)}</td><td>${x.low} of ${x.n}</td>${_sq.mode==="camp"||_sq.since?`<td>${x.delta==null?"—":(x.delta>=0?"+":"")+x.delta.toFixed(1)}</td>`:""}</tr>`).join("")}</table>`).join(""));
+}
+function sqCampCardHtml(c){
+ let names=campRevNames(c);if(names.length<SQ_MIN)return "";
+ let save=_sq;_sq={mode:"camp",team:c.team||"",cid:c.id,disc:"",since:30};let D=sqData(names,sqWindow());_sq=save;
+ if(D.assessed<SQ_MIN||!D.skills.length)return "";
+ let tp=sqTop(D.skills,3),li=x=>`<b>${sqLbl(x,D.skills)}</b> ${x.avg.toFixed(1)}`;
+ return `<div class="card"><div class="csK">Squad strengths at this camp</div><div style="display:flex;gap:10px;margin-top:4px"><div style="flex:1"><div style="font-size:11px;font-weight:700;color:#34d399;text-transform:uppercase;letter-spacing:.04em">Strongest</div><div style="font-size:13px;line-height:1.5">${tp.strong.map(li).join("<br>")}</div></div><div style="flex:1"><div style="font-size:11px;font-weight:700;color:#fbbf24;text-transform:uppercase;letter-spacing:.04em">Needs work</div><div style="font-size:13px;line-height:1.5">${tp.weak.map(li).join("<br>")}</div></div></div><div class="muted" style="font-size:12px;margin-top:6px">${D.assessed} of ${D.total} players assessed during the camp</div><button type="button" class="btn secondary noPrint" style="margin-top:8px;padding:5px 12px;font-size:12.5px" onclick="squadStrengthsCamp('${c.id}')">Open squad strengths ›</button></div>`;
+}
 function campSelHtml(c){
  let names=campRevNames(c);if(!names.length)return "";
  let k=campRevCounts(c),avg=campRevAvg(c),rated=names.filter(n=>campRevOf(c,n).r).length,tt=campTagTally(c),days=campDays(c).length;
  return `<div class="card" style="margin-top:12px"><div class="csK">Selection so far</div>${campSelBarHtml(k,false)}
  <div class="csStats"><div><b>${names.length}</b><span>Players</span></div><div><b>${avg===null?"—":avg.toFixed(1)}</b><span>Avg rating</span></div><div><b>${days}</b><span>Day${days===1?"":"s"}</span></div><div><b>${rated}/${names.length}</b><span>Rated</span></div></div></div>
  <button type="button" class="btn primary campBig noPrint" onclick="campSummaryReport('${c.id}')">Camp summary report ›</button>
- ${(tt.good.length||tt.bad.length)?`<div class="card">${tt.good.length?`<div class="csK">Most common strengths</div>${tt.good.map(x=>`<span class="csChip g">${esc(x[0])} ×${x[1]}</span>`).join("")}`:""}${tt.bad.length?`<div class="csK" style="margin-top:6px">Most common areas to work on</div>${tt.bad.map(x=>`<span class="csChip a">${esc(x[0])} ×${x[1]}</span>`).join("")}`:""}</div>`:""}`;
+ ${(tt.good.length||tt.bad.length)?`<div class="card">${tt.good.length?`<div class="csK">Most common strengths</div>${tt.good.map(x=>`<span class="csChip g">${esc(x[0])} ×${x[1]}</span>`).join("")}`:""}${tt.bad.length?`<div class="csK" style="margin-top:6px">Most common areas to work on</div>${tt.bad.map(x=>`<span class="csChip a">${esc(x[0])} ×${x[1]}</span>`).join("")}`:""}</div>`:""}${sqCampCardHtml(c)}`;
 }
 function campReportTabHtml(c){
  let has=campRevNames(c).length>0;
@@ -10652,7 +10723,7 @@ function teamOverview(name){
  modal(`<div class="sheetHead"><h2>${esc(name)}</h2><button class="x" onclick="closeM()">×</button></div>
  ${season?`<div class="card"><b>${esc(season.name)}</b>${ph?` · <span class="tag">${esc(ph.name)}</span>${ph.focus?`<div class="muted" style="font-size:var(--fs-3)">${esc(ph.focus)}</div>`:""}`:""}</div>`:""}
  ${section("Squad",stageHtml)}
- <div class="toolbar noPrint" style="margin-top:8px"><button class="btn secondary" onclick="closeM();go('players')">Players</button><button class="btn secondary" onclick="squadSelectSheet(undefined,window._teamOvName)">Select squad</button></div>
+ <div class="toolbar noPrint" style="margin-top:8px"><button class="btn secondary" onclick="closeM();go('players')">Players</button><button class="btn secondary" onclick="squadSelectSheet(undefined,window._teamOvName)">Select squad</button><button class="btn secondary" onclick="squadStrengths(window._teamOvName)">Squad strengths</button></div>
  ${section("Camps ("+camps.length+")",`<div class="card">${campHtml}</div>`)}
  ${section("Sessions",`<div class="card"><div class="muted" style="margin-bottom:6px">${ss.filter(s=>String(s.date||"").slice(0,7)===mk).length} this month · ${ss.length} in total</div>${upcoming.length?`<b style="font-size:var(--fs-3)">Coming up</b>${upcoming.map(sessRow).join("")}`:""}${recent.length?`<b style="font-size:var(--fs-3)">Recent</b>${recent.map(sessRow).join("")}`:""}${ss.length?"":`<div class="muted">No sessions yet.</div>`}</div>`)}
  ${section("Matches",`<div class="card">${matchHtml}</div>`)}
