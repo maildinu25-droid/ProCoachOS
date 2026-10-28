@@ -2137,22 +2137,23 @@ function goalMetricOptions(){
  return o}
 /* goals from camp review and assessments */
 const GOAL_TAG_SKILL={"Shot selection":"Batting|Shot Selection","Footwork":"Batting|Footwork","Playing spin":"Batting|Playing Spin","Playing pace and bounce":"Batting|Playing Pace","Strike rotation":"Batting|Strike Rotation","Finishing innings":"Batting|Execution Under Pressure","Bowling accuracy":"Bowling|Line & Length Accuracy","Line and length":"Bowling|Line & Length Accuracy","Run-up and rhythm":"Bowling|Run-up / Approach","Action and alignment":"Bowling|Action & Alignment","Variations":"Bowling|Variations","Bowling under pressure":"Bowling|Execution Under Pressure","Catching":"Fielding|Catching","Ground fielding":"Fielding|Ground Fielding","Throwing accuracy":"Fielding|Throwing Accuracy","Speed and agility":"Fielding|Movement & Agility","Communication":"Fielding|Communication","Decision-making":"Fielding|Decision Making","Game awareness":"Fielding|Game Awareness","Wicketkeeping basics":"Wicketkeeping|Glove Work"};
-function goalTargetSuggest(b){if(b==null||!Number.isFinite(b))return "";let m=b>5?10:5;return Math.min(m,Math.round(b)+1)}
+const GOAL_LOW=4;let _goalBackAid="";
+function goalTargetSuggest(b){if(b==null||!Number.isFinite(b))return "";return Math.min(10,Math.round(b)+1)}
 function goalOpenFor(p,metric){return (p.goals||[]).find(g=>!g.achieved&&g.metric===metric)}
 function goalSkillName(metric){return String(metric).split("|").slice(-1)[0]}
 function goalSourceLabel(g){if(g.source==="camp"){let c=g.campId&&db.camps.find(x=>x.id===g.campId);return "From camp review"+(c?" · "+c.name:"")}return g.source==="assessment"?"From assessment":""}
 function goalDefaultDate(){let t=today(),n=(db.camps||[]).filter(c=>c.startDate>t&&!c.deletedAt).sort((a,b)=>a.startDate.localeCompare(b.startDate))[0];if(n)return{d:n.startDate,why:"Next camp date"};return{d:new Date(new Date(t+"T00:00:00Z").getTime()+56*86400000).toISOString().slice(0,10),why:"8 weeks from today"}}
-function goalDialogFromBtn(b){goalDialog(b.dataset.p,b.dataset.m,b.dataset.s,b.dataset.c)}
-function goalDialog(pid,metric,src,campId){
+function goalDialogFromBtn(b){_goalBackAid=b.dataset.a||"";goalDialog(b.dataset.p,b.dataset.m,b.dataset.s,b.dataset.c,b.dataset.b)}
+function goalDialog(pid,metric,src,campId,baseOver){
  let p=db.players.find(x=>x.id===pid);if(!p)return;
- let sk=goalSkillName(metric),d=metric.split("|")[1],base=goalValue(p,metric),tg=goalTargetSuggest(base),dd=goalDefaultDate();
+ let sk=goalSkillName(metric),d=metric.split("|")[1],base=(baseOver!==undefined&&baseOver!==""&&Number.isFinite(+baseOver))?+baseOver:goalValue(p,metric),tg=goalTargetSuggest(base),dd=goalDefaultDate();
  let c=campId&&db.camps.find(x=>x.id===campId),from=src==="camp"?"from the "+(c?c.name+" ":"camp ")+"review":src==="assessment"?"from the assessment":"";
  modal(`<div class="sheetHead"><h2>Make this a goal</h2><button class="x" onclick="closeM()">×</button></div>
  <div class="muted" style="margin-bottom:8px">${esc(p.name)}${from?" · "+esc(from):""}</div>
  <form onsubmit="goalDialogSave(event,'${p.id}','${esc(metric)}','${esc(src||"")}','${esc(campId||"")}')" class="formgrid" style="padding:0">
  <label class="full">Goal<input name="text" required value="${esc("Improve "+sk.toLowerCase())}"></label>
  <label class="full">Skill measured<input value="${esc(d+" › "+sk)}" disabled></label>
- <label>Starting score<input name="base" type="number" step="any" value="${base==null?"":base.toFixed(1)}" placeholder="none yet"><span class="muted" style="font-size:12px">${base==null?"No assessment yet for this skill":"Latest assessment"}</span></label>
+ <label>Starting score<input name="base" type="number" step="any" value="${base==null?"":base.toFixed(1)}" placeholder="none yet"><span class="muted" style="font-size:12px">${base==null?"No assessment yet for this skill":(baseOver!==undefined&&baseOver!==""?"From this assessment":"Latest assessment")}</span></label>
  <label>Target<input name="target" type="number" step="any" required value="${tg}"><span class="muted" style="font-size:12px">${tg===""?"Enter a target":"Suggested: +1"}</span></label>
  <label class="full">Target date<input type="date" name="targetDate" value="${dd.d}"><span class="muted" style="font-size:12px">${esc(dd.why)}</span></label>
  <div class="full" style="display:flex;gap:8px"><button class="btn primary" style="flex:1">Save goal</button><button type="button" class="btn secondary" onclick="closeM()">Cancel</button></div></form>`);
@@ -2167,6 +2168,7 @@ function goalDialogSave(e,pid,metric,src,campId){
  p.goals.push({id:uid("goal"),text,targetDate:fd.get("targetDate")||"",createdDate:today(),achieved:false,achievedDate:"",metric,target:+tg,baseline:(bs===""||!Number.isFinite(+bs))?"":+bs,source:src||"",campId:campId||""});
  save();closeM();
  if(src==="camp")campRevRefreshAll();
+ if(src==="assessment"&&_goalBackAid){let a=_goalBackAid;_goalBackAid="";goalAssessmentPicker(a)}
 }
 function goalFormMetric(sel,pid){
  let f=sel.closest("form"),t=f.querySelector('[name="target"]'),h=f.querySelector(".goalHint"),p=db.players.find(x=>x.id===pid);if(!t||!p)return;
@@ -2188,9 +2190,32 @@ function goalCampRowHtml(c,name,v,pl){
  if(!out.length&&!prev)return "";
  return `<div style="margin:2px 0 8px">${out.length?`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap"><span class="muted" style="font-size:12px;font-weight:700;letter-spacing:.04em;text-transform:uppercase">Set goal</span>${out.join("")}</div>`:""}${prev}</div>`;
 }
+function goalSkillRows(a){
+ let rows=[];assessmentDisciplines(a).forEach(d=>{let vals=(a.ratings&&a.ratings[d])||[],legacy=(d==="Bowling"&&vals.length===10),names=allSkillsFor(d);if(legacy)return;vals.forEach((x,i)=>{x=Number(x);if(x>0&&names[i])rows.push({d,k:names[i],v:x,m:"skill|"+d+"|"+names[i]})})});
+ return rows}
+function goalChipHtml(a,d,k,v){
+ let p=db.players.find(x=>x.name===a.player&&!x.deletedAt);if(!p||!a.id||!allSkillsFor(d).includes(k))return "";
+ let m="skill|"+d+"|"+k;
+ return goalOpenFor(p,m)?` <span class="muted noPrint" style="font-size:12px">Goal set ✓</span>`:` <button type="button" class="btn secondary noPrint" style="padding:1px 8px;font-size:11.5px" data-p="${esc(p.id)}" data-m="${esc(m)}" data-s="assessment" data-c="" data-b="${v}" data-a="" onclick="goalDialogFromBtn(this)">+ Goal</button>`}
+function goalAssessmentPicker(aid){
+ let a=db.assessments.find(x=>x.id===aid);if(!a)return;let p=db.players.find(x=>x.name===a.player&&!x.deletedAt);if(!p)return;
+ let rows=goalSkillRows(a).sort((x,y)=>x.v-y.v);
+ modal(`<div class="sheetHead"><h2>Set goals</h2><button class="x" onclick="closeM()">×</button></div>
+ <div class="muted" style="margin-bottom:8px">${esc(p.name)} · ${esc(fmtDate(a.date))} assessment. Lowest skills first.</div>
+ ${rows.length?`<div class="card" style="padding:4px 10px">${rows.map(r=>{let open=goalOpenFor(p,r.m);return `<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)"><span style="min-width:0"><b>${esc(r.k)}</b> <span class="muted" style="font-size:12px">${esc(r.d)} · ${r.v}/10</span></span>${open?`<span class="muted" style="font-size:12px;white-space:nowrap">Goal set ✓</span>`:`<button type="button" class="btn secondary" style="padding:3px 10px;font-size:12px;flex:none" data-p="${esc(p.id)}" data-m="${esc(r.m)}" data-s="assessment" data-c="" data-b="${r.v}" data-a="${esc(a.id)}" onclick="goalDialogFromBtn(this)">+ Goal</button>`}</div>`}).join("")}</div>`:`<div class="muted">No skill scores in this assessment.</div>`}
+ <button type="button" class="btn secondary full" style="margin-top:12px" onclick="closeM()">Close</button>`);
+}
+function goalAfterBulk(recs){
+ let items=[];recs.forEach(a=>{let p=db.players.find(x=>x.name===a.player&&!x.deletedAt);if(!p)return;let low=goalSkillRows(a).filter(r=>r.v<=GOAL_LOW&&!goalOpenFor(p,r.m)).sort((x,y)=>x.v-y.v);if(low.length)items.push({a,low})});
+ if(!items.length)return;
+ modal(`<div class="sheetHead"><h2>Assessments saved</h2><button class="x" onclick="closeM()">×</button></div>
+ <div class="muted" style="margin-bottom:8px">${items.length} player${items.length===1?"":"s"} with skills at ${GOAL_LOW} or below. Set goals?</div>
+ <div class="card" style="padding:4px 10px">${items.map(({a,low})=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--line)"><span style="min-width:0"><b>${esc(a.player)}</b> <span class="muted" style="font-size:12px">${esc(low.slice(0,2).map(r=>r.k+" "+r.v).join(", "))}${low.length>2?" +"+(low.length-2):""}</span></span><button type="button" class="btn secondary" style="padding:3px 10px;font-size:12px;flex:none" onclick="goalAssessmentPicker('${a.id}')">Review</button></div>`).join("")}</div>
+ <button type="button" class="btn secondary full" style="margin-top:12px" onclick="closeM()">Not now</button>`);
+}
 function goalAfterAssessment(a){
  let p=db.players.find(x=>x.name===a.player&&!x.deletedAt);if(!p)return;
- let low=[];assessmentDisciplines(a).forEach(d=>{let vals=(a.ratings&&a.ratings[d])||[],labels=(d==="Bowling"&&vals.length===10)?legacyBowlingSkills:allSkillsFor(d);vals.forEach((x,i)=>{x=Number(x);let m="skill|"+d+"|"+labels[i];if(x>0&&x<=2&&labels[i]&&allSkillsFor(d).includes(labels[i])&&!goalOpenFor(p,m))low.push({m,k:labels[i],v:x})})});
+ let low=[];assessmentDisciplines(a).forEach(d=>{let vals=(a.ratings&&a.ratings[d])||[],labels=(d==="Bowling"&&vals.length===10)?legacyBowlingSkills:allSkillsFor(d);vals.forEach((x,i)=>{x=Number(x);let m="skill|"+d+"|"+labels[i];if(x>0&&x<=GOAL_LOW&&labels[i]&&allSkillsFor(d).includes(labels[i])&&!goalOpenFor(p,m))low.push({m,k:labels[i],v:x})})});
  low.sort((x,y)=>x.v-y.v);low=low.slice(0,3);
  let reached=(p.goals||[]).filter(g=>!g.achieved&&g.metric&&(()=>{let m=goalMeasure(p,g);return m&&m.state==="reached"})());
  if(!low.length&&!reached.length)return;
@@ -4176,6 +4201,7 @@ function saveBulkAssessment(){
  // Remember who was ticked for this team + skill area, so next time starts from the same selection.
  db.settings=db.settings||{};db.settings.bulkSel=db.settings.bulkSel||{};
  let all=bulkPlayers();db.settings.bulkSel[bulkSelKey()]={on:all.filter(p=>bulkAssessmentDraft.include[p.name]).map(p=>p.name),off:all.filter(p=>!bulkAssessmentDraft.include[p.name]).map(p=>p.name)};
+ let savedRecs=[];
  players.forEach(p=>{
   let vals=bulkAssessmentDraft.ratings[p.name];
   if(!vals)return;
@@ -4191,13 +4217,14 @@ function saveBulkAssessment(){
    rec.formats=["General"];
    rec.formatRatings={};
   }
-  db.assessments.push(rec);
+  db.assessments.push(rec);savedRecs.push(rec);
  });
  save();
  closeM();
  assessments();
+ try{goalAfterBulk(savedRecs)}catch(err){}
 }
-function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<div class="toolbar noPrint"><button class="btn primary" onclick="newAssessment()">+ New Assessment</button>${campMenu("asAct","Actions ▾",[{label:"Bulk assess squad",icon:"players",fn:"openBulkAssessment()"}])}</div><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(fmtDate(a.date))} · ${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}${assessmentFormatTagsHtml(a)}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editAssessment('${a.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delAssessment('${a.id}')">${icon("trash",17)}</button></div></div>`).join(""):emptyRich("No assessments yet","Rate batting, bowling and fielding to track each player's progress over time.","+ New Assessment","newAssessment()")}</div>`}
+function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<div class="toolbar noPrint"><button class="btn primary" onclick="newAssessment()">+ New Assessment</button>${campMenu("asAct","Actions ▾",[{label:"Bulk assess squad",icon:"players",fn:"openBulkAssessment()"}])}</div><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?db.assessments.slice().reverse().map(a=>`<div class="item"><div><b>${esc(a.player)}</b><div class="muted">${esc(fmtDate(a.date))} · ${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</div><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${esc(d)}</span>`).join("")}${assessmentFormatTagsHtml(a)}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Set goals" onclick="goalAssessmentPicker('${a.id}')">🎯</button><button class="btn secondary iconBtn" title="Edit" onclick="editAssessment('${a.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delAssessment('${a.id}')">${icon("trash",17)}</button></div></div>`).join(""):emptyRich("No assessments yet","Rate batting, bowling and fielding to track each player's progress over time.","+ New Assessment","newAssessment()")}</div>`}
 function assessmentFormHtml(a,mode){
  a=a||{};
  return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Assessment":"Player Assessment"}</h2><button class="x" onclick="closeM()">×</button></div>
@@ -4674,7 +4701,7 @@ function assessmentFormatEntries(a,d){
 }
 function assessmentFormatTagsHtml(a){return (Array.isArray(a.formats)?a.formats:[]).filter(f=>f!=="General").map(f=>`<span class="tag">${esc(f)}</span>`).join("")+(a.technique&&Object.keys(a.technique).length?`<span class="tag">Technique</span>`:"")}
 function disciplineAvg(a,d){let n=[];if(a.ratings&&Array.isArray(a.ratings[d]))n=a.ratings[d].map(Number).filter(x=>x>0);else if(d==="Fielding")n=legacySkills.map((_,i)=>Number(a["s"+i]||0)).filter(x=>x>0);assessmentFormatEntries(a,d).forEach(({vals})=>{n=n.concat(vals.map(Number).filter(x=>x>0))});return n.length?(n.reduce((x,y)=>x+y,0)/n.length).toFixed(1):"—"}function assessmentAvg(a){let n=assessmentDisciplines(a).map(d=>Number(disciplineAvg(a,d))).filter(Number.isFinite);return n.length?(n.reduce((x,y)=>x+y,0)/n.length).toFixed(1):"—"}
-function assessmentDetailHTML(a){return assessmentDisciplines(a).map(d=>{let vals=a.ratings?.[d]||[],labels=(d==="Bowling"&&vals.length===10)?legacyBowlingSkills:allSkillsFor(d);if(!vals.length&&d==="Fielding")vals=legacySkills.map((_,i)=>Number(a["s"+i]||0));let formatEntries=assessmentFormatEntries(a,d).filter(({vals:fv})=>fv.some(x=>x));let fmtHtml=formatEntries.map(({format,vals:fv,labels:fl})=>`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><b>${esc(format)} specifics</b>${fl.map((s,i)=>fv[i]?`<div style="margin-top:4px"><b>${esc(s)}</b> — ${esc(fv[i])}/10</div>`:"").join("")}</div>`).join("");let formatTags=formatEntries.map(({format})=>` <span class="tag">${esc(format)}</span>`).join("");if(disciplineAvg(a,d)==="—"&&!(a.disciplineNotes&&a.disciplineNotes[d]))return "";return `<h2 class="section">${d} · ${disciplineAvg(a,d)}/10${formatTags}</h2><div class="card">${labels.map((s,i)=>vals[i]?`<div><b>${esc(s)}</b> — ${esc(vals[i])}/10</div>`:"").join("")}${fmtHtml}${a.disciplineNotes?.[d]?`<p><b>Development notes</b><br>${esc(a.disciplineNotes[d])}</p>`:""}</div>`}).join("")+assessmentMediaLinksHtml(a)}
+function assessmentDetailHTML(a,noGoal){return assessmentDisciplines(a).map(d=>{let vals=a.ratings?.[d]||[],labels=(d==="Bowling"&&vals.length===10)?legacyBowlingSkills:allSkillsFor(d);if(!vals.length&&d==="Fielding")vals=legacySkills.map((_,i)=>Number(a["s"+i]||0));let formatEntries=assessmentFormatEntries(a,d).filter(({vals:fv})=>fv.some(x=>x));let fmtHtml=formatEntries.map(({format,vals:fv,labels:fl})=>`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><b>${esc(format)} specifics</b>${fl.map((s,i)=>fv[i]?`<div style="margin-top:4px"><b>${esc(s)}</b> — ${esc(fv[i])}/10</div>`:"").join("")}</div>`).join("");let formatTags=formatEntries.map(({format})=>` <span class="tag">${esc(format)}</span>`).join("");if(disciplineAvg(a,d)==="—"&&!(a.disciplineNotes&&a.disciplineNotes[d]))return "";return `<h2 class="section">${d} · ${disciplineAvg(a,d)}/10${formatTags}</h2><div class="card">${labels.map((s,i)=>vals[i]?`<div><b>${esc(s)}</b> — ${esc(vals[i])}/10${noGoal||(d==="Bowling"&&vals.length===10)?"":goalChipHtml(a,d,s,vals[i])}</div>`:"").join("")}${fmtHtml}${a.disciplineNotes?.[d]?`<p><b>Development notes</b><br>${esc(a.disciplineNotes[d])}</p>`:""}</div>`}).join("")+assessmentMediaLinksHtml(a)}
 function assessmentMediaLinksHtml(a){
  if(!a.mediaLinks||!a.mediaLinks.length)return "";
  return `<div class="card" style="margin-top:10px"><b>Video / Photo Links</b><div style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px">${a.mediaLinks.map((link,i)=>{
@@ -8051,7 +8078,7 @@ function buildPlayerReport(){
  ${(()=>{let parts=[];if(!battingEntries.length&&!bowlingEntries.length)parts.push(`<p>Played in ${matches.length} match${matches.length!==1?"es":""}, no batting or bowling entries logged.</p>`);if(backToBackCount>0)parts.push(`<p style="color:var(--gold)"><b>⚠ Workload note:</b> ${backToBackCount} match${backToBackCount!==1?"es":""} played with a day or less rest before the next one.</p>`);return (matches.length&&parts.length)?`<h2>Match Performance</h2><div class="card">${parts.join("")}</div>`:""})()}
  ${playerMatchStatsHtml(p,matches)}
  ${matchTrendHtml}
- <h2>Assessment History</h2>${aa.length?aa.slice().reverse().map(a=>`<div class="card"><b>${esc(fmtDate(a.date))} · ${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</b><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d}${disciplineAvg(a,d)==="—"?"":" "+disciplineAvg(a,d)+"/10"}</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${assessmentDetailHTML(a)}${techAssessHtml(a)}</div>`).join(""):empty("No assessments for this player.")}`)}
+ <h2>Assessment History</h2>${aa.length?aa.slice().reverse().map(a=>`<div class="card"><b>${esc(fmtDate(a.date))} · ${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</b><div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d}${disciplineAvg(a,d)==="—"?"":" "+disciplineAvg(a,d)+"/10"}</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${assessmentDetailHTML(a,true)}${techAssessHtml(a)}</div>`).join(""):empty("No assessments for this player.")}`)}
 function seasonReport(){scopeAndRangeModal("Season / Full Report","buildSeasonReport")}
 function buildSeasonReport(){
  let scope=scopeValues();
@@ -10158,7 +10185,7 @@ function campFbSummaryAuto(c,n){
  let L=[s1+"."];
  if(d.att)L.push(d.att.a===d.att.t?`${fn} attended every session.`:`${fn} attended ${d.att.a} of ${d.att.t} sessions.`);
  if(sp.g.length)L.push(`Strengths included ${join(sp.g.slice(0,2).map(low))}.`);
- let wk=sp.w.slice(0,2).map(low);if(!wk.length&&d.low&&d.low.b<3)wk=[d.low.k.toLowerCase()];
+ let wk=sp.w.slice(0,2).map(low);if(!wk.length&&d.low&&d.low.b<5)wk=[d.low.k.toLowerCase()];
  if(wk.length)L.push(wk.length>1?`The main areas to work on next are ${join(wk)}.`:`The main area to work on next is ${wk[0]}.`);
  return L.join(" ");
 }
@@ -10204,7 +10231,7 @@ function campFbCardHtml(c,n,o,edit){
   out.push(`<div class="fbSh">Progress during the camp</div><div class="fbTiles">${t1}${t2}</div>`)}
  // skills
  if(o.skills&&d.skills.length){any=true;
-  out.push(`<div class="fbSh">Skill snapshot</div>${d.skills.map(x=>{let lo=Math.min(x.a,x.b)/5*100,df=Math.abs(x.b-x.a)/5*100,up=x.b>x.a;return `<div class="fbSk"><span class="l">${esc(x.k)}</span><div class="tr"><i style="left:0;width:${x.multi?lo:x.b/5*100}%;background:#cbd5e1"></i>${x.multi&&Math.abs(x.b-x.a)>=0.05?`<i style="left:${lo}%;width:${df}%;background:${up?"#10b981":"#fca5a5"}"></i>`:""}</div><b>${x.multi?`${f1(x.a)} → ${f1(x.b)} ${arrow(x.a,x.b)}`:f1(x.b)}</b></div>`}).join("")}`)}
+  out.push(`<div class="fbSh">Skill snapshot</div>${d.skills.map(x=>{let lo=Math.min(x.a,x.b)/10*100,df=Math.abs(x.b-x.a)/10*100,up=x.b>x.a;return `<div class="fbSk"><span class="l">${esc(x.k)}</span><div class="tr"><i style="left:0;width:${x.multi?lo:x.b/10*100}%;background:#cbd5e1"></i>${x.multi&&Math.abs(x.b-x.a)>=0.05?`<i style="left:${lo}%;width:${df}%;background:${up?"#10b981":"#fca5a5"}"></i>`:""}</div><b>${x.multi?`${f1(x.a)} → ${f1(x.b)} ${arrow(x.a,x.b)}`:f1(x.b)}</b></div>`}).join("")}`)}
  // strengths
  if(sp.g.length){any=true;out.push(`<div class="fbSh">What you did well</div><div>${sp.g.map(t=>chip(t,1)).join("")}</div>`)}
  // areas to work on: chips + lines
