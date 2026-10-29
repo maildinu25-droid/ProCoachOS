@@ -2241,8 +2241,8 @@ function goalValue(p,metric,upTo){
  if(metric.startsWith("disc|")){let d=metric.split("|")[1],a=aa.filter(x=>assessmentDisciplines(x).includes(d)).pop();if(!a)return null;let v=Number(disciplineAvg(a,d));return Number.isFinite(v)?v:null}
  if(metric.startsWith("skill|")){let [_,d,n]=metric.split("|"),i=allSkillsFor(d).indexOf(n);if(i<0)return null;let v=null;aa.forEach(a=>{let r=a.ratings&&a.ratings[d]&&Number(a.ratings[d][i]);if(r>0)v=r});return v}
  let ms=uspByDate(playerMatches(p).filter(m=>String(m.date||"")<=up)).slice(-5);
- if(metric==="bat|avg"){let rows=ms.map(m=>(m.battingReview||[]).find(r=>sameName(r.name,p.name))).filter(Boolean);if(rows.length<2)return null;let r=0,o=0;rows.forEach(x=>{r+=+x.runs||0;if(isOutText(x.dismissal))o++});return o?r/o:r/rows.length}
- if(metric==="bowl|econ"){let rows=ms.map(m=>(m.bowlingReview||[]).find(r=>sameName(r.name,p.name))).filter(Boolean);if(rows.length<2)return null;let b=0,r=0;rows.forEach(x=>{b+=ovToBalls(x.overs);r+=+x.runs||0});return b?r*6/b:null}
+ if(metric==="bat|avg"){let rows=ms.flatMap(m=>matchRowsFor(m,"battingReview",p.name));if(rows.length<2)return null;let r=0,o=0;rows.forEach(x=>{r+=+x.runs||0;if(isOutText(x.dismissal))o++});return o?r/o:r/rows.length}
+ if(metric==="bowl|econ"){let rows=ms.flatMap(m=>matchRowsFor(m,"bowlingReview",p.name));if(rows.length<2)return null;let b=0,r=0;rows.forEach(x=>{b+=ovToBalls(x.overs);r+=+x.runs||0});return b?r*6/b:null}
  if(metric==="fld|catches"){let rows=ms.map(m=>(m.fieldingReview||[]).find(r=>sameName(r.name,p.name))).filter(Boolean);if(rows.length<2)return null;return rows.reduce((a,x)=>a+(+x.catches||0),0)/rows.length}
  if(metric==="att|rate"){let from=new Date(new Date(up==="9999-12-31"?today():up).getTime()-30*86400000).toISOString().slice(0,10);let ts=p.team?activeSessions().filter(s=>s.squad===p.team&&s.sessionType!=="player"&&s.date>=from&&s.date<=(up==="9999-12-31"?today():up)):[];if(ts.length<3)return null;return ts.filter(s=>(s.attendees||[]).includes(p.name)).length/ts.length*100}
  return null}
@@ -3751,8 +3751,8 @@ function deletePlayerGoal(playerId,goalId){
 }
 function computePlayerMatchPatterns(p){
  let matches=playerMatches(p);
- let battingEntries=matches.map(m=>{let r=(m.battingReview||[]).find(x=>x.name===p.name);return r?{...r,date:m.date}:null}).filter(Boolean);
- let bowlingEntries=matches.map(m=>{let r=(m.bowlingReview||[]).find(x=>x.name===p.name);return r?{...r,date:m.date}:null}).filter(Boolean);
+ let battingEntries=matches.flatMap(m=>matchRowsFor(m,"battingReview",p.name).map(r=>({...r,date:m.date})));
+ let bowlingEntries=matches.flatMap(m=>matchRowsFor(m,"bowlingReview",p.name).map(r=>({...r,date:m.date})));
  let flags=[];
 
  if(battingEntries.length>=3){
@@ -3824,7 +3824,7 @@ function playerViewBody(p,forPrint){
  <h2 class="section">Assessment history (${assessments.length})</h2>${assessments.length?`<div class="card">${assessments.map(a=>`<div class="item"><div><b>${esc(fmtDate(a.date))}</b>${assessmentFormatTagsHtml(a)}<div class="muted">${assessmentAvg(a)==="—"?"Technique only":"Overall "+assessmentAvg(a)+"/10"}</div>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div></div>`).join("")}</div>`:empty("No assessments yet.")}
  <h2 class="section">Session attendance (${sessions.length})</h2>${sessions.length?`<div class="card">${sessions.map(s=>`<div class="item"><div><b>${esc(sessionLabel(s))}${sessionFocusText(s)?" · "+esc(sessionFocusText(s)):""}</b><div class="muted">${esc(fmtDate(s.date))}${(s.campId&&campById(s.campId))?" · 🏕 "+esc(campById(s.campId).name):""}</div></div>${forPrint?"":`<button class="btn secondary" onclick="closeM();printSessionPlan('${s.id}')">View</button>`}</div>`).join("")}</div>`:empty("No recorded attendance yet.")}
  ${matchPatternsHtml(p)}
- <h2 class="section">Match history (${matches.length})</h2>${matches.length?`<div class="card">${matches.map(m=>{let bat=(m.battingReview||[]).find(r=>sameName(r.name,p.name));let bowl=(m.bowlingReview||[]).find(r=>sameName(r.name,p.name));return `<div class="item"><div><b>vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(fmtDate(m.date))}${bat?" · "+esc(bat.runs||0)+"("+esc(bat.balls||0)+")":""}${bowl?" · "+esc(bowl.wickets||0)+"/"+esc(bowl.runs||0):""}</div></div><button class="btn secondary" onclick="closeM();matchReportView('${m.id}')">Report</button></div>`}).join("")}</div>`:empty("No match entries yet.")}`;
+ <h2 class="section">Match history (${matches.length})</h2>${matches.length?`<div class="card">${matches.map(m=>{let bats=matchRowsFor(m,"battingReview",p.name),bowls=matchRowsFor(m,"bowlingReview",p.name);return `<div class="item"><div><b>vs ${esc(m.opp||"Opposition")}</b><div class="muted">${esc(fmtDate(m.date))}${bats.length?" · "+bats.map(b=>esc(b.runs||0)+(isOutText(b.dismissal)?"":"*")+"("+esc(b.balls||0)+")").join(" & "):""}${bowls.length?" · "+bowls.map(w=>esc(w.wickets||0)+"/"+esc(w.runs||0)).join(" & "):""}</div></div><button class="btn secondary" onclick="closeM();matchReportView('${m.id}')">Report</button></div>`}).join("")}</div>`:empty("No match entries yet.")}`;
 }
 function playerView(id){let p=db.players.find(x=>x.id===id);if(!p)return;modal(`<div class="sheetHead"><h2>${esc(p.name)}</h2><button class="x" onclick="closeM()">×</button></div>${playerViewBody(p)}<button class="btn secondary" style="margin-top:14px" onclick="playerProfileReport('${p.id}')">Print Profile</button>
  <button class="btn secondary" style="margin-top:8px" onclick="parentSummaryReport('${p.id}')">Parent / Player Summary</button>
@@ -6461,13 +6461,87 @@ function matchActionsReportHtml(m){
  let list=L.length?`<div>${L.map(a=>`<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #e2e8e4"><input type="checkbox" class="maChk" ${a.done?"checked":""} onchange="toggleMatchAction('${m.id}','${a.id}','report')"><div style="min-width:0;flex:1"><div style="${a.done?"text-decoration:line-through;opacity:.65":"font-weight:600"}">${esc(a.text)}</div><div class="muted" style="font-size:var(--fs-3)">${matchActionMeta(a)}</div>${a.done?"":matchActionDrillLinks(a.tag,3)}</div></div>`).join("")}</div>`:"";
  let notes=m.actions?`<p style="${L.length?"margin-top:10px":""}">${L.length?`<b>Notes:</b> `:""}${esc(m.actions)}</p>`:"";
  return `<div class="card">${list}${notes}${!list&&!notes?"<p>—</p>":""}</div>`}
+/* ===== Multi-innings scorecards (Test / multi-day) ===== */
+function matchRowsFor(m,key,name){return (m&&m[key]||[]).filter(r=>r&&sameName(r.name,name))}
+var matchInnDraft=[],matchInnActive=1,matchInnFirstOurs=true;
+const INN_ORD=["1st","2nd","3rd","4th"];
+function matchInnBlank(){return{runs:"",wkts:"",overs:"",declared:false,followOn:false}}
+function matchMultiOn(){let f=document.querySelector('#matchForm select[name="format"]');return !!f&&MULTI_DAY_FMT(f.value)}
+function matchInnOurs(n){let f=matchInnFirstOurs,fo=!!(matchInnDraft[2]&&matchInnDraft[2].followOn);if(n===1)return f;if(n===2)return !f;if(n===3)return fo?!f:f;return fo?f:!f}
+function matchInnFilled(i){return i&&(String(i.runs)!==""||String(i.wkts)!==""||String(i.overs)!=="")}
+function matchInnPart(i){let w=String(i.wkts)===""?10:+i.wkts;return (+i.runs||0)+(w>=10?"":"/"+w)+(i.declared?" d":"")}
+function matchInnCalc(list,firstOurs){
+ let side={our:{r:0,w:0,b:0,parts:[],n:0},opp:{r:0,w:0,b:0,parts:[],n:0}};
+ let fo=!!(list[2]&&list[2].followOn),ours=n=>n===1?firstOurs:n===2?!firstOurs:n===3?(fo?!firstOurs:firstOurs):(fo?firstOurs:!firstOurs);
+ list.forEach((i,k)=>{if(!matchInnFilled(i))return;let o=ours(k+1),S=o?side.our:side.opp;S.r+=+i.runs||0;S.w+=+i.wkts||0;S.b+=ovToBalls(i.overs);S.parts.push(matchInnPart(i));S.n++});
+ return side}
+function matchInnResultCalc(list,firstOurs,team,opp){
+ let side=matchInnCalc(list,firstOurs);if(!side.our.n&&!side.opp.n)return null;
+ let fo=!!(list[2]&&list[2].followOn),ours=n=>n===1?firstOurs:n===2?!firstOurs:n===3?(fo?!firstOurs:firstOurs):(fo?firstOurs:!firstOurs);
+ let filled=list.map((i,k)=>matchInnFilled(i)?k+1:0).filter(Boolean),last=Math.max(...filled);
+ let line=`${side.our.parts.join(" & ")||"-"} v ${side.opp.parts.join(" & ")||"-"}`;
+ let draw={outcome:"Draw",result:"Match drawn",line};
+ if(last>=4){let i4=list[3],L=ours(4),LT=L?side.our.r:side.opp.r,OT=L?side.opp.r:side.our.r,w4=String(i4.wkts)===""?10:+i4.wkts;
+  let win=(w)=>({outcome:w?"Won":"Lost",line});
+  if(LT>OT){let r=win(L);r.result=`${L?"Won":"Lost"} by ${10-w4} wicket${10-w4===1?"":"s"}`;return r}
+  if(LT===OT)return w4>=10?{outcome:"Tie",result:"Match tied",line}:draw;
+  if(w4>=10){let r=win(!L);r.result=`${!L?"Won":"Lost"} by ${OT-LT} runs`;return r}
+  return draw}
+ if(last===3&&fo){let a=ours(1),A=a?side.our.r:side.opp.r,B=a?side.opp.r:side.our.r,w3=String(list[2].wkts)===""?10:+list[2].wkts;
+  if(A>B&&w3>=10){let r={outcome:a?"Won":"Lost",line};r.result=`${a?"Won":"Lost"} by an innings and ${A-B} runs`;return r}}
+ return draw}
+function matchInnAuto(){
+ let f=document.getElementById("matchForm");if(!f||!matchMultiOn())return;
+ let opp=(f.querySelector('[name="opp"]').value||"").trim()||"Opposition",team=matchFormTeam()||"Us";
+ let sumEl=document.getElementById("matchInnSummary"),R=matchInnResultCalc(matchInnDraft,matchInnFirstOurs,team,opp);
+ if(sumEl)sumEl.innerHTML=R?`<b>${esc(team)}</b> ${esc(R.line.split(" v ")[0])} v <b>${esc(opp)}</b> ${esc(R.line.split(" v ")[1])}<div style="margin-top:4px"><b>${esc(R.result)}</b> <span class="muted">· worked out from the innings, you can overtype it below</span></div>`:'<span class="muted">Enter the innings totals and the score line and result are worked out for you.</span>';
+ if(!R)return;
+ let res=f.querySelector('[name="result"]'),oc=f.querySelector('[name="outcome"]');
+ if(res&&(!res.dataset.manual||res.value===res.dataset.auto||!res.value)){res.value=R.result;res.dataset.auto=R.result;res.dataset.manual=""}
+ if(oc&&!oc.dataset.manual){oc.value=R.outcome}
+ let b=f.querySelector('[name="batted"]');if(b)b.value=matchInnFirstOurs?"First":"Second"}
+function matchInnSet(i,f,v){if(!matchInnDraft[i])return;matchInnDraft[i][f]=v;if(f==="followOn"||f==="declared"){renderMatchInnings();return}matchInnAuto()}
+function matchInnTab(n){matchInnActive=n;renderMatchInnings()}
+function matchInnAdd(){if(matchInnDraft.length>=4)return;matchInnDraft.push(matchInnBlank());matchInnActive=matchInnDraft.length;renderMatchInnings()}
+function matchInnRemove(){if(matchInnDraft.length<=1)return;let n=matchInnDraft.length;matchDraft.batting=matchDraft.batting.filter(r=>(r.inn||1)!==n);matchDraft.bowling=matchDraft.bowling.filter(r=>(r.inn||1)!==n);matchInnDraft.pop();if(matchInnActive>matchInnDraft.length)matchInnActive=matchInnDraft.length;renderMatchInnings()}
+function matchInnFirstSet(v){matchInnFirstOurs=v==="us";renderMatchInnings()}
+function renderMatchInnings(){
+ let host=document.getElementById("matchInnBlock"),single=document.getElementById("matchSingleScore"),tots=document.getElementById("matchSingleTotals");
+ let on=matchMultiOn();if(single)single.style.display=on?"none":"";if(tots)tots.style.display=on?"none":"";if(host)host.style.display=on?"":"none";
+ if(!on||!host)return;
+ if(!matchInnDraft.length)matchInnDraft=[matchInnBlank(),matchInnBlank()];
+ let f=document.getElementById("matchForm"),team=matchFormTeam()||"Us",opp=((f&&f.querySelector('[name="opp"]').value)||"").trim()||"Opposition";
+ let n=Math.min(matchInnActive,matchInnDraft.length),i=matchInnDraft[n-1],ours=matchInnOurs(n),name=ours?team:opp;
+ let tabs=matchInnDraft.map((d,k)=>{let t=matchInnOurs(k+1)?team:opp;return `<button type="button" class="tab${k+1===n?" on":""}" onclick="matchInnTab(${k+1})" style="flex:0 0 auto;min-width:96px;text-align:left;padding:8px 11px;border-radius:12px;border:1px solid ${k+1===n?"var(--g)":"var(--line)"};background:${k+1===n?"var(--mint)":"var(--surface)"};color:var(--ink)"><b style="display:block;font-size:13px">${INN_ORD[k]} innings</b><span style="font-size:11px;opacity:.75">${esc(t)}${matchInnFilled(d)?" · "+esc(matchInnPart(d)):""}</span></button>`}).join("");
+ let rows=ours?matchDraft.batting.filter(r=>r.name&&(r.inn||1)===n):matchDraft.bowling.filter(r=>r.name&&(r.inn||1)===n);
+ let sum=ours?rows.reduce((t,r)=>t+(+r.runs||0),0):rows.reduce((t,r)=>t+(+r.runs||0),0),tot=+i.runs||0,extras=(rows.length&&String(i.runs)!==""&&tot>=sum)?tot-sum:null;
+ let list=ours?(rows.length?rows.map(r=>`<div class="row" style="display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)"><div><b>${esc(r.name)}</b><div class="muted" style="font-size:13px">${esc(r.balls?r.balls+" balls · ":"")}${esc(r.dismissal||"Not out")}</div></div><b style="font-size:17px">${esc(r.runs||0)}${isOutText(r.dismissal)?"":"*"}</b></div>`).join(""):'<div class="muted" style="padding:8px 0">No batting scores for this innings yet.</div>')
+  :(rows.length?`<table class="reportTable" style="margin-top:4px"><tr><th>Bowler</th><th>O</th><th>R</th><th>W</th></tr>${rows.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.overs||"-")}</td><td>${esc(r.runs||"-")}</td><td><b>${esc(r.wickets||0)}</b></td></tr>`).join("")}</table>`:'<div class="muted" style="padding:8px 0">No bowling figures for this innings yet.</div>');
+ let fld=(k,l,w,ph,step)=>`<label style="font-size:12px;color:var(--muted)">${l}<input type="number" inputmode="${step?"decimal":"numeric"}" ${step?'step="0.1"':""} min="0" value="${esc(i[k])}" placeholder="${ph||""}" oninput="matchInnSet(${n-1},'${k}',this.value)" style="width:100%;font-weight:700;font-size:16px;margin-top:2px"></label>`;
+ host.innerHTML=`<div class="full" style="margin-top:14px"><b>Innings</b> <span class="muted" style="font-weight:400">· in the order played. Enter your batters when your team bats and your bowlers when the opposition bats.</span></div>
+ <label style="margin-top:8px;display:block">Who batted first<select onchange="matchInnFirstSet(this.value)"><option value="us" ${matchInnFirstOurs?"selected":""}>${esc(team)} batted first</option><option value="opp" ${matchInnFirstOurs?"":"selected"}>${esc(opp)} batted first</option></select></label>
+ <div style="display:flex;gap:6px;overflow-x:auto;padding:10px 0 4px">${tabs}${matchInnDraft.length<4?`<button type="button" class="btn secondary" style="flex:0 0 auto;padding:8px 12px" onclick="matchInnAdd()">+ Innings</button>`:""}</div>
+ <div class="card" style="padding:12px 14px;margin-top:8px"><b>${esc(name)} · ${INN_ORD[n-1]} innings total</b>
+  <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:8px">${fld("runs","Runs",0,"0")}${fld("wkts","Wickets",0,"10")}${fld("overs","Overs",0,"e.g. 68.2",true)}</div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap;margin-top:10px;font-size:14px"><label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" class="maChk" ${i.declared?"checked":""} onchange="matchInnSet(${n-1},'declared',this.checked)"> Declared</label>${n===3?`<label style="display:flex;gap:6px;align-items:center;font-weight:400"><input type="checkbox" class="maChk" ${i.followOn?"checked":""} onchange="matchInnSet(2,'followOn',this.checked)"> Followed on</label>`:""}</div></div>
+ <div class="card" style="padding:12px 14px;margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><b>${ours?"Batting":"Our bowling"}</b><div style="display:flex;gap:6px"><button type="button" class="btn secondary" style="padding:6px 10px" onclick="qeOpen('grid',${n});${ours?"":"qeTab('bowl')"}">Enter scores</button><button type="button" class="btn secondary" style="padding:6px 10px" onclick="qeOpen('paste',${n})">Paste</button></div></div>${list}${rows.length?(extras!==null&&rows.length>=(ours?8:4)?`<div class="muted" style="font-size:13px;margin-top:6px">${ours?"Batters":"Bowlers"} ${sum} + extras ${extras} = ${tot}${extras>60?` <span style="color:var(--gold)">· check the figures</span>`:" ✓"}</div>`:`<div class="muted" style="font-size:13px;margin-top:6px">${ours?"Batters":"Bowlers"} so far: ${sum} runs</div>`):""}</div>
+ <div id="matchInnSummary" class="card" style="padding:12px 14px;margin-top:10px;background:var(--mint)"></div>
+ ${matchInnDraft.length>1?`<button type="button" class="btn secondary" style="margin-top:8px;padding:6px 10px" onclick="if(confirm('Remove the last innings and its scores?'))matchInnRemove()">Remove ${INN_ORD[matchInnDraft.length-1]} innings</button>`:""}`;
+ matchInnAuto()}
+function matchInningsReportHtml(m){
+ return (m.innings||[]).map(inn=>{let team=inn.ours?m.team:m.opp,tot=(+inn.runs||0)+(String(inn.wkts)===""||+inn.wkts>=10?" all out":"/"+inn.wkts)+(inn.declared?" d":""),ov=inn.overs?` (${esc(inn.overs)} ov)`:"";
+  let rows=inn.ours?(m.battingReview||[]).filter(r=>(r.inn||1)===inn.no):(m.bowlingReview||[]).filter(r=>(r.inn||1)===inn.no);
+  let sum=rows.reduce((t,r)=>t+(+r.runs||0),0),ext=rows.length&&(+inn.runs||0)>=sum?(+inn.runs||0)-sum:null;
+  let tbl=inn.ours?(rows.length?`<table class="reportTable" style="margin-top:8px"><tr><th>Batter</th><th>How out</th><th>R</th><th>B</th></tr>${rows.map(r=>`<tr><td>${esc(r.name)}</td><td class="muted">${esc(r.dismissal||"Not out")}</td><td><b>${esc(r.runs||0)}${isOutText(r.dismissal)?"":"*"}</b></td><td>${esc(r.balls||"-")}</td></tr>`).join("")}</table>`:`<p class="muted" style="margin:8px 0 0">No individual scores recorded.</p>`)
+   :(rows.length?`<table class="reportTable" style="margin-top:8px"><tr><th>Bowler</th><th>O</th><th>R</th><th>W</th></tr>${rows.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.overs||"-")}</td><td>${esc(r.runs||"-")}</td><td><b>${esc(r.wickets||0)}</b></td></tr>`).join("")}</table>`:`<p class="muted" style="margin:8px 0 0">No bowling figures recorded.</p>`);
+  return `<div class="card" style="margin-top:12px"><div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap;align-items:baseline"><b>${esc(team||"Team")} — ${INN_ORD[inn.no-1]} innings${inn.followOn?" (following on)":""}</b><b>${esc(tot)}<span class="muted" style="font-weight:400">${ov}</span></b></div>${tbl}${ext!==null&&rows.length>=(inn.ours?8:4)?`<p class="muted" style="margin:6px 0 0;font-size:13px">${inn.ours?"Batters":"Bowlers"} ${sum} + extras ${ext} = ${+inn.runs||0}</p>`:""}</div>`}).join("")}
 var matchXiShowAll=false;
 function MULTI_DAY_FMT(f){return /multi|test/i.test(f||"")}
 function matchDateStr(m){if(!m)return "";let a=fmtDate(m.date||""),b=m.endDate&&m.endDate>(m.date||"")?fmtDate(m.endDate):"";return b?a+" to "+b:a}
 function matchDayCount(m){if(!m||!m.date||!m.endDate||m.endDate<=m.date)return 1;return Math.round((new Date(m.endDate)-new Date(m.date))/86400000)+1}
 function matchOnDate(m,d){return !!m.date&&m.date<=d&&(m.endDate||m.date)>=d}
 function matchStartChanged(v){let e=document.getElementById("matchEndDate");if(!e)return;e.min=v;if(e.value&&e.value<v)e.value=v}
-function matchFormatChanged(f){let e=document.getElementById("matchEndDate"),st=document.querySelector('#matchForm input[name="date"]');if(!e||!st)return;if(MULTI_DAY_FMT(f)&&!e.value&&st.value){let d=new Date(st.value);d.setDate(d.getDate()+2);e.value=d.toISOString().slice(0,10)}}
+function matchFormatChanged(f){setTimeout(renderMatchInnings,0);let e=document.getElementById("matchEndDate"),st=document.querySelector('#matchForm input[name="date"]');if(!e||!st)return;if(MULTI_DAY_FMT(f)&&!e.value&&st.value){let d=new Date(st.value);d.setDate(d.getDate()+2);e.value=d.toISOString().slice(0,10)}}
 function matchFormTeam(){let sel=document.getElementById("matchTeamSelect");if(!sel)return "";if(sel.value==="__custom__"){let c=document.querySelector('#matchForm input[name="teamCustom"]');return c?c.value.trim():""}return sel.value}
 function matchRosterFor(team,keep,showAll){let all=activePlayers();if(showAll||!team)return all;let t=all.filter(p=>p.team===team||(keep||[]).includes(p.name));return t.some(p=>p.team===team)?t:all}
 function matchXiListHtml(team,keep,showAll){return matchRosterFor(team,keep,showAll).map(p=>`<label style="${p.available==="no"?"opacity:.55":""}"><input type="checkbox" name="playingXI" value="${esc(p.name)}" onchange="renderBattingRows();renderBowlingRows()" ${(keep||[]).includes(p.name)?"checked":""}> ${esc(p.name)}${p.available==="no"?` <span class="muted">(unavailable)</span>`:""}${p.team&&p.team!==team?` <span class="muted">(${esc(p.team)})</span>`:""}</label>`).join("")}
@@ -6478,9 +6552,9 @@ ${matchSectionHead("details","Match Details",true)}
 <div class="formgrid" id="matchSec-details" style="margin-top:10px">
 <label>${MULTI_DAY_FMT(m.format)?"Start date":"Date"}<input type="date" name="date" value="${esc(m.date||today())}" required onchange="matchStartChanged(this.value)"></label>
 <label>End date <span class="muted" style="font-weight:400">(multi-day only)</span><input type="date" name="endDate" id="matchEndDate" value="${esc(m.endDate||"")}" min="${esc(m.date||today())}"><span class="muted" style="font-size:var(--fs-3)">Leave blank for a one-day match. For a Test or multi-day match, pick the last day.</span></label>
-<label>Your team<select name="teamSelect" id="matchTeamSelect" onchange="toggleMatchTeamCustom(this.value);refreshMatchXI()">${db.teams.length?db.teams.map((t,i)=>`<option value="${esc(t.name)}" ${(m.team===t.name||(!m.team&&i===0))?"selected":""}>${esc(t.name)}</option>`).join(""):""}<option value="__custom__" ${((m.team&&!db.teams.some(t=>t.name===m.team))||!db.teams.length)?"selected":""}>+ Custom / type a team name</option></select></label>
+<label>Your team<select name="teamSelect" id="matchTeamSelect" onchange="toggleMatchTeamCustom(this.value);refreshMatchXI();renderMatchInnings()">${db.teams.length?db.teams.map((t,i)=>`<option value="${esc(t.name)}" ${(m.team===t.name||(!m.team&&i===0))?"selected":""}>${esc(t.name)}</option>`).join(""):""}<option value="__custom__" ${((m.team&&!db.teams.some(t=>t.name===m.team))||!db.teams.length)?"selected":""}>+ Custom / type a team name</option></select></label>
 <div class="full" id="matchTeamCustomWrap" style="${((m.team&&db.teams.some(t=>t.name===m.team))||(!m.team&&db.teams.length))?"display:none":""}"><label>Custom team name<input name="teamCustom" oninput="refreshMatchXI()" value="${esc((!m.team||!db.teams.some(t=>t.name===m.team))?(m.team||""):"")}" placeholder="e.g. 1st XI"></label></div>
-<label>Opposition<input name="opp" value="${esc(m.opp||"")}"></label>
+<label>Opposition<input name="opp" value="${esc(m.opp||"")}" onchange="renderMatchInnings()"></label>
 <label>Venue<input name="venue" list="venueDatalist" value="${esc(m.venue||"")}"><datalist id="venueDatalist">${venueOptions()}</datalist></label>
 <label>Format<select name="format" onchange="matchFormatChanged(this.value)">${MATCH_FORMATS.map(f=>`<option ${m.format===f?"selected":""}>${f}</option>`).join("")}</select></label>
 <label>Tournament <span class="muted" style="font-weight:400">(optional)</span><select name="tournamentId"><option value="">None</option>${db.tournaments.map(t=>`<option value="${t.id}" ${m.tournamentId===t.id?"selected":""}>${esc(t.name)}</option>`).join("")}</select></label>
@@ -6498,12 +6572,15 @@ ${activePlayers().length?`<div class="toolbar" style="margin-bottom:10px;gap:10p
 </div>
 ${matchSectionHead("scorecard","Scorecard & Result",true)}
 <div id="matchSec-scorecard" style="margin-top:10px">
+<div id="matchInnBlock" style="display:none"></div>
+<div id="matchSingleScore">
 <div class="toolbar" style="margin-top:14px"><button type="button" class="btn secondary" onclick="qeOpen('grid')">⚡ One-screen scorecard</button><button type="button" class="btn secondary" onclick="qeOpen('paste')">📋 Paste scorecard</button></div>
 <div class="card" style="padding:12px 14px;margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div id="battingSummary" style="flex:1"></div><button type="button" class="btn secondary" onclick="qeOpen('grid')">Edit</button></div></div>
 <div class="card" style="padding:12px 14px;margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div id="bowlingSummary" style="flex:1"></div><button type="button" class="btn secondary" onclick="qeOpen('grid');qeTab('bowl')">Edit</button></div></div>
+</div>
 <div class="card" style="padding:12px 14px;margin-top:10px"><div style="display:flex;justify-content:space-between;align-items:center;gap:10px"><div id="fieldingSummary" style="flex:1"></div><button type="button" class="btn secondary" onclick="qeOpen('grid');qeTab('field')">Edit</button></div></div>
 <div class="formgrid" style="margin-top:14px">
-<div class="full" style="margin-top:4px"><b>Team scores</b> <span class="muted" style="font-weight:400">(full totals including extras)${m.scorerInnings?" · filled automatically from the Match Scorer":""}</span></div>
+<div class="full" id="matchSingleTotals"><div style="margin-top:4px"><b>Team scores</b> <span class="muted" style="font-weight:400">(full totals including extras)${m.scorerInnings?" · filled automatically from the Match Scorer":""}</span></div>
 <div class="full" style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
 <label>Our runs<input name="ourRuns" type="number" inputmode="numeric" value="${esc(m.ourRuns||"")}"></label>
 <label>Our wickets lost<input name="ourWkts" type="number" inputmode="numeric" min="0" max="10" value="${esc(m.ourWkts||"")}"></label>
@@ -6512,9 +6589,9 @@ ${matchSectionHead("scorecard","Scorecard & Result",true)}
 <label>Our overs<input name="ourOvers" type="number" inputmode="decimal" step="0.1" min="0" placeholder="e.g. 18.3" value="${esc(m.ourOvers||"")}"></label>
 <label>Opposition overs<input name="oppOvers" type="number" inputmode="decimal" step="0.1" min="0" placeholder="e.g. 20" value="${esc(m.oppOvers||"")}"></label>
 <label>We batted<select name="batted"><option value="">— Not recorded —</option><option ${m.batted==="First"?"selected":""}>First</option><option ${m.batted==="Second"?"selected":""}>Second</option></select></label>
-</div>
-<label>Outcome<select name="outcome"><option value="">— Select —</option>${[["Won","Won"],["Lost","Lost"],["Draw","Draw"],["Tie","Tie"],["No result","No result"]].map(([v,l])=>`<option value="${v}" ${((m.outcome||({Win:"Won",Loss:"Lost",Draw:"Draw",NR:"No result"}[m.result?matchResultOutcome({result:m.result}):""]))===v)?"selected":""}>${l}</option>`).join("")}</select></label>
-<label>Result details<input name="result" value="${esc(m.result||"")}" placeholder="e.g. Won by 24 runs"></label>
+</div></div>
+<label>Outcome<select name="outcome" onchange="this.dataset.manual='1'"><option value="">— Select —</option>${[["Won","Won"],["Lost","Lost"],["Draw","Draw"],["Tie","Tie"],["No result","No result"]].map(([v,l])=>`<option value="${v}" ${((m.outcome||({Win:"Won",Loss:"Lost",Draw:"Draw",NR:"No result"}[m.result?matchResultOutcome({result:m.result}):""]))===v)?"selected":""}>${l}</option>`).join("")}</select></label>
+<label>Result details<input name="result" value="${esc(m.result||"")}" placeholder="e.g. Won by 24 runs" oninput="this.dataset.manual=(this.value!==this.dataset.auto)?'1':''"></label>
 </div>
 </div>
 ${matchSectionHead("teamreview","Team Review",false)}
@@ -6559,12 +6636,14 @@ ${matchSectionHead("learnings","Key Learnings & Training Actions",(m.actionItems
 
 function openMatchForm(existing,mode){
  matchXiShowAll=false;
+ matchInnDraft=existing&&Array.isArray(existing.innings)?existing.innings.map(i=>({runs:i.runs===undefined?"":i.runs,wkts:i.wkts===undefined?"":i.wkts,overs:i.overs||"",declared:!!i.declared,followOn:!!i.followOn})):[];
+ matchInnFirstOurs=existing&&Array.isArray(existing.innings)&&existing.innings.length?!!existing.innings[0].ours:!(existing&&existing.batted==="Second");matchInnActive=1;
  matchActionDraft=existing&&Array.isArray(existing.actionItems)?JSON.parse(JSON.stringify(existing.actionItems)):[];
  matchDraft={batting:existing&&existing.battingReview?JSON.parse(JSON.stringify(existing.battingReview)):[],bowling:existing&&existing.bowlingReview?JSON.parse(JSON.stringify(existing.bowlingReview)):[],fielding:existing&&existing.fieldingReview?JSON.parse(JSON.stringify(existing.fieldingReview)):[]};
  battingNotesOpen=new WeakSet();bowlingNotesOpen=new WeakSet();
  editingMatchId=mode==="edit"?existing.id:null;
  modal(matchFormHtml(existing,mode));
- renderBattingRows();renderBowlingRows();renderFieldingRows();refreshMatchXI();renderMatchActions();
+ renderBattingRows();renderBowlingRows();renderFieldingRows();refreshMatchXI();renderMatchActions();{let rr=document.querySelector('#matchForm [name="result"]'),oo=document.querySelector('#matchForm [name="outcome"]');if(existing&&rr&&rr.value)rr.dataset.manual="1";if(existing&&oo&&oo.value)oo.dataset.manual="1"}renderMatchInnings();
 }
 function newMatch(){openMatchForm(null,"new")}
 function logMatchFromFixture(tournamentId,fixtureId){
@@ -6647,17 +6726,18 @@ function syncTeamFielding(){let a=matchDraft.fielding||[];if(!a.length)return;le
 function renderFieldingRows(){let el=document.getElementById("fieldingSummary");if(!el)return;let a=(matchDraft.fielding||[]).filter(r=>r.name);
  if(!a.length){el.innerHTML='<span class="muted">No fielding yet. Add catches, drops and run outs per player, or type team counts in Fielding Review.</span>';return}
  let S=fieldSums(a);el.innerHTML=`<b>${a.length}</b> fielders · <b>${S.taken}</b> catches · <b>${S.missed}</b> dropped · <b>${S.runouts}</b> run outs`+(S.stumpings?` · <b>${S.stumpings}</b> stumpings`:"")}
-function qeOpen(mode){
+function qeOpen(mode,inn){
+ let multi=matchMultiOn(),qi=multi?(inn||matchInnActive||1):0,inI=r=>!qi||(r.inn||1)===qi;
  let xi=currentXINames();
  let pool=[...new Set([...xi,...matchRosterFor(matchFormTeam(),xi,matchXiShowAll).map(p=>p.name)])];
  if(mode==="grid"&&!xi.length&&!matchDraft.batting.length&&!matchDraft.bowling.length&&!(matchDraft.fielding||[]).length){alert("Tick the Playing XI first, then open the one-screen grid.");let b=document.getElementById("matchSec-xi"),h=document.getElementById("matchSecHead-xi");if(b)b.style.display="";if(h){h.classList.add("open");h.scrollIntoView({block:"start"})}return}
  let allN=[...xi];
  matchDraft.batting.concat(matchDraft.bowling,matchDraft.fielding||[]).forEach(r=>{if(r.name&&!allN.includes(r.name))allN.push(r.name)});
  let ordered=(draft)=>{let o=draft.map(r=>r.name).filter(n=>n&&allN.includes(n));return [...new Set([...o,...allN])]};
- let batNames=ordered(matchDraft.batting),bowlNames=ordered(matchDraft.bowling);
- qe={tab:mode==="paste"?"paste":"bat",pool,note:"",
-  bat:batNames.map(n=>{let e=matchDraft.batting.find(r=>r.name===n);return e?{name:n,runs:e.runs||"",balls:e.balls||"",dismissal:e.dismissal||"Not out"}:{name:n,runs:"",balls:"",dismissal:"Not out"}}),
-  bowl:bowlNames.map(n=>{let e=matchDraft.bowling.find(r=>r.name===n);return e?{name:n,overs:e.overs||"",runs:e.runs||"",wickets:e.wickets||""}:{name:n,overs:"",runs:"",wickets:""}}),
+ let batNames=ordered(matchDraft.batting.filter(inI)),bowlNames=ordered(matchDraft.bowling.filter(inI));
+ qe={tab:mode==="paste"?"paste":"bat",pool,note:"",inn:qi,
+  bat:batNames.map(n=>{let e=matchDraft.batting.filter(inI).find(r=>r.name===n);return e?{name:n,runs:e.runs||"",balls:e.balls||"",dismissal:e.dismissal||"Not out"}:{name:n,runs:"",balls:"",dismissal:"Not out"}}),
+  bowl:bowlNames.map(n=>{let e=matchDraft.bowling.filter(inI).find(r=>r.name===n);return e?{name:n,overs:e.overs||"",runs:e.runs||"",wickets:e.wickets||""}:{name:n,overs:"",runs:"",wickets:""}}),
   field:allN.map(n=>{let e=(matchDraft.fielding||[]).find(r=>r.name===n);return e?{name:n,ct:e.catches||"",dr:e.drops||"",ro:e.runouts||"",st:e.stumpings||"",mf:e.misfields||""}:{name:n,ct:"",dr:"",ro:"",st:"",mf:""}})};
  let ov=document.getElementById("qeOv");if(ov)ov.remove();
  ov=document.createElement("div");ov.id="qeOv";
@@ -6718,7 +6798,7 @@ function qeRender(keep){
   ${qe.bowl.map((r,i)=>`<div style="display:grid;grid-template-columns:22px 1.2fr .7fr .6fr .6fr 24px;gap:6px;align-items:center;padding:6px 2px;border-bottom:1px solid var(--line)"><div style="display:grid;gap:2px"><button type="button" onclick="qeMove(${i},-1)" style="height:19px;width:22px;padding:0;border:0;border-radius:5px;background:var(--surface2);color:var(--muted);font-size:10px">▲</button><button type="button" onclick="qeMove(${i},1)" style="height:19px;width:22px;padding:0;border:0;border-radius:5px;background:var(--surface2);color:var(--muted);font-size:10px">▼</button></div>${qeNameCell(r,i)}${inp(i,"overs",r.overs,0,true)}${inp(i,"runs",r.runs)}${inp(i,"wickets",r.wickets)}<button type="button" class="miniBtn" style="width:26px;height:26px;border-radius:6px;border:1px solid var(--line);background:var(--surface2);color:var(--muted)" onclick="qeRemove(${i})">×</button></div>`).join("")||empty("No players.")}
   <div class="muted" style="font-size:12px;margin-top:8px">Leave a row empty if the player did not bowl.</div>`;
  }
- ov.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 14px 6px"><h2 style="margin:0;font-size:20px">Match scorecard</h2><button type="button" class="x" onclick="qeClose()">×</button></div>
+ ov.innerHTML=`<div style="display:flex;justify-content:space-between;align-items:center;padding:14px 14px 6px"><h2 style="margin:0;font-size:20px">Match scorecard${qe.inn?" · "+INN_ORD[qe.inn-1]+" innings":""}</h2><button type="button" class="x" onclick="qeClose()">×</button></div>
  <div style="display:flex;gap:8px;padding:6px 14px 10px">${tabBtn("bat","Batting")}${tabBtn("bowl","Bowling")}${tabBtn("field","Fielding")}${tabBtn("paste","Paste")}</div>
  <div id="qeBody" style="flex:1;overflow:auto;padding:0 14px 12px">${qe.ordering&&tab!=="paste"?qeOrderHtml():body}</div>
  <div style="padding:10px 14px calc(12px + env(safe-area-inset-bottom));border-top:1px solid var(--line);background:var(--surface)"><div id="qeTot" class="muted" style="font-size:13px;margin-bottom:8px"></div><button type="button" class="btn primary" style="width:100%" onclick="qeApply()">Done — add to match</button></div>`;
@@ -6741,23 +6821,25 @@ function qeRead(){
 function qeApply(){
  let rowName=r=>String(r.name||"").trim();
  let batNames=new Set(qe.bat.map(rowName).filter(Boolean)),bowlNames=new Set(qe.bowl.map(rowName).filter(Boolean));
- let oldBat=matchDraft.batting,oldBowl=matchDraft.bowling;
+ let qi=qe.inn||0,inI=r=>!qi||(r.inn||1)===qi,tagI=o=>{if(qi)o.inn=qi;return o};
+ let otherBat=matchDraft.batting.filter(r=>!inI(r)),otherBowl=matchDraft.bowling.filter(r=>!inI(r));
+ let oldBat=matchDraft.batting.filter(inI),oldBowl=matchDraft.bowling.filter(inI);
  let batOut=oldBat.filter(r=>!batNames.has(r.name));
  qe.bat.forEach(r=>{let n=rowName(r);if(!n||r.dismissal===QE_DNB)return;
   if(String(r.runs)===""&&String(r.balls)===""&&(!r.dismissal||r.dismissal==="Not out"))return;
-  let old=oldBat.find(x=>x.name===n);batOut.push({name:n,runs:r.runs,balls:r.balls,dismissal:r.dismissal||"Not out",notes:old?old.notes||"":""})});
+  let old=oldBat.find(x=>x.name===n);batOut.push(tagI({name:n,runs:r.runs,balls:r.balls,dismissal:r.dismissal||"Not out",notes:old?old.notes||"":""}))});
  let bowlOut=oldBowl.filter(r=>!bowlNames.has(r.name));
  qe.bowl.forEach(r=>{let n=rowName(r);if(!n)return;
   if(String(r.overs)===""&&String(r.runs)===""&&String(r.wickets)==="")return;
-  let old=oldBowl.find(x=>x.name===n);bowlOut.push({name:n,overs:r.overs,runs:r.runs,wickets:r.wickets,notes:old?old.notes||"":""})});
+  let old=oldBowl.find(x=>x.name===n);bowlOut.push(tagI({name:n,overs:r.overs,runs:r.runs,wickets:r.wickets,notes:old?old.notes||"":""}))});
  let fldNames=new Set(qe.field.map(rowName).filter(Boolean));
  let fldOut=(matchDraft.fielding||[]).filter(r=>!fldNames.has(r.name));
  qe.field.forEach(r=>{let n=rowName(r);if(!n)return;if(![r.ct,r.dr,r.ro,r.st,r.mf].some(v=>String(v)!==""))return;fldOut.push({name:n,catches:r.ct,drops:r.dr,runouts:r.ro,stumpings:r.st,misfields:r.mf})});
- matchDraft.batting=batOut;matchDraft.bowling=bowlOut;matchDraft.fielding=fldOut;
+ matchDraft.batting=otherBat.concat(batOut);matchDraft.bowling=otherBowl.concat(bowlOut);matchDraft.fielding=fldOut;
  let used=new Set([...batOut,...bowlOut,...fldOut].map(r=>r.name));
  document.querySelectorAll('input[name="playingXI"]').forEach(cb=>{if(used.has(cb.value))cb.checked=true});
  ["batting","bowling"].forEach(id=>{let b=document.getElementById("matchSec-"+id),h=document.getElementById("matchSecHead-"+id);if(b)b.style.display="";if(h)h.classList.add("open")});
- renderBattingRows();renderBowlingRows();renderFieldingRows();syncTeamFielding();qeClose();
+ renderBattingRows();renderBowlingRows();renderFieldingRows();syncTeamFielding();qeClose();renderMatchInnings();
 }
 function copyLastPlayingXI(){
  let matches=db.matches.filter(m=>m.id!==editingMatchId&&m.playingXI&&m.playingXI.length).slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||"")));
@@ -6786,6 +6868,15 @@ function saveMatch(e){
  if(m.fieldingReview.length){let S=fieldSums(m.fieldingReview);m.taken=S.taken;m.missed=S.missed;m.runouts=S.runouts;m.stumpings=S.stumpings;m.misfields=S.misfields}
  m.playingXI=fd.getAll("playingXI");
  m.actionItems=(matchActionDraft||[]).filter(a=>a&&String(a.text||"").trim()).map(a=>({...a,text:String(a.text).trim()}));if(!m.actionItems.length)delete m.actionItems;
+ if(matchMultiOn()&&matchInnDraft.some(matchInnFilled)){
+  let team=m.team||"Us";m.innings=matchInnDraft.map((i,k)=>({no:k+1,ours:matchInnOurs(k+1),runs:i.runs===""?"":+i.runs,wkts:i.wkts===""?"":+i.wkts,overs:i.overs||"",declared:!!i.declared,followOn:!!i.followOn})).filter(matchInnFilled);
+  let sd=matchInnCalc(matchInnDraft,matchInnFirstOurs);
+  m.ourRuns=sd.our.n?String(sd.our.r):"";m.ourWkts=sd.our.n?String(sd.our.w):"";m.ourOvers=sd.our.b?ballsToOv(sd.our.b):"";
+  m.oppRuns=sd.opp.n?String(sd.opp.r):"";m.oppWkts=sd.opp.n?String(sd.opp.w):"";m.oppOvers=sd.opp.b?ballsToOv(sd.opp.b):"";
+  m.batted=matchInnFirstOurs?"First":"Second";
+  m.scoreLine=(sd.our.parts.join(" & ")||"-")+" v "+(sd.opp.parts.join(" & ")||"-");
+  m.battingReview.forEach(r=>{if(!r.inn)r.inn=1});m.bowlingReview.forEach(r=>{if(!r.inn)r.inn=1});
+ }else{delete m.innings;m.battingReview.forEach(r=>{delete r.inn});m.bowlingReview.forEach(r=>{delete r.inn})}
  if(m.endDate&&m.endDate<m.date){alert("The end date cannot be before the start date.");return}
  if(!m.endDate||m.endDate===m.date)delete m.endDate;
  if(!String(m.result||"").trim()&&m.outcome)m.result=m.outcome==="Won"?"Won":m.outcome==="Lost"?"Lost":m.outcome;
@@ -6830,9 +6921,9 @@ function matchReportView(id){
  </div>
  <div class="card" style="margin-top:12px"><p><b>Venue:</b> ${esc(m.venue||"—")}</p></div>
  <h2>Foundation</h2><div class="card"><p><b>Conditions:</b> ${esc(m.conditions||"—")}</p></div>
- ${m.scorerInnings?scorerInningsHtml(m):`<h2>Batting Review</h2>${battingRows?`<table class="reportTable"><tr><th>Batter</th><th>Runs</th><th>Balls</th><th>Dismissal</th><th>Notes</th></tr>${battingRows}</table>`:empty("No batting entries recorded.")}`}
+ ${m.scorerInnings?scorerInningsHtml(m):m.innings?`<h2>Scorecard</h2>${m.scoreLine?`<div class="card" style="margin-bottom:6px"><b style="font-size:var(--fs-5)">${esc(m.scoreLine)}</b><div class="muted">${esc(m.team||"Us")} v ${esc(m.opp||"Opposition")}${m.result?" · "+esc(m.result):""}</div></div>`:""}${matchInningsReportHtml(m)}`:`<h2>Batting Review</h2>${battingRows?`<table class="reportTable"><tr><th>Batter</th><th>Runs</th><th>Balls</th><th>Dismissal</th><th>Notes</th></tr>${battingRows}</table>`:empty("No batting entries recorded.")}`}
  ${m.battingRatings?`<div class="card" style="margin-top:10px"><b style="display:block;margin-bottom:2px">Batting Assessment · ${avgRatingObj(m.battingRatings).toFixed(1)}/10 avg</b>${metricRows(m.battingRatings)}${m.battingAssessmentNotes?`<p style="margin-top:8px">${esc(m.battingAssessmentNotes)}</p>`:""}</div>`:""}
- ${m.scorerInnings?"":`<h2>Bowling Review</h2>${bowlingRows?`<table class="reportTable"><tr><th>Bowler</th><th>Overs</th><th>Runs</th><th>Wickets</th><th>Notes</th></tr>${bowlingRows}</table>`:empty("No bowling entries recorded.")}`}
+ ${(m.scorerInnings||m.innings)?"":`<h2>Bowling Review</h2>${bowlingRows?`<table class="reportTable"><tr><th>Bowler</th><th>Overs</th><th>Runs</th><th>Wickets</th><th>Notes</th></tr>${bowlingRows}</table>`:empty("No bowling entries recorded.")}`}
  ${m.bowlingRatings?`<div class="card" style="margin-top:10px"><b style="display:block;margin-bottom:2px">Bowling Assessment · ${avgRatingObj(m.bowlingRatings).toFixed(1)}/10 avg</b>${metricRows(m.bowlingRatings)}${m.bowlingAssessmentNotes?`<p style="margin-top:8px">${esc(m.bowlingAssessmentNotes)}</p>`:""}</div>`:""}
  ${m.scorecardText&&!m.scorerInnings?`<h2>Full Scorecard</h2><div class="card"><pre style="white-space:pre-wrap;word-break:break-word;margin:0;font-family:inherit;font-size:var(--fs-2);line-height:1.5">${esc(m.scorecardText)}</pre></div>`:""}
  <h2>Fielding Review</h2><div class="card">${(m.taken||m.missed||m.runouts||m.misfields||m.stumpings)?`<p>Catches taken ${esc(m.taken||0)} · Dropped ${esc(m.missed||0)} · Run outs ${esc(m.runouts||0)} · Stumpings ${esc(m.stumpings||0)} · Misfields ${esc(m.misfields||0)}</p>`:""}${(m.fieldingReview||[]).length?`<table class="reportTable"><tr><th>Player</th><th>Catches</th><th>Dropped</th><th>Run outs</th><th>Stumpings</th><th>Misfields</th></tr>${m.fieldingReview.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.catches||"-")}</td><td>${esc(r.drops||"-")}</td><td>${esc(r.runouts||"-")}</td><td>${esc(r.stumpings||"-")}</td><td>${esc(r.misfields||"-")}</td></tr>`).join("")}</table>`:""}${m.fieldingRatings?`<b style="display:block;margin:10px 0 2px">Fielding Assessment · ${avgRatingObj(m.fieldingRatings).toFixed(1)}/10 avg</b>${metricRows(m.fieldingRatings)}`:""}<p style="margin-top:8px">${esc(m.notes||"—")}</p></div>
@@ -7157,7 +7248,7 @@ function matchStatsAgg(matches,onlyName){
   (m.fieldingReview||[]).forEach(r=>{if(!r||!r.name)return;if(onlyName&&!sameName(r.name,onlyName))return;let p=g(r.name);p.mats[m.id]=1;p.fldInns++;p.ct+=+r.catches||0;p.dr+=+r.drops||0;p.ro+=+r.runouts||0;p.st+=+r.stumpings||0;p.mf+=+r.misfields||0});
   if(!onlyName){
    if(m.taken||m.missed||m.runouts||m.misfields||m.stumpings){T.stump+=+m.stumpings||0;T.taken+=+m.taken||0;T.missed+=+m.missed||0;T.runouts+=+m.runouts||0;T.misfields+=+m.misfields||0;T.fieldN++}
-   {let t=matchTotals(m);if(t){T.forRuns+=t.fr;T.againstRuns+=t.ar;T.wLost+=t.fw;T.wTaken+=t.aw;T.scoredN++;if(t.fb){T.fB+=t.fb;T.fBR+=t.fr}if(t.ab){T.aB+=t.ab;T.aBR+=t.ar}if(T.hi===null||t.fr>T.hi)T.hi=t.fr;if(T.lo===null||t.fr<T.lo)T.lo=t.fr;T.rows.push({date:m.date,opp:m.opp,oc:matchResultOutcome(m),t})}}
+   {let t=matchTotals(m);if(t){T.forRuns+=t.fr;T.againstRuns+=t.ar;T.wLost+=t.fw;T.wTaken+=t.aw;T.scoredN++;if(t.fb){T.fB+=t.fb;T.fBR+=t.fr}if(t.ab){T.aB+=t.ab;T.aBR+=t.ar}{let oi=(m.innings||[]).filter(i=>i.ours&&String(i.runs)!==""),hiR=oi.length?Math.max(...oi.map(i=>+i.runs||0)):t.fr,loR=oi.length?Math.min(...oi.map(i=>+i.runs||0)):t.fr;if(T.hi===null||hiR>T.hi)T.hi=hiR;if(T.lo===null||loR<T.lo)T.lo=loR}T.rows.push({date:m.date,opp:m.opp,oc:matchResultOutcome(m),t})}}
    {let bf=matchBattedFirst(m),oc=matchResultOutcome(m);if(bf!==null&&(oc==="Win"||oc==="Loss"||oc==="Draw")){if(bf){T.bfN++;if(oc==="Win")T.bfW++}else{T.chN++;if(oc==="Win")T.chW++}}}
    let oc=matchResultOutcome(m);if(oc==="Win"||oc==="Loss"||oc==="Draw"){T.decided++;if(oc==="Win")T.wins++;else if(oc==="Loss")T.losses++;else T.draws++}
   }
@@ -7317,8 +7408,8 @@ function playerSkillSeries(aa){
  return sk}
 function playerStory(p,aa,matches,dt,attendanceRate){
  let sk=playerSkillSeries(aa),L=[];
- let bat=matches.map(m=>(m.battingReview||[]).find(r=>sameName(r.name,p.name))).filter(Boolean);
- let bowl=matches.map(m=>(m.bowlingReview||[]).find(r=>sameName(r.name,p.name))).filter(Boolean);
+ let bat=matches.flatMap(m=>matchRowsFor(m,"battingReview",p.name));
+ let bowl=matches.flatMap(m=>matchRowsFor(m,"bowlingReview",p.name));
  let fld=matches.map(m=>(m.fieldingReview||[]).find(r=>sameName(r.name,p.name))).filter(Boolean);
  let halves=a=>{if(a.length<4)return null;let mid=Math.floor(a.length/2);return [a.slice(0,mid),a.slice(mid)]};
  let avg=a=>a.length?a.reduce((s,v)=>s+v,0)/a.length:null;
@@ -7430,9 +7521,9 @@ function playerJourneyEvents(p){
  let ev=[],mon=d=>String(d||"").slice(0,7);
  playerAssessments(p).forEach(a=>{let v=assessmentAvg(a);ev.push({d:a.date,k:"a",t:`Assessment${assessmentDisciplines(a).length?" · "+assessmentDisciplines(a).join(", "):""}${v!=="—"?" · "+v+"/10":""}`})});
  campOfPlayer(p).forEach(c=>{let r=campRevOf(c,p.name),rec=r.rec==="in"?"In":r.rec==="maybe"?"Maybe":r.rec==="out"?"Out":"";ev.push({d:c.startDate,k:"c",t:`Camp · ${c.name}${rec?" · "+rec:""}${r.r?" ("+r.r+"/5)":""}`})});
- playerMatches(p).forEach(m=>{let bits=[];let b=(m.battingReview||[]).find(r=>sameName(r.name,p.name)),w=(m.bowlingReview||[]).find(r=>sameName(r.name,p.name)),f=(m.fieldingReview||[]).find(r=>sameName(r.name,p.name));
-  if(b&&(b.runs!==""&&b.runs!=null))bits.push(`${b.runs}${b.balls?" ("+b.balls+")":""}${isOutText(b.dismissal)?"":"*"}`);
-  if(w&&(w.overs||w.wickets))bits.push(`${w.wickets||0}/${w.runs||0}`);
+ playerMatches(p).forEach(m=>{let bits=[];let bs=matchRowsFor(m,"battingReview",p.name),ws=matchRowsFor(m,"bowlingReview",p.name),f=(m.fieldingReview||[]).find(r=>sameName(r.name,p.name));
+  let bt=bs.filter(b=>b.runs!==""&&b.runs!=null).map(b=>`${b.runs}${b.balls?" ("+b.balls+")":""}${isOutText(b.dismissal)?"":"*"}`);if(bt.length)bits.push(bt.join(" & "));
+  let wt=ws.filter(w=>w.overs||w.wickets).map(w=>`${w.wickets||0}/${w.runs||0}`);if(wt.length)bits.push(wt.join(" & "));
   if(f&&+f.catches)bits.push(`${f.catches} catch${+f.catches!==1?"es":""}`);
   let oc=matchResultOutcome(m);ev.push({d:m.date,k:"m",t:`Match vs ${m.opp||"opponent"}${oc?" · "+oc:""}${bits.length?" · "+bits.join(" · "):""}`})});
  let bym={};playerSessions(p).forEach(s=>{(bym[mon(s.date)]=bym[mon(s.date)]||[]).push(s)});
@@ -7450,7 +7541,7 @@ function playerJourneyHtml(p,open){
 /* selection evidence */
 function selectionRow(p,t){
  let ms=uspByDate(playerMatches(p)),A=matchStatsAgg(ms,p.name).players[0];
- let bat=ms.map(m=>(m.battingReview||[]).find(r=>sameName(r.name,p.name))).filter(Boolean);
+ let bat=ms.flatMap(m=>matchRowsFor(m,"battingReview",p.name));
  let l=[];
  if(bat.length)l.push(`Form: ${bat.slice(-3).map(r=>(r.runs||0)+(isOutText(r.dismissal)?"":"*")).join(", ")}${A&&A.outs?" · avg "+(A.runs/A.outs).toFixed(1):""}`);
  if(A&&A.w)l.push(`${A.w} wkts · econ ${econText(A)}`);else if(A&&A.ob)l.push(`Bowling econ ${econText(A)}`);
@@ -8480,7 +8571,7 @@ function buildPlayerReport(){
   });
  });
  let matches=playerMatches(p).filter(m=>inRange(m.date,from,to)).slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
- let battingEntries=matches.map(m=>(m.battingReview||[]).find(r=>sameName(r.name,p.name))).filter(Boolean);
+ let battingEntries=matches.flatMap(m=>matchRowsFor(m,"battingReview",p.name));
  let bowlingEntries=matches.map(m=>(m.bowlingReview||[]).find(r=>sameName(r.name,p.name))).filter(Boolean);
  let totalRuns=battingEntries.reduce((s,r)=>s+(+r.runs||0),0);
  let totalWickets=bowlingEntries.reduce((s,r)=>s+(+r.wickets||0),0);
