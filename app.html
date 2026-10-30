@@ -7969,7 +7969,7 @@ function updateScopeValueField(){
  let type=document.getElementById("reportScopeType").value;
  let wrap=document.getElementById("reportScopeValueWrap");
  if(type==="team"){
-  let teams=[...new Set(db.players.map(p=>p.team).filter(Boolean))];
+  let teams=[...new Set([...db.players.map(p=>p.team),...db.matches.map(m=>m.team)].filter(Boolean))];
   wrap.innerHTML=teams.length?`<label>Team<select id="reportScopeValue">${teams.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("")}</select></label>`:`<div class="muted">No teams assigned to any player yet.</div>`;
  }else if(type==="player"){
   wrap.innerHTML=activePlayers().length?`<label>Player<select id="reportScopeValue">${activePlayers().map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("")}</select></label>`:`<div class="muted">No players added yet.</div>`;
@@ -8428,23 +8428,33 @@ function customReportBuilder(){
 // directly when possible, and falls back to "attended/played by someone in
 // the scoped roster" for scopes (player/group/tournament) that don't map to
 // a single team name — same fallback buildTeamReport already relies on.
+function rptTeamList(){return [...new Set([...db.players.map(p=>p.team),...db.matches.map(m=>m.team),...activeSessions().map(x=>x.squad),...(db.teams||[]).map(t=>t.name)].filter(Boolean))].sort()}
+function rptTeamSelect(id){let t=rptTeamList();return t.length?`<label>Team <span class="muted" style="font-weight:400">(optional)</span><select id="${id}"><option value="">All teams</option>${t.map(x=>`<option value="${esc(x)}">${esc(x)}</option>`).join("")}</select></label>`:""}
+function rptTeamVal(id){let e=document.getElementById(id);return e?e.value:""}
+function rptSessInTeam(x,team){return !team||x.squad===team}
+function rptMatchInTeam(m,team){return !team||m.team===team}
+function rptAssessInTeam(a,team){if(!team)return true;let p=db.players.find(q=>q.name===a.player);return !!p&&p.team===team}
+function rptReflInTeam(r,team){if(!team)return true;let x=r.sessionId&&db.sessions.find(q=>q.id===r.sessionId);if(x)return x.squad===team;let m=r.matchId&&db.matches.find(q=>q.id===r.matchId);return !!m&&m.team===team}
 function sessionsInScope(scope,from,to){
  if(scope.type==="team")return activeSessions().filter(s=>s.squad===scope.value&&inRange(s.date,from,to));
  if(scope.type==="season"){
   let season=db.seasons.find(x=>x.id===scope.value);
-  return season&&season.team?activeSessions().filter(s=>s.squad===season.team&&inRange(s.date,from,to)):[];
+  if(!season)return [];
+  return activeSessions().filter(s=>(!season.team||s.squad===season.team)&&(!(season.startDate&&season.endDate)||(s.date>=season.startDate&&s.date<=season.endDate))&&inRange(s.date,from,to));
  }
  if(scope.type==="all")return activeSessions().filter(s=>inRange(s.date,from,to));
  let names=new Set(playersInScope(scope).map(p=>p.name));
  return activeSessions().filter(s=>inRange(s.date,from,to)&&(s.attendees||[]).some(n=>names.has(n)));
 }
 function matchesInScope(scope,roster,from,to){
- if(scope.type==="team")return db.matches.filter(m=>m.team===scope.value&&matchInRange(m,from,to));
+ if(scope.type==="team")return db.matches.filter(m=>m.team===scope.value&&matchInRange(m,from,to)).sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
  if(scope.type==="season"){
   let season=db.seasons.find(x=>x.id===scope.value);
-  return season&&season.team?db.matches.filter(m=>m.team===season.team&&matchInRange(m,from,to)):[];
+  if(!season)return [];
+  return db.matches.filter(m=>(!season.team||m.team===season.team)&&(!(season.startDate&&season.endDate)||(m.date>=season.startDate&&m.date<=season.endDate))&&matchInRange(m,from,to)).sort((x,y)=>String(x.date||"").localeCompare(String(y.date||"")));
  }
  if(scope.type==="all")return db.matches.filter(m=>matchInRange(m,from,to));
+ if(scope.type==="tournament")return db.matches.filter(m=>m.tournamentId===scope.value&&matchInRange(m,from,to)).sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
  let seen=new Set(),out=[];
  roster.forEach(p=>{playerMatches(p).forEach(m=>{if(matchInRange(m,from,to)&&!seen.has(m.id)){seen.add(m.id);out.push(m)}})});
  return out.sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
@@ -8554,18 +8564,20 @@ function fmtMonthKey(mk){if(!mk||!/^\d{4}-\d{2}/.test(mk))return mk||"";let[y,m]
 function monthlyReport(){
  modal(`<div class="sheetHead"><h2>Monthly Coaching Report</h2><button class="x" onclick="closeM()">×</button></div>
  <label>Select month<input type="month" id="monthlyReportMonth" value="${today().slice(0,7)}"></label>
+ ${rptTeamSelect("monthlyReportTeam")}
  <button class="btn primary" style="margin-top:15px" onclick="buildMonthlyReport()">Generate Report</button>`);
 }
 function buildMonthlyReport(){
  let mk=(document.getElementById("monthlyReportMonth").value||today().slice(0,7));
- let ss=activeSessions().filter(x=>monthKey(x.date)===mk),aa=db.assessments.filter(x=>monthKey(x.date)===mk),rr=db.reflections.filter(x=>monthKey(x.date)===mk),mm=db.matches.filter(x=>monthKey(x.date)===mk),hrs=ss.reduce((a,s)=>a+(+s.duration||0),0)/60;
+ let mTeam=rptTeamVal("monthlyReportTeam");
+ let ss=activeSessions().filter(x=>monthKey(x.date)===mk&&rptSessInTeam(x,mTeam)),aa=db.assessments.filter(x=>monthKey(x.date)===mk&&rptAssessInTeam(x,mTeam)),rr=db.reflections.filter(x=>monthKey(x.date)===mk&&rptReflInTeam(x,mTeam)),mm=db.matches.filter(x=>monthKey(x.date)===mk&&rptMatchInTeam(x,mTeam)),hrs=ss.reduce((a,s)=>a+(+s.duration||0),0)/60;
  {let [yy,mo]=mk.split("-").map(Number),pk=mo===1?(yy-1)+"-12":yy+"-"+String(mo-1).padStart(2,"0");
-  let ps=activeSessions().filter(x=>monthKey(x.date)===pk),pa=db.assessments.filter(x=>monthKey(x.date)===pk),pm=db.matches.filter(x=>monthKey(x.date)===pk),ph=ps.reduce((a,x)=>a+(+x.duration||0),0)/60;
+  let ps=activeSessions().filter(x=>monthKey(x.date)===pk&&rptSessInTeam(x,mTeam)),pa=db.assessments.filter(x=>monthKey(x.date)===pk&&rptAssessInTeam(x,mTeam)),pm=db.matches.filter(x=>monthKey(x.date)===pk&&rptMatchInTeam(x,mTeam)),ph=ps.reduce((a,x)=>a+(+x.duration||0),0)/60;
   let wr=ms=>{let T=matchStatsAgg(ms).T;return T.decided?T.wins/T.decided*100:null};
   let rows=[["Sessions",rptArrow(ps.length,ss.length,true,x=>x.toFixed(0))],["Hours",rptArrow(ph,hrs,true)],["Assessments",rptArrow(pa.length,aa.length,true,x=>x.toFixed(0))],["Matches",rptArrow(pm.length,mm.length,true,x=>x.toFixed(0))],["Win rate",rptArrow(wr(pm),wr(mm),true,x=>Math.round(x),"%")]].filter(x=>x[1]);
   let extra=(ps.length||pa.length||pm.length)&&rows.length?`<div class="muted" style="margin-top:10px">Compared with ${esc(fmtMonthKey(pk))}</div>${rows.map(x=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0"><span>${x[0]}</span><span>${x[1]}</span></div>`).join("")}`:"";
-  let o={label:"Monthly Coaching Report",period:fmtMonthKey(mk),matches:mm,sessions:ss,extra};setReportExtras(reportCoverHtml(o),reportNextHtml(o))}
- reportShell("Monthly Coaching Report",fmtMonthKey(mk),`<div class="grid g4"><div class="card stat"><span>Sessions</span><b>${ss.length}</b></div><div class="card stat"><span>Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Assessments</span><b>${aa.length}</b></div><div class="card stat"><span>Reflections</span><b>${rr.length}</b></div></div>${mm.length?`<h2>Match Performance</h2>${matchPerfHtml(mm)}${trainingResultsHtml(ss,mm)}`:""}<h2>Sessions</h2>${ss.length?ss.map(s=>`<div class="card"><b>${esc(fmtDate(s.date))} · ${esc(s.title||sessionLabel(s))}</b> <span class="tag">${esc(sessionTypeLabel(s.sessionType))}</span>${sessFocusHtml(s)}<p>${esc(s.objectives||"")}</p></div>`).join(""):empty("No sessions in this month.")}<h2>Assessments</h2>${aa.length?aa.map(a=>`<div class="card"><b>${esc(a.player)} · ${assessmentAvg(a)}/10</b><p>${esc(a.priority||"")}</p></div>`).join(""):empty("No assessments in this month.")}<h2>Match actions</h2>${mm.filter(m=>m.actions||m.notes||matchActionItems(m).length).length?mm.filter(m=>m.actions||m.notes||matchActionItems(m).length).map(m=>`<div class="card"><b>${esc(m.team)} vs ${esc(m.opp)}</b><p>${esc(m.actions||m.notes||"")}</p></div>`).join(""):empty("No match notes in this month.")}`)}
+  let o={label:"Monthly Coaching Report"+(mTeam?" — "+mTeam:""),period:fmtMonthKey(mk),matches:mm,sessions:ss,extra};setReportExtras(reportCoverHtml(o),reportNextHtml(o))}
+ reportShell("Monthly Coaching Report"+(mTeam?" — "+esc(mTeam):""),fmtMonthKey(mk),`<div class="grid g4"><div class="card stat"><span>Sessions</span><b>${ss.length}</b></div><div class="card stat"><span>Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Assessments</span><b>${aa.length}</b></div><div class="card stat"><span>Reflections</span><b>${rr.length}</b></div></div>${mm.length?`<h2>Match Performance</h2>${matchPerfHtml(mm)}${trainingResultsHtml(ss,mm)}`:""}<h2>Sessions</h2>${ss.length?ss.map(s=>`<div class="card"><b>${esc(fmtDate(s.date))} · ${esc(s.title||sessionLabel(s))}</b> <span class="tag">${esc(sessionTypeLabel(s.sessionType))}</span>${sessFocusHtml(s)}<p>${esc(s.objectives||"")}</p></div>`).join(""):empty("No sessions in this month.")}<h2>Assessments</h2>${aa.length?aa.map(a=>`<div class="card"><b>${esc(a.player)} · ${assessmentAvg(a)}/10</b><p>${esc(a.priority||"")}</p></div>`).join(""):empty("No assessments in this month.")}<h2>Match actions</h2>${mm.filter(m=>m.actions||m.notes||matchActionItems(m).length).length?mm.filter(m=>m.actions||m.notes||matchActionItems(m).length).map(m=>`<div class="card"><b>${esc(m.team)} vs ${esc(m.opp)}</b><p>${esc(m.actions||m.notes||"")}</p></div>`).join(""):empty("No match notes in this month.")}`)}
 function playerReport(){
  if(!activePlayers().length){alert("Add a player first.");return}
  modal(`<div class="sheetHead"><h2>Player Development Report</h2><button class="x" onclick="closeM()">×</button></div>
@@ -8592,7 +8604,7 @@ function buildPlayerReport(){
  });
  let matches=playerMatches(p).filter(m=>matchInRange(m,from,to)).slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
  let battingEntries=matches.flatMap(m=>matchRowsFor(m,"battingReview",p.name));
- let bowlingEntries=matches.map(m=>(m.bowlingReview||[]).find(r=>sameName(r.name,p.name))).filter(Boolean);
+ let bowlingEntries=matches.flatMap(m=>matchRowsFor(m,"bowlingReview",p.name));
  let totalRuns=battingEntries.reduce((s,r)=>s+(+r.runs||0),0);
  let totalWickets=bowlingEntries.reduce((s,r)=>s+(+r.wickets||0),0);
  let backToBackCount=0;
@@ -8663,9 +8675,9 @@ function buildSeasonReport(){
  let{from,to}=reportRangeValues();
  let roster=playersInScope(scope);
  let rosterNames=new Set(roster.map(p=>p.name));
- let sessions=activeSessions().filter(s=>inRange(s.date,from,to));
- let reflections=db.reflections.filter(r=>inRange(r.date,from,to));
- let matches=db.matches.filter(m=>matchInRange(m,from,to));
+ let sessions=sessionsInScope(scope,from,to);
+ let matches=matchesInScope(scope,roster,from,to);
+ let reflections=db.reflections.filter(r=>inRange(r.date,from,to)&&(scope.type==="all"||sessions.some(x=>x.id===r.sessionId)||matches.some(m=>m.id===r.matchId)));
  let hrs=sessions.reduce((a,s)=>a+(+s.duration||0),0)/60;
  let wins=matches.filter(m=>matchResultOutcome(m)==="Win").length;
  let losses=matches.filter(m=>matchResultOutcome(m)==="Loss").length;
@@ -8697,34 +8709,59 @@ function buildSeasonReport(){
  ${seasonStoryHtml({label:"",matches,sessions,roster,from,to})}
  <h2>Players</h2>${roster.map(p=>`<div class="card"><b>${esc(p.name)} · ${esc(p.role||"")}</b><p>${esc(p.focus||"")}</p></div>`).join("")||empty("No players in this scope.")}
  <h2>Coach Reflections Summary</h2><div class="card"><p>${reflections.length} reflection${reflections.length!==1?"s":""} logged this period.</p></div>`)}
-function sessionReport(){reportRangeModal("Session Report","buildSessionReport")}
+function sessionReport(){
+ let players=activePlayers();
+ modal(`<div class="sheetHead"><h2>Session Report</h2><button class="x" onclick="closeM()">×</button></div>
+ <div class="muted" style="margin-bottom:12px">Leave everything blank to include all sessions, or narrow it down.</div>
+ <div class="formgrid">
+ ${rptTeamSelect("sessRptTeam")}
+ <label>Player <span class="muted" style="font-weight:400">(optional)</span><select id="sessRptPlayer"><option value="">All players</option>${players.map(p=>`<option value="${esc(p.name)}">${esc(p.name)}</option>`).join("")}</select></label>
+ <label>Session type <span class="muted" style="font-weight:400">(optional)</span><select id="sessRptType"><option value="">All types</option><option value="team">Team / Squad</option><option value="player">Individual (1-on-1)</option><option value="custom">Custom group</option></select></label>
+ <label>Led by <span class="muted" style="font-weight:400">(optional)</span><select id="sessRptLed"><option value="">Anyone</option><option value="__me">Me</option>${["Assistant coach","S&C trainer","Physio","External / guest"].map(o=>`<option value="${o}">${o}</option>`).join("")}</select></label>
+ <label>From <span class="muted" style="font-weight:400">(optional)</span><input type="date" id="reportRangeFrom"></label>
+ <label>To <span class="muted" style="font-weight:400">(optional)</span><input type="date" id="reportRangeTo"></label>
+ </div>
+ <button class="btn primary" style="margin-top:15px" onclick="buildSessionReport()">Generate Report</button>`)}
 function sessionTypeLabel(t){return t==="team"?"Team":t==="player"?"1-on-1":t==="custom"?"Group":"—"}
 function buildSessionReport(){
  let{from,to}=reportRangeValues();
- let sessions=activeSessions().filter(s=>inRange(s.date,from,to));
+ let sTeam=rptTeamVal("sessRptTeam"),sPl=rptTeamVal("sessRptPlayer"),sTy=rptTeamVal("sessRptType"),sLed=rptTeamVal("sessRptLed");
+ let sPlayer=sPl?db.players.find(p=>p.name===sPl):null;
+ let sessions=activeSessions().filter(s=>inRange(s.date,from,to)&&rptSessInTeam(s,sTeam)&&(!sPl||(s.attendees||[]).some(n=>sameName(n,sPl))||(sPlayer&&s.sessionPlayerId===sPlayer.id))&&(!sTy||(s.sessionType||"custom")===sTy)&&(!sLed||(sLed==="__me"?!s.ledBy:s.ledBy===sLed)));
+ let sParts=[sTeam,sPl,sTy?{team:"Team sessions",player:"1-on-1",custom:"Custom group"}[sTy]:"",sLed?(sLed==="__me"?"Led by me":"Led by "+sLed):""].filter(Boolean);
  let categoryCounts=OBJECTIVE_CATEGORIES.map(c=>({name:c,count:sessions.filter(s=>(s.objectiveTags||[]).includes(c)).length})).sort((a,b)=>b.count-a.count);
  let hasAnyTags=categoryCounts.some(c=>c.count>0);
- reportShell("Session Report",rangeLabel(from,to),sessions.length?`
+ reportShell("Session Report"+(sParts.length?" — "+esc(sParts.join(" · ")):""),rangeLabel(from,to)+" · "+sessions.length+" session"+(sessions.length!==1?"s":""),sessions.length?`
  ${hasAnyTags?`<h2>Objective Category Breakdown</h2><div class="card">${categoryCounts.map(c=>`<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${esc(c.name)}</span><b>${c.count} session${c.count!==1?"s":""}</b></div>`).join("")}</div>`:""}
  <table class="reportTable"><tr><th>Date</th><th>Title</th><th>Type</th><th>Focus</th><th>Categories</th><th>Objectives</th></tr>${sessions.slice().sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b))).map(s=>`<tr><td>${esc(fmtDate(s.date))}</td><td>${esc(s.title||"—")}</td><td>${esc(sessionTypeLabel(s.sessionType))}</td><td>${esc(s.focus)}</td><td>${(s.objectiveTags||[]).map(t=>esc(t)).join(", ")||"—"}</td><td>${esc(s.objectives)}</td></tr>`).join("")}</table>`:empty("No sessions documented."));
 }
-function matchReport(){reportRangeModal("Match Report","buildMatchReport")}
+function matchReport(){scopeAndRangeModal("Match Report","buildMatchReport")}
 function buildMatchReport(){
+ let scope=scopeValues();
  let{from,to}=reportRangeValues();
- let matches=db.matches.filter(m=>matchInRange(m,from,to));
+ let matches=matchesInScope(scope,playersInScope(scope),from,to);
  let batAvgs=matches.map(m=>avgRatingObj(m.battingRatings)).filter(v=>v>0);
  let bowlAvgs=matches.map(m=>avgRatingObj(m.bowlingRatings)).filter(v=>v>0);
  let fieldAvgs=matches.map(m=>avgRatingObj(m.fieldingRatings)).filter(v=>v>0);
  let avgOf=arr=>arr.length?(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1):"—";
- {let o={label:"Match Report",period:rangeLabel(from,to),matches};setReportExtras(reportCoverHtml(o),reportNextHtml(o))}
- reportShell("Match Report",rangeLabel(from,to)+" · "+matches.length+" match"+(matches.length!==1?"es":""),
+ {let o={label:scope.type==="all"?"Match Report":"Match Report — "+scopeLabel(scope),period:rangeLabel(from,to),matches};setReportExtras(reportCoverHtml(o),reportNextHtml(o))}
+ reportShell("Match Report"+(scope.type==="all"?"":" — "+esc(scopeLabel(scope))),rangeLabel(from,to)+" · "+matches.length+" match"+(matches.length!==1?"es":""),
  `${matchPerfHtml(matches)}
  <h2>Match History</h2>${matches.map(m=>`<div class="card"><b>${esc(matchDateStr(m))} · ${esc(m.team)} vs ${esc(m.opp)}</b>${matchHighlightHtml(m)}${(m.teamNotes||m.teamRating)?`<p><b>Team Review:</b> ${esc(m.teamRating||"—")}/10${m.teamNotes?" · "+esc(m.teamNotes):""}</p>`:""}${m.actions?`<p><b>Training actions:</b> ${esc(m.actions)}</p>`:""}</div>`).join("")||empty("No match notes.")}`);
 }
-function coachReport(){reportRangeModal("Coach Development Report","buildCoachReport")}
+function coachReport(){
+ modal(`<div class="sheetHead"><h2>Coach Development Report</h2><button class="x" onclick="closeM()">×</button></div>
+ <div class="muted" style="margin-bottom:12px">Leave both blank to include all-time data, or set a range to narrow it.</div>
+ <div class="formgrid">
+ ${rptTeamSelect("coachRptTeam")}
+ <label>From <span class="muted" style="font-weight:400">(optional)</span><input type="date" id="reportRangeFrom"></label>
+ <label>To <span class="muted" style="font-weight:400">(optional)</span><input type="date" id="reportRangeTo"></label>
+ </div>
+ <button class="btn primary" style="margin-top:15px" onclick="buildCoachReport()">Generate Report</button>`)}
 function buildCoachReport(){
  let{from,to}=reportRangeValues();
- let reflections=db.reflections.filter(r=>inRange(r.date,from,to));
+ let cTeam=rptTeamVal("coachRptTeam");
+ let reflections=db.reflections.filter(r=>inRange(r.date,from,to)&&rptReflInTeam(r,cTeam));
  let objectiveRatingAgg={};
  reflections.forEach(r=>{
   if(!r.objectiveRatings)return;
@@ -8736,7 +8773,7 @@ function buildCoachReport(){
   });
  });
  let objectiveRatingRows=Object.entries(objectiveRatingAgg).map(([cat,d])=>({cat,avg:d.sum/d.count,count:d.count})).sort((a,b)=>b.avg-a.avg);
- reportShell("Coach Development Report",rangeLabel(from,to),
+ reportShell("Coach Development Report"+(cTeam?" — "+esc(cTeam):""),rangeLabel(from,to),
  `${objectiveRatingRows.length?`<h2 style="margin-top:0">Objective Achievement — Term Average</h2><div class="card">${objectiveRatingRows.map(r=>`<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${esc(r.cat)} <span class="muted" style="font-size:var(--fs-2)">(${r.count} reflection${r.count!==1?"s":""})</span></span><b>${r.avg.toFixed(1)}/5</b></div>`).join("")}</div>`:""}
  ${reflections.length?reflections.map(r=>{
   let reasonsPart=(r.betterReasons&&r.betterReasons.length)?r.betterReasons.join(", "):"";
