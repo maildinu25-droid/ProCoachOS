@@ -2131,7 +2131,7 @@ function reflToggleDebrief(on){
 function debriefSummaryText(x){return [x.debriefFeedback,x.debriefActions?"Follow-up: "+x.debriefActions:"",x.debriefNiggles?"Concerns: "+x.debriefNiggles:""].filter(Boolean).join(" · ")||(x.debriefDone||"Debrief")}
 function latestDebriefFor(team){
  let cut=new Date(new Date(today()+"T00:00:00Z").getTime()-21*86400000).toISOString().slice(0,10);
- return db.reflections.filter(r=>r.debriefMode&&(r.debriefActions||r.debriefNiggles)&&String(r.date||"")>=cut&&(()=>{let s=db.sessions.find(x=>x.id===r.sessionId);return !team||!s||s.squad===team})()).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]||null}
+ return db.reflections.filter(r=>r.debriefMode&&!r.followUpDismissed&&(r.debriefActions||r.debriefNiggles)&&String(r.date||"")>=cut&&(()=>{let s=db.sessions.find(x=>x.id===r.sessionId);return !team||!s||s.squad===team})()).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0]||null}
 /* measurable goals */
 const GOAL_MATCH_METRICS=[["bat|avg","Batting average (recent matches)",true,1],["bowl|econ","Bowling economy (recent matches)",false,2],["fld|catches","Catches per match (recent matches)",true,2],["att|rate","Training attendance %",true,0]];
 function goalMetricOptions(){
@@ -2302,6 +2302,12 @@ function smartSuggestionsHtml(){
  if(!list.length)return "";
  return `<div class="homeSection"><div class="card"><div class="homeSectionTitle" style="margin-bottom:6px">Suggestions</div>${list.map(x=>`<div style="display:flex;gap:8px;align-items:flex-start;padding:6px 0;border-top:1px solid var(--line)"><span style="cursor:pointer;flex:1" onclick="${x.action}">${esc(x.text)}</span><button class="btn secondary" style="padding:2px 8px" aria-label="Dismiss" onclick="sugDismiss('${esc(x.id)}')">×</button></div>`).join("")}<div class="muted" style="font-size:12px;margin-top:6px">Each line comes from your recent data. Tap to open, × to hide.</div></div></div>`}
 /* planner suggestions */
+function sugKey(x){return String(x.focus[0]||"")+"|"+String(x.why||"")}
+function sugDismissed(x){return !!(db.settings&&db.settings.dismissedSuggestions&&db.settings.dismissedSuggestions[sugKey(x)])}
+function persistQuiet(){try{idbSet(DB_KEY,db).catch(()=>{})}catch(e){}try{localStorage.setItem(DB_KEY,JSON.stringify(db))}catch(e){}}
+function sessionDismissSuggestion(i){let x=_sessSug[i];if(!x)return;db.settings=db.settings||{};db.settings.dismissedSuggestions=db.settings.dismissedSuggestions||{};db.settings.dismissedSuggestions[sugKey(x)]=today();persistQuiet();sessionSuggestRefresh()}
+function sessionDismissNextFocus(key){if(db.settings&&db.settings.nextFocus)delete db.settings.nextFocus[key];persistQuiet();sessionNextFocusRefresh()}
+function sessionDismissDebrief(id){let r=db.reflections.find(x=>x.id===id);if(r)r.followUpDismissed=true;persistQuiet();sessionNextFocusRefresh()}
 function focusSuggestions(type,team,playerName){
  let out=[],pl=playerName?db.players.find(p=>p.name===playerName):null;
  let ms=pl?uspByDate(playerMatches(pl)).slice(-8):sugTeamMatches(type==="team"?team:"",8);
@@ -2324,11 +2330,11 @@ function focusSuggestions(type,team,playerName){
  // match coming
  let nm=db.matches.filter(m=>matchEnd(m)>=today()&&(!team||!m.team||m.team===team)).sort((a,b)=>a.date.localeCompare(b.date))[0];
  if(nm){let d=Math.max(0,Math.round((new Date(nm.date)-new Date(today()))/86400000));if(d<=3)out.push({focus:["Match simulation"],tag:"Match preparation",why:`A match is ${d===0?"today":"in "+d+" day"+(d!==1?"s":"")}.`})}
- let seen=new Set();return out.filter(x=>{let k=x.focus[0];if(seen.has(k))return false;seen.add(k);return true}).slice(0,4).map(x=>({...x,repeat:x.focus[0]===lastFocus}))}
+ let seen=new Set();return out.filter(x=>{let k=x.focus[0];if(seen.has(k))return false;seen.add(k);return true}).filter(x=>!sugDismissed(x)).slice(0,4).map(x=>({...x,repeat:x.focus[0]===lastFocus}))}
 function sessionSuggestHtml(type,team,playerName){
  let l=[];try{l=focusSuggestions(type,team,playerName)}catch(e){console.warn(e)}
  if(!l.length)return "";
- return `<div class="card"><b>Suggested focus</b> <span class="muted" style="font-size:12px">· from recent matches and assessments</span>${l.map((x,i)=>`<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:5px 0"><span>${esc(x.focus.join(" + "))}${x.repeat?` <span class="muted">(same as your last session)</span>`:""}<div class="muted" style="font-size:13px">${esc(x.why)}</div>${x.drills&&x.drills.length?`<div class="muted" style="font-size:13px">Drills: ${x.drills.map(esc).join(" · ")}</div>`:""}</div><button type="button" class="btn secondary" style="padding:4px 10px" onclick="sessionApplySuggestion(${i})">Use</button></div>`).join("")}</div>`}
+ return `<div class="card"><b>Suggested focus</b> <span class="muted" style="font-size:12px">· from recent matches and assessments</span>${l.map((x,i)=>`<div style="display:flex;gap:8px;align-items:center;justify-content:space-between;padding:5px 0"><span>${esc(x.focus.join(" + "))}${x.repeat?` <span class="muted">(same as your last session)</span>`:""}<div class="muted" style="font-size:13px">${esc(x.why)}</div>${x.drills&&x.drills.length?`<div class="muted" style="font-size:13px">Drills: ${x.drills.map(esc).join(" · ")}</div>`:""}</div><span style="display:flex;gap:6px;flex:0 0 auto"><button type="button" class="btn secondary" style="padding:4px 10px" onclick="sessionApplySuggestion(${i})">Use</button><button type="button" class="btn secondary" style="padding:4px 10px" aria-label="Dismiss this suggestion" title="Dismiss" onclick="sessionDismissSuggestion(${i})">✕</button></span></div>`).join("")}</div>`}
 let _sessSug=[];
 function sessionApplySuggestion(i){
  let x=_sessSug[i];if(!x)return;
@@ -2353,8 +2359,8 @@ function sessionNetPlanRefresh(){
  if(w)w.style.display=sessionNetPlanShow(el?el.value:"",sessionNetPlanDraft)?"":"none"}
 function nextFocusFor(type,team,player){
  let m=(db.settings&&db.settings.nextFocus)||{};
- if(type==="player"&&player&&m["player: "+player.toLowerCase()])return m["player: "+player.toLowerCase()];
- if(type==="team"&&team&&m["team: "+team.toLowerCase()])return m["team: "+team.toLowerCase()];
+ if(type==="player"&&player&&m["player: "+player.toLowerCase()])return Object.assign({_key:"player: "+player.toLowerCase()},m["player: "+player.toLowerCase()]);
+ if(type==="team"&&team&&m["team: "+team.toLowerCase()])return Object.assign({_key:"team: "+team.toLowerCase()},m["team: "+team.toLowerCase()]);
  return null}
 function nextFocusReminderHtml(s,type){
  let team=type==="team"?(s.squad||(db.teams[0]&&db.teams[0].name)||""):"",pl=null;
@@ -2362,8 +2368,8 @@ function nextFocusReminderHtml(s,type){
  return nextFocusCardsHtml(nextFocusFor(type,team,pl),type==="team"?team:"")}
 function nextFocusCardsHtml(n,team){
  let d=latestDebriefFor(team),h="";
- if(n)h+=`<div class="card" style="border-left:4px solid var(--g)"><b>Next focus from your last report</b> <span class="muted" style="font-size:12px">· saved ${esc(fmtDate(n.date))}</span><div style="margin-top:4px;white-space:pre-line">${esc(n.text)}</div></div>`;
- if(d)h+=`<div class="card" style="border-left:4px solid var(--g);margin-top:8px"><b>Follow-up from the ${esc(fmtDate(d.date))} debrief</b>${d.debriefActions?`<div style="margin-top:4px;white-space:pre-line">${esc(d.debriefActions)}</div>`:""}${d.debriefNiggles?`<div class="muted" style="margin-top:4px;white-space:pre-line">Concerns: ${esc(d.debriefNiggles)}</div>`:""}</div>`;
+ if(n)h+=`<div class="card" style="border-left:4px solid var(--g)"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><div><b>Next focus from your last report</b> <span class="muted" style="font-size:12px">· saved ${esc(fmtDate(n.date))}</span></div>${n._key?`<button type="button" class="btn secondary" style="padding:4px 10px;flex:0 0 auto" onclick="sessionDismissNextFocus(${esc(JSON.stringify(n._key)).replace(/"/g,"&quot;")})">Dismiss</button>`:""}</div><div style="margin-top:4px;white-space:pre-line">${esc(n.text)}</div></div>`;
+ if(d)h+=`<div class="card" style="border-left:4px solid var(--g);margin-top:8px"><div style="display:flex;justify-content:space-between;gap:8px;align-items:flex-start"><b>Follow-up from the ${esc(fmtDate(d.date))} debrief</b><button type="button" class="btn secondary" style="padding:4px 10px;flex:0 0 auto" onclick="sessionDismissDebrief(${esc(JSON.stringify(d.id)).replace(/"/g,"&quot;")})">Dismiss</button></div>${d.debriefActions?`<div style="margin-top:4px;white-space:pre-line">${esc(d.debriefActions)}</div>`:""}${d.debriefNiggles?`<div class="muted" style="margin-top:4px;white-space:pre-line">Concerns: ${esc(d.debriefNiggles)}</div>`:""}</div>`;
  return h}
 function sessionNextFocusRefresh(){
  let host=document.getElementById("sessionNextFocus");if(!host)return;
