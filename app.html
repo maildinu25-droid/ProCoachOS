@@ -2918,7 +2918,7 @@ function drillBlockHtml(list,mode){
  return mode==="names"?`<div style="margin-top:8px">${list.map(d=>drillPrintHtml(d,mode)).join("")}</div>`:list.map(d=>drillPrintHtml(d,mode)).join("");
 }
 function viewDrillFromMatch(id,mid){viewDrill(id,"matchReportView('"+String(mid).replace(/[^\w-]/g,"")+"')","match report")}
-function viewDrill(id,ret,retLabel){let d=drillById(id);if(!d)return;reportShell(esc(d.name),esc(d.cat||"Drill")+(d.builtin?" · Built-in":""),(ret?`<div class="noPrint" style="margin-bottom:10px"><button type="button" class="btn secondary" onclick="${ret}">← Back to ${esc(retLabel||"previous page")}</button></div>`:"")+drillPrintHtml(d,"full")+(d.builtin?`<div class="noPrint" style="margin-top:8px"><button class="btn primary" onclick="addBuiltinDrill('${d.id}')">Add to my drills</button></div>`:""),ret||undefined)}
+function viewDrill(id,ret,retLabel){let d=drillById(id);if(!d)return;reportShell(esc(d.name),esc(d.cat||"Drill")+(d.builtin?" · Built-in":""),drillPrintHtml(d,"full")+(d.builtin?`<div class="noPrint" style="margin-top:8px"><button class="btn primary" onclick="addBuiltinDrill('${d.id}')">Add to my drills</button></div>`:""),ret||undefined)}
 function sessionAttachmentPrintHtml(s){
  let at=s.attachment;if(!at||!at.name)return"";
  if(/^image\//.test(at.type||"")&&at.dataUrl)return `<h2>Attached Plan</h2><div class="card"><img src="${at.dataUrl}" style="max-width:100%;max-height:230mm"></div>`;
