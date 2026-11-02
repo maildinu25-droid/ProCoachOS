@@ -176,6 +176,25 @@ input[type=range]{accent-color:var(--g);width:100%;height:6px;padding:0;backgrou
 .msdChips{margin-top:8px;display:flex;flex-wrap:wrap;gap:4px}
 .msdAdd{display:flex;gap:8px;margin:6px 0 4px}.msdAdd input{flex:1;min-width:0}
 .msdDel{background:none;border:0;color:var(--muted);font-size:18px;line-height:1;padding:0 6px;cursor:pointer}
+
+/* ===== v130: chart kit ===== */
+.vz{-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.vz svg{display:block;max-width:100%;height:auto}
+.vzCard{border:1px solid var(--line);border-radius:12px;padding:10px 12px;margin-bottom:8px;break-inside:avoid}
+.vzT{font-size:12px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);margin-bottom:4px;font-weight:600}
+.vzNote{color:var(--muted);font-size:12px;padding:6px 0}
+.vzLeg{display:flex;gap:12px;flex-wrap:wrap;font-size:12px;color:var(--muted);margin-top:4px}
+.vzLeg i{display:inline-block;width:14px;height:0;border-top:3px solid;vertical-align:middle;margin-right:4px}
+.vzLeg i.d{border-top-style:dashed}
+.vzBar{position:relative;height:10px;border-radius:6px;background:rgba(128,128,128,.22);overflow:visible;margin:6px 0 2px}
+.vzBar b{position:absolute;left:0;top:0;bottom:0;border-radius:6px;display:block}
+.vzBar u{position:absolute;top:-4px;bottom:-4px;width:2px;background:var(--ink);text-decoration:none;opacity:.75}
+.vzGoal{padding:6px 0;border-top:1px solid var(--line)}.vzGoal:first-of-type{border-top:0}
+.vzGoal .r{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.vzHeat{border-collapse:collapse;font-size:12px}.vzHeat th{font-weight:600;color:var(--muted);padding:2px 4px;text-align:center;max-width:70px;vertical-align:bottom}
+.vzHeat td{padding:0}.vzHeat td.n{padding:2px 8px 2px 0;white-space:nowrap;cursor:pointer;position:sticky;left:0;background:var(--card,var(--bg,#fff))}
+.vzHeat td.c{width:34px;height:28px;text-align:center;color:#fff;font-weight:600;border:2px solid var(--bg,transparent);border-radius:5px}
+@media print{.vz,.vz *{-webkit-print-color-adjust:exact;print-color-adjust:exact}.vzCard{border-color:#999!important}.vzT,.vzNote,.vzLeg{color:#333!important}.vzBar{background:#ddd!important}.vzBar u{background:#000!important}}
 .printOnly{display:none}
 @media print{
 html,body{margin:0!important;padding:0!important;background:#fff!important;width:100%!important;height:auto!important;min-height:0!important;overflow:visible!important}
@@ -1891,6 +1910,77 @@ function dashMore(id){let s=db.sessions.find(x=>x.id===id);if(!s)return;let it=(
 function dashInsights(){let sc=coachingActivityScore(),act=recentActivity().slice(0,6);modal(`<div class="sheetHead"><h2>Insights &amp; activity</h2><button class="x" onclick="closeM()">×</button></div><div style="display:flex;gap:14px;align-items:center;margin-bottom:12px"><div class="heroRing">${scoreRingSvg(sc.composite,64)}<b>${sc.composite}</b></div><div><b>Coaching activity</b><div class="muted">${esc(scoreCaption(sc.composite))}</div></div></div><div class="homeSectionTitle">Recent activity</div>${act.length?act.map(a=>`<div class="activityRow"><div class="activityIc">${a.icon}</div><div style="flex:1;min-width:0"><b>${esc(a.text)}</b><span>${esc(fmtDate(a.date))}</span></div></div>`).join(""):empty("No records yet — start by adding a session or player.")}<button class="btn primary" style="margin-top:12px;width:100%" onclick="closeM();go('reports')">Full analytics &amp; insights</button>`)}
 function dashRow(c,t,sub,a,fn,x){return `<div class="dRow" onclick="${fn}"><span class="dDot ${c}"></span><div><b>${t}</b><small>${sub}</small></div>${a?`<i>${a} ›</i>`:""}${x||""}</div>`}
 function dashEv(time,t,sub,a,fn,cls){return `<div class="dEv" onclick="${fn}"><span class="tm">${time}</span><span class="bar ${cls||""}"></span><div><b>${t}</b><small>${sub}</small></div><i>${a} ›</i></div>`}
+/* ===== v129: goal health, camp progress, goal from match action, restore hidden ===== */
+function goalHealthData(pls){
+ let t=today(),out={reached:[],overdue:[],behind:[],track:[],open:[],recent:0,total:0};
+ let cut=(()=>{let d=new Date();d.setDate(d.getDate()-30);return localISO(d)})();
+ (pls||activePlayers()).forEach(p=>(p.goals||[]).forEach(g=>{
+  if(g.achieved){if(g.achievedDate&&g.achievedDate>=cut)out.recent++;return}
+  let m=null;try{m=goalMeasure(p,g)}catch(e){}
+  let cat=(m&&m.state==="reached")?"reached":(g.targetDate&&g.targetDate<t)?"overdue":(m&&m.state==="behind")?"behind":(m&&m.state==="track")?"track":"open";
+  out[cat].push({p,g,m});out.total++}));
+ return out}
+const GH_LABEL={reached:"Reached, tick off",overdue:"Past target date",behind:"Behind pace",track:"On pace",open:"Open"};
+function goalHealthSheet(only){
+ let H=goalHealthData(activePlayers().filter(p=>dashTeamOk(p.team))),cats=["reached","overdue","behind","track","open"];
+ let chip=c=>`<button class="dPill${only===c?" g":""}" onclick="goalHealthSheet('${only===c?"":c}')">${GH_LABEL[c]} · ${H[c].length}</button>`;
+ let row=(x,c)=>`<div class="item" style="display:flex;gap:10px;align-items:flex-start"><div style="flex:1;min-width:0;cursor:pointer" onclick="closeM();playerView('${x.p.id}')"><b>${esc(x.p.name)}</b><div>${esc(x.g.text)}</div><div class="muted" style="font-size:var(--fs-3)">${x.m?esc(x.m.text):""}${x.g.targetDate?(x.m?" · ":"")+"target "+esc(fmtDate(x.g.targetDate)):""}</div></div>${c==="reached"?`<button class="btn primary" style="padding:6px 10px;flex:none" onclick="goalMarkDone('${x.p.id}','${x.g.id}',this)">Mark achieved</button>`:""}</div>`;
+ let body=cats.filter(c=>H[c].length&&(!only||only===c)).map(c=>`<h3 style="margin:12px 0 6px">${GH_LABEL[c]} (${H[c].length})</h3><div class="list">${H[c].map(x=>row(x,c)).join("")}</div>`).join("")||empty("No open goals yet. Set goals from a player's profile or from a match action.");
+ modal(`<div class="sheetHead"><h2>Goal health</h2><button class="x" onclick="closeM()">×</button></div><div class="muted" style="margin-bottom:8px">${H.total} open goal${H.total===1?"":"s"}${H.recent?` · ${H.recent} achieved in the last 30 days`:""}</div><div class="dChips" style="margin:0 0 4px">${cats.map(chip).join("")}</div>${body}`)}
+/* camp-to-camp progress */
+function playerCampProgress(p){
+ let list=[];try{list=campOfPlayer(p)}catch(e){return []}
+ let snaps=list.map(c=>{let v=campRevOf(c,p.name),sp=campTagSplit(v.tags||[]),d=null;try{d=campFbData(c,p.name)}catch(e){}return{c,r:v.r||0,g:sp.g,w:sp.w,avg:d&&d.avg1!==null?d.avg1:null,att:d&&d.att&&d.att.t?d.att.a/d.att.t:null,date:c.endDate||c.startDate||""}}).filter(s=>s.r||s.g.length||s.w.length||s.avg!==null);
+ snaps.sort((a,b)=>String(a.date).localeCompare(String(b.date)));return snaps}
+function playerCampProgressHtml(p){
+ let S=playerCampProgress(p);if(S.length<2)return "";
+ let a=S[S.length-2],b=S[S.length-1];
+ let mv=(x,y,f)=>{if(x==null||y==null||(x===0&&f==="r")||(y===0&&f==="r"))return "";let up=y>x+0.0001,dn=y<x-0.0001,fx=f==="r"?(v=>v):f==="pct"?(v=>Math.round(v*100)+"%"):(v=>v.toFixed(1));return `<span style="color:${up?"var(--g)":dn?"var(--red)":"var(--muted)"};font-weight:700">${fx(x)} → ${fx(y)} ${up?"▲":dn?"▼":"•"}</span>`};
+ let line=(lbl,v)=>v?`<div style="display:flex;justify-content:space-between;gap:10px;padding:5px 0;border-top:1px solid var(--line)"><span class="muted">${lbl}</span><span style="text-align:right">${v}</span></div>`:"";
+ let chips=(L,c)=>L.map(t=>`<span class="tag" style="border-color:${c};color:${c}">${esc(t)}</span>`).join(" ");
+ let gone=a.w.filter(t=>!b.w.includes(t)),kept=a.w.filter(t=>b.w.includes(t)),fresh=b.w.filter(t=>!a.w.includes(t)),newG=b.g.filter(t=>!a.g.includes(t));
+ let trend=S.filter(s=>s.r).map(s=>`${esc(s.c.name)}: <b>${s.r}</b>`).join(" · ");
+ return `<h2 class="section">Camp progress</h2><div class="card"><div class="muted" style="font-size:12.5px;margin-bottom:4px">${esc(a.c.name)} → ${esc(b.c.name)}</div>${line("Camp rating (out of 5)",mv(a.r,b.r,"r"))}${line("Assessment average",mv(a.avg,b.avg,"avg"))}${line("Attendance",mv(a.att,b.att,"pct"))}${line("New strengths",newG.length?chips(newG,"#1f8a4c"):"")}${line("No longer flagged",gone.length?chips(gone,"#1f8a4c"):"")}${line("Still to work on",kept.length?chips(kept,"#b45309"):"")}${line("New areas to work on",fresh.length?chips(fresh,"#b45309"):"")}${trend&&S.filter(s=>s.r).length>2?`<div class="muted" style="font-size:12.5px;margin-top:8px">All camps · ${trend}</div>`:""}<div class="muted" style="font-size:12px;margin-top:8px">"No longer flagged" means the area was not raised again in the latest camp review. It may not have been re-reviewed.</div></div>`}
+/* one-tap goal from a match action */
+function maGoalPlayers(a){return maOwners(a).map(n=>activePlayers().find(p=>sameName(p.name,n))).filter(Boolean)}
+function maGoalBtnHtml(m,a){
+ if(!a||a.done||!a.text)return "";let ps=maGoalPlayers(a);if(!ps.length)return "";
+ let all=ps.every(p=>(p.goals||[]).some(g=>g.actionId===a.id&&g.matchId===m.id));
+ return all?`<div class="muted noPrint" style="font-size:var(--fs-3);margin-top:4px">Goal set ✓</div>`:`<button class="btn secondary noPrint" style="padding:3px 10px;margin-top:6px" onclick="event.stopPropagation();maSetGoal('${m.id}','${a.id}',this)">Set as goal</button>`}
+function maSetGoal(mid,aid,btn){
+ if(typeof requireWriteAccess==="function"&&!requireWriteAccess())return;
+ let m=db.matches.find(x=>x.id===mid),a=m&&matchActionItems(m).find(x=>x.id===aid);if(!a)return;
+ let ps=maGoalPlayers(a);if(!ps.length){alert("Assign this action to one or more players first. Goals belong to individual players.");return}
+ let due=a.due||(()=>{let d=new Date();d.setDate(d.getDate()+14);return localISO(d)})();
+ ps.forEach(p=>{if(!p.goals)p.goals=[];if(p.goals.some(g=>g.actionId===aid&&g.matchId===mid))return;p.goals.push({id:uid("goal"),text:a.text,targetDate:due,createdDate:today(),achieved:false,achievedDate:"",metric:"",target:"",baseline:"",source:"match",matchId:mid,actionId:aid})});
+ save();if(btn&&btn.isConnected)btn.outerHTML=`<div class="muted noPrint" style="font-size:var(--fs-3);margin-top:4px">Goal set for ${ps.length===1?esc(ps[0].name):ps.length+" players"} ✓</div>`}
+/* restore hidden suggestions */
+function hiddenSuggestionCount(){let s=db.settings||{};return Object.keys(s.dismissedSugg||{}).length+Object.keys(s.dismissedSuggestions||{}).length+db.reflections.filter(r=>r.followUpDismissed).length}
+function restoreHiddenSuggestions(){if(!hiddenSuggestionCount())return;db.settings=db.settings||{};db.settings.dismissedSugg={};db.settings.dismissedSuggestions={};db.reflections.forEach(r=>{if(r.followUpDismissed)delete r.followUpDismissed});save()}
+
+/* ===== v131: dashboard charts + workload lanes ===== */
+function vzWeekBars(vals,goal,labels){
+ let n=vals.length,w=300,h=110,T=14,B=18,mx=Math.max(goal||0,...vals,3),bw=(w-24)/n,y=v=>h-B-(h-T-B)*v/mx;
+ let bars=vals.map((v,i)=>{let x=12+i*bw+bw*.18,ww=bw*.64,last=i===n-1;return `<rect x="${x}" y="${y(v)}" width="${ww}" height="${Math.max(1.5,h-B-y(v))}" rx="3" fill="${goal&&v>=goal?"var(--g)":"var(--blue2)"}" ${last?'stroke="var(--ink)" stroke-width="1.6"':""}/><text x="${x+ww/2}" y="${y(v)-3}" font-size="9.5" text-anchor="middle" fill="currentColor">${v}</text><text x="${x+ww/2}" y="${h-5}" font-size="9" text-anchor="middle" fill="currentColor" fill-opacity=".7">${esc(labels[i])}</text>`}).join("");
+ let gl=goal?`<line x1="6" x2="${w-6}" y1="${y(goal)}" y2="${y(goal)}" stroke="currentColor" stroke-dasharray="5 4" stroke-opacity=".7"/><text x="${w-6}" y="${y(goal)-3}" font-size="9.5" text-anchor="end" fill="currentColor">goal ${goal}</text>`:"";
+ return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Sessions per week" style="color:var(--ink);width:100%">${gl}${bars}</svg>`}
+function vzSpark(vals,min,max){
+ let n=vals.length,w=200,h=46,x=i=>6+(w-12)*i/(n-1),y=v=>6+(h-12)*(1-(v-min)/(max-min));
+ return `<svg viewBox="0 0 ${w} ${h}" role="img" aria-label="Reflection ratings" style="color:var(--ink);width:100%;max-width:200px"><path d="${vals.map((v,i)=>(i?"L":"M")+x(i)+","+y(v)).join(" ")}" fill="none" stroke="var(--g)" stroke-width="2.2" stroke-linejoin="round"/>${vals.map((v,i)=>`<circle cx="${x(i)}" cy="${y(v)}" r="${i===n-1?3.6:2.4}" fill="var(--g)"/>`).join("")}</svg>`}
+function vzRing(v,max,label){
+ let r=26,C=2*Math.PI*r,f=Math.max(0,Math.min(1,v/max));
+ return `<svg viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="${esc(label)}" style="color:var(--ink)"><circle cx="32" cy="32" r="${r}" fill="none" stroke="currentColor" stroke-opacity=".18" stroke-width="7"/><circle cx="32" cy="32" r="${r}" fill="none" stroke="var(--g)" stroke-width="7" stroke-linecap="round" stroke-dasharray="${(C*f).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 32 32)"/><text x="32" y="36" text-anchor="middle" font-size="14" font-weight="700" fill="currentColor">${v.toFixed(1)}</text></svg>`}
+function vzLane(dates){
+ let t=today(),days=[...Array(14)].map((_,i)=>{let d=new Date(t+"T12:00:00");d.setDate(d.getDate()-13+i);return localISO(d)}),w=280,cw=w/14;
+ let cells=days.map((d,i)=>{let on=dates.includes(d),x=i*cw;return `<rect x="${x+1}" y="6" width="${cw-2}" height="18" rx="3" fill="${on?"var(--red)":"currentColor"}" fill-opacity="${on?1:.14}"/>${on?`<text x="${x+cw/2}" y="19" font-size="10" font-weight="700" text-anchor="middle" fill="#fff">M</text>`:""}<text x="${x+cw/2}" y="35" font-size="8" text-anchor="middle" fill="currentColor" fill-opacity=".65">${+d.slice(8)}</text>`}).join("");
+ return `<svg viewBox="0 0 ${w} 38" role="img" aria-label="Matches in the last 14 days" style="color:var(--ink);width:100%;max-width:300px;margin-top:4px">${cells}</svg>`}
+function dashTrendsHtml(sess,c){
+ let wk=[...Array(8)].map((_,i)=>7-i).map(o=>{let a=weekStart(o),d=new Date(a+"T12:00:00");d.setDate(d.getDate()+6);let b=localISO(d);return{a,n:sess.filter(s=>s.date>=a&&s.date<=b).length,l:fmtDate(a).replace(/-\d{4}$/,"").slice(0,5)}});
+ let out="";
+ if(wk.filter(x=>x.n>0).length>=3)out+=`<div class="vzCard"><div class="vzT">Sessions per week · last 8</div>${vzWeekBars(wk.map(x=>x.n),c.weeklyGoal||0,wk.map(x=>x.l))}<div class="muted" style="font-size:12px">${c.weeklyGoal?`Dashed line = your goal of ${c.weeklyGoal} · green bars met it · outlined = this week`:"Outlined = this week · set a weekly goal to see a target line"}</div></div>`;
+ let rs=db.reflections.filter(r=>r.date&&Number.isFinite(Number(r.rating))&&Number(r.rating)>0).sort((a,b)=>a.date.localeCompare(b.date)).map(r=>Number(r.rating)).slice(-12);
+ if(rs.length>=3){let av=rs.reduce((a,b)=>a+b,0)/rs.length;out+=`<div class="vzCard"><div class="vzT">Reflection ratings · last ${rs.length}</div><div style="display:flex;align-items:center;gap:14px">${vzRing(av,5,"Average rating "+av.toFixed(1)+" of 5")}<div style="flex:1">${vzSpark(rs,1,5)}<div class="muted" style="font-size:12px">Average ${av.toFixed(1)} / 5 · latest ${rs[rs.length-1]}</div></div></div></div>`}
+ return out?`<div class="dSec">Trends</div><div class="vz">${out}</div>`:""}
 function dashBuild(c){
  let teams=dashTeams();if(dashTeam&&!teams.includes(dashTeam)){dashTeam="";dashStore("dashTeam","")}
  let t=today(),now=new Date().getHours()*60+new Date().getMinutes(),TO=dashTeamOk;
@@ -1933,6 +2023,7 @@ function dashBuild(c){
  let unassessed=pls.filter(p=>!db.assessments.some(a=>a.player===p.name));
  let dueRe=pls.map(p=>{let pa=db.assessments.filter(a=>a.player===p.name).map(a=>a.date).filter(Boolean).sort();if(!pa.length)return null;let d=Math.floor((new Date(t+"T00:00:00Z")-new Date(pa[pa.length-1]+"T00:00:00Z"))/86400000);return d>=30?{p,d}:null}).filter(Boolean).sort((a,b)=>b.d-a.d);
  let names=a=>a.slice(0,3).map(x=>esc((x.p||x).name)).join(", ")+(a.length>3?" +"+(a.length-3):"");
+ let gh=goalHealthData(pls),hid=hiddenSuggestionCount();
  let sessWeek=sess.filter(s=>s.date>=weekStart(0)&&s.date<=weekEnd(0)).length;
  /* ---- Attention ---- */
  let A=[];
@@ -1942,11 +2033,12 @@ function dashBuild(c){
  if((todaySess.length||todayMats.length)&&!db.reflections.some(r=>r.date===t))A.push([1,dashRow("am","Log today's reflection","Not yet logged","Log","newReflection()")]);
  if(unassessed.length)A.push([1,dashRow("am",`${plural(unassessed.length,"player")} awaiting first assessment`,names(unassessed),"Assess","assessPendingPlayers()")]);
  if(dueRe.length)A.push([1,dashRow("am",`${plural(dueRe.length,"player")} due for reassessment`,names(dueRe),"Assess","reassessDuePlayers()")]);
+ if(gh.reached.length)A.push([1,dashRow("am",`${plural(gh.reached.length,"goal")} reached`,gh.reached.slice(0,3).map(x=>esc(x.p.name)).join(", ")+(gh.reached.length>3?" +"+(gh.reached.length-3):"")+" · tick them off","Review","goalHealthSheet('reached')")]);
  let sug=[];try{sug=smartSuggestions().slice(0,3)}catch(e){console.warn(e)}
  sug.forEach(x=>A.push([2,dashRow("bl",esc(x.text),"Suggestion","Open",x.action,`<button class="dX" aria-label="Dismiss" onclick="event.stopPropagation();sugDismiss('${esc(x.id)}')">×</button>`)]));
  if(!c.showBackupNotice&&((c.daysSinceBackup!==null&&c.daysSinceBackup>=7)||(c.daysSinceBackup===null&&c.hasRealData)))A.push([1,dashRow("am",c.daysSinceBackup!==null?`${c.daysSinceBackup} days since your last backup`:"You haven't backed up yet","Tap to export a backup now","Export","exportBackup()")]);
  A.sort((a,b)=>a[0]-b[0]);
- let attHtml=A.length?A.map(x=>x[1]).join(""):`<div class="dEmpty">All caught up ✓<small>Nothing needs your attention right now.</small></div>`;
+ let attHtml=(A.length?A.map(x=>x[1]).join(""):`<div class="dEmpty">All caught up ✓<small>Nothing needs your attention right now.</small></div>`)+(hid?`<a class="dLink" onclick="restoreHiddenSuggestions()">Restore hidden suggestions</a>`:"");
  /* ---- Schedule ---- */
  let tab=["att","sch","watch"].includes(dashTab)?dashTab:"att";
  let days=[...Array(7)].map((_,i)=>plus(i));let sel=days.includes(dashDay)?dashDay:t;
@@ -1960,11 +2052,13 @@ function dashBuild(c){
  /* ---- Watch ---- */
  let W=[],wc=0;
  let wl=workloadFlagDetails().filter(f=>{let p=db.players.find(x=>x.name===f.name);return !p||TO(p.team)});
- if(wl.length){W.push(`<div class="dSec">High workload · ${wl.length}</div>`);wl.forEach(f=>{let p=db.players.find(x=>x.name===f.name);wc++;W.push(dashRow("rd",esc(f.name),`Matches on ${esc(fmtDate(f.dates[0]))} &amp; ${esc(fmtDate(f.dates[1]))}`,"Check",p?`playerView('${p.id}')`:"showWorkloadFlags()"))})}
+ if(wl.length){W.push(`<div class="dSec">High workload · ${wl.length}</div>`);wl.forEach(f=>{let p=db.players.find(x=>x.name===f.name);wc++;W.push(dashRow("rd",esc(f.name),`Matches ${esc(fmtDate(f.dates[0]))} &amp; ${esc(fmtDate(f.dates[1]))}`+vzLane(f.dates),"Check",p?`playerView('${p.id}')`:"showWorkloadFlags()"))})}
  let gl=[];pls.forEach(p=>(p.goals||[]).filter(g=>!g.achieved&&g.targetDate&&g.targetDate<=plus(7)).forEach(g=>gl.push({p,g,d:Math.round((new Date(g.targetDate)-new Date(t))/86400000)})));gl.sort((a,b)=>a.d-b.d);
  let look=[];gl.slice(0,4).forEach(x=>look.push(dashRow(x.d<0?"rd":"am",esc(x.p.name),`${esc(x.g.text||"Goal")} · ${x.d<0?Math.abs(x.d)+" days overdue":x.d===0?"due today":"due in "+x.d+" days"}`,"Goal",`playerView('${x.p.id}')`)));
  dueRe.slice(0,4).forEach(x=>look.push(dashRow("am",esc(x.p.name),`No review in ${x.d} days`,"Assess",`newAssessmentForPlayer('${x.p.id}')`)));
  if(look.length){wc+=look.length;W.push(`<div class="dSec">Needs a look · ${look.length}</div>`,...look)}
+ if(gh.total){let bits=[gh.behind.length&&gh.behind.length+" behind pace",gh.overdue.length&&gh.overdue.length+" past target",gh.track.length&&gh.track.length+" on pace",gh.reached.length&&gh.reached.length+" reached"].filter(Boolean);W.push(`<div class="dSec">Goals</div>`,dashRow(gh.behind.length||gh.overdue.length?"am":"gn",plural(gh.total,"open goal"),bits.join(" · ")||"No measurable progress yet","Open","goalHealthSheet()"))}
+ W.push(dashTrendsHtml(sess,c));
  let good=[];
  if(c.reflectionTrendPct!==null)good.push(dashRow(c.reflectionTrendPct>=0?"gn":"am",`Reflection ratings ${c.reflectionTrendPct>=0?"up":"down"} ${Math.abs(c.reflectionTrendPct)}%`,"This month vs last month","","dashInsights()"));
  if(good.length)W.push(`<div class="dSec">Going well</div>`,...good);
@@ -2130,7 +2224,7 @@ function sessions(){
   let linkedReflection=db.reflections.find(r=>r.sessionId===s.id);
   let showReflectionStatus=s.date<=today();
   let thumbDrill=mainDrills.concat(gameDrills).find(d=>d.fieldSteps&&d.fieldSteps.length);
-  return `<div class="item">${thumbDrill?`<div class="sessThumb">${fieldStepsPreviewHtml(thumbDrill.fieldSteps.slice(0,1),76)}</div>`:""}<div><b>${esc(sessionLabel(s))}${sessionFocusText(s)?" · "+esc(sessionFocusText(s)):""}</b><div class="muted" style="font-size:var(--fs-3)">${esc(fmtDate(s.date))}${s.time?" · "+esc(fmtTime(s.time)):""}${s.duration?" · "+esc(s.duration)+"m":""} · ${esc(sessionTypeLabel(s.sessionType))}</div>${sessMetaTagsHtml(s)}<small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.concat(gameDrills).map(d=>`<span class="tag" style="cursor:pointer" onclick="viewDrill('${d.id}')">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px">${s.attachment.dataUrl?`<a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a>`:`<span class="muted" style="font-size:var(--fs-3)">📎 ${esc(s.attachment.name)} (archived)</span>`}</div>`:""}${(s.campId&&campById(s.campId))?`<div style="margin-top:6px"><span class="tag" style="cursor:pointer" onclick="go('camps');openCamp('${s.campId}')">🏕 ${esc(campById(s.campId).name)}</span></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="printSessionPlan('${s.id}')">View</button>${kebabMenu("s"+s.id,[{label:"Edit",icon:"edit",fn:`editSession('${s.id}')`},{label:"Start timer",icon:"clock",fn:`timerSetup('${s.id}')`},{label:"Remind me (calendar)",icon:"bell",fn:`remindSheet('${s.id}')`},{label:"Share on WhatsApp",icon:"share",fn:`shareSessionSummary('${s.id}')`},{label:"Copy text",icon:"copy",fn:`copySessionSummary('${s.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delSession('${s.id}')`}])}</div></div>`;
+  return `<div class="item">${thumbDrill?`<div class="sessThumb">${fieldStepsPreviewHtml(thumbDrill.fieldSteps.slice(0,1),76)}</div>`:""}<div><b>${esc(sessionLabel(s))}${sessionFocusText(s)?" · "+esc(sessionFocusText(s)):""}</b><div class="muted" style="font-size:var(--fs-3)">${esc(fmtDate(s.date))}${s.time?" · "+esc(fmtTime(s.time)):""}${s.duration?" · "+esc(s.duration)+"m":""} · ${esc(sessionTypeLabel(s.sessionType))}</div>${sessMetaTagsHtml(s)}${vzTimeSplit(s)}<small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.concat(gameDrills).map(d=>`<span class="tag" style="cursor:pointer" onclick="viewDrill('${d.id}')">🎯 ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">🏏 ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px">${s.attachment.dataUrl?`<a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">📎 ${esc(s.attachment.name)}</a>`:`<span class="muted" style="font-size:var(--fs-3)">📎 ${esc(s.attachment.name)} (archived)</span>`}</div>`:""}${(s.campId&&campById(s.campId))?`<div style="margin-top:6px"><span class="tag" style="cursor:pointer" onclick="go('camps');openCamp('${s.campId}')">🏕 ${esc(campById(s.campId).name)}</span></div>`:""}${showReflectionStatus?`<div style="margin-top:6px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="toolbar"><button class="btn secondary" onclick="printSessionPlan('${s.id}')">View</button>${kebabMenu("s"+s.id,[{label:"Edit",icon:"edit",fn:`editSession('${s.id}')`},{label:"Start timer",icon:"clock",fn:`timerSetup('${s.id}')`},{label:"Remind me (calendar)",icon:"bell",fn:`remindSheet('${s.id}')`},{label:"Share on WhatsApp",icon:"share",fn:`shareSessionSummary('${s.id}')`},{label:"Copy text",icon:"copy",fn:`copySessionSummary('${s.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delSession('${s.id}')`}])}</div></div>`;
  }).join("")}</div>`:empty("No sessions match your search.")}</div>`;
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -3762,7 +3856,7 @@ function players(){
  if(stageFilter&&!stagesList().some(x=>x.id===stageFilter))stageFilter="";
  if(stageFilter)list=list.filter(p=>stageOf(p).id===stageFilter);
  document.getElementById("players").innerHTML=head("Players","Development record for every player.")
- +`<div class="toolbar noPrint"><button class="btn primary" onclick="newPlayer()">+ Add Player</button>${campMenu("plAct","Actions ▾",[{label:"Add multiple",icon:"players",fn:"newPlayersBulk()"},{label:"Bulk assess",icon:"edit",fn:"openBulkAssessment()"},{label:"Select squad",icon:"share",fn:"squadSelectSheet(undefined,playerTeamFilter)"},{label:"Print roster",icon:"print",fn:"playerRosterReport()"}])}</div>
+ +`<div class="toolbar noPrint"><button class="btn primary" onclick="newPlayer()">+ Add Player</button>${campMenu("plAct","Actions ▾",[{label:"Add multiple",icon:"players",fn:"newPlayersBulk()"},{label:"Bulk assess",icon:"edit",fn:"openBulkAssessment()"},{label:"Squad skills heatmap",icon:"chart",fn:"squadHeatmap()"},{label:"Select squad",icon:"share",fn:"squadSelectSheet(undefined,playerTeamFilter)"},{label:"Print roster",icon:"print",fn:"playerRosterReport()"}])}</div>
  ${stageChipsHtml()}
  ${filterBarHtml("players",`<input id="playerSearch" value="${esc(playerQuery)}" oninput="playerQuery=this.value;players()" onfocus="playerSearchFocused=true" onblur="playerSearchFocused=false" placeholder="Search players, teams, notes...">`,`<label>Role<select onchange="playerRoleFilter=this.value;players()"><option value="">All roles</option>${PLAYER_ROLES.map(r=>`<option value="${r}" ${playerRoleFilter===r?"selected":""}>${r}</option>`).join("")}</select></label>
  <label>Team<select onchange="playerTeamFilter=this.value;players()"><option value="">All teams</option>${playerTeams().map(t=>`<option value="${esc(t)}" ${playerTeamFilter===t?"selected":""}>${esc(t)}</option>`).join("")}</select></label>`,(playerRoleFilter?1:0)+(playerTeamFilter?1:0))}
@@ -3936,13 +4030,14 @@ function playerViewBody(p,forPrint){
  ${playerJourneyHtml(p,forPrint)}
  ${p.focus?`<h2 class="section">Current goal</h2><div class="card">${esc(p.focus)}</div>`:""}
  ${playerGoalsHtml(p)}
+ ${playerVisualsHtml(p,assessments,sessions,matches)}
  ${forPrint?playerProgressPrintHtml(playerAssessments(p)):playerProgressChartHtml(p)}
  ${fitnessTestsHtml(p,forPrint)}
  ${forPrint?"":playerStageHtml(p)}
  ${playerCampsHtml(p,forPrint)}
  ${playerTournamentsHtml(p)}
  ${forPrint?vmPairsHtml(p):`<div id="vmSec" data-p="${esc(p.name)}"></div>`}
- ${playerReviewHtml(p)}
+ ${playerReviewHtml(p)}${playerCampProgressHtml(p)}
  ${p.strengths?`<h2 class="section">Strengths</h2><div class="card">${esc(p.strengths)}</div>`:""}
  ${p.areas?`<h2 class="section">Development areas</h2><div class="card">${esc(p.areas)}</div>`:""}
  ${p.notes?`<h2 class="section">Coach notes</h2><div class="card">${esc(p.notes)}</div>`:""}
@@ -4015,6 +4110,7 @@ function parentSummaryReport(id){
  `<div class="card"><b>Strengths</b><p>${esc(p.strengths||((playerReviewTags(p)||{g:[]}).g.join(", "))||"Building foundations across the board.")}</p></div>
  ${activeGoals.length?`<h2>Current Goals</h2><div class="card">${activeGoals.map(g=>`<p><b>${esc(g.text)}</b>${g.targetDate?" — target "+esc(fmtDate(g.targetDate)):""}</p>`).join("")}</div>`:""}
  ${trendLines.length?`<h2>Recent Progress</h2><div class="card">${trendLines.map(l=>`<p>${esc(l)}</p>`).join("")}</div>`:""}
+ ${playerVisualsHtml(p,aa,[],[],"parent")}
  ${playerProgressPrintHtml(aa)}
  ${techParentHtml(p)}
  ${vmPairsHtml(p)}
@@ -6392,7 +6488,7 @@ function fieldStepsPreviewHtml(fieldSteps,size){
  let steps=fieldSteps.map(normalizeFieldStep);
  return `<div class="fieldStepPreviewWrap" style="display:flex;gap:${size>=200?16:8}px;flex-wrap:wrap;margin:10px 0">${steps.map(st=>{let shape=curFieldShape(st);let view={shape:shape,items:curFieldItems(st)};return `<div class="fieldStepBlock" style="width:${size}px"><div style="font-size:${size>=200?"var(--fs-2)":"var(--fs-1)"};color:var(--muted);margin-bottom:3px;text-align:center">${esc(st.label||"")}</div>${fieldDiagramSvg(view,{interactive:false})}${fieldLegendHtml(view.items,true)}</div>`}).join("")}</div>`;
 }
-function drillCardHtml(d){return `<div class="card" style="position:relative;cursor:pointer" onclick="viewDrill('${d.id}')"><span class="tag">${esc(d.cat||"General")}</span>${d.builtin?`<span class="tag">Built-in</span>`:""}${drillMetaChips(d)}<h3>${esc(d.name)}</h3><div class="muted">${esc(d.players||"")}${d.duration?" · "+esc(d.duration):""}${d.equipment?" · "+esc(d.equipment):""}</div>${d.diagram?`<img src="${d.diagram}" style="max-width:100%;border-radius:10px;margin:10px 0">`:""}${fieldStepsPreviewHtml(d.fieldSteps)}<p>${esc(d.points||"")}</p>${d.progressions?`<div class="muted"><b>Progression:</b> ${esc(d.progressions)}</div>`:""}${d.regressions?`<div class="muted"><b>Regression:</b> ${esc(d.regressions)}</div>`:""}<div style="position:absolute;top:10px;right:10px" onclick="event.stopPropagation()">${kebabMenu("d"+d.id,d.builtin?[{label:"View",icon:"players",fn:`viewDrill('${d.id}')`},{label:"Add to my drills",icon:"copy",fn:`addBuiltinDrill('${d.id}')`}]:[{label:"View",icon:"players",fn:`viewDrill('${d.id}')`},{label:"Edit",icon:"edit",fn:`editDrill('${d.id}')`},{label:"Duplicate",icon:"copy",fn:`duplicateDrill('${d.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delDrill('${d.id}')`}])}</div></div>`}
+function drillCardHtml(d){return `<div class="card" style="position:relative;cursor:pointer" onclick="viewDrill('${d.id}')"><span class="tag">${esc(d.cat||"General")}</span>${d.builtin?`<span class="tag">Built-in</span>`:""}${drillMetaChips(d)}<h3>${esc(d.name)}</h3><div class="muted">${esc(d.players||"")}${d.duration?" · "+esc(d.duration):""}${d.equipment?" · "+esc(d.equipment):""}</div>${vzDurBar(d)}${d.diagram?`<img src="${d.diagram}" style="max-width:100%;border-radius:10px;margin:10px 0">`:""}${fieldStepsPreviewHtml(d.fieldSteps)}<p>${esc(d.points||"")}</p>${d.progressions?`<div class="muted"><b>Progression:</b> ${esc(d.progressions)}</div>`:""}${d.regressions?`<div class="muted"><b>Regression:</b> ${esc(d.regressions)}</div>`:""}<div style="position:absolute;top:10px;right:10px" onclick="event.stopPropagation()">${kebabMenu("d"+d.id,d.builtin?[{label:"View",icon:"players",fn:`viewDrill('${d.id}')`},{label:"Add to my drills",icon:"copy",fn:`addBuiltinDrill('${d.id}')`}]:[{label:"View",icon:"players",fn:`viewDrill('${d.id}')`},{label:"Edit",icon:"edit",fn:`editDrill('${d.id}')`},{label:"Duplicate",icon:"copy",fn:`duplicateDrill('${d.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delDrill('${d.id}')`}])}</div></div>`}
 function drillLibraryReport(){
  let list=db.drills.slice().sort((a,b)=>String(a.cat||"").localeCompare(String(b.cat||""))||String(a.name||"").localeCompare(String(b.name||"")));
  reportShell("Drill Library",`${list.length} drills`,
@@ -6666,12 +6762,12 @@ function toggleMatchAction(mid,aid,ctx){
  save();if(ctx==="dash")showOpenMatchActions();else if(ctx==="report")matchReportView(mid)}
 function showOpenMatchActions(){
  let L=openMatchActions(),t=today();
- let row=x=>`<div class="item" style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" class="maChk" onchange="toggleMatchAction('${x.m.id}','${x.a.id}','dash')"><div style="min-width:0;flex:1;cursor:pointer" onclick="closeM();matchReportView('${x.m.id}')"><b>${esc(x.a.text)}</b><div class="muted" style="font-size:var(--fs-3)">${matchActionMeta(x.a)}</div><div class="muted" style="font-size:var(--fs-3)">${esc(x.m.team||"Team")} vs ${esc(x.m.opp||"Opposition")} · ${esc(matchDateStr(x.m))}</div></div></div>`;
+ let row=x=>`<div class="item" style="display:flex;gap:10px;align-items:flex-start"><input type="checkbox" class="maChk" onchange="toggleMatchAction('${x.m.id}','${x.a.id}','dash')"><div style="min-width:0;flex:1;cursor:pointer" onclick="closeM();matchReportView('${x.m.id}')"><b>${esc(x.a.text)}</b><div class="muted" style="font-size:var(--fs-3)">${matchActionMeta(x.a)}</div><div class="muted" style="font-size:var(--fs-3)">${esc(x.m.team||"Team")} vs ${esc(x.m.opp||"Opposition")} · ${esc(matchDateStr(x.m))}</div>${maGoalBtnHtml(x.m,x.a)}</div></div>`;
  let late=L.filter(x=>x.a.due&&x.a.due<t),rest=L.filter(x=>!(x.a.due&&x.a.due<t));
  modal(`<div class="sheetHead"><h2>Open match actions</h2><button class="x" onclick="closeM()">×</button></div><div class="muted" style="margin-bottom:10px">Tick an action when it has been worked on. Tap its text to open the match report.</div>${late.length?`<h3 style="color:var(--red);margin:10px 0 6px">Overdue (${late.length})</h3><div class="list">${late.map(row).join("")}</div>`:""}${rest.length?`<h3 style="margin:14px 0 6px">${late.length?"Upcoming":"Open"} (${rest.length})</h3><div class="list">${rest.map(row).join("")}</div>`:""}${L.length?"":empty("No open match actions. Add them under Key Learnings & Training Actions in a match.")}`)}
 function matchActionsReportHtml(m){
  let L=matchActionItems(m).filter(a=>a.text);
- let list=L.length?`<div>${L.map(a=>`<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #e2e8e4"><input type="checkbox" class="maChk" ${a.done?"checked":""} onchange="toggleMatchAction('${m.id}','${a.id}','report')"><div style="min-width:0;flex:1"><div style="${a.done?"text-decoration:line-through;opacity:.65":"font-weight:600"}">${esc(a.text)}</div><div class="muted" style="font-size:var(--fs-3)">${matchActionMeta(a)}</div>${a.done?"":matchActionDrillLinks(a.tag,3,m.id)}</div></div>`).join("")}</div>`:"";
+ let list=L.length?`<div>${L.map(a=>`<div style="display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid #e2e8e4"><input type="checkbox" class="maChk" ${a.done?"checked":""} onchange="toggleMatchAction('${m.id}','${a.id}','report')"><div style="min-width:0;flex:1"><div style="${a.done?"text-decoration:line-through;opacity:.65":"font-weight:600"}">${esc(a.text)}</div><div class="muted" style="font-size:var(--fs-3)">${matchActionMeta(a)}</div>${a.done?"":matchActionDrillLinks(a.tag,3,m.id)}${maGoalBtnHtml(m,a)}</div></div>`).join("")}</div>`:"";
  let notes=m.actions?`<p style="${L.length?"margin-top:10px":""}">${L.length?`<b>Notes:</b> `:""}${esc(m.actions)}</p>`:"";
  return `<div class="card">${list}${notes}${!list&&!notes?"<p>—</p>":""}</div>`}
 /* ===== Multi-innings scorecards (Test / multi-day) ===== */
@@ -7857,9 +7953,11 @@ function buildTeamReport(){
  reportShell(`Team Report — ${esc(scopeLabel(scope))}`,`${roster.length} player${roster.length!==1?"s":""} · ${matches.length} match${matches.length!==1?"es":""} · ${rangeLabel(from,to)}`,
  `<div class="grid g4"><div class="card stat"><span>Players</span><b>${roster.length}</b></div><div class="card stat"><span>Wins</span><b>${wins}</b></div><div class="card stat"><span>Losses</span><b>${losses}</b></div><div class="card stat"><span>Draws</span><b>${draws}</b></div></div>
  ${matches.length?`<div class="card" style="margin-top:15px"><span class="muted">Recent Form (oldest → newest)</span><div style="margin-top:8px">${recentForm}</div></div>`:""}
+ ${matches.length?`<h2>Record</h2>${vzRecordBar(wins,losses,draws,matches.length-wins-losses-draws)}`:""}${vzRunsPairs(matches)}
  <h2>Team Performance</h2>${matchPerfHtml(matches)}
  ${trainingResultsHtml(_tSessions,matches)}
  ${campPathwayHtml(roster)}
+ ${(()=>{let rr=roster.filter(p=>p.available!=="no"&&p.team).map(p=>{let ts=activeSessions().filter(s=>s.squad===p.team&&inRange(s.date,from,to));return ts.length?{l:p.name,v:Math.round(ts.filter(s=>(s.attendees||[]).includes(p.name)).length/ts.length*100)}:null}).filter(Boolean).sort((a,b)=>a.v-b.v);return rr.length>=3?`<h2>Attendance by player</h2>${vzHBars(rr.map(r=>({...r,t:r.v+"%",c:r.v<60?"var(--red)":"var(--g)"})),100)}`:""})()}
  <h2>Player Performance</h2>${roster.length?playerPerfCardsHtml(roster,matches,_tSessions):empty("No players in this scope.")}
  <div class="card" style="margin-top:12px"><span class="muted">Average Attendance</span><div style="margin-top:4px;font-size:20px;font-weight:800">${avgAttendance!==null?avgAttendance+"%":"No session data in this range"}</div></div>
  <h2>Match Results</h2>${matches.length?matches.map(m=>`<div class="card"><b>${esc(matchDateStr(m))} · vs ${esc(m.opp||"Opposition")}</b><p>${esc(m.result||"—")}</p>${matchScoreText(m)?`<div class="muted">${matchScoreText(m)}</div>`:""}</div>`).join(""):empty("No matches recorded in this scope.")}`);
@@ -7907,6 +8005,7 @@ function buildAssessmentReport(){
  `${assessmentCoverageHeatmapHtml(roster)}
  ${skillTrendsHtml(roster,assessments)}
  ${techFocusHtml(roster)}
+ ${byPlayer.filter(x=>x.latest&&Number(assessmentAvg(x.latest))>0).length>=3?`<h2>Latest scores</h2>${vzHBars(byPlayer.filter(x=>x.latest&&Number(assessmentAvg(x.latest))>0).map(x=>({l:x.p.name,v:Number(assessmentAvg(x.latest)),c:vzCol(Number(assessmentAvg(x.latest)))})).sort((a,b)=>b.v-a.v),10," /10")}`:""}
  <h2>Player Summary</h2>${byPlayer.length?byPlayer.map(({p,count,latest})=>`<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.role||"Player")}</span><p>${count} assessment${count!==1?"s":""} logged${latest?" · Latest: "+(assessmentAvg(latest)==="—"?"technique only":assessmentAvg(latest)+"/10")+" on "+esc(fmtDate(latest.date)):""}</p></div>`).join(""):empty("No players in this scope.")}
  <h2>Full Assessment Log</h2>${assessments.length?assessments.slice().sort((a,b)=>String(b.date||"").localeCompare(String(a.date||""))).map(a=>`<div class="card"><b>${esc(a.player)} · ${esc(fmtDate(a.date))}</b>${assessmentFormatTagsHtml(a)}<div>${assessmentDisciplines(a).map(d=>`<span class="tag">${d}${disciplineAvg(a,d)==="—"?"":" "+disciplineAvg(a,d)+"/10"}</span>`).join("")}</div><p><b>Priority:</b> ${esc(a.priority||"—")}</p>${techAssessHtml(a)}${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">🎬 Link ${i+1}</a>`).join("")}</div>`:""}</div>`).join(""):empty("No assessments recorded in this scope.")}`);
 }
@@ -7935,6 +8034,7 @@ function buildAttendanceReport(){
  rows.sort((a,b)=>(a.rate===null?101:a.rate)-(b.rate===null?101:b.rate));
  reportShell(`Attendance Report — ${esc(scopeLabel(scope))}`,rangeLabel(from,to),
  `<div class="muted" style="margin-bottom:12px">Attendance is calculated against sessions logged for each player's own team, sorted lowest attendance first. Players marked Unavailable are excluded from the percentage, since they weren't expected to attend. Reassessment status is included for context — a player attending consistently but overdue for reassessment is a different situation from one who's also missing sessions.</div>
+ ${rows.filter(r=>r.rate!==null).length>=3?`<h2>At a glance</h2>${vzHBars(rows.filter(r=>r.rate!==null).map(r=>({l:r.p.name,v:r.rate,t:r.rate+"%",c:r.rate<60?"var(--red)":"var(--g)"})),100)}<div class="muted" style="font-size:12px">Red = below 60%</div>`:""}
  <h2>Player Attendance</h2>${rows.length?rows.map(({p,attended,total,rate,reassessDue,unavailable})=>`<div class="card"><b>${esc(p.name)}</b> <span class="tag">${esc(p.team||"No team set")}</span>${unavailable?`<span class="tag" style="background:var(--redTint);color:var(--red)">Unavailable</span>`:""}${reassessDue?`<span class="tag" style="background:var(--redTint);color:var(--red)">Reassessment due</span>`:""}<p>${unavailable?"Marked unavailable — excluded from attendance calculation.":total>0?`${attended}/${total} sessions attended · <b>${rate}%</b>`:"No team sessions in this range to compare against."}</p></div>`).join(""):empty("No players yet.")}`);
 }
 function tournamentReport(){
@@ -7955,7 +8055,8 @@ function buildTournamentReport(){
  {let _sq=(t.squadPlayerIds||[]).map(id=>db.players.find(p=>p.id===id)).filter(Boolean);let o={label:"Tournament: "+t.name,period:(t.startDate||t.endDate)?(fmtDate(t.startDate)||"?")+" → "+(fmtDate(t.endDate)||"?"):"",matches,sessions:[],roster:_sq};setReportExtras(reportCoverHtml(o),reportNextHtml(o))}
  reportShell(`Tournament Report — ${esc(t.name)}`,`${(t.startDate||t.endDate)?esc(fmtDate(t.startDate)||"?")+" → "+esc(fmtDate(t.endDate)||"?")+" · ":""}${matches.length} match${matches.length!==1?"es":""}`,
  `<div class="grid g4"><div class="card stat"><span>Wins</span><b>${wins}</b></div><div class="card stat"><span>Losses</span><b>${losses}</b></div><div class="card stat"><span>Draws</span><b>${draws}</b></div><div class="card stat"><span>Matches</span><b>${matches.length}</b></div></div>
- <h2>Tournament Performance</h2>${matchPerfHtml(matches)}
+ ${vzRecordFor(matches)}
+ <h2>Tournament Performance</h2>${matchPerfHtml(matches)}${vzTopScorers(matches)}
  ${(()=>{let u=(t.squadPlayerIds||[]).map(id=>db.players.find(p=>p.id===id)).filter(Boolean);return (u.length&&matches.length)?`${campPathwayHtml(u)}<h2>Player Performance</h2>${playerPerfCardsHtml(u,matches)}`:campPathwayHtml(u)})()}
  ${t.notes?`<h2>Notes</h2><div class="card"><p>${esc(t.notes)}</p></div>`:""}
  ${selectionNotesHtml(t)}
@@ -7990,7 +8091,8 @@ function buildSeasonAnalyticsReport(){
  `<div class="grid g3"><div class="card stat"><span>Sessions</span><b>${seasonSessions.length}</b></div><div class="card stat"><span>Coaching Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Reflections</span><b>${seasonReflections.length}</b></div></div>
  <div class="grid g4" style="margin-top:15px"><div class="card stat"><span>Matches</span><b>${seasonMatches.length}</b></div><div class="card stat"><span>Wins</span><b>${wins}</b></div><div class="card stat"><span>Losses</span><b>${losses}</b></div><div class="card stat"><span>Draws</span><b>${draws}</b></div></div>
  <div class="grid g3" style="margin-top:15px">${statCardHtml("Assessments",seasonAssessments.length)}${statCardHtml("Players assessed",new Set(seasonAssessments.map(a=>a.player)).size)}${statCardHtml("Camps",(db.camps||[]).filter(c=>c.startDate&&c.startDate>=s.startDate&&c.startDate<=s.endDate&&(!s.team||c.team===s.team)).length)}</div>
- <h2>Match Performance</h2>${matchPerfHtml(seasonMatches)}${trainingResultsHtml(seasonSessions,seasonMatches)}${seasonStoryHtml({label:"",matches:seasonMatches,sessions:seasonSessions,roster:db.players.filter(p=>s.team&&p.team===s.team),from:s.startDate,to:s.endDate})}
+ ${vzRecordFor(seasonMatches)}${vzMonthWeeks(seasonSessions)}${vzReflRatings(seasonReflections)}
+ <h2>Match Performance</h2>${matchPerfHtml(seasonMatches)}${vzTopScorers(seasonMatches)}${trainingResultsHtml(seasonSessions,seasonMatches)}${seasonStoryHtml({label:"",matches:seasonMatches,sessions:seasonSessions,roster:db.players.filter(p=>s.team&&p.team===s.team),from:s.startDate,to:s.endDate})}
  ${(s.phases&&s.phases.length)?`<h2>Season Plan — Phase Breakdown</h2>${s.phases.slice().sort((a,b)=>String(a.startDate||"").localeCompare(String(b.startDate||""))).map(ph=>{
   let actual=activeSessions().filter(x=>ph.startDate&&ph.endDate&&x.date>=ph.startDate&&x.date<=ph.endDate&&x.sessionType!=="player"&&(!s.team||x.squad===s.team)).length;
   let target=Number(ph.sessionTarget)||0;
@@ -8779,7 +8881,7 @@ function buildMonthlyReport(){
   let rows=[["Sessions",rptArrow(ps.length,ss.length,true,x=>x.toFixed(0))],["Hours",rptArrow(ph,hrs,true)],["Assessments",rptArrow(pa.length,aa.length,true,x=>x.toFixed(0))],["Matches",rptArrow(pm.length,mm.length,true,x=>x.toFixed(0))],["Win rate",rptArrow(wr(pm),wr(mm),true,x=>Math.round(x),"%")]].filter(x=>x[1]);
   let extra=(ps.length||pa.length||pm.length)&&rows.length?`<div class="muted" style="margin-top:10px">Compared with ${esc(fmtMonthKey(pk))}</div>${rows.map(x=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0"><span>${x[0]}</span><span>${x[1]}</span></div>`).join("")}`:"";
   let o={label:"Monthly Coaching Report"+(mTeam?" — "+mTeam:""),period:fmtMonthKey(mk),matches:mm,sessions:ss,extra};setReportExtras(reportCoverHtml(o),reportNextHtml(o))}
- reportShell("Monthly Coaching Report"+(mTeam?" — "+esc(mTeam):""),fmtMonthKey(mk),`<div class="grid g4"><div class="card stat"><span>Sessions</span><b>${ss.length}</b></div><div class="card stat"><span>Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Assessments</span><b>${aa.length}</b></div><div class="card stat"><span>Reflections</span><b>${rr.length}</b></div></div>${mm.length?`<h2>Match Performance</h2>${matchPerfHtml(mm)}${trainingResultsHtml(ss,mm)}`:""}<h2>Sessions</h2>${ss.length?ss.map(s=>`<div class="card"><b>${esc(fmtDate(s.date))} · ${esc(s.title||sessionLabel(s))}</b> <span class="tag">${esc(sessionTypeLabel(s.sessionType))}</span>${sessFocusHtml(s)}<p>${esc(s.objectives||"")}</p></div>`).join(""):empty("No sessions in this month.")}<h2>Assessments</h2>${aa.length?aa.map(a=>`<div class="card"><b>${esc(a.player)} · ${assessmentAvg(a)}/10</b><p>${esc(a.priority||"")}</p></div>`).join(""):empty("No assessments in this month.")}<h2>Match actions</h2>${mm.filter(m=>m.actions||m.notes||matchActionItems(m).length).length?mm.filter(m=>m.actions||m.notes||matchActionItems(m).length).map(m=>`<div class="card"><b>${esc(m.team)} vs ${esc(m.opp)}</b><p>${esc(m.actions||m.notes||"")}</p></div>`).join(""):empty("No match notes in this month.")}`)}
+ reportShell("Monthly Coaching Report"+(mTeam?" — "+esc(mTeam):""),fmtMonthKey(mk),`<div class="grid g4"><div class="card stat"><span>Sessions</span><b>${ss.length}</b></div><div class="card stat"><span>Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Assessments</span><b>${aa.length}</b></div><div class="card stat"><span>Reflections</span><b>${rr.length}</b></div></div>${vzMonthWeeks(ss)}${mm.length?`${vzRecordFor(mm)}<h2>Match Performance</h2>${matchPerfHtml(mm)}${trainingResultsHtml(ss,mm)}`:""}<h2>Sessions</h2>${ss.length?ss.map(s=>`<div class="card"><b>${esc(fmtDate(s.date))} · ${esc(s.title||sessionLabel(s))}</b> <span class="tag">${esc(sessionTypeLabel(s.sessionType))}</span>${sessFocusHtml(s)}<p>${esc(s.objectives||"")}</p></div>`).join(""):empty("No sessions in this month.")}<h2>Assessments</h2>${aa.length?aa.map(a=>`<div class="card"><b>${esc(a.player)} · ${assessmentAvg(a)}/10</b><p>${esc(a.priority||"")}</p></div>`).join(""):empty("No assessments in this month.")}<h2>Match actions</h2>${mm.filter(m=>m.actions||m.notes||matchActionItems(m).length).length?mm.filter(m=>m.actions||m.notes||matchActionItems(m).length).map(m=>`<div class="card"><b>${esc(m.team)} vs ${esc(m.opp)}</b><p>${esc(m.actions||m.notes||"")}</p></div>`).join(""):empty("No match notes in this month.")}`)}
 function playerReport(){
  if(!activePlayers().length){alert("Add a player first.");return}
  modal(`<div class="sheetHead"><h2>Player Development Report</h2><button class="x" onclick="closeM()">×</button></div>
@@ -8863,6 +8965,7 @@ function buildPlayerReport(){
  </div>
  <div class="grid g2" style="margin-top:15px"><div class="card"><b>Squad</b><div>${esc(p.group||"—")}</div></div><div class="card"><b>Current goal</b><div>${esc(p.focus||"—")}</div></div></div>
  ${goalProgressHtml}
+ ${playerVisualsHtml(p,aa,[],matches)}
  <h2>Profile</h2><div class="card"><b>Strengths</b><p>${esc(p.strengths||((playerReviewTags(p)||{g:[]}).g.join(", "))||"—")}</p><b>Development areas</b><p>${esc(p.areas||((playerReviewTags(p)||{w:[]}).w.join(", "))||"—")}</p></div>
  ${_plFocus}${playerGoalsReportHtml(p)}${playerWhatWorkedHtml(p)}${dismissalPatternHtml(_S.bat,"")}${_plSkill}${playerJourneyHtml(p,true)}
  ${Object.entries(disciplineTrend).some(([,t])=>t.count>=2)?`<h2>Development Trend</h2><div class="card">${Object.entries(disciplineTrend).filter(([,t])=>t.count>=2).map(([d,t])=>{let diff=(t.last-t.first).toFixed(1);let sign=t.last>=t.first?"+":"";let color=t.last>=t.first?"var(--g)":"var(--red)";return `<div style="margin-bottom:6px"><b>${esc(d)}:</b> ${t.first.toFixed(1)} → ${t.last.toFixed(1)} <span style="color:${color};font-weight:700">(${sign}${diff})</span></div>`}).join("")}</div>`:""}
@@ -8905,9 +9008,9 @@ function buildSeasonReport(){
  `<div class="grid g4"><div class="card stat"><span>Sessions</span><b>${sessions.length}</b></div><div class="card stat"><span>Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Players</span><b>${roster.length}</b></div><div class="card stat"><span>Matches</span><b>${matches.length}</b></div></div>
  ${matches.length?`<div class="grid g3" style="margin-top:12px"><div class="card stat"><span>Wins</span><b>${wins}</b></div><div class="card stat"><span>Losses</span><b>${losses}</b></div><div class="card stat"><span>Draws</span><b>${draws}</b></div></div>`:""}
  ${avgAttendance!==null?`<div class="card" style="margin-top:12px"><span class="muted">Average Attendance</span><div style="font-size:22px;font-weight:800">${avgAttendance}%</div></div>`:""}
- ${categoryCounts.length?`<h2>Coaching Focus This Period</h2><div class="card">${categoryCounts.map(c=>`<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${esc(c.name)}</span><b>${c.count} session${c.count!==1?"s":""}</b></div>`).join("")}</div>`:""}
+ ${categoryCounts.some(c=>c.count>0)?`<h2>Coaching Focus This Period</h2><div class="card">${vzCatBars(categoryCounts," sessions")}</div>`:""}${vzMonthWeeks(sessions)}
  ${mostImproved.length?`<h2>Most Improved</h2><div class="card">${mostImproved.map(m=>`<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${esc(m.name)}</span><b style="color:var(--g)">${m.first.toFixed(1)} → ${m.last.toFixed(1)} (+${m.diff.toFixed(1)})</b></div>`).join("")}</div>`:""}
- ${matches.length?`<h2>Match Performance</h2>${matchPerfHtml(matches)}${trainingResultsHtml(sessions,matches)}`:""}
+ ${matches.length?`${vzRecordFor(matches)}<h2>Match Performance</h2>${matchPerfHtml(matches)}${vzTopScorers(matches)}${trainingResultsHtml(sessions,matches)}`:""}
  ${seasonStoryHtml({label:"",matches,sessions,roster,from,to})}
  <h2>Players</h2>${roster.map(p=>`<div class="card"><b>${esc(p.name)} · ${esc(p.role||"")}</b><p>${esc(p.focus||"")}</p></div>`).join("")||empty("No players in this scope.")}
  <h2>Coach Reflections Summary</h2><div class="card"><p>${reflections.length} reflection${reflections.length!==1?"s":""} logged this period.</p></div>`)}
@@ -8934,7 +9037,7 @@ function buildSessionReport(){
  let categoryCounts=OBJECTIVE_CATEGORIES.map(c=>({name:c,count:sessions.filter(s=>(s.objectiveTags||[]).includes(c)).length})).sort((a,b)=>b.count-a.count);
  let hasAnyTags=categoryCounts.some(c=>c.count>0);
  reportShell("Session Report"+(sParts.length?" — "+esc(sParts.join(" · ")):""),rangeLabel(from,to)+" · "+sessions.length+" session"+(sessions.length!==1?"s":""),sessions.length?`
- ${hasAnyTags?`<h2>Objective Category Breakdown</h2><div class="card">${categoryCounts.map(c=>`<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${esc(c.name)}</span><b>${c.count} session${c.count!==1?"s":""}</b></div>`).join("")}</div>`:""}
+ ${hasAnyTags?`<h2>Objective Category Breakdown</h2><div class="card">${vzCatBars(categoryCounts," sessions")}</div>`:""}${vzMonthWeeks(sessions)}
  <table class="reportTable"><tr><th>Date</th><th>Title</th><th>Type</th><th>Focus</th><th>Categories</th><th>Objectives</th></tr>${sessions.slice().sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b))).map(s=>`<tr><td>${esc(fmtDate(s.date))}</td><td>${esc(s.title||"—")}</td><td>${esc(sessionTypeLabel(s.sessionType))}</td><td>${esc(s.focus)}</td><td>${(s.objectiveTags||[]).map(t=>esc(t)).join(", ")||"—"}</td><td>${esc(s.objectives)}</td></tr>`).join("")}</table>`:empty("No sessions documented."));
 }
 function matchReport(){scopeAndRangeModal("Match Report","buildMatchReport")}
@@ -8948,7 +9051,7 @@ function buildMatchReport(){
  let avgOf=arr=>arr.length?(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1):"—";
  {let o={label:scope.type==="all"?"Match Report":"Match Report — "+scopeLabel(scope),period:rangeLabel(from,to),matches};setReportExtras(reportCoverHtml(o),reportNextHtml(o))}
  reportShell("Match Report"+(scope.type==="all"?"":" — "+esc(scopeLabel(scope))),rangeLabel(from,to)+" · "+matches.length+" match"+(matches.length!==1?"es":""),
- `${matchPerfHtml(matches)}
+ `${vzRecordFor(matches)}${matchPerfHtml(matches)}${vzTopScorers(matches)}
  <h2>Match History</h2>${matches.map(m=>`<div class="card"><b>${esc(matchDateStr(m))} · ${esc(m.team)} vs ${esc(m.opp)}</b>${matchHighlightHtml(m)}${(m.teamNotes||m.teamRating)?`<p><b>Team Review:</b> ${esc(m.teamRating||"—")}/10${m.teamNotes?" · "+esc(m.teamNotes):""}</p>`:""}${m.actions?`<p><b>Training actions:</b> ${esc(m.actions)}</p>`:""}</div>`).join("")||empty("No match notes.")}`);
 }
 function coachReport(){
@@ -8976,7 +9079,7 @@ function buildCoachReport(){
  });
  let objectiveRatingRows=Object.entries(objectiveRatingAgg).map(([cat,d])=>({cat,avg:d.sum/d.count,count:d.count})).sort((a,b)=>b.avg-a.avg);
  reportShell("Coach Development Report"+(cTeam?" — "+esc(cTeam):""),rangeLabel(from,to),
- `${objectiveRatingRows.length?`<h2 style="margin-top:0">Objective Achievement — Term Average</h2><div class="card">${objectiveRatingRows.map(r=>`<div style="display:flex;justify-content:space-between;padding:4px 0"><span>${esc(r.cat)} <span class="muted" style="font-size:var(--fs-2)">(${r.count} reflection${r.count!==1?"s":""})</span></span><b>${r.avg.toFixed(1)}/5</b></div>`).join("")}</div>`:""}
+ `${objectiveRatingRows.length?`<h2 style="margin-top:0">Objective Achievement — Term Average</h2><div class="card">${vzHBars(objectiveRatingRows.map(r=>({l:r.cat,v:r.avg,t:r.avg.toFixed(1)+"/5",c:r.avg<3?"var(--red)":"var(--g)"})),5,"")}<div class="muted" style="font-size:12px">${objectiveRatingRows.map(r=>esc(r.cat)+": "+r.count+" reflection"+(r.count!==1?"s":"")).join(" · ")}</div></div>`:""}${vzReflRatings(reflections)}
  ${reflections.length?reflections.map(r=>{
   let reasonsPart=(r.betterReasons&&r.betterReasons.length)?r.betterReasons.join(", "):"";
   let detailPart=r.betterDetail!==undefined?r.betterDetail:(r.betterReasons===undefined?(r.better||""):"");
@@ -9110,7 +9213,7 @@ function calendar(){
   const dd=(n,c,t)=>n?`<span class="calCount" title="${n} ${t}"><span class="calDot ${c}"></span>${n>1?n:""}</span>`:"";
   dots=dd(items.sessions.length,"calDotS","session(s)")+dd(items.matches.length,"calDotM","match(es)")+dd(items.events.length,"calDotE","reminder(s)/event(s)")+dd(items.camps.length,"calDotC","camp day");
   if(items.camps.length){let cl=calClashes(ds);if(cl.sessions.length||cl.matches.length)dots+=`<span class="calCount" title="Clash with a camp" style="color:#dc2626;font-weight:800;font-size:12px">!</span>`}
-  cells+=`<div class="calCell${ds===today()?" calToday":""}" onclick="openCalDay('${ds}')"><div class="calDayNum">${d}</div><div class="calDots">${dots}</div></div>`;
+  {let nn=items.sessions.length+items.matches.length+items.events.length+items.camps.length;cells+=`<div class="calCell${ds===today()?" calToday":""}" ${nn?`style="background:rgba(16,185,129,${Math.min(.34,.09+nn*.07).toFixed(2)})"`:""} onclick="openCalDay('${ds}')"><div class="calDayNum">${d}</div><div class="calDots">${dots}</div></div>`}
  }
  let upcoming=db.events.slice().filter(e=>e.date>=today()).sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
  if(calEventQuery){let q=calEventQuery.toLowerCase();upcoming=upcoming.filter(e=>[e.title,e.notes].some(v=>String(v||"").toLowerCase().includes(q)))}
@@ -11180,6 +11283,7 @@ function campFbSummaryAuto(c,n){
  return L.join(" ");
 }
 function campFbSummary(c,n){let st=c.fbSum&&c.fbSum[n];return st!==undefined?st:campFbSummaryAuto(c,n)}
+Object.assign(CAMP_FB_PRO,{"Power hitting": ["Tee and heavy-bat blocks: 3 sets of 8 off a hitting tee with a slightly heavier bat, aiming past a marker 15 metres away, with a phone clip from side-on. Cue: strong base, hit through. 3 times a week.", "Machine power blocks: 4 sets of 8 balls from a ball machine at 100 to 110 kph, hitting down the ground into a target zone at 25 metres. Log clears per set and beat the count weekly. 3 times a week.", "Machine at match pace with a bat-speed sensor or radar: 4 sets of 6 balls, hitting for the boundary only in your zone and leaving the rest. Log hitting percentage and exit speed. 2 to 3 times a week."], "Timing": ["Hitting tee with impact tape on the bat: 3 sets of 10 contacts, checking where the ball marks the bat. Cue: watch the ball hit the bat. 4 times a week.", "Machine at 80 kph with a marked half-volley spot: 4 sets of 8 balls, counting middle-of-the-bat contacts from the impact tape. 3 times a week.", "Machine with random pace changes (80 to 120 kph): 4 sets of 8 balls, scoring a point for each ball played with easy, clean timing. Review side-on video after each set. 3 times a week."], "Off-side play": ["Hitting tee with a front-on camera: 3 sets of 8 straight and cover drives, checking head position and stride. Cue: still head, stride to the ball. 4 times a week.", "Machine on off-stump line at 90 kph: 4 sets of 8 balls with a marker outside off, playing drive, cut or leave by length. Target 6 of 8 in control. 3 times a week.", "Machine plus a bowler with an off-side field in cones: 4 sets of 8 balls at match pace; score runs only through gaps and log false shots on a sheet. 3 times a week."], "Leg-side play": ["Hitting tee set on the pads line with a net behind midwicket: 3 sets of 8 flicks, with video from behind. Cue: head over the ball. 4 times a week.", "Machine on leg-stump line at 85 to 95 kph: 4 sets of 8 balls, playing the flick, clip or pull as the length asks. Count controlled leg-side shots. 3 times a week.", "Machine with leg-side field cones: 4 sets of 6 balls at match pace; score only by finding gaps and lose a run for each shot in the air. Review video of balance. 3 times a week."], "Playing swing": ["Bowling machine with a seamed ball at 80 kph set slightly across the line: 3 sets of 8 balls, playing late and under the eyes. Cue: wait for the ball. 3 times a week.", "Machine plus a marked channel outside off: 4 sets of 8 balls at 90 kph; leave anything outside the channel and play only balls at the stumps. Count good leaves. 3 times a week.", "New-ball bowler with a stump camera or side-on video: 4 overs, scoring only off balls in your zone and leaving the rest; review how many you played late. 2 to 3 times a week."], "Building an innings": ["Machine at 75 to 80 kph: 3 sets of 10 balls where the first 5 are defended and the next 5 are scored off with singles. Cue: settle, then score. 3 times a week.", "Machine session in stages: bat 24 balls with 6 to settle, 12 to rotate and 6 to attack at 85 to 95 kph. Log runs and false shots per stage. 3 times a week.", "Full innings simulation with a bowler, a field and a scoreboard: a 60-ball innings with phases (settle, build, accelerate), filmed. Review the plan with the coach. 2 times a week."], "Back-foot play": ["Machine on a short length at 75 kph into a net: 3 sets of 8 balls, stepping back and across with the bat going straight. Cue: back and across. 4 times a week.", "Machine with bounce at chest height at 90 kph: 4 sets of 8 balls, choosing between punch, pull, cut and leave. Count controlled shots. 3 times a week.", "Machine at 110 to 120 kph on a bouncy length with a helmet and chest guard: 4 sets of 8 balls on the back foot only; keep at least 6 of 8 in control. Review video. 3 times a week."], "Front-foot play": ["Hitting tee with a front-on camera: 3 sets of 8 balls, striding to the pitch with a straight bat. Cue: head over the front knee. 4 times a week.", "Machine on a full length at 85 kph: 4 sets of 8 balls, driving on the stride and defending if it swings. Count balls played with a stable head. 3 times a week.", "Machine at match pace with swing: 4 sets of 8 full balls, choosing drive, push or defence by length. Target at least 6 of 8 under control. Review the stride on video. 3 times a week."], "Death-over batting": ["Machine on full and low lengths at 80 kph: 3 sets of 6 balls where the aim is a boundary or two runs off every ball. 2 to 3 times a week.", "Machine set to yorkers, slower balls and full tosses: 4 overs with a target of 8 off each over. Log boundaries, dots and misses. 2 to 3 times a week.", "Chase simulation with a bowler, a death field and a scoreboard: 18 off 12 balls, planning each ball, filmed. Repeat 4 times with different targets. 2 times a week."], "Seam and swing movement": ["Seam-position checks with a phone on slow motion: 3 sets of 10 gentle deliveries, checking that the seam stays upright. Cue: seam up, fingers behind. 4 times a week.", "New ball to a marked line outside off with a stump camera behind: 4 sets of 6 balls, logging the balls that move. 3 times a week.", "New-ball spell of 4 overs to a batter, with a slow-motion seam clip after each over and a speed gun reading. Aim to move the ball late and hit the top of off. 2 to 3 times a week."], "Over control": ["Six-ball accuracy set to a target mat: 3 overs of 6 balls aimed at one spot, counting hits. Cue: same run-up, same release. 3 times a week.", "Plan an over with a target mat and a stump camera: choose line, length and pace before each ball and tick those that land. Aim for 4 of 6 on plan. 3 times a week.", "Spell with a batter and a ball-tracking app or video tally: 4 overs to a plan, logging dots, boundaries and misses. Target under 6 runs an over. 2 to 3 times a week."], "Bowling pace": ["Run-up marking and rhythm work with video from the side: 3 sets of 6 balls at 80 per cent effort. Cue: smooth acceleration, strong landing. 3 times a week.", "Speed gun or radar: 4 sets of 6 balls at 80, 90 and 100 per cent effort, logging pace and the landing spot. 3 times a week.", "Pace plan: 2 speed sessions and one strength session a week, 5 overs at match pace with a radar and rest, logging speed and accuracy. Review video monthly. Keep to your workload plan."], "Spin flight and turn": ["Target mat with a high-frame-rate phone clip from behind: 3 sets of 6 slow, high balls aimed at the mat. Cue: loop it up and land on the mark. 4 times a week.", "Turn pitch or rough mat with a marked spot: 4 sets of 6 balls with extra revolutions, logging turn and drift with slow-motion video. 3 times a week.", "Spin spell with a batter and a ball-tracking or video tally: 4 overs mixing flight and pace changes, aiming to beat the bat on 2 balls an over. Review revolutions on video. 2 to 3 times a week."], "New-ball bowling": ["Target mat on a good length with a stump camera behind: 3 sets of 6 balls with an upright seam. Cue: hit the top of off. 3 times a week.", "Opening spell of 4 overs with a new ball to a batter, with a speed gun and tally of dots and movement. Aim at the off-stump channel. 3 times a week.", "Powerplay new-ball plan: 3 overs in a powerplay field with a plan for each batter, tracked on video. Target two wicket chances and under 6 an over. 2 times a week."], "Death bowling": ["Yorker mat or marked block: 3 sets of 6 balls at the base of the stumps, then one slower ball per set, filmed from behind. 3 times a week.", "Death-over practice against a batter chasing 12 an over: 4 overs mixing yorkers, slower balls and wide yorkers. Log runs conceded and landing spots. 2 to 3 times a week.", "Last-over simulation with a scoreboard and ball tracking: defend 10 off 6 balls against a batter with a death field. Repeat 4 times and review video of the release. 2 times a week."], "Yorkers": ["Yorker block on the crease with a stump camera behind: 3 sets of 6 balls from a short run-up. Count the hits. Cue: full and at the stumps. 4 times a week.", "Yorker ladder with three mats at leg, middle and off: 4 sets of 6 yorkers from a normal run-up, counting those that land. Check release on video. 3 times a week.", "Match yorkers with a batter and a scoreboard: 3 overs at the death, aiming for 4 yorkers an over, tracked by landing spot and speed. 2 to 3 times a week."], "Wicket-taking": ["Stump target with a stump camera behind: 3 sets of 6 balls aimed only at the stumps, with no fielders. Cue: top of off stump. 3 times a week.", "Plan for a dismissal with a ball-tracking or video tally: pick one way to get a batter out each over and bowl it. Log the chances created. 3 times a week.", "Wicket-taking spell of 4 overs to a plan with fielders set to the plan, recorded on video. Target two chances and one dismissal; review each over. 2 times a week."], "Economy": ["Target mat with a ball tally: 3 overs aiming for 3 dot balls in every over at a single spot. Cue: bowl to one spot. 3 times a week.", "Restrict-runs spell with a batter and a field, with an analyst's tally of dots and boundaries: 4 overs keeping the batter under 5 an over. 3 times a week.", "Economy spell of 4 overs at match pace against a set batter, with video and a scoring sheet. Target under 5.5 an over and 12 dots; review with the coach. 2 times a week."], "Slip catching": ["Slip cradle at low speed: 3 sets of 8 catches, low and to the side. Cue: soft hands, watch the ball. 4 times a week.", "Slip cradle at match pace with a rebound: 4 sets of 8 catches from both sides; count drops and catches taken. 3 times a week.", "Edges from a bat-and-ball machine with a keeper and two slips: 4 sets of 8 edges, calling the catches, filmed from behind. Aim for 7 of 8 taken. 3 times a week."], "Boundary fielding": ["Rebound net or boundary rope: 3 sets of 6 rolled balls from 20 metres; run, slide or stop and return. Cue: be low and quick. 3 times a week.", "Boundary relay with a timer: 4 sets of 5 balls to the rope; take the catch or stop the ball, then relay it in. Time the relay and count clean ones. 3 times a week.", "Outfield match practice with a ball launcher and a stopwatch: 4 sets of 6 balls to the rope with a relay and a throw to the stumps. Beat the relay time weekly. 2 to 3 times a week."], "Anticipation": ["Reaction ball or rebound net: 3 sets of 10 reaction balls, starting in a stable position and moving as the ball is released. Cue: be ready before the ball is hit. 3 times a week.", "Read the batter with a camera behind the fielder: stand in the field while a batter plays 12 balls, call the direction before each shot and track the hit rate. 3 times a week.", "Situation fielding with a coach scoring early moves: the captain gives a plan for each ball, the fielder adjusts before each ball, and a camera records the first step. 2 times a week."], "Standing up": ["Stumps and a mirror or phone camera from the side: 3 sets of 8 gentle balls from a feeder, standing up and taking late. Cue: stay low, take late. 4 times a week.", "Standing up to a spinner with video from behind: 4 sets of 6 balls at normal pace; keep the head still and rise with the bounce. Log clean takes. 3 times a week.", "Standing up with a batter stepping out and a stump camera: 4 sets of 6 balls from a spinner; take and break in one movement. Count clean stumpings. 3 times a week."], "Keeping to pace": ["Bowling machine at 70 per cent pace with the keeper standing back: 3 sets of 8 balls. Cue: move your feet before your hands. 4 times a week.", "Bowling machine or bowler at match pace: 4 sets of 8 balls with the keeper standing back; count clean takes and byes, with video from behind. 3 times a week.", "Machine at full pace on a variable-bounce surface with a radar: 4 sets of 8 balls, logging clean takes and misses against ball speed. Review video. 3 times a week."], "Keeping to spin": ["Spinner or spin machine with slow balls and a stump camera: 3 sets of 8 balls, taking late under the eyes. Cue: let the ball come. 4 times a week.", "Spin takes with stock, googly and slider, with video from the side: 4 sets of 6 balls, reading the ball from the hand. Count clean takes and byes. 3 times a week.", "Spin keeping with a batter stepping out and a stump camera: 4 overs of spin; log takes and stumpings and review footwork on video. 3 times a week."], "Stumpings": ["Stumps with a phone clip from the side: 3 sets of 8 balls where the keeper takes and breaks at once with a batter's foot in the crease. Cue: take first, then break. 4 times a week.", "Stumping speed with a timer or slow-motion video: 4 sets of 6 balls with a batter stepping out; measure take to stumps and aim for under 1 second. 3 times a week.", "Stumping pressure with a spinner, a batter and a scoreboard: 4 sets of 6 balls with the batter stepping out at random; a point for each clean stumping, minus one for a miss. Review video. 3 times a week."]});
 function campFbWorkLines(c,n){
  let st=c.fbWork&&c.fbWork[n];if(st!==undefined)return String(st).split("\n").map(x=>x.trim()).filter(Boolean);
  let kit=campFbOpts().kit;
@@ -11526,7 +11630,7 @@ function campSummaryReport(id){
  ${types.length?`<h2>What was covered</h2>${bar}`:""}
  ${d.themes.length?`<div style="margin-top:8px">${d.themes.map(x=>`<span class="tag">Day ${x.i+1}: ${esc(x.t)}</span>`).join(" ")}</div>`:""}
  ${d.assessed?`<h2>Assessments</h2><p>${d.assessed} of ${d.P} players assessed (${d.nAssess} assessment${d.nAssess===1?"":"s"})${d.firstAvg!==null?` · squad average ${d.firstAvg.toFixed(1)} → ${d.lastAvg.toFixed(1)}`:""}</p>
-  ${d.disc.length?`<div>${d.disc.map(x=>`<span class="tag">${esc(x.k)} ${x.v.toFixed(1)}</span>`).join(" ")}</div>`:""}
+  ${d.disc.length>=2?vzHBars(d.disc.map(x=>({l:x.k,v:x.v,c:vzCol(x.v)})),10," /10"):d.disc.length?`<div>${d.disc.map(x=>`<span class="tag">${esc(x.k)} ${x.v.toFixed(1)}</span>`).join(" ")}</div>`:""}
   ${d.skills.length>=4?`<p style="margin:8px 0 0"><b>Strongest skills:</b> ${d.skills.slice(0,3).map(x=>esc(x.k)+" "+x.v.toFixed(1)).join(", ")}<br><b>Needs work:</b> ${d.skills.slice(-3).reverse().map(x=>esc(x.k)+" "+x.v.toFixed(1)).join(", ")}</p>`:""}
   ${(o.names&&d.improvers.length)?`<p style="margin:8px 0 0"><b>Biggest improvers:</b> ${d.improvers.map(x=>esc(x.n)+" +"+x.d.toFixed(1)).join(", ")}</p>`:""}`:""}
  ${d.attSessions?`<h2>Participation</h2><p>Across ${d.attSessions} session${d.attSessions===1?"":"s"} with attendance recorded, an average of <b>${Math.round(d.attAvg)} of ${d.P}</b> players (${Math.round(d.attAvg/d.P*100)}%) attended.</p>`:""}
@@ -11607,6 +11711,122 @@ function playerCampLine(p){
  let v=campRevOf(c,p.name),rc=CAMP_REV_REC.find(x=>x[0]===v.rec);
  return `<div class="muted" style="font-size:12.5px">Camp: ${esc(c.name)}${v.r?` · <span style="color:#d97706">${campRevStars(v.r)}</span>`:""}${rc?` · <b style="color:${rc[2]}">${rc[1]}</b>`:""}</div>`;
 }
+
+/* ===== v130: chart kit + profile visuals ===== */
+function vzNote(t){return `<div class="vzNote">${esc(t)}</div>`}
+function vzCol(v){return `hsl(${Math.round(Math.max(0,Math.min(1,(v-1)/9))*125)},62%,34%)`}
+function vzRadar(axes,A,B,size){
+ size=size||260;let n=axes.length,c=size/2,R=size/2-46,pt=(i,v)=>{let a=-Math.PI/2+i*2*Math.PI/n,r=R*Math.max(0,Math.min(10,v))/10;return [c+r*Math.cos(a),c+r*Math.sin(a)]};
+ let g=[2.5,5,7.5,10].map(l=>`<polygon points="${axes.map((_,i)=>pt(i,l).join(",")).join(" ")}" fill="none" stroke="currentColor" stroke-opacity=".18"/>`).join("");
+ let sp=axes.map((_,i)=>{let q=pt(i,10);return `<line x1="${c}" y1="${c}" x2="${q[0]}" y2="${q[1]}" stroke="currentColor" stroke-opacity=".18"/>`}).join("");
+ let poly=(arr,col,dash)=>arr?`<polygon points="${arr.map((v,i)=>pt(i,v||0).join(",")).join(" ")}" fill="${col}" fill-opacity="${dash?0:.22}" stroke="${col}" stroke-width="2.2" ${dash?'stroke-dasharray="5 4"':""}/>`:"";
+ let dots=A.map((v,i)=>{let q=pt(i,v||0);return `<circle cx="${q[0]}" cy="${q[1]}" r="3.2" fill="var(--g)"/>`}).join("");
+ let lab=axes.map((t,i)=>{let a=-Math.PI/2+i*2*Math.PI/n,x=c+(R+14)*Math.cos(a),y=c+(R+14)*Math.sin(a),an=Math.abs(Math.cos(a))<.2?"middle":Math.cos(a)>0?"start":"end";let tx=String(t).length>11?String(t).slice(0,10)+"…":t;return `<text x="${x}" y="${y+4}" text-anchor="${an}" font-size="11" fill="currentColor" fill-opacity=".85">${esc(tx)} ${A[i]?Number(A[i]).toFixed(1):""}</text>`}).join("");
+ return `<svg viewBox="-60 0 ${size+120} ${size}" width="${size+120}" role="img" aria-label="Skills radar" style="color:var(--ink);margin:0 auto">${g}${sp}${poly(B,"#8a95ab",true)}${poly(A,"var(--g)",false)}${dots}${lab}</svg>`}
+function vzLine(pts,w,h){
+ w=w||320;h=h||120;let L=30,Rr=12,T=10,Bm=22,n=pts.length,x=i=>L+(w-L-Rr)*(n===1?.5:i/(n-1)),y=v=>T+(h-T-Bm)*(1-(Math.max(1,Math.min(10,v))-1)/9);
+ let grid=[2,4,6,8,10].map(v=>`<line x1="${L}" x2="${w-Rr}" y1="${y(v)}" y2="${y(v)}" stroke="currentColor" stroke-opacity=".14"/><text x="${L-6}" y="${y(v)+4}" text-anchor="end" font-size="10" fill="currentColor" fill-opacity=".7">${v}</text>`).join("");
+ let path=pts.map((p,i)=>(i?"L":"M")+x(i)+","+y(p.v)).join(" ");
+ let dots=pts.map((p,i)=>`<circle cx="${x(i)}" cy="${y(p.v)}" r="3.4" fill="var(--g)"/>`).join("");
+ let end=pts[n-1],first=pts[0];
+ return `<svg viewBox="0 0 ${w} ${h}" width="${w}" role="img" aria-label="Assessment trend" style="color:var(--ink)">${grid}<path d="${path}" fill="none" stroke="var(--g)" stroke-width="2.4" stroke-linejoin="round"/>${dots}<text x="${x(0)}" y="${h-6}" font-size="10" text-anchor="start" fill="currentColor" fill-opacity=".75">${esc(fmtDate(first.d))}</text><text x="${x(n-1)}" y="${h-6}" font-size="10" text-anchor="end" fill="currentColor" fill-opacity=".75">${esc(fmtDate(end.d))}</text><text x="${x(n-1)}" y="${y(end.v)-8}" font-size="11" font-weight="700" text-anchor="end" fill="currentColor">${end.v.toFixed(1)}</text></svg>`}
+function vzRunsStrip(inn){
+ let n=inn.length,w=Math.max(260,n*26+20),h=110,T=16,B=20,mx=Math.max(50,...inn.map(i=>i.runs)),bw=Math.min(20,(w-20)/n-5);
+ let bars=inn.map((i,k)=>{let x=10+k*((w-20)/n)+((w-20)/n-bw)/2,bh=Math.max(2,(h-T-B)*i.runs/mx),y=h-B-bh,fifty=i.runs>=50;
+  return `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" rx="3" fill="${i.out?"#8a95ab":"var(--g)"}" ${fifty?'stroke="var(--ink)" stroke-width="2"':""}/><text x="${x+bw/2}" y="${y-3}" font-size="9.5" text-anchor="middle" fill="currentColor">${i.runs}${i.out?"":"*"}</text>`}).join("");
+ let line50=mx>=50?`<line x1="0" x2="${w}" y1="${h-B-(h-T-B)*50/mx}" y2="${h-B-(h-T-B)*50/mx}" stroke="currentColor" stroke-opacity=".3" stroke-dasharray="3 3"/><text x="${w-2}" y="${h-B-(h-T-B)*50/mx-3}" font-size="9" text-anchor="end" fill="currentColor" fill-opacity=".7">50</text>`:"";
+ return `<div style="overflow-x:auto"><svg viewBox="0 0 ${w} ${h}" width="${w}" role="img" aria-label="Runs per innings" style="color:var(--ink)">${line50}${bars}</svg></div>`}
+function vzDotGrid(items){
+ return `<div style="display:flex;flex-wrap:wrap;gap:5px">${items.map(i=>`<span title="${esc(i.t)}" style="width:22px;height:22px;border-radius:6px;display:inline-flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;${i.on?"background:var(--g);color:#fff":"border:2px solid #8a95ab;color:#8a95ab"}">${i.on?"✓":"–"}</span>`).join("")}</div>`}
+function vzSkillRows(a,d){let sk=allSkillsFor(d),r=(a&&a.ratings&&a.ratings[d])||[];return sk.map((n,i)=>({n,v:Number(r[i])||0}))}
+function vzLatestSkill(assessments,d){/* latest rating per skill for discipline d */
+ let sk=allSkillsFor(d),out=sk.map(n=>({n,v:0}));
+ assessments.forEach(a=>{if(!assessmentDisciplines(a).includes(d))return;let r=a.ratings&&a.ratings[d];if(!Array.isArray(r))return;sk.forEach((n,i)=>{let v=Number(r[i]);if(v>0)out[i].v=v})});return out}
+function playerVisualsHtml(p,assessments,sessions,matches,mode){
+ let out=[];
+ /* radar */
+ let asd=assessments.filter(a=>assessmentAvg(a)!=="—");
+ if(asd.length){
+  let latest=asd[asd.length-1],cut=new Date(new Date(latest.date).getTime()-60*86400000).toISOString().slice(0,10),old=asd.slice(0,-1).filter(a=>a.date<=cut).slice(-1)[0];
+  let ds=assessmentDisciplines(latest).filter(d=>disciplineAvg(latest,d)!=="—"&&Number(disciplineAvg(latest,d))>0),axes,A,B=null,ttl;
+  if(ds.length>=3){axes=ds;A=ds.map(d=>Number(disciplineAvg(latest,d)));if(old)B=ds.map(d=>{let v=Number(disciplineAvg(old,d));return v>0?v:0});ttl="Skills by discipline"}
+  else if(ds.length){let d=ds[0],r=vzSkillRows(latest,d).filter(x=>x.v>0);if(r.length>=3){axes=r.map(x=>x.n);A=r.map(x=>x.v);if(old){let o=vzSkillRows(old,d);B=r.map(x=>(o.find(y=>y.n===x.n)||{v:0}).v)}ttl=d+" skills"}}
+  if(axes&&A){
+   let rows=axes.map((n,i)=>({n,v:A[i],dv:B&&B[i]?A[i]-B[i]:null})),best=rows.slice().sort((a,b)=>b.v-a.v)[0],low=rows.slice().sort((a,b)=>a.v-b.v)[0],gain=rows.filter(r=>r.dv!=null).sort((a,b)=>b.dv-a.dv)[0];
+   out.push(`<div class="vzCard"><div class="vzT">${esc(ttl)} · /10</div>${vzRadar(axes,A,B)}<div class="vzLeg"><span><i style="border-color:var(--g)"></i>${esc(fmtDate(latest.date))}</span>${B?`<span><i class="d" style="border-color:#8a95ab"></i>${esc(fmtDate(old.date))}</span>`:""}</div><div class="muted" style="font-size:12px;margin-top:4px">Strongest: <b>${esc(best.n)}</b> ${best.v.toFixed(1)}${low.n!==best.n&&mode!=="parent"?` · Needs work: <b>${esc(low.n)}</b> ${low.v.toFixed(1)}`:""}${gain&&gain.dv>0.04?` · Biggest gain: <b>${esc(gain.n)}</b> +${gain.dv.toFixed(1)}`:""}</div>${B?"":`<div class="vzNote">Comparison line appears once there is an assessment at least 2 months older.</div>`}</div>`)}
+  /* trend */
+  let pts=asd.map(a=>({d:a.date,v:Number(assessmentAvg(a))})).filter(x=>Number.isFinite(x.v));
+  if(pts.length>=3)out.push(`<div class="vzCard"><div class="vzT">Overall assessment trend · /10</div>${vzLine(pts)}</div>`);
+  else out.push(`<div class="vzCard"><div class="vzT">Overall assessment trend</div>${vzNote("Not enough data yet — a trend line shows after 3 assessments.")}</div>`)}
+ /* goal bars */
+ let gb=(p.goals||[]).filter(g=>!g.achieved).map(g=>({g,m:goalMeasure(p,g)})).filter(x=>x.m&&x.m.cur!=null&&x.m.base!=null&&x.m.base!==x.m.tgt);
+ if(gb.length)out.push(`<div class="vzCard"><div class="vzT">Goal progress</div>${gb.map(({g,m})=>{let pct=Math.max(0,Math.min(1,(m.cur-m.base)/(m.tgt-m.base))),exp=null;if(g.targetDate&&g.createdDate&&g.targetDate>g.createdDate){let t0=new Date(g.createdDate).getTime(),t1=new Date(g.targetDate).getTime();exp=Math.max(0,Math.min(1,(new Date(today()).getTime()-t0)/(t1-t0)))}
+  let lab={reached:"Reached",behind:"Behind pace",track:"On pace",open:"In progress"}[m.state]||"";
+  return `<div class="vzGoal"><div class="r"><span>${esc(g.text)}</span><b style="color:${m.color};white-space:nowrap">${lab}</b></div><div class="vzBar"><b style="width:${Math.round(pct*100)}%;background:${m.state==="behind"?"var(--red)":"var(--g)"}"></b>${exp!=null?`<u style="left:${Math.round(exp*100)}%" title="Where they should be by now"></u>`:""}</div><div class="muted" style="font-size:12px">${esc(m.fx(m.base))} → <b>${esc(m.fx(m.cur))}</b> → ${esc(m.fx(m.tgt))} (${Math.round(pct*100)}%)${exp!=null?` · marker = expected pace`:""}</div></div>`}).join("")}</div>`);
+ /* runs strip */
+ let inn=[];matches.slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||""))).forEach(m=>matchRowsFor(m,"battingReview",p.name).forEach(r=>{let ru=Number(r.runs);if(Number.isFinite(ru)&&String(r.runs).trim()!=="")inn.push({runs:ru,out:isOutText(r.dismissal)})}));
+ inn=inn.slice(-15);
+ if(inn.length>=3)out.push(`<div class="vzCard"><div class="vzT">Runs per innings (last ${inn.length})</div>${vzRunsStrip(inn)}<div class="vzLeg"><span>* not out</span><span>outlined = 50+</span><span>grey = out</span></div></div>`);
+ else if(inn.length)out.push(`<div class="vzCard"><div class="vzT">Runs per innings</div>${vzNote("Not enough data yet — shows after 3 innings.")}</div>`);
+ /* attendance grid */
+ let ts=activeSessions().filter(x=>x.sessionType!=="player"&&x.date<=today()&&Array.isArray(x.attendees)&&(p.team?x.squad===p.team:true)).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b))).slice(-20);
+ if(ts.length>=3){let on=ts.filter(x=>x.attendees.includes(p.name)).length;out.push(`<div class="vzCard"><div class="vzT">Attendance · last ${ts.length} ${p.team?esc(p.team)+" ":""}sessions</div>${vzDotGrid(ts.map(x=>({on:x.attendees.includes(p.name),t:fmtDate(x.date)+" "+(x.title||"")})))}<div class="muted" style="font-size:12px;margin-top:4px"><b>${on}</b> of ${ts.length} attended (${Math.round(on/ts.length*100)}%) · ✓ present, – absent</div></div>`)}
+ return out.length?`<h2 class="section">Visual summary</h2><div class="vz">${out.join("")}</div>`:""}
+function squadHeatmap(){
+ let teams=playerTeams(),disc=Object.keys(skillSets);
+ window._hm=window._hm||{team:"",d:disc[0]};if(!disc.includes(_hm.d))_hm.d=disc[0];
+ let ps=activePlayers().filter(p=>!_hm.team||p.team===_hm.team).sort((a,b)=>String(a.name).localeCompare(String(b.name)));
+ let sk=allSkillsFor(_hm.d),rows=ps.map(p=>({p,l:vzLatestSkill(playerAssessments(p),_hm.d)})).filter(r=>r.l.some(x=>x.v>0));
+ let body=rows.length<1?vzNote("No assessments for "+_hm.d+" yet."):`<div style="overflow:auto;max-height:60vh"><table class="vzHeat"><tr><th></th>${sk.map(n=>`<th><div style="writing-mode:vertical-rl;transform:rotate(180deg);height:78px;margin:auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">${esc(n)}</div></th>`).join("")}<th>Avg</th></tr>${rows.map(r=>{let vs=r.l.filter(x=>x.v>0),av=vs.reduce((a,x)=>a+x.v,0)/vs.length;return `<tr><td class="n" onclick="closeM();setTimeout(()=>playerView('${r.p.id}'),50)"><b>${esc(r.p.name)}</b></td>${r.l.map(x=>`<td class="c" style="background:${x.v?vzCol(x.v):"rgba(128,128,128,.25)"}" title="${esc(x.n)}">${x.v?(Number.isInteger(x.v)?x.v:x.v.toFixed(1)):"·"}</td>`).join("")}<td class="c" style="background:${vzCol(av)}">${av.toFixed(1)}</td></tr>`}).join("")}</table></div>
+ <div class="vzLeg"><span>Latest rating per skill, /10 · red = low, green = high · tap a name to open the profile</span></div>`;
+ modal(`<div class="sheetHead"><h2>Squad skills</h2><button class="x" onclick="closeM()">×</button></div><div class="toolbar noPrint"><select onchange="_hm.d=this.value;squadHeatmap()">${disc.map(d=>`<option ${d===_hm.d?"selected":""}>${esc(d)}</option>`).join("")}</select><select onchange="_hm.team=this.value;squadHeatmap()"><option value="">All teams</option>${teams.map(t=>`<option ${t===_hm.team?"selected":""}>${esc(t)}</option>`).join("")}</select><button class="btn secondary" onclick="window.print()">Print</button></div><div class="vz">${body}</div>`)}
+
+/* ===== v132: report visuals ===== */
+function vzHBars(rows,max,unit){
+ return `<div class="vz">${rows.map(r=>{let pct=r.v==null?0:Math.max(0,Math.min(100,r.v/max*100));return `<div style="display:flex;align-items:center;gap:8px;margin:5px 0;font-size:13px;break-inside:avoid"><span style="width:34%;min-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${esc(r.l)}</span><span class="vzBar" style="flex:1;margin:0"><b style="width:${pct}%;background:${r.c||"var(--g)"}"></b></span><b style="width:54px;text-align:right">${r.v==null?"—":(r.t||(Number.isInteger(r.v)?r.v:r.v.toFixed(1))+(unit||""))}</b></div>`}).join("")}</div>`}
+function vzRecordBar(w,l,d,nr){
+ let tot=w+l+d+nr;if(tot<1)return "";
+ let seg=(n,c,t)=>n?`<span style="flex:${n};background:${c};color:#fff;font-weight:700;font-size:12px;text-align:center;padding:4px 0;min-width:26px">${t} ${n}</span>`:"";
+ return `<div class="vz"><div style="display:flex;border-radius:8px;overflow:hidden">${seg(w,"var(--g)","W")}${seg(d,"#8a95ab","D")}${seg(l,"var(--red)","L")}${seg(nr,"#6b7280","NR")}</div></div>`}
+function vzRunsPairs(matches){
+ let rows=matches.map(m=>({o:parseFloat(m.ourRuns),p:parseFloat(m.oppRuns),n:m.opp||"Opp"})).filter(r=>Number.isFinite(r.o)&&Number.isFinite(r.p)).slice(-10);
+ if(rows.length<3)return "";
+ let mx=Math.max(...rows.flatMap(r=>[r.o,r.p]),1);
+ return `<div class="vz vzCard"><div class="vzT">Runs for and against · last ${rows.length} matches</div>${rows.map(r=>`<div style="margin:6px 0;font-size:12px;break-inside:avoid"><div>vs ${esc(r.n)}</div><div style="display:flex;align-items:center;gap:6px"><span class="vzBar" style="flex:1;margin:2px 0"><b style="width:${r.o/mx*100}%;background:var(--g)"></b></span><b style="width:30px;text-align:right">${r.o}</b></div><div style="display:flex;align-items:center;gap:6px"><span class="vzBar" style="flex:1;margin:2px 0"><b style="width:${r.p/mx*100}%;background:#8a95ab"></b></span><b style="width:30px;text-align:right">${r.p}</b></div></div>`).join("")}<div class="vzLeg"><span><i style="border-color:var(--g)"></i>Ours</span><span><i style="border-color:#8a95ab"></i>Opposition</span></div></div>`}
+
+/* ===== v133: more report visuals ===== */
+function vzRecordFor(ms){
+ if(!ms||!ms.length)return "";
+ let w=0,l=0,d=0,n=0;ms.forEach(m=>{let o=matchResultOutcome(m);if(o==="Win")w++;else if(o==="Loss")l++;else if(o==="Draw")d++;else n++});
+ return `<h2>Record</h2>${vzRecordBar(w,l,d,n)}${vzRunsPairs(ms.slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||""))))}`}
+function vzTopScorers(ms){
+ let bat={},bowl={};
+ ms.forEach(m=>{(m.battingReview||[]).forEach(r=>{if(r&&r.name){let v=parseFloat(r.runs);if(Number.isFinite(v))bat[r.name]=(bat[r.name]||0)+v}});(m.bowlingReview||[]).forEach(r=>{if(r&&r.name){let v=parseFloat(r.wickets);if(Number.isFinite(v))bowl[r.name]=(bowl[r.name]||0)+v}})});
+ let top=o=>Object.entries(o).filter(([,v])=>v>0).sort((a,b)=>b[1]-a[1]).slice(0,6).map(([l,v])=>({l,v}));
+ let b=top(bat),w=top(bowl),h="";
+ if(b.length>=3)h+=`<h2>Top run-scorers</h2>${vzHBars(b,Math.max(...b.map(x=>x.v)),"")}`;
+ if(w.length>=3)h+=`<h2>Top wicket-takers</h2>${vzHBars(w,Math.max(...w.map(x=>x.v)),"")}`;
+ return h}
+function vzCatBars(cc,unit){
+ let rows=cc.filter(c=>c.count>0);if(!rows.length)return "";
+ return vzHBars(rows.map(c=>({l:c.name,v:c.count,t:c.count+(unit||"")})),Math.max(...rows.map(c=>c.count)),"")}
+function vzMonthWeeks(ss){
+ if(ss.length<3)return "";
+ let by={};ss.forEach(x=>{let d=new Date(x.date+"T12:00:00"),day=d.getDay();d.setDate(d.getDate()-(day===0?6:day-1));let k=localISO(d);by[k]=(by[k]||0)+1});
+ let ks=Object.keys(by).sort();if(ks.length<3)return "";
+ return `<div class="vzCard vz"><div class="vzT">Sessions by week</div>${vzWeekBars(ks.map(k=>by[k]),0,ks.map(k=>fmtDate(k).slice(0,5)))}</div>`}
+function vzReflRatings(rs){
+ let v=rs.filter(r=>r.date&&Number(r.rating)>0).sort((a,b)=>a.date.localeCompare(b.date)).map(r=>Number(r.rating)).slice(-15);
+ if(v.length<3)return "";let av=v.reduce((a,b)=>a+b,0)/v.length;
+ return `<div class="vzCard vz"><div class="vzT">Session ratings · ${v.length} reflections</div><div style="display:flex;align-items:center;gap:14px">${vzRing(av,5,"Average "+av.toFixed(1)+" of 5")}<div style="flex:1">${vzSpark(v,1,5)}<div class="muted" style="font-size:12px">Average ${av.toFixed(1)} / 5 · latest ${v[v.length-1]}</div></div></div></div>`}
+
+function vzTimeSplit(s){
+ let st;try{st=timerBuildSteps(s)}catch(e){return ""}
+ if(!st||st.length<2)return "";
+ let tot=st.reduce((a,x)=>a+(x.m||0),0);if(tot<1)return "";
+ let cols=["var(--g)","var(--blue)","#d97706","#8a95ab","#a855f7","#0891b2"];
+ return `<div class="vz" style="margin:6px 0 2px"><div style="display:flex;gap:2px;border-radius:6px;overflow:hidden">${st.map((x,i)=>`<span title="${esc(x.n)} · ${x.m} min" style="flex:${x.m};background:${cols[i%cols.length]};height:10px;min-width:4px"></span>`).join("")}</div><div class="muted" style="font-size:11px;margin-top:3px">${st.map(x=>esc(String(x.n).slice(0,22))+" "+x.m+"m").join(" · ")}</div></div>`}
+function vzDurBar(d){let m=parseInt(d&&d.duration,10);if(!(m>0))return "";return `<div class="vz" style="margin:4px 0;display:flex;align-items:center;gap:6px"><span class="vzBar" style="flex:1;max-width:140px;margin:0"><b style="width:${Math.min(100,m/60*100)}%;background:var(--blue2)"></b></span><span class="muted" style="font-size:11px">${m} min</span></div>`}
 function playerStandingHtml(p,assessments,sessions,matches){
  let box=(l,v,sub)=>`<div class="card" style="padding:8px 10px"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.3px">${l}</div><b>${v}</b>${sub?`<div class="muted" style="font-size:12px">${sub}</div>`:""}</div>`;
  let items=[];
