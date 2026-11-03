@@ -378,7 +378,7 @@ p{orphans:3;widows:3}
 .dCk u{text-decoration:none;width:20px;height:20px;border-radius:50%;border:2px solid var(--muted);display:inline-flex;align-items:center;justify-content:center;font-size:11px;flex:none}.dCk u.d{background:var(--g);border-color:var(--g);color:#06231a}
 .dCk span{flex:1}.dCk i{color:var(--g);font-style:normal;font-weight:700;font-size:var(--fs-3)}
 .dBig .thBtns{margin-top:10px}.dLinks{display:flex;justify-content:center;gap:20px;margin-top:10px;font-size:var(--fs-3);font-weight:700}.dLinks a{color:var(--g);cursor:pointer}
-.dRate{display:flex;gap:6px;margin:6px 0 8px}.dRate button{flex:1;padding:10px 0;border-radius:10px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);font-size:var(--fs-4);font-weight:800;cursor:pointer}
+.dRate{display:flex;flex-wrap:wrap;gap:6px;margin:6px 0 8px}.dRate button{flex:1 0 calc(20% - 6px);padding:10px 0;border-radius:10px;border:1px solid var(--line);background:var(--surface2);color:var(--ink);font-size:var(--fs-4);font-weight:800;cursor:pointer}
 .dTiles{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:12px 0}
 .dTile{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px;cursor:pointer}.dTile b{display:block;font-family:'Sora',sans-serif;font-size:var(--fs-6)}.dTile small{color:var(--muted);font-size:var(--fs-2)}.dTile.r b{color:var(--red)}
 .dStrip{display:grid;grid-template-columns:repeat(7,1fr);gap:6px;margin-bottom:10px}
@@ -608,7 +608,20 @@ const PROFILES_KEY="coachbook_profiles",ACTIVE_KEY="coachbook_active_profile";
 const LICENSE_KEY="coachbook_license",TRIAL_DAYS=14;
 const BASIC_TEAM_CAP=1,BASIC_PROFILE_CAP=1;
 const OBJECTIVE_CATEGORIES=["Technical improvement","Tactical understanding","Physical development","Mental skills","Teamwork & communication","Match preparation","Specific skill development"];
-const RATING_LABELS={1:"Struggled",2:"Below Par",3:"Solid",4:"Good",5:"Excellent"};
+const RATING_LABELS={1:"Very poor",2:"Struggled",3:"Poor",4:"Below par",5:"Fair",6:"Solid",7:"Fairly good",8:"Good",9:"Very good",10:"Excellent"};
+// One-time: reflection + objective ratings used to be 1-5; everything is now /10. Old values are doubled (5->10, 3->6).
+// Flag travels with the data (also inside backups), so a restored OLD backup converts once and a new one never doubles.
+function migrateRatingsTo10(){
+ if(!db||db.ratingScale10)return false;
+ const d2=v=>{let n=Number(v);return(Number.isFinite(n)&&n>0&&n<=5)?String(n*2):v};
+ (Array.isArray(db.reflections)?db.reflections:[]).forEach(r=>{
+  if(!r||r._r5)return;
+  r._r5={rating:r.rating,tacticalDecisions:r.tacticalDecisions,playerManagement:r.playerManagement,objectiveRatings:r.objectiveRatings?Object.assign({},r.objectiveRatings):undefined};
+  ["rating","tacticalDecisions","playerManagement"].forEach(k=>{if(r[k]!==undefined&&r[k]!==null&&r[k]!=="")r[k]=d2(r[k])});
+  if(r.objectiveRatings&&typeof r.objectiveRatings==="object")Object.keys(r.objectiveRatings).forEach(k=>{r.objectiveRatings[k]=d2(r.objectiveRatings[k])});
+ });
+ db.ratingScale10=1;return true;
+}
 // Coach Self Reflection is about the coach's own performance, not the
 // players' — every chip list below is framed around what the coach did,
 // not what the team/players did, so "What went well" etc. stay coach-centric.
@@ -621,7 +634,7 @@ const COACH_TAKEAWAY_MATCH=["Reconsider Team Selection Approach","Adjust Tactica
 const COACH_NEXT_FOCUS=["Communication","Session Planning","Game-day Tactics","Player Management","Time Management","Feedback Delivery","Preparation","Adaptability","Technical Knowledge","Composure","Demonstration & Explanation","Player Engagement","Individual Feedback","Match Simulation","Opposition Analysis","Workload Awareness","Record Keeping","Mental Skills Coaching"];
 function matchLabel(m){return `${m.team||"My Team"} vs ${m.opp||"Opposition"}`}
 function ratingSelectRow(name,label,currentValue){
- return `<label>${esc(label)}<select name="${name}">${[5,4,3,2,1].map(n=>`<option value="${n}" ${String(currentValue)===String(n)?"selected":""}>${n} — ${RATING_LABELS[n]}</option>`).join("")}</select></label>`;
+ return `<label>${esc(label)}<select name="${name}">${[10,9,8,7,6,5,4,3,2,1].map(n=>`<option value="${n}" ${String(currentValue)===String(n)?"selected":""}>${n} — ${RATING_LABELS[n]}</option>`).join("")}</select></label>`;
 }
 const BASIC_CHECKOUT_URL="https://checkout.dodopayments.com/buy/pdt_0NlF4qxzPiVRkaHNhpa5M?quantity=1";
 const PREMIUM_CHECKOUT_URL="https://checkout.dodopayments.com/buy/pdt_0NlF4pFDxitmm3Oci73zh?quantity=1";
@@ -1600,6 +1613,8 @@ function initApp(){
    db.techMigrated=1;
   }
   db.settings=(db.settings&&typeof db.settings==="object")?db.settings:{};
+  db.reflections=Array.isArray(db.reflections)?db.reflections:[];
+  migrateRatingsTo10();
   db.teams=Array.isArray(db.teams)?db.teams:[];
   db.tournaments=Array.isArray(db.tournaments)?db.tournaments:[];
   db.camps=Array.isArray(db.camps)?db.camps:[];
@@ -1847,7 +1862,7 @@ function computeSuggestions(){
 function coachingActivityScore(){
  // Four parts, each 0-100, averaged. Parts that cannot apply yet (e.g. no sessions to reflect on) are left out rather than scored as zero.
  let players=activePlayers(),names=new Set(players.map(p=>p.name));
- // 1. Assessment quality: average rating (1-5 scale, x20) across assessments of players still on the roster.
+ // 1. Assessment quality: average rating (1-10 scale, x10) across assessments of players still on the roster.
  let ratings=db.assessments.filter(a=>names.has(a.player)).map(a=>Number(assessmentAvg(a))).filter(Number.isFinite);
  let teamAvg=ratings.length?ratings.reduce((a,b)=>a+b,0)/ratings.length:0;
  // 2. Session consistency: last 4 calendar weeks (this week + 3 before). Each week scores held sessions + matches
@@ -1870,7 +1885,7 @@ function coachingActivityScore(){
  let held=activeSessions().filter(s=>s.date>=cutKey&&s.date<=t0).map(s=>({k:"sessionId",id:s.id})).concat(db.matches.filter(m=>m.date>=cutKey&&m.date<=t0).map(m=>({k:"matchId",id:m.id})));
  let reflected=held.filter(h=>db.reflections.some(r=>r[h.k]===h.id)).length;
  let reflectionConsistency=held.length?reflected/held.length*100:null;
- let parts=[teamAvg*20,sessionConsistency,coverage];
+ let parts=[teamAvg*10,sessionConsistency,coverage];
  if(reflectionConsistency!==null)parts.push(reflectionConsistency);
  let composite=Math.round(parts.reduce((a,b)=>a+b,0)/parts.length);
  return{composite,teamAvg,sessionConsistency,coverage,reflectionConsistency:reflectionConsistency===null?0:reflectionConsistency,goal};
@@ -2001,7 +2016,7 @@ function dashTrendsHtml(sess,c){
  let out="";
  if(wk.filter(x=>x.n>0).length>=3)out+=`<div class="vzCard"><div class="vzT">Sessions per week · last 8</div>${vzWeekBars(wk.map(x=>x.n),c.weeklyGoal||0,wk.map(x=>x.l))}<div class="muted" style="font-size:12px">${c.weeklyGoal?`Dashed line = your goal of ${c.weeklyGoal} · green bars met it · outlined = this week`:"Outlined = this week · set a weekly goal to see a target line"}</div></div>`;
  let rs=db.reflections.filter(r=>r.date&&Number.isFinite(Number(r.rating))&&Number(r.rating)>0).sort((a,b)=>a.date.localeCompare(b.date)).map(r=>Number(r.rating)).slice(-12);
- if(rs.length>=3){let av=rs.reduce((a,b)=>a+b,0)/rs.length;out+=`<div class="vzCard"><div class="vzT">Reflection ratings · last ${rs.length}</div><div style="display:flex;align-items:center;gap:14px">${vzRing(av,5,"Average rating "+av.toFixed(1)+" of 5")}<div style="flex:1">${vzSpark(rs,1,5)}<div class="muted" style="font-size:12px">Average ${av.toFixed(1)} / 5 · latest ${rs[rs.length-1]}</div></div></div></div>`}
+ if(rs.length>=3){let av=rs.reduce((a,b)=>a+b,0)/rs.length;out+=`<div class="vzCard"><div class="vzT">Reflection ratings · last ${rs.length}</div><div style="display:flex;align-items:center;gap:14px">${vzRing(av,10,"Average rating "+av.toFixed(1)+" of 10")}<div style="flex:1">${vzSpark(rs,1,10)}<div class="muted" style="font-size:12px">Average ${av.toFixed(1)} / 10 · latest ${rs[rs.length-1]}</div></div></div></div>`}
  return out?`<div class="dSec">Trends</div><div class="vz">${out}</div>`:""}
 function dashBuild(c){
  let teams=dashTeams();if(dashTeam&&!teams.includes(dashTeam)){dashTeam="";dashStore("dashTeam","")}
@@ -2031,7 +2046,7 @@ function dashBuild(c){
  if(c.isNewUser){smart=""}
  else if(live){smart=`<div class="todayHero dBig"><div class="thLabel">In progress · ends ${hm(en(live))}</div><div class="thTitle">${esc(sessionLabel(live))}</div><div class="thMeta">${esc(meta(live))}</div>${attLine(live)}<div class="thBtns"><button class="btn primary" onclick="timerSetup('${live.id}')">Start timer</button><button class="btn secondary" onclick="printSessionPlan('${live.id}')">Open plan</button></div><div class="dLinks"><a onclick="newReflectionForSession('${live.id}')">Reflect</a><a onclick="editSession('${live.id}')">Edit</a></div></div>`}
  else if(pre){let n=tm(pre)-now;smart=`<div class="todayHero dBig"><div class="thLabel">Starts in ${n} min · ${hm(tm(pre))}</div><div class="thTitle">${esc(sessionLabel(pre))}</div><div class="thMeta">${esc(meta(pre))}</div>${planLine(pre)}${attLine(pre)}<div class="thBtns"><button class="btn primary" onclick="timerSetup('${pre.id}')">Start timer</button><button class="btn secondary" onclick="printSessionPlan('${pre.id}')">Open plan</button></div><div class="dLinks"><a onclick="remindSheet('${pre.id}')">Remind</a><a onclick="editSession('${pre.id}')">Edit</a></div></div>`}
- else if(post){smart=`<div class="todayHero dBig p"><div class="thLabel">Just finished · ${esc(sessionLabel(post))}</div><div class="thTitle">How did it go?</div><div class="thMeta">30 seconds · feeds your next plan</div><div class="dRate">${[1,2,3,4,5].map(n=>`<button onclick="dashQuickReflect('${post.id}',${n})">${n}</button>`).join("")}</div>${attLine(post)}<div class="thBtns"><button class="btn primary" onclick="newReflectionForSession('${post.id}')">Write reflection</button><button class="btn secondary" onclick="dashLater('${post.id}')">Later</button></div></div>`}
+ else if(post){smart=`<div class="todayHero dBig p"><div class="thLabel">Just finished · ${esc(sessionLabel(post))}</div><div class="thTitle">How did it go?</div><div class="thMeta">Rate out of 10 · feeds your next plan</div><div class="dRate">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button onclick="dashQuickReflect('${post.id}',${n})">${n}</button>`).join("")}</div>${attLine(post)}<div class="thBtns"><button class="btn primary" onclick="newReflectionForSession('${post.id}')">Write reflection</button><button class="btn secondary" onclick="dashLater('${post.id}')">Later</button></div></div>`}
  else if(mt){let k=Math.round((new Date(t)-new Date(mt.date))/86400000)+1,n=matchDayCount(mt);let scored=!!((mt.scorerInnings&&mt.scorerInnings.length)||mt.scoreLine||mt.ourRuns);let acts=openMatchActions().filter(x=>x.m.id===mt.id).length;smart=`<div class="todayHero dBig m"><div class="thLabel">Match day${n>1?` ${k} of ${n}`:""} · ${esc(mt.team||"My Team")}</div><div class="thTitle">vs ${esc(mt.opp||"Opposition")}</div><div class="thMeta">${esc([mt.venue,mt.format].filter(Boolean).join(" · "))}${mt.scoreLine?`<br><b>${esc(mt.scoreLine)}</b>`:""}</div>${ck(scored,scored?"Scores recorded":"Scores not entered yet",scored?"":"Add",scored?"":`editMatchScores('${mt.id}')`)}${acts?ck(false,plural(acts,"training action")+" open","View","showOpenMatchActions()"):""}<div class="thBtns"><button class="btn primary" onclick="editMatch('${mt.id}')">Open match</button><button class="btn secondary" onclick="matchReportView('${mt.id}')">Report</button></div></div>`}
  else{
   let nxt=todaySess.find(s=>!refl(s)&&(tm(s)===null?now<20*60:tm(s)>now))||sess.filter(s=>s.date>t).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b)))[0];
@@ -3329,7 +3344,7 @@ function reflections(){
  +`<button class="btn primary" onclick="newReflection()">+ New Reflection</button>
  ${filterBarHtml("reflections",`<input id="reflectionSearch" value="${esc(reflectionQuery)}" oninput="reflectionQuery=this.value;reflections()" onfocus="reflectionSearchFocused=true" onblur="reflectionSearchFocused=false" placeholder="Search reflections...">`,`<label>Type<select onchange="reflectionTypeFilter=this.value;reflections()"><option value="">All</option><option value="session" ${reflectionTypeFilter==="session"?"selected":""}>Practice Session</option><option value="match" ${reflectionTypeFilter==="match"?"selected":""}>Match</option></select></label>`,reflectionTypeFilter?1:0)}
  <h2 class="section">Reflection history (${list.length})</h2>
- <div class="card">${list.length?list.map(x=>`<div class="item"><div><b>${esc(fmtDate(x.date))} · ${esc(x.session||"Reflection")}</b> <span class="tag">${x.type==="match"?"Match":"Session"}</span>${x.debriefMode?`<span class="tag">Debrief</span>`:""}<div class="muted">Rating ${esc(x.rating)}/5</div><small>${esc(x.debriefMode?debriefSummaryText(x):reflectionWentWellText(x))}</small>${x.momentIds&&x.momentIds.length?`<div class="vmThumbs" data-ids="${esc(x.momentIds.join(","))}"></div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editReflection('${x.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delReflection('${x.id}')">${icon("trash",17)}</button></div></div>`).join(""):(db.reflections.length?empty("No reflections match your filters."):emptyRich("No reflections yet","A two-minute note after each session or match is how coaches improve fastest.","+ New Reflection","newReflection()"))}</div>
+ <div class="card">${list.length?list.map(x=>`<div class="item"><div><b>${esc(fmtDate(x.date))} · ${esc(x.session||"Reflection")}</b> <span class="tag">${x.type==="match"?"Match":"Session"}</span>${x.debriefMode?`<span class="tag">Debrief</span>`:""}<div class="muted">Rating ${esc(x.rating)}/10</div><small>${esc(x.debriefMode?debriefSummaryText(x):reflectionWentWellText(x))}</small>${x.momentIds&&x.momentIds.length?`<div class="vmThumbs" data-ids="${esc(x.momentIds.join(","))}"></div>`:""}</div><div class="toolbar"><button class="btn secondary iconBtn" title="Edit" onclick="editReflection('${x.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delReflection('${x.id}')">${icon("trash",17)}</button></div></div>`).join(""):(db.reflections.length?empty("No reflections match your filters."):emptyRich("No reflections yet","A two-minute note after each session or match is how coaches improve fastest.","+ New Reflection","newReflection()"))}</div>
  ${recurringThemesCardHtml()}`;
  vmFillThumbs();
  let sEl=document.getElementById("reflectionSearch");if(sEl&&reflectionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
@@ -3354,11 +3369,11 @@ function reflectionFormHtml(x,mode){
  </div>
  <div id="reflMatchBlock" class="full formgrid" style="padding:0;margin:0;${type==="match"?"":"display:none"}">
   <label class="full">Link to a specific match <span class="muted" style="font-weight:400">(optional)</span><select name="matchId" id="reflectionMatchSelect" onchange="onReflectionMatchPick(this)"><option value="">— No specific match —</option>${recentMatches.map(m=>`<option value="${m.id}" ${x.matchId===m.id?"selected":""}>${esc(matchDateStr(m))} · ${esc(matchLabel(m))}</option>`).join("")}</select></label>
-  ${ratingSelectRow("tacticalDecisions","Tactical decisions",x.tacticalDecisions)}
-  ${ratingSelectRow("playerManagement","Player management / rotation calls",x.playerManagement)}
+  ${ratingSelectRow("tacticalDecisions","Tactical decisions (out of 10)",x.tacticalDecisions)}
+  ${ratingSelectRow("playerManagement","Player management / rotation calls (out of 10)",x.playerManagement)}
  </div>
  ${debriefBlockHtml(x)}
- ${ratingSelectRow("rating","Overall rating",x.rating)}
+ ${ratingSelectRow("rating","Overall rating (out of 10)",x.rating)}
  <div class="full"><label>Video moments <span class="muted" style="font-weight:400">(optional — tap to attach)</span></label><input type="hidden" name="momentIds" id="reflMomIds" value="${esc((x.momentIds||[]).join(","))}"><div id="reflMoments" class="muted small">Loading…</div></div>
  <div class="full">${formSectionHead("wentWell","What went well?",false)}
  <div id="formSec-wentWell" style="display:none;margin-top:10px">
@@ -3438,7 +3453,7 @@ function renderReflectionObjectiveRatings(sessionId){
  let existing=(existingRefl&&existingRefl.objectiveRatings)||{};
  box.innerHTML=`<label style="margin-bottom:6px">Achieved Session Objectives <span class="muted" style="font-weight:400">— how well did this session deliver on what it set out to do?</span></label>${tags.map(t=>{
   let idx=OBJECTIVE_CATEGORIES.indexOf(t);
-  return ratingSelectRow(`objRating_${idx}`,t,existing[t]);
+  return ratingSelectRow(`objRating_${idx}`,t+" (out of 10)",existing[t]);
  }).join("")}`;
 }
 function newReflection(seed){editingReflectionId=null;modal(reflectionFormHtml(seed||null,"new"));renderReflectionObjectiveRatings(seed&&seed.sessionId?seed.sessionId:"");initReflectionSectionCounts()}
@@ -8247,7 +8262,7 @@ function reports(){
  <div class="statPill"><span>Matches</span><b>${db.matches.length}</b></div>
  <div class="statPill"><span>Assessments</span><b>${db.assessments.length}</b></div>
  <div class="statPill"><span>Attendance</span><b>${attendanceTotalCount}</b></div>
- <div class="statPill"><span>Avg Rating</span><b>${avgRating?avgRating.toFixed(1):"—"}</b></div>
+ <div class="statPill"><span>Avg Rating /10</span><b>${avgRating?avgRating.toFixed(1):"—"}</b></div>
  <div class="statPill" style="cursor:pointer" onclick="setHoursGoal()"><span>Coaching Hrs ${goal?"("+goalPct+"%)":""}</span><b>${hrs.toFixed(0)}</b>${goal?`<div class="goalBar"><div class="goalBarFill" style="width:${goalPct}%"></div></div>`:""}</div>
  </div>
  <div class="grid g2" style="margin-top:24px;align-items:start">
@@ -8848,7 +8863,7 @@ function buildCustomReport(){
    if(m)return m.team===teamFilter;
    return false;
   });
-  sections.push(`<h2>Reflections (${list.length})</h2>${list.length?list.map(r=>`<div class="item"><div><b>${esc(r.session||"Reflection")}</b><div class="muted">${esc(fmtDate(r.date))} · Rating ${esc(r.rating)}/5</div><small>${esc(reflectionWentWellText(r))}</small></div></div>`).join(""):empty(teamFilter?"No reflections linked to this team's sessions/matches in range.":"No reflections in range.")}`);
+  sections.push(`<h2>Reflections (${list.length})</h2>${list.length?list.map(r=>`<div class="item"><div><b>${esc(r.session||"Reflection")}</b><div class="muted">${esc(fmtDate(r.date))} · Rating ${esc(r.rating)}/10</div><small>${esc(reflectionWentWellText(r))}</small></div></div>`).join(""):empty(teamFilter?"No reflections linked to this team's sessions/matches in range.":"No reflections in range.")}`);
  }
  if(document.getElementById("crbPlayers").checked){
   let list=roster.slice().sort((a,b)=>String(a.name||"").localeCompare(String(b.name||"")));
@@ -9129,7 +9144,7 @@ function buildCoachReport(){
  });
  let objectiveRatingRows=Object.entries(objectiveRatingAgg).map(([cat,d])=>({cat,avg:d.sum/d.count,count:d.count})).sort((a,b)=>b.avg-a.avg);
  reportShell("Coach Development Report"+(cTeam?" — "+esc(cTeam):""),rangeLabel(from,to),
- `${objectiveRatingRows.length?`<h2 style="margin-top:0">Objective Achievement — Term Average</h2><div class="card">${vzHBars(objectiveRatingRows.map(r=>({l:r.cat,v:r.avg,t:r.avg.toFixed(1)+"/5",c:r.avg<3?"var(--red)":"var(--g)"})),5,"")}<div class="muted" style="font-size:12px">${objectiveRatingRows.map(r=>esc(r.cat)+": "+r.count+" reflection"+(r.count!==1?"s":"")).join(" · ")}</div></div>`:""}${vzReflRatings(reflections)}
+ `${objectiveRatingRows.length?`<h2 style="margin-top:0">Objective Achievement — Term Average</h2><div class="card">${vzHBars(objectiveRatingRows.map(r=>({l:r.cat,v:r.avg,t:r.avg.toFixed(1)+"/10",c:r.avg<6?"var(--red)":"var(--g)"})),10,"")}<div class="muted" style="font-size:12px">${objectiveRatingRows.map(r=>esc(r.cat)+": "+r.count+" reflection"+(r.count!==1?"s":"")).join(" · ")}</div></div>`:""}${vzReflRatings(reflections)}
  ${reflections.length?reflections.map(r=>{
   let reasonsPart=(r.betterReasons&&r.betterReasons.length)?r.betterReasons.join(", "):"";
   let detailPart=r.betterDetail!==undefined?r.betterDetail:(r.betterReasons===undefined?(r.better||""):"");
@@ -9137,11 +9152,11 @@ function buildCoachReport(){
   let learningsText=reflectionTakeawayText(r)||"—";
   let wentWellText=reflectionWentWellText(r)||"—";
   let nextFocusText=reflectionNextFocusText(r)||"—";
-  let objectiveRatingsHtml=(r.objectiveRatings&&Object.keys(r.objectiveRatings).length)?`<p><b>Achieved Objectives:</b> ${Object.entries(r.objectiveRatings).map(([cat,val])=>`${esc(cat)} ${esc(val)}/5`).join(", ")}</p>`:"";
-  return `<div class="card"><b>${esc(fmtDate(r.date))} · ${esc(r.session||"Coaching Reflection")}</b><p><b>Rating:</b> ${esc(r.rating)}/5</p><p><b>What went well:</b> ${esc(wentWellText)}</p><p><b>What could improve:</b> ${esc(betterText)}</p><p><b>Key takeaway:</b> ${esc(learningsText)}</p>${objectiveRatingsHtml}<p><b>Next focus:</b> ${esc(nextFocusText)}</p></div>`;
+  let objectiveRatingsHtml=(r.objectiveRatings&&Object.keys(r.objectiveRatings).length)?`<p><b>Achieved Objectives:</b> ${Object.entries(r.objectiveRatings).map(([cat,val])=>`${esc(cat)} ${esc(val)}/10`).join(", ")}</p>`:"";
+  return `<div class="card"><b>${esc(fmtDate(r.date))} · ${esc(r.session||"Coaching Reflection")}</b><p><b>Rating:</b> ${esc(r.rating)}/10</p><p><b>What went well:</b> ${esc(wentWellText)}</p><p><b>What could improve:</b> ${esc(betterText)}</p><p><b>Key takeaway:</b> ${esc(learningsText)}</p>${objectiveRatingsHtml}<p><b>Next focus:</b> ${esc(nextFocusText)}</p></div>`;
  }).join(""):empty("No reflections documented.")}`);
 }
-function backup(){let a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:"application/json"}));a.download="ProCoach-OS-Backup-"+today()+".json";a.click()}function restore(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{db=JSON.parse(r.result);save();alert("Backup restored.")}catch(e){alert("Invalid backup file.")}};r.readAsText(f)}
+function backup(){let a=document.createElement("a");a.href=URL.createObjectURL(new Blob([JSON.stringify(db,null,2)],{type:"application/json"}));a.download="ProCoach-OS-Backup-"+today()+".json";a.click()}function restore(e){let f=e.target.files[0];if(!f)return;let r=new FileReader();r.onload=()=>{try{db=JSON.parse(r.result);migrateRatingsTo10();save();alert("Backup restored.")}catch(e){alert("Invalid backup file.")}};r.readAsText(f)}
 
 function exportExcel(){
  if(!requireWriteAccess())return;
@@ -9176,7 +9191,7 @@ function exportExcel(){
     let objectiveRatingsText=(r.objectiveRatings&&Object.keys(r.objectiveRatings).length)?Object.entries(r.objectiveRatings).map(([cat,val])=>`${cat}:${val}`).join('; '):'';
     return{
       date:r.date,session:r.session||'',
-      rating:r.rating||'',
+      rating:r.rating?r.rating+'/10':'',
       whatWentWell:reflectionWentWellText(r),
       whatCouldImprove:[reasonsPart,detailPart].filter(Boolean).join(' — '),
       learningAndChange:learningsText,
@@ -9378,7 +9393,7 @@ function handleRestoreFile(input){
   ["sessions","reflections","players","assessments","matches","drills","events"].forEach(k=>{parsed[k]=Array.isArray(parsed[k])?parsed[k]:[]});
   parsed.matches.forEach(m=>{if(!m.id)m.id=uid("m")});
   parsed.drills.forEach(d=>{if(!d.id)d.id=uid("drill")});
-  db=parsed;
+  db=parsed;migrateRatingsTo10();
   if(licenseFromBackup&&typeof licenseFromBackup==="object"){
    // Restore the license too, so a fresh device doesn't need the key
    // re-entered by hand. Any staleness (e.g. a plan change since this
@@ -11868,7 +11883,7 @@ function vzMonthWeeks(ss){
 function vzReflRatings(rs){
  let v=rs.filter(r=>r.date&&Number(r.rating)>0).sort((a,b)=>a.date.localeCompare(b.date)).map(r=>Number(r.rating)).slice(-15);
  if(v.length<3)return "";let av=v.reduce((a,b)=>a+b,0)/v.length;
- return `<div class="vzCard vz"><div class="vzT">Session ratings · ${v.length} reflections</div><div style="display:flex;align-items:center;gap:14px">${vzRing(av,5,"Average "+av.toFixed(1)+" of 5")}<div style="flex:1">${vzSpark(v,1,5)}<div class="muted" style="font-size:12px">Average ${av.toFixed(1)} / 5 · latest ${v[v.length-1]}</div></div></div></div>`}
+ return `<div class="vzCard vz"><div class="vzT">Session ratings · ${v.length} reflections</div><div style="display:flex;align-items:center;gap:14px">${vzRing(av,10,"Average "+av.toFixed(1)+" of 10")}<div style="flex:1">${vzSpark(v,1,10)}<div class="muted" style="font-size:12px">Average ${av.toFixed(1)} / 10 · latest ${v[v.length-1]}</div></div></div></div>`}
 
 function vzTimeSplit(s){
  let st;try{st=timerBuildSteps(s)}catch(e){return ""}
