@@ -4037,7 +4037,6 @@ function playerViewBody(p,forPrint){
  ${playerCampsHtml(p,forPrint)}
  ${playerTournamentsHtml(p)}
  ${forPrint?vmPairsHtml(p):`<div id="vmSec" data-p="${esc(p.name)}"></div>`}
- ${playerReviewHtml(p)}${playerCampProgressHtml(p)}
  ${p.strengths?`<h2 class="section">Strengths</h2><div class="card">${esc(p.strengths)}</div>`:""}
  ${p.areas?`<h2 class="section">Development areas</h2><div class="card">${esc(p.areas)}</div>`:""}
  ${p.notes?`<h2 class="section">Coach notes</h2><div class="card">${esc(p.notes)}</div>`:""}
@@ -11839,16 +11838,40 @@ function playerStandingHtml(p,assessments,sessions,matches){
  if(matches.length){let m=matches[0],bat=(m.battingReview||[]).find(r=>sameName(r.name,p.name)),bowl=(m.bowlingReview||[]).find(r=>sameName(r.name,p.name));items.push(box("Last match","vs "+esc(m.opp||"Opposition"),esc(matchDateStr(m))+(bat?" · "+esc(bat.runs||0)+"("+esc(bat.balls||0)+")":"")+(bowl?" · "+esc(bowl.wickets||0)+"/"+esc(bowl.runs||0):"")))}
  return items.length?`<h2 class="section">Where they stand</h2><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">${items.join("")}</div>`:"";
 }
+window._pcOpen=window._pcOpen||{};
+function pcToggle(cid,pid){_pcOpen[cid]=!_pcOpen[cid];let p=db.players.find(x=>x.id===pid&&!x.deletedAt),el=document.getElementById("pCamps");if(p&&el)el.innerHTML=playerCampsInner(p,false)}
+function pcTrendSvg(pts){
+ let w=110,h=40,n=pts.length,x=i=>18+(w-36)*i/(n-1),y=v=>6+(h-18)*(1-(v-1)/4);
+ return `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" aria-label="Camp rating trend" style="color:var(--ink);flex:0 0 auto"><path d="${pts.map((q,i)=>(i?"L":"M")+x(i)+","+y(q.r)).join(" ")}" fill="none" stroke="var(--g)" stroke-width="2.4" stroke-linejoin="round"/>${pts.map((q,i)=>`<circle cx="${x(i)}" cy="${y(q.r)}" r="${i===n-1?4.5:3.2}" fill="var(--g)"/>`).join("")}<text x="${x(0)}" y="${h-1}" font-size="9" text-anchor="middle" fill="currentColor" fill-opacity=".7">${esc(fmtDate(pts[0].date).slice(3,5)+"/"+fmtDate(pts[0].date).slice(8))}</text><text x="${x(n-1)}" y="${h-1}" font-size="9" text-anchor="middle" fill="currentColor" fill-opacity=".7">${esc(fmtDate(pts[n-1].date).slice(3,5)+"/"+fmtDate(pts[n-1].date).slice(8))}</text></svg>`}
 function playerCampsInner(p,forPrint){
  let list=campOfPlayer(p);
  if(!list.length)return empty("Not in any camp yet.");
- return list.map(c=>{
-  let v=campRevOf(c,p.name),days=campDays(c).length,st=campStatusOf(c),rc=CAMP_REV_REC.find(x=>x[0]===v.rec);
-  let ctrl=forPrint?"":`<div class="pcRev" data-c="${c.id}" data-n="${esc(p.name)}" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:8px"><div style="display:flex;gap:4px">${[1,2,3,4,5].map(i=>`<button type="button" onclick="pcRev(this,'r',${i})" aria-label="${i} of 5" style="width:30px;height:30px;border-radius:50%;border:1px solid ${v.r>=i?"#f59e0b":"#8886"};background:${v.r>=i?"#f59e0b":"transparent"};color:${v.r>=i?"#fff":"var(--muted)"};font-size:13px">${i}</button>`).join("")}</div><div style="display:flex;gap:4px;margin-left:auto">${CAMP_REV_REC.map(([k,l,col])=>`<button type="button" onclick="pcRev(this,'rec','${k}')" style="padding:5px 10px;border-radius:8px;border:1px solid ${col};background:${v.rec===k?col:"transparent"};color:${v.rec===k?"#fff":col};font-weight:600;font-size:12.5px">${l}</button>`).join("")}</div></div>`;
-  let ro=forPrint?`<div style="margin-top:4px">${v.r?`<span style="color:#d97706">${campRevStars(v.r)}</span> `:""}${rc?`<b style="color:${rc[2]}">${rc[1]}</b>`:""}</div>`:"";
-  return `<div class="item" style="display:block"><div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap;align-items:flex-start"><div><b>${esc(c.name)}</b> <span class="tag">${st}</span><div class="muted" style="font-size:var(--fs-3)">${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""} · ${days} day${days===1?"":"s"}</div></div>${forPrint?"":`<button class="btn secondary" style="padding:4px 10px" onclick="closeM();go('camps');openCamp('${c.id}')">Open camp</button>`}</div>
-  ${ctrl}${ro}${campTagsHtml(v.tags,true)}${v.note?`<div style="margin-top:4px;font-size:var(--fs-3)">${esc(v.note)}</div>`:""}</div>`;
- }).join("");
+ let S=[];try{S=playerCampProgress(p)}catch(e){}
+ let rated=S.filter(x=>x.r);
+ let head="";
+ if(rated.length>=2){
+  let a=rated[0].r,b=rated[rated.length-1].r,up=b>a,dn=b<a,col=up?"var(--g)":dn?"var(--red)":"var(--muted)";
+  let pa=S[S.length-2],pb=S[S.length-1];
+  let delta=(x,y,fx)=>{if(x==null||y==null)return "";let u=y>x+.0001,d=y<x-.0001;return `<span style="color:${u?"var(--g)":d?"var(--red)":"var(--muted)"};font-weight:700">${fx(x)} → ${fx(y)} ${u?"▲":d?"▼":"•"}</span>`};
+  let extra=[pa.avg!=null&&pb.avg!=null?"Assessment avg "+delta(pa.avg,pb.avg,v=>v.toFixed(1)):"",pa.att!=null&&pb.att!=null?"Attendance "+delta(pa.att,pb.att,v=>Math.round(v*100)+"%"):""].filter(Boolean).join(" · ");
+  head=`<div style="display:flex;align-items:center;gap:14px;padding-bottom:6px"><div><div class="muted" style="font-size:12px">Camp rating (out of 5)</div><div style="font-size:26px;font-weight:800">${a} <span style="color:${col}">→ ${b} ${up?"▲":dn?"▼":"•"}</span></div></div>${rated.length>=2?`<div class="vz">${pcTrendSvg(rated)}</div>`:""}</div>${extra?`<div class="muted" style="font-size:12.5px;padding-bottom:6px">${extra}</div>`:""}`}
+ let dots=(r,sz)=>`<span style="display:inline-flex;gap:3px" aria-label="${r} of 5">${[1,2,3,4,5].map(i=>`<i style="width:${sz}px;height:${sz}px;border-radius:50%;display:inline-block;${r>=i?"background:#f59e0b":"border:1.5px solid #8a95ab"}"></i>`).join("")}</span>`;
+ let rows=list.map(c=>{
+  let v=campRevOf(c,p.name),days=campDays(c).length,rc=CAMP_REV_REC.find(x=>x[0]===v.rec),open=!forPrint&&!!_pcOpen[c.id];
+  let when=`${esc(fmtDate(c.startDate))}${c.endDate&&c.endDate!==c.startDate?" → "+esc(fmtDate(c.endDate)):""} · ${days} day${days===1?"":"s"}`;
+  let chip=rc?`<span style="border:1.5px solid ${rc[2]};background:${rc[2]};color:#fff;border-radius:999px;padding:2px 10px;font-size:12px;font-weight:700">${rc[1]}</span>`:"";
+  let ctrl=open?`<div class="pcRev" data-c="${c.id}" data-n="${esc(p.name)}" style="margin-top:8px"><div style="display:flex;gap:6px">${[1,2,3,4,5].map(i=>`<button type="button" onclick="pcRev(this,'r',${i})" aria-label="${i} of 5" style="width:32px;height:32px;border-radius:50%;border:1px solid ${v.r>=i?"#f59e0b":"#8886"};background:${v.r>=i?"#f59e0b":"transparent"};color:${v.r>=i?"#fff":"var(--muted)"};font-size:13px">${i}</button>`).join("")}</div><div style="display:flex;gap:6px;margin-top:8px">${CAMP_REV_REC.map(([k,l,col])=>`<button type="button" onclick="pcRev(this,'rec','${k}')" style="padding:5px 12px;border-radius:8px;border:1px solid ${col};background:${v.rec===k?col:"transparent"};color:${v.rec===k?"#fff":col};font-weight:600;font-size:12.5px">${l}</button>`).join("")}</div></div>${campTagsHtml(v.tags,true)}${v.note?`<div class="muted" style="margin-top:6px;font-size:var(--fs-3)">${esc(v.note)}</div>`:""}<button class="btn secondary" style="padding:4px 10px;margin-top:8px" onclick="closeM();go('camps');openCamp('${c.id}')">Open camp</button>`:"";
+  return `<div style="border-top:1px solid var(--line);padding:9px 0"><div ${forPrint?"":`role="button" tabindex="0" onclick="pcToggle('${c.id}','${p.id}')" style="display:flex;align-items:center;gap:10px;cursor:pointer"`} ${forPrint?'style="display:flex;align-items:center;gap:10px"':""}><div style="min-width:0;flex:1"><b>${esc(c.name)}</b><div class="muted" style="font-size:12px">${when}</div></div>${v.r?dots(v.r,9):""}${chip}${forPrint?"":`<span class="muted">${open?"⌄":"›"}</span>`}</div>${ctrl}</div>`}).join("");
+ /* latest review */
+ let r=playerReviewTags(p),rev="";
+ if(r){
+  let pa=S.length>=2?S[S.length-2]:null,pb=S.length>=2?S[S.length-1]:null,same=pa&&pb&&pb.c.name===r.camp;
+  let carried=same?r.w.filter(t=>pa.w.includes(t)):[],fresh=r.w.filter(t=>!carried.includes(t)),gone=same?pa.w.filter(t=>!pb.w.includes(t)):[];
+  let newG=same?r.g.filter(t=>!pa.g.includes(t)):[];
+  let ch=(L,c)=>L.map(t=>`<span class="tag" style="border-color:${c};color:${c}">${esc(t)}</span>`).join(" ");
+  let cp=list.find(c=>c.name===r.camp),nt=cp?campRevOf(cp,p.name).note:"";
+  rev=`<div style="border-top:1px solid var(--line);padding-top:8px;margin-top:2px"><div class="muted" style="font-size:12px;text-transform:uppercase;letter-spacing:.4px;font-weight:700">Latest review · ${esc(r.camp||"Camp")}${r.date?" · "+esc(fmtDate(r.date)):""}</div>${r.g.length?`<div style="margin-top:6px">${ch(r.g,"#1f8a4c")}${newG.length?` <span class="muted" style="font-size:12px">new: ${esc(newG.join(", "))}</span>`:""}</div>`:""}${r.w.length?`<div class="muted" style="font-size:12px;margin-top:8px">Still working on${carried.length?` <span class="tag" style="border-color:#8a95ab;color:var(--muted)">${carried.length} carried over</span>`:""}</div><div>${ch(carried,"#d97706")} ${ch(fresh,"#d97706")}</div>`:""}${gone.length?`<div class="muted" style="font-size:12px;margin-top:8px">No longer flagged</div><div>${ch(gone,"#1f8a4c")}</div>`:""}${nt?`<div class="muted" style="margin-top:8px;font-size:var(--fs-3)">“${esc(nt)}”</div>`:""}</div>`}
+ return head+rows+(forPrint||!list.length?"":`<div class="muted noPrint" style="font-size:12px;padding:6px 0">Tap a camp to change its rating, outcome and tags.</div>`)+rev;
 }
 function playerCampsHtml(p,forPrint){
  let list=campOfPlayer(p);if(forPrint&&!list.some(c=>{let v=campRevOf(c,p.name);return v.r||v.rec}))return "";
