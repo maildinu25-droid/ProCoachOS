@@ -206,6 +206,7 @@ input[type=range]{accent-color:var(--g);width:100%;height:6px;padding:0;backgrou
 .rBadge.W{background:var(--g)}.rBadge.L{background:var(--red)}
 .moreBtn{display:block;width:100%;margin:12px 0}
 .secIc{margin-right:8px;color:var(--g);display:inline-flex;vertical-align:-3px}.secIc svg{vertical-align:0!important}
+.delRow{display:block!important;min-width:0}.delRow+.delRow{margin-top:8px}.delRow .dn{display:block;min-width:0;overflow-wrap:anywhere;word-break:break-word;margin-bottom:8px}.delRow .da{display:flex;flex-wrap:wrap;gap:6px}.delRow .da .btn{flex:1 1 auto;min-width:0;white-space:normal}
 @media(max-width:640px){.card{padding:14px;border-radius:16px}.item{padding:11px 12px;border-radius:12px}.section{margin:20px 0 10px}.hero{margin-bottom:16px}}
 @media print{.pTab{display:block!important}.pTabs{display:none!important}.fbar{position:static}.chipRow,.moreBtn{display:none}}
 .printOnly{display:none}
@@ -10369,8 +10370,8 @@ function accountPage(){
 
  ${(db.players.some(p=>p.deletedAt)||db.sessions.some(s=>s.deletedAt))?`<h2 class="section">Recently Deleted</h2>
  <div class="card">
- ${db.players.filter(p=>p.deletedAt).map(p=>`<div class="item"><span>${esc(p.name)} <span class="muted">(player)</span></span><span style="display:flex;gap:6px"><button class="btn secondary" onclick="restorePlayer('${p.id}')">Restore</button><button class="btn danger" onclick="permanentlyDeletePlayer('${p.id}')">Delete Permanently</button></span></div>`).join("")}
- ${db.sessions.filter(s=>s.deletedAt).map(s=>`<div class="item"><span>${esc(sessionLabel(s))} <span class="muted">(session, ${esc(fmtDate(s.date))})</span></span><span style="display:flex;gap:6px"><button class="btn secondary" onclick="restoreSession('${s.id}')">Restore</button><button class="btn danger" onclick="permanentlyDeleteSession('${s.id}')">Delete Permanently</button></span></div>`).join("")}
+ ${db.players.filter(p=>p.deletedAt).map(p=>`<div class="item delRow"><span class="dn">${esc(p.name)} <span class="muted">(player)</span></span><span class="da"><button class="btn secondary" onclick="restorePlayer('${p.id}')">Restore</button><button class="btn danger" onclick="permanentlyDeletePlayer('${p.id}')">Delete Permanently</button></span></div>`).join("")}
+ ${db.sessions.filter(s=>s.deletedAt).map(s=>`<div class="item delRow"><span class="dn">${esc(sessionLabel(s))} <span class="muted">(session, ${esc(fmtDate(s.date))})</span></span><span class="da"><button class="btn secondary" onclick="restoreSession('${s.id}')">Restore</button><button class="btn danger" onclick="permanentlyDeleteSession('${s.id}')">Delete Permanently</button></span></div>`).join("")}
  </div>`:""}
 
  <h2 class="section">Commercial Roadmap</h2>
