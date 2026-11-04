@@ -1342,12 +1342,12 @@ function livePanelPaint(){
  let fl=n=>log.some(x=>x.p===n&&x.f);
  let chips=names.length?names.map((n,i)=>{let v=rv(n,blk),f=fl(n);return `<button type="button" class="lvChip${lvSel===n?" on":""}${f?" fl":""}" onclick="liveSel(${i})">${esc(n.split(" ")[0])}${v?` <b>${v}</b>`:""}${f?icon("alert",12):""}</button>`}).join(""):`<div class="muted">No one marked present.</div>`;
  let card="";
- if(lvSel){let v=rv(lvSel,blk),mine=log.filter(x=>x.p===lvSel&&x.n);
+ if(lvSel){let v=rv(lvSel,blk),mine=log.map((x,i)=>({x,i})).filter(o=>o.x.p===lvSel&&(o.x.n||o.x.f)),hasFlag=log.some(x=>x.p===lvSel&&x.b===blk&&x.f);
   card=`<div class="lvCard"><div style="display:flex;justify-content:space-between;gap:8px"><b>${esc(lvSel)}</b><span class="muted">${esc(blk)}</span></div>
   <div class="lvRate">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button type="button" class="${v===n?"on":""}" onclick="liveRate(${n})">${n}</button>`).join("")}</div>
   <textarea id="lvNote" rows="2" placeholder="Quick note (tap the mic to dictate)">${esc(lvDraft)}</textarea>
-  <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="btn secondary" style="flex:1" onclick="liveNote(0)">Save note</button><button type="button" class="btn secondary" style="flex:1" onclick="liveNote(1)">${icon("alert",14)} Flag</button></div>
-  ${mine.length?`<div class="muted" style="margin-top:8px;font-size:var(--fs-2)">${mine.slice(-3).map(x=>(x.f?"Flag · ":"")+esc(x.b)+": "+esc(x.n)).join("<br>")}</div>`:""}</div>`}
+  <div style="display:flex;gap:8px;margin-top:8px"><button type="button" class="btn secondary" style="flex:1" onclick="liveNote(0)">Save note</button><button type="button" class="btn secondary" style="flex:1" onclick="${hasFlag?"liveUnflag()":"liveNote(1)"}">${icon("alert",14)} ${hasFlag?"Unflag":"Flag"}</button></div>
+  ${mine.length?`<div style="margin-top:8px">${mine.map(({x,i})=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px"><span class="muted" style="font-size:var(--fs-2);min-width:0">${x.f?"Flag · ":""}${esc(x.b)}${x.n?": "+esc(x.n):""}</span><button type="button" class="btn secondary" style="padding:3px 10px;flex:none" onclick="liveDel(${i})">Remove</button></div>`).join("")}</div>`:""}</div>`}
  box.innerHTML=`<div class="lvLbl">Tap a player · quick log for this block</div><div class="lvChips">${chips}</div>${card}`;
  try{enhanceTextareasWithVoice(box)}catch(e){}
 }
@@ -1362,6 +1362,9 @@ function liveNote(flag){
  s.liveLog=(s.liveLog||[]);s.liveLog.push({p:lvSel,b:r.steps[r.idx].n,n:txt||"",f:flag?1:0,t:Date.now()});
  lvDraft="";persistQuiet();livePanelPaint();
 }
+function liveRepaint(){if(timerRun&&timerRun.done)liveWrapPaint(document.getElementById("timerOverlay"),timerRun);else livePanelPaint()}
+function liveDel(i){let s=liveSess();if(!s||!Array.isArray(s.liveLog)||!s.liveLog[i])return;s.liveLog.splice(i,1);persistQuiet();liveRepaint()}
+function liveUnflag(){let s=liveSess(),r=timerRun;if(!s||!lvSel||!r)return;let blk=r.steps[r.idx].n;s.liveLog=(s.liveLog||[]).filter(x=>!(x.p===lvSel&&x.b===blk&&x.f));persistQuiet();livePanelPaint()}
 function liveFinish(){
  let r=timerRun;if(!r||r.done)return;
  if(r.idx<r.steps.length-1&&!confirm("Finish the session now?"))return;
@@ -1391,6 +1394,7 @@ function liveWrapPaint(el,r){
  <div class="lvStats"><div><span class="muted">Attendance</span><b>${(s.attendees||[]).length}/${roster||(s.attendees||[]).length}</b></div><div><span class="muted">Blocks</span><b>${done}/${r.steps.length}</b></div><div><span class="muted">Player logs</span><b>${sm.logs}</b></div></div>
  <div class="lvLbl">How did it go? (out of 10)</div>
  <div class="dRate">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button type="button" class="${lvWrapRating===n?"on":""}" onclick="lvWrapRating=${n};liveWrapPaint(document.getElementById('timerOverlay'),timerRun)">${n}</button>`).join("")}</div>
+ ${(()=>{let L=(s.liveLog||[]).map((x,i)=>({x,i})).filter(o=>o.x.f||o.x.n);return L.length?`<div class="lvCard"><div class="lvLbl">Notes &amp; flags · remove any you don't want saved</div>${L.map(({x,i})=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;font-size:var(--fs-3)"><span style="min-width:0">${x.f?icon("alert",13)+" ":""}<b>${esc(x.p.split(" ")[0])}</b> · ${esc(x.b)}${x.n?": "+esc(x.n):""}</span><button type="button" class="btn secondary" style="padding:3px 10px;flex:none" onclick="liveDel(${i})">Remove</button></div>`).join("")}<div class="muted" style="margin-top:8px;font-size:var(--fs-2)">Flags are also added to that player's coach notes.</div></div>`:""})()}
  <div class="lvCard"><div class="lvLbl">Goes into your reflection</div><div style="font-size:var(--fs-3);line-height:1.6">
  ${sm.well.map(x=>`<div>${icon("check",13)} ${esc(x)}</div>`).join("")}${sm.better.map(x=>`<div>${icon("alert",13)} ${esc(x)}</div>`).join("")}${sm.notes.map(x=>`<div class="muted">${esc(x)}</div>`).join("")}
  ${sm.late.length?`<div class="muted">Late: ${esc(sm.late.join(", "))}</div>`:""}${sm.absent.length?`<div class="muted">Absent: ${esc(sm.absent.join(", "))}</div>`:""}
