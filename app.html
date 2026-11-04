@@ -477,7 +477,7 @@ h3{font-family:'Sora',sans-serif;font-size:16px;font-weight:700;line-height:1.3}
 .gsPg td{padding:6px 7px;border-bottom:1px solid #e6eeea;vertical-align:top}.gsPg tr{break-inside:avoid;page-break-inside:avoid}
 .gsT{width:56px;font-weight:800;color:#0a7f5a;white-space:nowrap}.gsD{width:42px;color:#555}.gsK{width:140px;color:#555}.gsB{font-weight:800}.gsC{color:#555;font-size:11.5px;margin-top:1px}
 .gsSet{border:1px solid #cfe3da;border-radius:8px;overflow:hidden;margin:2px 0}.gsSet .sh{display:flex;justify-content:space-between;gap:8px;background:#eef8f3;padding:4px 9px;font-weight:800}.gsSet .sh span{font-weight:600;color:#555}.gsSet .sh i{font-style:normal;color:#0a7f5a;margin-right:8px}
-.gsNets{display:grid}.gsNets .n{padding:5px 9px;border-right:1px solid #e1ece6;border-top:1px solid #e1ece6;font-size:11.5px;line-height:1.4}.gsNets .n b{display:block;color:#0a7f5a;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase}.gsNets .n u{text-decoration:none;color:#6b7a74;font-weight:700;font-size:9.5px;letter-spacing:.5px;text-transform:uppercase;display:block;margin-top:2px}.gsNets .n em{font-style:normal;display:block;margin-top:2px;color:#555}
+.gsNets{display:grid}.gsNets .n{padding:5px 9px;border-right:1px solid #e1ece6;border-top:1px solid #e1ece6;font-size:11.5px;line-height:1.4}.gsNets .n b{display:block;color:#0a7f5a;font-size:10.5px;letter-spacing:.6px;text-transform:uppercase}.gsNets .n u{text-decoration:none;color:#0b1f17;font-weight:900;font-size:10.5px;letter-spacing:.5px;text-transform:uppercase;display:block;margin-top:2px}.gsNets .n em{font-style:normal;display:block;margin-top:2px;color:#555}
 .gsAtt{display:grid;gap:0 16px}.gsAtt .r{display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid #eef3f0}.gsAtt .r i{width:12px;height:12px;border:1.5px solid #8a9a93;border-radius:3px;display:inline-block;flex:none;font-style:normal;font-size:10px;line-height:9px;text-align:center;color:#0a7f5a;font-weight:900}.gsAtt .r span{flex:1;min-width:0}.gsAtt .r em{font-style:normal;font-size:9.5px;color:#8a9a93}
 .gsCols{display:flex;gap:14px}.gsCols>div{flex:1}
 .gsNotes{flex:1;min-height:80px;border:1px solid #d9e4df;border-radius:7px;background:repeating-linear-gradient(transparent 0 21px,#e8efec 21px 22px)}
@@ -1291,7 +1291,7 @@ function liveRoster(s){
  if(s.sessionType==="player"){let p=db.players.find(x=>x.id===s.sessionPlayerId);return p?[p]:[]}
  let saved=Array.isArray(s.attendees)?s.attendees:[];
  let stIds=Array.isArray(s.stageFilter)?s.stageFilter:[];
- let base=activePlayers().filter(p=>{if(saved.includes(p.name))return true;if(isReleased(p))return false;if(s.sessionType==="team"&&s.squad)return p.team===s.squad;return !stIds.length||stIds.includes(stageOf(p).id)});
+ let base=activePlayers().filter(p=>{if(saved.includes(p.name))return true;if(isReleased(p))return false;if(s.sessionType==="team"&&s.squad&&p.team!==s.squad)return false;return !stIds.length||stIds.includes(stageOf(p).id)});
  return base;
 }
 function liveStart(id){
@@ -1363,7 +1363,8 @@ function liveNote(flag){
  lvDraft="";persistQuiet();livePanelPaint();
 }
 function liveRepaint(){if(timerRun&&timerRun.done)liveWrapPaint(document.getElementById("timerOverlay"),timerRun);else livePanelPaint()}
-function liveDel(i){let s=liveSess();if(!s||!Array.isArray(s.liveLog)||!s.liveLog[i])return;s.liveLog.splice(i,1);persistQuiet();liveRepaint()}
+function liveDel(i,sid){let s=sid?db.sessions.find(x=>x.id===sid):liveSess();if(!s||!Array.isArray(s.liveLog)||!s.liveLog[i])return;s.liveLog.splice(i,1);persistQuiet();if(sid&&!(timerRun&&timerRun.sid===sid)){liveAfterEdit();return}liveRepaint()}
+function liveAfterEdit(){renderAll()}
 function liveUnflag(){let s=liveSess(),r=timerRun;if(!s||!lvSel||!r)return;let blk=r.steps[r.idx].n;s.liveLog=(s.liveLog||[]).filter(x=>!(x.p===lvSel&&x.b===blk&&x.f));persistQuiet();livePanelPaint()}
 function liveFinish(){
  let r=timerRun;if(!r||r.done)return;
@@ -1419,6 +1420,32 @@ function liveSave(skip){
  }
  lvWrapRating=null;lvSel=null;lvDraft="";
  timerClose();save();
+}
+function liveHasNotes(s){return Array.isArray(s.liveLog)&&s.liveLog.some(x=>x.v||x.n||x.f)}
+function liveWrapOnly(id){
+ let s=db.sessions.find(x=>x.id===id);if(!s)return;
+ if(timerRun&&!timerRun.done){timerShow();return}
+ let log=(s.liveLog||[]),last=log.reduce((a,x)=>Math.max(a,x.t||0),0)||Date.now(),first=log.reduce((a,x)=>Math.min(a,x.t||a),last);
+ let steps=timerBuildSteps(s),idx=0;
+ log.forEach(x=>{let k=steps.findIndex(z=>z.n===x.b);if(k>idx)idx=k});
+ timerRun={title:sessionLabel(s),steps,idx,startedAt:s.liveStartedAt||first,finishedAt:last,done:true,sid:id,paused:false,endAt:0,remaining:0};
+ lvWrapRating=null;lvSel=null;lvDraft="";
+ try{closeM()}catch(e){}
+ timerShow();
+}
+function liveLogHtml(s,withActions){
+ let log=Array.isArray(s.liveLog)?s.liveLog:[];if(!log.some(x=>x.v||x.n||x.f))return "";
+ let rated=log.filter(x=>x.v),notes=log.map((x,i)=>({x,i})).filter(o=>o.x.f||o.x.n);
+ return `<div class="card" style="margin-top:8px"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.3px">Live log${s.liveDone?"":" · not saved yet"}</div>
+ ${rated.length?`<div style="margin-top:6px">${rated.map(x=>`<span class="tag">${esc(x.p.split(" ")[0])} · ${esc(x.b)} ${x.v}</span>`).join("")}</div>`:""}
+ ${notes.map(({x,i})=>`<div style="display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:6px;font-size:var(--fs-3)"><span style="min-width:0">${x.f?icon("alert",13)+" ":""}<b>${esc(x.p.split(" ")[0])}</b> · ${esc(x.b)}${x.n?": "+esc(x.n):""}</span>${withActions?`<button type="button" class="btn secondary" style="padding:3px 10px;flex:none" onclick="liveDel(${i},'${s.id}')">Remove</button>`:""}</div>`).join("")}
+ ${!s.liveDone&&withActions?`<div class="thBtns" style="margin-top:8px"><button class="btn primary" onclick="liveWrapOnly('${s.id}')">Review &amp; save</button></div>`:""}</div>`;
+}
+function liveUnsavedFlagsHtml(p){
+ let out=[];
+ (db.sessions||[]).forEach(s=>{if(s.liveDone||!Array.isArray(s.liveLog))return;s.liveLog.forEach(x=>{if(x.f&&x.p===p.name)out.push({s,x})})});
+ if(!out.length)return "";
+ return `<div class="card noPrint" style="margin-top:8px"><div class="muted" style="font-size:11px;text-transform:uppercase;letter-spacing:.3px">Flagged in live sessions · not saved yet</div>${out.map(({s,x})=>`<div style="margin-top:6px;font-size:var(--fs-3)">${icon("alert",13)} <b>${esc(fmtDate(s.date))}</b> · ${esc(x.b)}${x.n?": "+esc(x.n):""} <a style="cursor:pointer;color:var(--g)" onclick="closeM();liveWrapOnly('${s.id}')">Review &amp; save</a></div>`).join("")}</div>`;
 }
 /* ===== end live session mode ===== */
 
@@ -2225,6 +2252,7 @@ function dashBuild(c){
  let pre=todaySess.find(s=>!refl(s)&&tm(s)!==null&&tm(s)>now&&tm(s)-now<=60);
  let post=todaySess.find(s=>!refl(s)&&!later(s.id)&&((tm(s)!==null&&en(s)<=now&&now-en(s)<=300)||(tm(s)===null&&now>=20*60)));
  let mt=todayMats[0];
+ let unsavedLive=sess.filter(s=>!s.liveDone&&liveHasNotes(s)&&!later("unl_"+s.id)&&!(timerRun&&timerRun.sid===s.id)).sort((a,b)=>String(b.date).localeCompare(String(a.date)))[0];
  let ck=(done,txt,act,fn)=>`<div class="dCk"${fn?` style="cursor:pointer" onclick="${fn}"`:""}><u class="${done?"d":""}">${done?"✓":""}</u><span>${txt}</span>${act?`<i>${act} ›</i>`:""}</div>`;
  let attLine=s=>(s.attendees&&s.attendees.length)?ck(true,`Attendance · ${s.attendees.length} marked`,"",`editSession('${s.id}')`):ck(false,"Attendance not marked","Mark",`editSession('${s.id}')`);
  let planLine=s=>drillsN(s)?ck(true,`Plan ready · ${plural(drillsN(s),"drill")}`):ck(false,"No drills in the plan yet","Add",`editSession('${s.id}')`);
@@ -2233,6 +2261,7 @@ function dashBuild(c){
  else if(live){smart=`<div class="todayHero dBig"><div class="thLabel">In progress · ends ${hm(en(live))}</div><div class="thTitle">${esc(sessionLabel(live))}</div><div class="thMeta">${esc(meta(live))}</div>${attLine(live)}<div class="thBtns"><button class="btn primary" onclick="liveStart('${live.id}')">Go live</button><button class="btn secondary" onclick="timerSetup('${live.id}')">Timer only</button><button class="btn secondary" onclick="printSessionPlan('${live.id}')">Open plan</button></div><div class="dLinks"><a onclick="newReflectionForSession('${live.id}')">Reflect</a><a onclick="editSession('${live.id}')">Edit</a></div></div>`}
  else if(pre){let n=tm(pre)-now;smart=`<div class="todayHero dBig"><div class="thLabel">Starts in ${n} min · ${hm(tm(pre))}</div><div class="thTitle">${esc(sessionLabel(pre))}</div><div class="thMeta">${esc(meta(pre))}</div>${planLine(pre)}${attLine(pre)}<div class="thBtns"><button class="btn primary" onclick="liveStart('${pre.id}')">Go live</button><button class="btn secondary" onclick="timerSetup('${pre.id}')">Timer only</button><button class="btn secondary" onclick="printSessionPlan('${pre.id}')">Open plan</button></div><div class="dLinks"><a onclick="remindSheet('${pre.id}')">Remind</a><a onclick="editSession('${pre.id}')">Edit</a></div></div>`}
  else if(post){smart=`<div class="todayHero dBig p"><div class="thLabel">Just finished · ${esc(sessionLabel(post))}</div><div class="thTitle">How did it go?</div><div class="thMeta">Rate out of 10 · feeds your next plan</div><div class="dRate">${[1,2,3,4,5,6,7,8,9,10].map(n=>`<button onclick="dashQuickReflect('${post.id}',${n})">${n}</button>`).join("")}</div>${attLine(post)}<div class="thBtns"><button class="btn primary" onclick="newReflectionForSession('${post.id}')">Write reflection</button><button class="btn secondary" onclick="dashLater('${post.id}')">Later</button></div></div>`}
+ else if(unsavedLive){let nn=(unsavedLive.liveLog||[]).filter(x=>x.f||x.n).length,rr=(unsavedLive.liveLog||[]).filter(x=>x.v).length;smart=`<div class="todayHero dBig p"><div class="thLabel">Unsaved live notes · ${esc(fmtDate(unsavedLive.date))}</div><div class="thTitle">${esc(sessionLabel(unsavedLive))}</div><div class="thMeta">${nn} note${nn===1?"":"s"}/flag${nn===1?"":"s"} · ${rr} rating${rr===1?"":"s"} not saved to reflection or player notes</div><div class="thBtns"><button class="btn primary" onclick="liveWrapOnly('${unsavedLive.id}')">Review &amp; save</button><button class="btn secondary" onclick="dashLater('unl_${unsavedLive.id}')">Later</button></div></div>`}
  else if(mt){let k=Math.round((new Date(t)-new Date(mt.date))/86400000)+1,n=matchDayCount(mt);let scored=!!((mt.scorerInnings&&mt.scorerInnings.length)||mt.scoreLine||mt.ourRuns);let acts=openMatchActions().filter(x=>x.m.id===mt.id).length;smart=`<div class="todayHero dBig m"><div class="thLabel">Match day${n>1?` ${k} of ${n}`:""} · ${esc(mt.team||"My Team")}</div><div class="thTitle">vs ${esc(mt.opp||"Opposition")}</div><div class="thMeta">${esc([mt.venue,mt.format].filter(Boolean).join(" · "))}${mt.scoreLine?`<br><b>${esc(mt.scoreLine)}</b>`:""}</div>${ck(scored,scored?"Scores recorded":"Scores not entered yet",scored?"":"Add",scored?"":`editMatchScores('${mt.id}')`)}${acts?ck(false,plural(acts,"training action")+" open","View","showOpenMatchActions()"):""}<div class="thBtns"><button class="btn primary" onclick="editMatch('${mt.id}')">Open match</button><button class="btn secondary" onclick="matchReportView('${mt.id}')">Report</button></div></div>`}
  else{
   let nxt=todaySess.find(s=>!refl(s)&&(tm(s)===null?now<20*60:tm(s)>now))||sess.filter(s=>s.date>t).sort((a,b)=>sessionDateTimeKey(a).localeCompare(sessionDateTimeKey(b)))[0];
@@ -2448,7 +2477,7 @@ function sessions(){
   let linkedReflection=db.reflections.find(r=>r.sessionId===s.id);
   let showReflectionStatus=s.date<=today();
   let thumbDrill=mainDrills.concat(gameDrills).find(d=>d.fieldSteps&&d.fieldSteps.length);
-  return `<div class="item sRow"><div style="min-width:0;flex:1"><div role="button" tabindex="0" style="cursor:pointer" onclick="sessToggle(this)"><b>${esc(sessionLabel(s))}${sessionFocusText(s)?" · "+esc(sessionFocusText(s)):""}</b> <span class="muted sChev">›</span><div class="muted" style="font-size:var(--fs-3)">${esc(fmtDate(s.date))}${s.time?" · "+esc(fmtTime(s.time)):""}${s.duration?" · "+esc(s.duration)+"m":""} · ${esc(sessionTypeLabel(s.sessionType))}</div>${showReflectionStatus?`<div style="margin-top:4px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="sDet" style="display:none">${thumbDrill?`<div class="sessThumb">${fieldStepsPreviewHtml(thumbDrill.fieldSteps.slice(0,1),76)}</div>`:""}${sessMetaTagsHtml(s)}${vzTimeSplit(s)}<small>${esc(s.objectives)}</small>${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.concat(gameDrills).map(d=>`<span class="tag" style="cursor:pointer" onclick="viewDrill('${d.id}')">${icon("target",13)} ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">${icon("drills",13)} ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px">${s.attachment.dataUrl?`<a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">${icon("paperclip",13)} ${esc(s.attachment.name)}</a>`:`<span class="muted" style="font-size:var(--fs-3)">${icon("paperclip",13)} ${esc(s.attachment.name)} (archived)</span>`}</div>`:""}${(s.campId&&campById(s.campId))?`<div style="margin-top:6px"><span class="tag" style="cursor:pointer" onclick="go('camps');openCamp('${s.campId}')">${icon("layers",13)} ${esc(campById(s.campId).name)}</span></div>`:""}</div></div><div class="toolbar"><button class="btn secondary" onclick="printSessionPlan('${s.id}')">View</button>${kebabMenu("s"+s.id,[{label:"Edit",icon:"edit",fn:`editSession('${s.id}')`},{label:"Go live",icon:"bolt",fn:`liveStart('${s.id}')`},{label:"Timer only",icon:"clock",fn:`timerSetup('${s.id}')`},{label:"Remind me (calendar)",icon:"bell",fn:`remindSheet('${s.id}')`},{label:"Share on WhatsApp",icon:"share",fn:`shareSessionSummary('${s.id}')`},{label:"Copy text",icon:"copy",fn:`copySessionSummary('${s.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delSession('${s.id}')`}])}</div></div>`;
+  return `<div class="item sRow"><div style="min-width:0;flex:1"><div role="button" tabindex="0" style="cursor:pointer" onclick="sessToggle(this)"><b>${esc(sessionLabel(s))}${sessionFocusText(s)?" · "+esc(sessionFocusText(s)):""}</b> <span class="muted sChev">›</span><div class="muted" style="font-size:var(--fs-3)">${esc(fmtDate(s.date))}${s.time?" · "+esc(fmtTime(s.time)):""}${s.duration?" · "+esc(s.duration)+"m":""} · ${esc(sessionTypeLabel(s.sessionType))}</div>${showReflectionStatus?`<div style="margin-top:4px">${linkedReflection?`<span class="tag" style="cursor:pointer" onclick="editReflection('${linkedReflection.id}')">✓ Reflected</span>`:`<span class="tag" style="background:var(--redTint);color:var(--red);cursor:pointer" onclick="newReflectionForSession('${s.id}')">Reflection pending</span>`}</div>`:""}</div><div class="sDet" style="display:none">${thumbDrill?`<div class="sessThumb">${fieldStepsPreviewHtml(thumbDrill.fieldSteps.slice(0,1),76)}</div>`:""}${sessMetaTagsHtml(s)}${vzTimeSplit(s)}<small>${esc(s.objectives)}</small>${liveLogHtml(s,true)}${(s.objectiveTags&&s.objectiveTags.length)?`<div style="margin-top:6px">${s.objectiveTags.map(t=>`<span class="tag">${esc(t)}</span>`).join("")}</div>`:""}${(mainDrills.length||gameDrills.length)?`<div style="margin-top:6px">${mainDrills.concat(gameDrills).map(d=>`<span class="tag" style="cursor:pointer" onclick="viewDrill('${d.id}')">${icon("target",13)} ${esc(d.name)}</span>`).join("")}</div>`:""}${(s.netPlan&&s.netPlan.length)?`<div style="margin-top:6px"><span class="tag">${icon("drills",13)} ${netPlanCountLabel(s.netPlan)}</span></div>`:""}${s.attachment?`<div style="margin-top:6px">${s.attachment.dataUrl?`<a href="${s.attachment.dataUrl}" download="${esc(s.attachment.name)}" style="color:var(--g);font-size:var(--fs-3);font-weight:600">${icon("paperclip",13)} ${esc(s.attachment.name)}</a>`:`<span class="muted" style="font-size:var(--fs-3)">${icon("paperclip",13)} ${esc(s.attachment.name)} (archived)</span>`}</div>`:""}${(s.campId&&campById(s.campId))?`<div style="margin-top:6px"><span class="tag" style="cursor:pointer" onclick="go('camps');openCamp('${s.campId}')">${icon("layers",13)} ${esc(campById(s.campId).name)}</span></div>`:""}</div></div><div class="toolbar"><button class="btn secondary" onclick="printSessionPlan('${s.id}')">View</button>${kebabMenu("s"+s.id,[{label:"Edit",icon:"edit",fn:`editSession('${s.id}')`},{label:"Go live",icon:"bolt",fn:`liveStart('${s.id}')`},{label:"Timer only",icon:"clock",fn:`timerSetup('${s.id}')`},{label:"Remind me (calendar)",icon:"bell",fn:`remindSheet('${s.id}')`},{label:"Share on WhatsApp",icon:"share",fn:`shareSessionSummary('${s.id}')`},{label:"Copy text",icon:"copy",fn:`copySessionSummary('${s.id}')`},{label:"Delete",icon:"trash",danger:1,fn:`delSession('${s.id}')`}])}</div></div>`;
  },"list",!!sessionQuery)}</div>`:empty("No sessions match your search.")}</div>`;
  let sEl=document.getElementById("sessionSearch");if(sEl&&sessionSearchFocused){sEl.focus();const v=sEl.value;sEl.setSelectionRange(v.length,v.length)}
 }
@@ -12177,7 +12206,8 @@ function playerStandingHtml(p,assessments,sessions,matches){
  if(cs){let v=campRevOf(cs,p.name),rc=CAMP_REV_REC.find(x=>x[0]===v.rec);items.push(box("Latest camp review",`${v.r?`<span style="color:#d97706">${campRevStars(v.r)}</span> `:""}${rc?`<span style="color:${rc[2]}">${rc[1]}</span>`:""}`,esc(cs.name)))}
  if(sessions.length)items.push(box("Sessions",sessions.length,"last "+esc(fmtDate(sessions[0].date))));
  if(matches.length){let m=matches[0],bat=(m.battingReview||[]).find(r=>sameName(r.name,p.name)),bowl=(m.bowlingReview||[]).find(r=>sameName(r.name,p.name));items.push(box("Last match","vs "+esc(m.opp||"Opposition"),esc(matchDateStr(m))+(bat?" · "+esc(bat.runs||0)+"("+esc(bat.balls||0)+")":"")+(bowl?" · "+esc(bowl.wickets||0)+"/"+esc(bowl.runs||0):"")))}
- return items.length?`<h2 class="section">Where they stand</h2><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">${items.join("")}</div>`:"";
+ let _uf=liveUnsavedFlagsHtml(p);
+ return items.length?_uf+`<h2 class="section">Where they stand</h2><div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px">${items.join("")}</div>`:"";
 }
 window._pcOpen=window._pcOpen||{};
 function pcToggle(cid,pid){_pcOpen[cid]=!_pcOpen[cid];let p=db.players.find(x=>x.id===pid&&!x.deletedAt),el=document.getElementById("pCamps");if(p&&el)el.innerHTML=playerCampsInner(p,false)}
