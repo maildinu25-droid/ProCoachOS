@@ -206,6 +206,10 @@ input[type=range]{accent-color:var(--g);width:100%;height:6px;padding:0;backgrou
 .rBadge.W{background:var(--g)}.rBadge.L{background:var(--red)}
 .moreBtn{display:block;width:100%;margin:12px 0}
 .secIc{margin-right:8px;color:var(--g);display:inline-flex;vertical-align:-3px}.secIc svg{vertical-align:0!important}
+.asSec{margin-top:10px;border:1px solid var(--line);border-radius:12px;overflow:hidden}.asSh{display:flex;justify-content:space-between;align-items:center;background:var(--mint);padding:7px 10px;font-size:var(--fs-3);font-weight:700}
+.asSk{display:flex;align-items:center;gap:8px;padding:6px 10px;border-top:1px solid var(--line);font-size:var(--fs-3)}.asSk>span{flex:1;min-width:0;overflow-wrap:anywhere}.asBar{width:64px;height:6px;border-radius:9px;background:rgba(128,128,128,.25);overflow:hidden;flex:none}.asBar b{display:block;height:100%}.asSk em{font-style:normal;width:22px;text-align:right;font-weight:700}.asSk u{text-decoration:none;width:38px;text-align:right;font-size:11px}.asTog{cursor:pointer}
+.asD{font-size:11px;font-weight:700;white-space:nowrap}.asD.up{color:var(--g2)}.asD.dn{color:var(--red)}.asD.fl{color:var(--muted)}.asNote{font-size:var(--fs-3);margin-top:8px;color:var(--muted)}.asNote b{color:var(--ink)}
+.asCmp{width:100%;border-collapse:collapse;font-size:var(--fs-3)}.asCmp th,.asCmp td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line)}
 .delRow{display:block!important;min-width:0}.delRow+.delRow{margin-top:8px}.delRow .dn{display:block;min-width:0;overflow-wrap:anywhere;word-break:break-word;margin-bottom:8px}.delRow .da{display:flex;flex-wrap:wrap;gap:6px}.delRow .da .btn{flex:1 1 auto;min-width:0;white-space:normal}
 @media(max-width:640px){.card{padding:14px;border-radius:16px}.item{padding:11px 12px;border-radius:12px}.section{margin:20px 0 10px}.hero{margin-bottom:16px}}
 @media print{.pTab{display:block!important}.pTabs{display:none!important}.fbar{position:static}.chipRow,.moreBtn{display:none}}
@@ -4801,7 +4805,7 @@ function saveBulkAssessment(){
  assessments();
  try{goalAfterBulk(savedRecs)}catch(err){}
 }
-function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<div class="toolbar noPrint"><button class="btn primary" onclick="newAssessment()">+ New Assessment</button>${campMenu("asAct","Actions ▾",[{label:"Bulk assess squad",icon:"players",fn:"openBulkAssessment()"}])}</div><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?monthGroupsHtml("assess",db.assessments.slice().reverse(),a=>a.date,a=>`<div class="item sRow"><div style="min-width:0;flex:1"><div role="button" tabindex="0" style="cursor:pointer" onclick="sessToggle(this)"><b>${esc(a.player)}</b> <span class="muted sChev">›</span><div class="muted">${esc(fmtDate(a.date))} · ${assessmentAvg(a)==="—"?"Technique only":assessmentAvg(a)+"/10"} · ${assessmentDisciplines(a).map(esc).join(" · ")}</div></div><div class="sDet" style="display:none"><div>${assessmentFormatTagsHtml(a)}</div><small>${esc(a.priority||"")}</small>${a.mediaLinks&&a.mediaLinks.length?`<div style="margin-top:6px">${a.mediaLinks.map((link,i)=>`<a href="${esc(link)}" target="_blank" rel="noopener" class="tag" style="cursor:pointer">${icon("video",14)} Link ${i+1}</a>`).join("")}</div>`:""}</div></div><div class="toolbar"><button class="btn secondary iconBtn" title="Set goals" onclick="goalAssessmentPicker('${a.id}')">${icon("target",17)}</button><button class="btn secondary iconBtn" title="Edit" onclick="editAssessment('${a.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delAssessment('${a.id}')">${icon("trash",17)}</button></div></div>`,"list",false):emptyRich("No assessments yet","Rate batting, bowling and fielding to track each player's progress over time.","+ New Assessment","newAssessment()")}</div>`}
+function assessments(){document.getElementById("assessments").innerHTML=head("Player Assessments","Choose one or more disciplines. For an all-rounder select Batting + Bowling; Fielding can also be added.")+`<div class="toolbar noPrint"><button class="btn primary" onclick="newAssessment()">+ New Assessment</button>${campMenu("asAct","Actions ▾",[{label:"Bulk assess squad",icon:"players",fn:"openBulkAssessment()"}])}</div><h2 class="section">Assessment history</h2><div class="card">${db.assessments.length?monthGroupsHtml("assess",db.assessments.slice().reverse(),a=>a.date,a=>`<div class="item sRow" style="flex-wrap:wrap"><div style="min-width:0;flex:1"><div role="button" tabindex="0" style="cursor:pointer" onclick="asToggle(this)"><b>${esc(a.player)}</b> <span class="muted sChev">›</span><div class="muted">${esc(fmtDate(a.date))} · ${assessmentAvg(a)==="—"?"Technique only":assessmentAvg(a)+"/10"} · ${assessmentDisciplines(a).map(esc).join(" · ")}</div></div></div><div class="toolbar"><button class="btn secondary iconBtn" title="Set goals" onclick="goalAssessmentPicker('${a.id}')">${icon("target",17)}</button><button class="btn secondary iconBtn" title="Edit" onclick="editAssessment('${a.id}')">${icon("edit",17)}</button><button class="btn danger iconBtn" title="Delete" onclick="delAssessment('${a.id}')">${icon("trash",17)}</button></div><div class="sDet asDet" style="display:none;flex:0 0 100%;width:100%">${assessmentExpandHtml(a)}</div></div>`,"list",false):emptyRich("No assessments yet","Rate batting, bowling and fielding to track each player's progress over time.","+ New Assessment","newAssessment()")}</div>`}
 function assessmentFormHtml(a,mode){
  a=a||{};
  return `<div class="sheetHead"><h2>${mode==="edit"?"Edit Assessment":"Player Assessment"}</h2><button class="x" onclick="closeM()">×</button></div>
@@ -5278,6 +5282,51 @@ function assessmentFormatEntries(a,d){
 }
 function assessmentFormatTagsHtml(a){return (Array.isArray(a.formats)?a.formats:[]).filter(f=>f!=="General").map(f=>`<span class="tag">${esc(f)}</span>`).join("")+(a.technique&&Object.keys(a.technique).length?`<span class="tag">Technique</span>`:"")}
 function disciplineAvg(a,d){let n=[];if(a.ratings&&Array.isArray(a.ratings[d]))n=a.ratings[d].map(Number).filter(x=>x>0);else if(d==="Fielding")n=legacySkills.map((_,i)=>Number(a["s"+i]||0)).filter(x=>x>0);assessmentFormatEntries(a,d).forEach(({vals})=>{n=n.concat(vals.map(Number).filter(x=>x>0))});return n.length?(n.reduce((x,y)=>x+y,0)/n.length).toFixed(1):"—"}function assessmentAvg(a){let n=assessmentDisciplines(a).map(d=>Number(disciplineAvg(a,d))).filter(Number.isFinite);return n.length?(n.reduce((x,y)=>x+y,0)/n.length).toFixed(1):"—"}
+function asToggle(el){let r=el.closest(".sRow"),d=r&&r.querySelector(".asDet");if(!d)return;let o=d.style.display==="none";d.style.display=o?"":"none";let c=el.querySelector(".sChev");if(c)c.textContent=o?"⌄":"›"}
+function asPrior(a,d){
+ let all=db.assessments,ix=all.indexOf(a);
+ let c=all.map((x,i)=>({x,i})).filter(o=>o.x.player===a.player&&o.x!==a&&(String(o.x.date||"")<String(a.date||"")||(o.x.date===a.date&&o.i<ix))&&(d?disciplineAvg(o.x,d)!=="—":assessmentAvg(o.x)!=="—"));
+ c.sort((m,n)=>String(m.x.date||"").localeCompare(String(n.x.date||""))||m.i-n.i);
+ return c.length?c[c.length-1].x:null;
+}
+function asDelta(cur,prev,suffix){
+ if(prev==null||prev===""||isNaN(cur)||isNaN(prev))return "";
+ let d=Math.round((Number(cur)-Number(prev))*10)/10;
+ if(!d)return `<span class="asD fl">–</span>`;
+ return `<span class="asD ${d>0?"up":"dn"}">${d>0?"▲":"▼"}${suffix?" "+(d>0?"+":"")+d.toFixed(1):Math.abs(d)}</span>`;
+}
+function asSkillRows(a,d){
+ let vals=(a.ratings&&a.ratings[d])||[],labels=(d==="Bowling"&&vals.length===10)?legacyBowlingSkills:allSkillsFor(d);
+ if(!vals.length&&d==="Fielding"){vals=legacySkills.map((_,i)=>Number(a["s"+i]||0))}
+ return labels.map((n,i)=>({n,v:Number(vals[i])||0})).filter(r=>r.v>0);
+}
+function assessmentExpandHtml(a){
+ let pa=asPrior(a,null),ov=assessmentAvg(a),h="";
+ let head=`<div style="display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:8px">${assessmentFormatTagsHtml(a)}${pa&&ov!=="—"?`<span class="muted" style="font-size:var(--fs-3)">Vs ${esc(fmtDate(pa.date))}: ${asDelta(ov,assessmentAvg(pa),true)}</span>`:""}</div>`;
+ let secs=assessmentDisciplines(a).map(d=>{
+  let rows=asSkillRows(a,d),fe=assessmentFormatEntries(a,d).filter(e=>e.vals.some(x=>Number(x)>0)),notes=a.disciplineNotes&&a.disciplineNotes[d];
+  if(!rows.length&&!fe.length&&!notes)return "";
+  let pr=asPrior(a,d),pm={};if(pr)asSkillRows(pr,d).forEach(r=>{pm[r.n]=r.v});
+  let da=disciplineAvg(a,d),dd=pr&&da!=="—"&&disciplineAvg(pr,d)!=="—"?asDelta(da,disciplineAvg(pr,d),true):"";
+  let row=r=>`<div class="asSk"><span>${esc(r.n)}</span><div class="asBar"><b style="width:${r.v*10}%;background:${r.v>=7?"var(--g)":r.v>=5?"var(--gold)":"var(--red)"}"></b></div><em>${r.v}</em><u>${pm[r.n]?asDelta(r.v,pm[r.n]):""}</u></div>`;
+  let first=rows.slice(0,4).map(row).join(""),rest=rows.slice(4);
+  return `<div class="asSec"><div class="asSh"><span>${esc(d)}${da==="—"?"":" · "+da+"/10"}</span>${dd}</div>${first}${rest.length?`<div class="asMore" style="display:none">${rest.map(row).join("")}</div><div class="asSk asTog" role="button" tabindex="0" onclick="asMoreToggle(this,${rest.length})"><span class="muted">+ ${rest.length} more</span><u style="color:var(--g2);width:auto">Show all</u></div>`:""}${fe.map(e=>`<div class="asSk" style="display:block"><div class="muted" style="font-size:11px">${esc(e.format)} specifics</div><div style="margin-top:3px">${e.labels.map((s,i)=>Number(e.vals[i])>0?esc(s)+" "+esc(e.vals[i]):"").filter(Boolean).join(" · ")}</div></div>`).join("")}${notes?`<div class="asSk" style="display:block"><div class="muted" style="font-size:11px">Development notes</div><div style="margin-top:3px;white-space:pre-wrap">${esc(notes)}</div></div>`:""}</div>`}).join("");
+ let pri=a.priority?`<div class="asNote"><b>Priority</b> · ${esc(a.priority)}</div>`:"";
+ let pl=db.players.find(x=>x.name===a.player&&!x.deletedAt);
+ let hasPrev=!!pa;
+ let btns=`<div style="display:flex;gap:8px;margin-top:10px;flex-wrap:wrap">${pl?`<button type="button" class="btn secondary" style="padding:7px 12px" onclick="playerView('${pl.id}')">Open player</button>`:""}${hasPrev?`<button type="button" class="btn secondary" style="padding:7px 12px" onclick="assessmentCompare('${a.id}')">Compare with last</button>`:""}</div>`;
+ return `<div style="margin-top:4px">${head}${secs}${pri}${assessmentMediaLinksHtml(a)}${btns}</div>`;
+}
+function asMoreToggle(el,n){let m=el.previousElementSibling;if(!m)return;let o=m.style.display==="none";m.style.display=o?"":"none";let s=el.querySelector("u"),l=el.querySelector("span");if(s)s.textContent=o?"Show less":"Show all";if(l)l.textContent=o?"":"+ "+n+" more"}
+function assessmentCompare(id){
+ let a=db.assessments.find(x=>x.id===id);if(!a)return;
+ let blocks=assessmentDisciplines(a).map(d=>{
+  let pr=asPrior(a,d);if(!pr)return "";
+  let cur=asSkillRows(a,d),pm={};asSkillRows(pr,d).forEach(r=>{pm[r.n]=r.v});
+  let rows=cur.map(r=>`<tr><td>${esc(r.n)}</td><td>${pm[r.n]||"–"}</td><td><b>${r.v}</b></td><td>${pm[r.n]?asDelta(r.v,pm[r.n]):""}</td></tr>`).join("");
+  return `<h2 class="section">${esc(d)} · ${esc(fmtDate(pr.date))} → ${esc(fmtDate(a.date))}</h2><div class="card" style="overflow:auto"><table class="asCmp"><tr><th></th><th>${esc(fmtDate(pr.date))}</th><th>${esc(fmtDate(a.date))}</th><th></th></tr>${rows}<tr><td><b>Average</b></td><td>${disciplineAvg(pr,d)}</td><td><b>${disciplineAvg(a,d)}</b></td><td>${asDelta(disciplineAvg(a,d),disciplineAvg(pr,d),true)}</td></tr></table></div>`}).join("");
+ modal(`<div class="sheetHead"><h2>${esc(a.player)} · compare</h2><button class="x" onclick="closeM()">×</button></div>${blocks||`<div class="muted">Nothing earlier to compare with.</div>`}`);
+}
 function assessmentDetailHTML(a,noGoal){return assessmentDisciplines(a).map(d=>{let vals=a.ratings?.[d]||[],labels=(d==="Bowling"&&vals.length===10)?legacyBowlingSkills:allSkillsFor(d);if(!vals.length&&d==="Fielding")vals=legacySkills.map((_,i)=>Number(a["s"+i]||0));let formatEntries=assessmentFormatEntries(a,d).filter(({vals:fv})=>fv.some(x=>x));let fmtHtml=formatEntries.map(({format,vals:fv,labels:fl})=>`<div style="margin-top:10px;padding-top:10px;border-top:1px solid var(--line)"><b>${esc(format)} specifics</b>${fl.map((s,i)=>fv[i]?`<div style="margin-top:4px"><b>${esc(s)}</b> — ${esc(fv[i])}/10</div>`:"").join("")}</div>`).join("");let formatTags=formatEntries.map(({format})=>` <span class="tag">${esc(format)}</span>`).join("");if(disciplineAvg(a,d)==="—"&&!(a.disciplineNotes&&a.disciplineNotes[d]))return "";return `<h2 class="section">${d} · ${disciplineAvg(a,d)}/10${formatTags}</h2><div class="card">${labels.map((s,i)=>vals[i]?`<div><b>${esc(s)}</b> — ${esc(vals[i])}/10${noGoal||(d==="Bowling"&&vals.length===10)?"":goalChipHtml(a,d,s,vals[i])}</div>`:"").join("")}${fmtHtml}${a.disciplineNotes?.[d]?`<p><b>Development notes</b><br>${esc(a.disciplineNotes[d])}</p>`:""}</div>`}).join("")+assessmentMediaLinksHtml(a)}
 function assessmentMediaLinksHtml(a){
  if(!a.mediaLinks||!a.mediaLinks.length)return "";
