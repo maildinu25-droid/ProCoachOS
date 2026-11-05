@@ -304,6 +304,18 @@ p{orphans:3;widows:3}
 .rvSeg{display:flex;border:1px solid var(--line);border-radius:9px;overflow:hidden;flex:none}.rvSeg button{border:0;border-radius:0;background:transparent;padding:7px 10px;font-size:12.5px;font-weight:700;color:var(--muted);cursor:pointer}
 .rvRate{display:flex;gap:4px;margin-top:7px;align-items:center}.rvRate .nb{width:28px;height:28px;border-radius:50%;font-size:13px;padding:0;cursor:pointer}
 .report .rptMast{background:linear-gradient(120deg,#0b3d2e,#0f6b4f);color:#fff;border-radius:12px;padding:18px 20px;margin:0 0 14px;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+
+/* v157 shared report look */
+.report .grid.g4>.card.stat,.report .grid>.card.stat{display:flex;flex-direction:column-reverse;align-items:center;justify-content:center;text-align:center;gap:3px;border:1px solid #dcebe4!important;border-radius:12px!important;background:#f4f8f6!important;padding:10px 6px!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.report .card.stat span{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;font-weight:700;color:#51667a}
+.report .card.stat b{font-weight:800}
+.report .card.rptCover{background:#f0f8f4!important;border:0!important;border-left:4px solid #0e9968!important;border-radius:0 12px 12px 0!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.report .card.rptCover .muted:first-child{text-transform:uppercase;letter-spacing:.1em;font-size:10.5px;font-weight:800;color:#047857}
+.report .card.rptNext{background:#fdf6e6!important;border:0!important;border-left:4px solid #f59e0b!important;border-radius:0 12px 12px 0!important;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.report .trTiles div,.report .csStats div{background:#f4f8f6;border-color:#dcebe4;-webkit-print-color-adjust:exact;print-color-adjust:exact}
+.report .trAw div{background:#fff}
+.report .rptMast{margin-bottom:16px}
+.report>.rptMast+.card.rptCover,.report>.rptMast+.grid{margin-top:0}
 .report .rptMast small{display:block;letter-spacing:.14em;text-transform:uppercase;font-size:11px;font-weight:700;opacity:.85;color:#fff}
 .report .rptMast .rptT{font-size:26px;font-weight:800;line-height:1.15;margin:4px 0 3px;color:#fff}
 .report .rptMast p{margin:0;opacity:.92;font-size:13.5px;color:#fff;overflow-wrap:anywhere}
@@ -4437,7 +4449,7 @@ function renderVideoComparison(playerId){
  <div class="card"><b>After — ${esc(fmtDate(after.date))}</b><div style="margin-top:8px"><a href="${esc(after.link)}" target="_blank" rel="noopener" class="btn secondary full">Open Video</a></div></div>
  </div>`;
 }
-function playerProfileReport(id){let p=db.players.find(x=>x.id===id);if(!p)return;reportShell(esc(p.name),`${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}`,playerViewBody(p,true))}
+function playerProfileReport(id){let p=db.players.find(x=>x.id===id);if(!p)return;_rptMast={k:"Player profile"+(p.team?" · "+esc(p.team):""),t:esc(p.name)};reportShell(esc(p.name),`${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}`,playerViewBody(p,true))}
 // A deliberately curated, parent/player-facing summary — strengths,
 // active goals, a plain-language trend, and next focus only. No coach
 // notes, no raw per-session assessment scores, and nothing about any
@@ -4462,7 +4474,7 @@ function parentSummaryReport(id){
  let attended=teamSessions.filter(s=>(s.attendees||[]).includes(p.name)).length;
  let attendanceRate=teamSessions.length?Math.round(attended/teamSessions.length*100):null;
  let activeGoals=(p.goals||[]).filter(g=>!g.achieved);
- reportShell(`${esc(p.name)} — Progress Summary`,`${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}`,
+ _rptMast={k:"Progress summary"+(p.team?" · "+esc(p.team):""),t:esc(p.name)};reportShell(`${esc(p.name)} — Progress Summary`,`${esc(p.role||"Player")}${p.team?" · "+esc(p.team):""}`,
  `<div class="card"><b>Strengths</b><p>${esc(p.strengths||((playerReviewTags(p)||{g:[]}).g.join(", "))||"Building foundations across the board.")}</p></div>
  ${activeGoals.length?`<h2>Current Goals</h2><div class="card">${activeGoals.map(g=>`<p><b>${esc(g.text)}</b>${g.targetDate?" — target "+esc(fmtDate(g.targetDate)):""}</p>`).join("")}</div>`:""}
  ${trendLines.length?`<h2>Recent Progress</h2><div class="card">${trendLines.map(l=>`<p>${esc(l)}</p>`).join("")}</div>`:""}
@@ -7652,7 +7664,7 @@ function matchReportView(id){
  <h2>Fielding Review</h2><div class="card">${(m.taken||m.missed||m.runouts||m.misfields||m.stumpings)?`<p>Catches taken ${esc(m.taken||0)} · Dropped ${esc(m.missed||0)} · Run outs ${esc(m.runouts||0)} · Stumpings ${esc(m.stumpings||0)} · Misfields ${esc(m.misfields||0)}</p>`:""}${(m.fieldingReview||[]).length?`<table class="reportTable"><tr><th>Player</th><th>Catches</th><th>Dropped</th><th>Run outs</th><th>Stumpings</th><th>Misfields</th></tr>${m.fieldingReview.map(r=>`<tr><td>${esc(r.name)}</td><td>${esc(r.catches||"-")}</td><td>${esc(r.drops||"-")}</td><td>${esc(r.runouts||"-")}</td><td>${esc(r.stumpings||"-")}</td><td>${esc(r.misfields||"-")}</td></tr>`).join("")}</table>`:""}${m.fieldingRatings?`<b style="display:block;margin:10px 0 2px">Fielding Assessment · ${avgRatingObj(m.fieldingRatings).toFixed(1)}/10 avg</b>${metricRows(m.fieldingRatings)}`:""}<p style="margin-top:8px">${esc(m.notes||"—")}</p></div>
  <h2>Team Review</h2><div class="card"><p><b>Rating:</b> ${esc(m.teamRating||"—")}/10</p><p>${esc(m.teamNotes||"—")}</p></div>
  <h2>Key Learnings &amp; Training Actions</h2>${matchActionsReportHtml(m)}`;
- reportShell(`${esc(m.team||"Team")} vs ${esc(m.opp||"Opposition")}`,`${esc(matchDateStr(m))}${matchDayCount(m)>1?" ("+matchDayCount(m)+" days)":""} · Automatic Match Report`,body);
+ _rptMast={k:"Match report"+(m.team?" · "+esc(m.team):""),t:`${esc(m.team||"Team")} vs ${esc(m.opp||"Opposition")}`};reportShell(`${esc(m.team||"Team")} vs ${esc(m.opp||"Opposition")}`,`${esc(matchDateStr(m))}${matchDayCount(m)>1?" ("+matchDayCount(m)+" days)":""} · Automatic Match Report`,body);
 }
 /* ===== End Match Centre ===== */
 /* ===== Teams, Tournaments & Seasons ===== */
@@ -8883,7 +8895,8 @@ function reflectionTakeawayText(r){return[(r.takeawayThemes||[]).join(", "),r.le
 function reflectionNextFocusText(r){return[(r.nextFocusThemes||[]).join(", "),r.next].filter(Boolean).join(" — ")}
 function venueOptions(){let venues=[...new Set([...activeSessions().map(s=>s.venue),...db.matches.map(m=>m.venue)].filter(Boolean))];return venues.map(v=>`<option value="${esc(v)}">`).join("")}
 let _rptMast=null;
-function reportShell(title,sub,body,onClose){let _x=_rptExtras,_m=_rptMast;_rptMast=null;setPrintTitle(title);modal(`<div class="sheetHead noPrint"><h2>${title}</h2><button class="x" onclick="${onClose||"closeM()"}">×</button></div><div class="report">${_m?`<div class="rptMast rptCover"><small>${_m.k}</small><div class="rptT">${_m.t}</div><p>${sub}</p></div>`:`<h1>${title}</h1><div class="muted">${sub}</div>`}${_rptExtras?_rptExtras.cover:""}${body}${_rptExtras?_rptExtras.next:""}<div class="reportActions noPrint"><button class="btn primary" onclick="printReport()">Print / Save PDF</button></div></div>`);try{rptPrintPicker()}catch(e){console.warn(e)}_rptExtras=null}
+function rptAutoMast(title){let t=String(title||""),plain=t.replace(/<[^>]*>/g,"");if(!/Report|Analytics|Progress Summary|Roster|Squad strengths/.test(plain)||/^INV/i.test(plain))return null;let i=t.indexOf(" — ");return i>0?{k:t.slice(0,i),t:t.slice(i+3)}:{k:"ProCoach OS",t:t}}
+function reportShell(title,sub,body,onClose){let _x=_rptExtras,_m=_rptMast||rptAutoMast(title);_rptMast=null;if(_m)body=String(body).replace(/<h2>/g,'<h2 class="rsh">');setPrintTitle(title);modal(`<div class="sheetHead noPrint"><h2>${title}</h2><button class="x" onclick="${onClose||"closeM()"}">×</button></div><div class="report">${_m?`<div class="rptMast rptCover"><small>${_m.k}</small><div class="rptT">${_m.t}</div><p>${sub}</p></div>`:`<h1>${title}</h1><div class="muted">${sub}</div>`}${_rptExtras?_rptExtras.cover:""}${body}${_rptExtras?_rptExtras.next:""}<div class="reportActions noPrint"><button class="btn primary" onclick="printReport()">Print / Save PDF</button></div></div>`);try{rptPrintPicker()}catch(e){console.warn(e)}_rptExtras=null}
 /* ===== Print options: choose which sections print (all reports) ===== */
 const RPT_SUMMARY_KEEP=/^(overview|key takeaways|season story|match performance|tournament performance|team performance|compared|goal progress|focus and evidence|what worked|training and results|skill changes|selection notes|most improved|next focus|camp pathway|after the camp|selection outcome)/i;
 function rptPrefKey(){let h=sheet.querySelector(".report h1");return h?h.textContent.split(" — ")[0].trim():"report"}
@@ -9359,7 +9372,7 @@ function buildMonthlyReport(){
   let rows=[["Sessions",rptArrow(ps.length,ss.length,true,x=>x.toFixed(0))],["Hours",rptArrow(ph,hrs,true)],["Assessments",rptArrow(pa.length,aa.length,true,x=>x.toFixed(0))],["Matches",rptArrow(pm.length,mm.length,true,x=>x.toFixed(0))],["Win rate",rptArrow(wr(pm),wr(mm),true,x=>Math.round(x),"%")]].filter(x=>x[1]);
   let extra=(ps.length||pa.length||pm.length)&&rows.length?`<div class="muted" style="margin-top:10px">Compared with ${esc(fmtMonthKey(pk))}</div>${rows.map(x=>`<div style="display:flex;justify-content:space-between;gap:10px;padding:3px 0"><span>${x[0]}</span><span>${x[1]}</span></div>`).join("")}`:"";
   let o={label:"Monthly Coaching Report"+(mTeam?" — "+mTeam:""),period:fmtMonthKey(mk),matches:mm,sessions:ss,extra};setReportExtras(reportCoverHtml(o),reportNextHtml(o))}
- reportShell("Monthly Coaching Report"+(mTeam?" — "+esc(mTeam):""),fmtMonthKey(mk),`<div class="grid g4"><div class="card stat"><span>Sessions</span><b>${ss.length}</b></div><div class="card stat"><span>Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Assessments</span><b>${aa.length}</b></div><div class="card stat"><span>Reflections</span><b>${rr.length}</b></div></div>${vzMonthWeeks(ss)}${mm.length?`${vzRecordFor(mm)}<h2>Match Performance</h2>${matchPerfHtml(mm)}${trainingResultsHtml(ss,mm)}`:""}<h2>Sessions</h2>${ss.length?ss.map(s=>`<div class="card"><b>${esc(fmtDate(s.date))} · ${esc(s.title||sessionLabel(s))}</b> <span class="tag">${esc(sessionTypeLabel(s.sessionType))}</span>${sessFocusHtml(s)}<p>${esc(s.objectives||"")}</p></div>`).join(""):empty("No sessions in this month.")}<h2>Assessments</h2>${aa.length?aa.map(a=>`<div class="card"><b>${esc(a.player)} · ${assessmentAvg(a)}/10</b><p>${esc(a.priority||"")}</p></div>`).join(""):empty("No assessments in this month.")}<h2>Match actions</h2>${mm.filter(m=>m.actions||m.notes||matchActionItems(m).length).length?mm.filter(m=>m.actions||m.notes||matchActionItems(m).length).map(m=>`<div class="card"><b>${esc(m.team)} vs ${esc(m.opp)}</b><p>${esc(m.actions||m.notes||"")}</p></div>`).join(""):empty("No match notes in this month.")}`)}
+ _rptMast={k:"Monthly coaching report"+(mTeam?" · "+esc(mTeam):""),t:esc(fmtMonthKey(mk))};reportShell("Monthly Coaching Report"+(mTeam?" — "+esc(mTeam):""),fmtMonthKey(mk),`<div class="grid g4"><div class="card stat"><span>Sessions</span><b>${ss.length}</b></div><div class="card stat"><span>Hours</span><b>${hrs.toFixed(1)}</b></div><div class="card stat"><span>Assessments</span><b>${aa.length}</b></div><div class="card stat"><span>Reflections</span><b>${rr.length}</b></div></div>${vzMonthWeeks(ss)}${mm.length?`${vzRecordFor(mm)}<h2>Match Performance</h2>${matchPerfHtml(mm)}${trainingResultsHtml(ss,mm)}`:""}<h2>Sessions</h2>${ss.length?ss.map(s=>`<div class="card"><b>${esc(fmtDate(s.date))} · ${esc(s.title||sessionLabel(s))}</b> <span class="tag">${esc(sessionTypeLabel(s.sessionType))}</span>${sessFocusHtml(s)}<p>${esc(s.objectives||"")}</p></div>`).join(""):empty("No sessions in this month.")}<h2>Assessments</h2>${aa.length?aa.map(a=>`<div class="card"><b>${esc(a.player)} · ${assessmentAvg(a)}/10</b><p>${esc(a.priority||"")}</p></div>`).join(""):empty("No assessments in this month.")}<h2>Match actions</h2>${mm.filter(m=>m.actions||m.notes||matchActionItems(m).length).length?mm.filter(m=>m.actions||m.notes||matchActionItems(m).length).map(m=>`<div class="card"><b>${esc(m.team)} vs ${esc(m.opp)}</b><p>${esc(m.actions||m.notes||"")}</p></div>`).join(""):empty("No match notes in this month.")}`)}
 function playerReport(){
  if(!activePlayers().length){alert("Add a player first.");return}
  modal(`<div class="sheetHead"><h2>Player Development Report</h2><button class="x" onclick="closeM()">×</button></div>
@@ -9434,7 +9447,7 @@ function buildPlayerReport(){
   goalProgressHtml=`<h2>Goal Progress</h2><div class="card"><p>${esc(p.focus||"Goal")}</p><p class="muted" style="margin-top:4px">Set ${esc(fmtDate(p.goalSetDate))} · Target ${esc(fmtDate(p.goalTargetDate))} · ${daysLeft>=0?`${daysLeft} day${daysLeft!==1?"s":""} remaining`:`${Math.abs(daysLeft)} day${Math.abs(daysLeft)!==1?"s":""} overdue`}</p>${progressRows.length?progressRows.map(([d,t])=>{let diff=(t.last-t.first).toFixed(1);let sign=t.last>=t.first?"+":"";let color=t.last>=t.first?"var(--g)":"var(--red)";return `<div style="margin-top:8px"><b>${esc(d)}:</b> ${t.first.toFixed(1)} → ${t.last.toFixed(1)} <span style="color:${color};font-weight:700">(${sign}${diff})</span></div>`}).join(""):`<p class="muted" style="margin-top:8px">Log at least 2 assessments since this goal was set to see progress.</p>`}</div>`;
  }
  let _S=playerStory(p,aa,matches,disciplineTrend,attendanceRate),_pn=playerCoverNext(p,latest,matches,_S,aa);setReportExtras(_pn.cover,_pn.next);let _plFocus=playerFocusEvidenceHtml(p,latest,_S),_plSkill=playerSkillChangesHtml(_S);
- reportShell("Player Development Report",`${p.name} · ${p.role||"Player"}${(from||to)?" · "+rangeLabel(from,to):""}`,
+ _rptMast={k:"Player development report"+(p.team?" · "+esc(p.team):""),t:esc(p.name)};reportShell("Player Development Report",`${p.name} · ${p.role||"Player"}${(from||to)?" · "+rangeLabel(from,to):""}`,
  `<div class="grid g4">
  <div class="card stat"><span>Assessments</span><b>${aa.length}</b></div>
  <div class="card stat"><span>Latest Overall</span><b>${latest?(assessmentAvg(latest)==="—"?"Technique only":assessmentAvg(latest)+"/10"):"—"}</b></div>
