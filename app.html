@@ -210,6 +210,8 @@ input[type=range]{accent-color:var(--g);width:100%;height:6px;padding:0;backgrou
 .asSk{display:flex;align-items:center;gap:8px;padding:6px 10px;border-top:1px solid var(--line);font-size:var(--fs-3)}.asSk>span{flex:1;min-width:0;overflow-wrap:anywhere}.asBar{width:64px;height:6px;border-radius:9px;background:rgba(128,128,128,.25);overflow:hidden;flex:none}.asBar b{display:block;height:100%}.asSk em{font-style:normal;width:22px;text-align:right;font-weight:700}.asSk u{text-decoration:none;width:38px;text-align:right;font-size:11px}.asTog{cursor:pointer}
 .asD{font-size:11px;font-weight:700;white-space:nowrap}.asD.up{color:var(--g2)}.asD.dn{color:var(--red)}.asD.fl{color:var(--muted)}.asNote{font-size:var(--fs-3);margin-top:8px;color:var(--muted)}.asNote b{color:var(--ink)}
 .asCmp{width:100%;border-collapse:collapse;font-size:var(--fs-3)}.asCmp th,.asCmp td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line)}
+.csG2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}.csG2:has(>.csBx:only-child){grid-template-columns:1fr}.csBx{border:1px solid var(--line);border-radius:12px;overflow:hidden;break-inside:avoid}.csBh{display:flex;justify-content:space-between;gap:8px;background:var(--mint);padding:7px 12px;font-weight:800;font-size:var(--fs-4)}
+.csSub{padding:8px 12px 2px;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}.csS1{color:var(--g)}.csS2{color:var(--gold)}.csR{display:flex;justify-content:space-between;gap:8px;padding:3px 12px;font-size:var(--fs-3)}.csR span{min-width:0;overflow-wrap:anywhere}.csR b{white-space:nowrap}.csHr{height:1px;background:var(--line);margin:6px 12px}
 .delRow{display:block!important;min-width:0}.delRow+.delRow{margin-top:8px}.delRow .dn{display:block;min-width:0;overflow-wrap:anywhere;word-break:break-word;margin-bottom:8px}.delRow .da{display:flex;flex-wrap:wrap;gap:6px}.delRow .da .btn{flex:1 1 auto;min-width:0;white-space:normal}
 @media(max-width:640px){.card{padding:14px;border-radius:16px}.item{padding:11px 12px;border-radius:12px}.section{margin:20px 0 10px}.hero{margin-bottom:16px}}
 @media print{.pTab{display:block!important}.pTabs{display:none!important}.fbar{position:static}.chipRow,.moreBtn{display:none}}
@@ -11945,6 +11947,17 @@ function campHoursByType(c){
  });
  return{by,total,blocks,mat};
 }
+function campSkillBoxesHtml(d){
+ let by=d.skillsBy||{},dv=k=>{let x=(d.disc||[]).find(y=>y.k===k);return x?x.v.toFixed(1):""};
+ let split=L=>{let n=Math.min(3,Math.floor(L.length/2));if(n<1)return null;return {s:L.slice(0,n),w:L.slice(-n).reverse()}};
+ let li=x=>`<div class="csR"><span>${esc(x.k)}</span><b>${x.v.toFixed(1)}</b></div>`;
+ let box=k=>{let sp=by[k]&&split(by[k]);if(!sp)return "";return `<div class="csBx"><div class="csBh"><span>${esc(k)}</span>${dv(k)?`<span class="muted">avg ${dv(k)}</span>`:""}</div><div class="csSub csS1">Strongest</div>${sp.s.map(li).join("")}<div class="csHr"></div><div class="csSub csS2">Needs work</div>${sp.w.map(li).join("")}<div style="height:6px"></div></div>`};
+ let bx=["Batting","Bowling"].map(box).join("");
+ let line=k=>{let sp=by[k]&&split(by[k]);if(!sp)return "";let f=x=>esc(x.k)+" "+x.v.toFixed(1);return `<p style="margin:6px 0 0;font-size:13px"><b>${esc(k)}</b> · Strongest: ${sp.s.map(f).join(", ")} · Needs work: ${sp.w.map(f).join(", ")}</p>`};
+ let ln=["Fielding","Wicketkeeping"].map(line).join("");
+ if(!bx&&!ln)return "";
+ return `${bx?`<div class="csG2">${bx}</div>`:""}${ln}`;
+}
 function campSummaryData(c){
  let names=campRevNames(c),days=campDays(c),end=c.endDate||c.startDate,d={names,P:names.length,days:days.length,groups:(c.batches||[]).length>1?c.batches.length:0};
  d.hours=campHoursByType(c);
@@ -11956,13 +11969,14 @@ function campSummaryData(c){
  let multi=Object.entries(per).filter(([n,v])=>v.length>1);
  d.firstAvg=null;d.lastAvg=null;d.improvers=[];
  if(multi.length){d.firstAvg=multi.reduce((a,[n,v])=>a+v[0],0)/multi.length;d.lastAvg=multi.reduce((a,[n,v])=>a+v[v.length-1],0)/multi.length;d.improvers=multi.map(([n,v])=>({n,d:v[v.length-1]-v[0],last:v[v.length-1]})).sort((a,b)=>b.d-a.d).slice(0,3).filter(x=>x.d>0.04)}
- let disc={},skill={};
+ let disc={},skill={},skillBy={};
  as.forEach(a=>{try{assessmentDisciplines(a).forEach(dn=>{let v=Number(disciplineAvg(a,dn));if(Number.isFinite(v))(disc[dn]=disc[dn]||[]).push(v);
   let vals=(a.ratings&&a.ratings[dn])||[],labels=(dn==="Bowling"&&vals.length===10)?legacyBowlingSkills:allSkillsFor(dn);
-  vals.forEach((x,i)=>{x=Number(x);if(x>0&&labels[i])(skill[labels[i]]=skill[labels[i]]||[]).push(x)})})}catch(e){}});
+  vals.forEach((x,i)=>{x=Number(x);if(x>0&&labels[i]){(skill[labels[i]]=skill[labels[i]]||[]).push(x);((skillBy[dn]=skillBy[dn]||{})[labels[i]]=(skillBy[dn][labels[i]]||[])).push(x)}})})}catch(e){}});
  let avg=a=>a.reduce((x,y)=>x+y,0)/a.length;
  d.disc=Object.entries(disc).map(([k,v])=>({k,v:avg(v)})).sort((a,b)=>b.v-a.v);
  d.skills=Object.entries(skill).filter(([k,v])=>v.length>=3).map(([k,v])=>({k,v:avg(v)})).sort((a,b)=>b.v-a.v);
+ d.skillsBy={};Object.keys(skillBy).forEach(dn=>{let L=Object.entries(skillBy[dn]).filter(([k,v])=>v.length>=3).map(([k,v])=>({k,v:avg(v)})).sort((a,b)=>b.v-a.v);if(L.length)d.skillsBy[dn]=L});
  // attendance recorded in sessions
  let ss=db.sessions.filter(x=>x.campId===c.id&&!x.deletedAt&&x.date<=today()&&(x.attendees||[]).length);
  d.attSessions=ss.length;d.attAvg=ss.length&&d.P?ss.reduce((a,x)=>a+Math.min(x.attendees.length,d.P),0)/ss.length:0;
@@ -12033,7 +12047,7 @@ function campSummaryReport(id){
  ${d.themes.length?`<div style="margin-top:8px">${d.themes.map(x=>`<span class="tag">Day ${x.i+1}: ${esc(x.t)}</span>`).join(" ")}</div>`:""}
  ${d.assessed?`<h2>Assessments</h2><p>${d.assessed} of ${d.P} players assessed (${d.nAssess} assessment${d.nAssess===1?"":"s"})${d.firstAvg!==null?` · squad average ${d.firstAvg.toFixed(1)} → ${d.lastAvg.toFixed(1)}`:""}</p>
   ${d.disc.length>=2?vzHBars(d.disc.map(x=>({l:x.k,v:x.v,c:vzCol(x.v)})),10," /10"):d.disc.length?`<div>${d.disc.map(x=>`<span class="tag">${esc(x.k)} ${x.v.toFixed(1)}</span>`).join(" ")}</div>`:""}
-  ${d.skills.length>=4?`<p style="margin:8px 0 0"><b>Strongest skills:</b> ${d.skills.slice(0,3).map(x=>esc(x.k)+" "+x.v.toFixed(1)).join(", ")}<br><b>Needs work:</b> ${d.skills.slice(-3).reverse().map(x=>esc(x.k)+" "+x.v.toFixed(1)).join(", ")}</p>`:""}
+  ${campSkillBoxesHtml(d)}
   ${(o.names&&d.improvers.length)?`<p style="margin:8px 0 0"><b>Biggest improvers:</b> ${d.improvers.map(x=>esc(x.n)+" +"+x.d.toFixed(1)).join(", ")}</p>`:""}`:""}
  ${d.attSessions?`<h2>Participation</h2><p>Across ${d.attSessions} session${d.attSessions===1?"":"s"} with attendance recorded, an average of <b>${Math.round(d.attAvg)} of ${d.P}</b> players (${Math.round(d.attAvg/d.P*100)}%) attended.</p>`:""}
  ${d.decided?`<h2>Selection outcome</h2><div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">${stat("In",d.rev.in)}${stat("Maybe",d.rev.maybe)}${stat("Out",d.rev.out)}${stat("Avg rating",d.rated?d.revAvg.toFixed(1):"—")}</div>
