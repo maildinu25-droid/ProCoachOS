@@ -8108,16 +8108,6 @@ function campPathwayHtml(roster){
  if(!rows.length)return "";
  let sel=rows.filter(r=>camps.some(c=>c.review[r.p.name]&&c.review[r.p.name].rec==="in")).length;
  return `<h2>Camp Pathway</h2><div class="card"><div class="muted" style="margin-bottom:6px">${rows.length} of ${roster.length} players were reviewed at a camp; ${sel} selected (In) at least once.</div><div class="rptCols">${rows.map(r=>`<div style="padding:2px 0"><span>${esc(r.p.name)}</span><div class="muted" style="font-size:12px">${r.hits.join(" · ")}</div></div>`).join("")}</div></div>`}
-function campAfterHtml(c){
- let end=c.endDate||c.startDate;if(!end||!c.review)return "";
- let names=Object.keys(c.review);let inN=names.filter(n=>c.review[n].rec==="in"),otN=names.filter(n=>c.review[n].rec!=="in"&&(c.review[n].rec||c.review[n].r));
- if(!inN.length||!otN.length)return "";
- let after=db.matches.filter(m=>m.date>end);if(!after.length)return "";
- let P=matchStatsAgg(after).players;
- let grp=ns=>{let r={n:0,inns:0,runs:0,outs:0,w:0,ob:0,rc:0};ns.forEach(n=>{let a=P.find(x=>sameName(x.name,n));if(a&&(a.inns||a.bowlInns)){r.n++;r.inns+=a.inns;r.runs+=a.runs;r.outs+=a.outs;r.w+=a.w;r.ob+=a.ob;r.rc+=a.rc}});return r};
- let a=grp(inN),b=grp(otN);if(!a.n&&!b.n)return "";
- let txt=(g,l)=>g.n?`<div style="padding:4px 0"><b>${l}</b> · ${g.n} player${g.n!==1?"s":""} with scores<div class="muted">${g.inns?`${g.runs} runs in ${g.inns} innings (avg ${g.outs?(g.runs/g.outs).toFixed(1):"n/o"})`:"No batting entries"} · ${g.ob?`${g.w} wkts, econ ${(g.rc*6/g.ob).toFixed(2)}`:"No bowling entries"}</div></div>`:"";
- return `<h2>After the Camp</h2><div class="card"><div class="muted" style="margin-bottom:6px">Matches played after ${esc(fmtDate(end))}, by camp selection outcome.</div>${txt(a,"Selected (In)")}${txt(b,"Maybe / Out / other")}</div>`}
 function playerSkillSeries(aa){
  let sk=[];Object.keys(skillSets).forEach(d=>{allSkillsFor(d).forEach((name,i)=>{
   let ser=aa.filter(a=>assessmentDisciplines(a).includes(d)&&a.ratings&&Array.isArray(a.ratings[d])).map(a=>Number(a.ratings[d][i])).filter(v=>Number.isFinite(v)&&v>0);
@@ -12053,7 +12043,6 @@ function campSummaryReport(id){
  ${d.decided?`<h2>Selection outcome</h2><div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px">${stat("In",d.rev.in)}${stat("Maybe",d.rev.maybe)}${stat("Out",d.rev.out)}${stat("Avg rating",d.rated?d.revAvg.toFixed(1):"—")}</div>
   ${campSelBarHtml(d.rev,true)}
   ${(d.goodTags.length||d.badTags.length)?`<div class="rgrid2" style="margin-top:12px"><div class="rbox"><div class="csK">Common strengths</div>${d.goodTags.map(x=>`<span class="csChip g">${esc(x[0])} ×${x[1]}</span>`).join("")||'<span class="muted">—</span>'}</div><div class="rbox"><div class="csK">Common work-ons</div>${d.badTags.map(x=>`<span class="csChip a">${esc(x[0])} ×${x[1]}</span>`).join("")||'<span class="muted">—</span>'}</div></div>`:""}${names}`:""}
- ${campAfterHtml(c)}
  <h2>Next steps</h2><div class="sumEdit noPrint"><textarea rows="3" placeholder="Optional: what happens next, e.g. Camp 2 squad announced on 5 Nov." onchange="campSumSave('${c.id}','sumNext',this)" style="width:100%">${esc(c.sumNext||"")}</textarea></div><p class="printOnly" id="sum_sumNext" style="white-space:pre-wrap">${esc(c.sumNext||"")}</p>
  ${o.sched?`<h2>Schedule</h2>${campSheetTable(c)}`:""}
  <div class="noPrint" style="margin-top:12px"><button class="btn secondary" onclick="campSumShare('${c.id}')">Share / copy as text</button></div>`;
