@@ -8487,11 +8487,16 @@ function buildTournamentReport(forceId){
   if(bfR.length)bl.push(`Batting first: ${bfR.length} match${bfR.length===1?"":"es"}, avg ${avgR(bfR)}${T.bfN?` · won ${T.bfW}`:""}`);
   if(chR.length)bl.push(`Chasing: ${chR.length} match${chR.length===1?"":"es"}, avg ${avgR(chR)}${T.chN?` · won ${T.chW}`:""}`);
   if(T.hi!==null)bl.push(`Highest total ${T.hi} · lowest ${T.lo}`);
+  if(T.hasBat){let ro=PL.reduce((x,q)=>x+q.runs,0),ou=PL.reduce((x,q)=>x+q.outs,0),ba=PL.reduce((x,q)=>x+q.balls,0),f5=PL.reduce((x,q)=>x+q.f50,0),f1=PL.reduce((x,q)=>x+q.f100,0);
+   bl.push(`Batting average ${ou?(ro/ou).toFixed(1):"n/o"}${ba?` · strike rate ${(ro*100/ba).toFixed(0)}`:""}`);
+   if(f5||f1)bl.push(`${f5} fifties${f1?` · ${f1} hundreds`:""}`);
+   if(!T.scoredN)bl.push(`${ro} runs from the batters · ${Math.round(ro/matches.length)} a match`)}
+  if(T.scoredN&&!bfR.length&&!chR.length)bl.push(`<span class="muted">Set "Batted first / second" on each match to see first-innings vs chasing.</span>`);
   let bw=[];
   if(T.hasBowl){bw.push(`Wickets: ${T.wkts}${T.ob?` · economy ${(T.rc*6/T.ob).toFixed(2)}`:""}`);let bb=PL.filter(p=>p.bw>=0&&p.bowlInns).sort((a,b)=>b.bw-a.bw||a.br-b.br)[0];if(bb&&bb.bw>0)bw.push(`Best figures: ${esc(bb.name)} ${bb.bw}/${bb.br}`)}
   if(T.scoredN)bw.push(`Runs conceded: ${T.againstRuns} (${Math.round(T.againstRuns/T.scoredN)} a match)`);
   let bx=(ttl,sub,L)=>L.length?`<div class="csBx"><div class="csBh"><span>${ttl}</span><span class="muted">${sub}</span></div><div style="padding:6px 12px;line-height:1.7;font-size:var(--fs-3)">${L.join("<br>")}</div></div>`:"";
-  boxes=bx("Batting",T.scoredN?`${Math.round(T.forRuns/T.scoredN)} a match`:"",bl)+bx("Bowling",T.hasBowl&&T.ob?`econ ${(T.rc*6/T.ob).toFixed(2)}`:"",bw);
+  boxes=bx("Batting",T.scoredN?`${Math.round(T.forRuns/T.scoredN)} a match`:(T.hasBat?`${Math.round(PL.reduce((x,q)=>x+q.runs,0)/matches.length)} a match`:""),bl)+bx("Bowling",T.hasBowl&&T.ob?`econ ${(T.rc*6/T.ob).toFixed(2)}`:"",bw);
  }
  let trends=boxes?`<h2>Team trends</h2><div class="csG2">${boxes}</div>`:"";
  /* fielding */
