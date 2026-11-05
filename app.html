@@ -212,6 +212,10 @@ input[type=range]{accent-color:var(--g);width:100%;height:6px;padding:0;backgrou
 .asCmp{width:100%;border-collapse:collapse;font-size:var(--fs-3)}.asCmp th,.asCmp td{text-align:left;padding:5px 6px;border-bottom:1px solid var(--line)}
 .csG2{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:10px}.csG2:has(>.csBx:only-child){grid-template-columns:1fr}.csBx{border:1px solid var(--line);border-radius:12px;overflow:hidden;break-inside:avoid}.csBh{display:flex;justify-content:space-between;gap:8px;background:var(--mint);padding:7px 12px;font-weight:800;font-size:var(--fs-4)}
 .csSub{padding:8px 12px 2px;font-size:10.5px;font-weight:800;letter-spacing:.06em;text-transform:uppercase}.csS1{color:var(--g)}.csS2{color:var(--gold)}.csR{display:flex;justify-content:space-between;gap:8px;padding:3px 12px;font-size:var(--fs-3)}.csR span{min-width:0;overflow-wrap:anywhere}.csR b{white-space:nowrap}.csHr{height:1px;background:var(--line);margin:6px 12px}
+.trTiles{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}.trTiles div{flex:1 1 90px;border:1px solid var(--line);border-radius:12px;padding:8px 6px;text-align:center}.trTiles b{display:block;font-size:19px;overflow-wrap:anywhere}.trTiles span{font-size:10px;text-transform:uppercase;color:var(--muted);letter-spacing:.04em}
+.trStrip{display:flex;gap:3px;margin-top:8px}.trStrip i{flex:1;height:22px;border-radius:5px;font-style:normal;color:#fff;text-align:center;line-height:22px;font-size:11px;font-weight:800;background:#9aa5a0}.trStrip i.W{background:#10b981}.trStrip i.L{background:#ef5350}.trStrip i.U{background:transparent;color:var(--muted);border:1px dashed var(--muted);font-weight:600}
+.trAw{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:8px}.trAw div{border:1px solid var(--line);border-radius:12px;padding:9px}.trAw small{display:block;font-size:9.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--gold);font-weight:800}.trAw b{display:block;margin-top:3px;font-size:var(--fs-4)}.trAw span{font-size:var(--fs-3)}
+.trRes{font-weight:800}.trRes.w{color:var(--g)}.trRes.l{color:var(--red)}.trRes.u{color:var(--muted)}.trG{color:var(--g);font-weight:700}.trY{color:var(--gold);font-weight:700}
 .delRow{display:block!important;min-width:0}.delRow+.delRow{margin-top:8px}.delRow .dn{display:block;min-width:0;overflow-wrap:anywhere;word-break:break-word;margin-bottom:8px}.delRow .da{display:flex;flex-wrap:wrap;gap:6px}.delRow .da .btn{flex:1 1 auto;min-width:0;white-space:normal}
 @media(max-width:640px){.card{padding:14px;border-radius:16px}.item{padding:11px 12px;border-radius:12px}.section{margin:20px 0 10px}.hero{margin-bottom:16px}}
 @media print{.pTab{display:block!important}.pTabs{display:none!important}.fbar{position:static}.chipRow,.moreBtn{display:none}}
@@ -7270,6 +7274,7 @@ ${matchSectionHead("details","Match Details",true)}
 <label>Venue<input name="venue" list="venueDatalist" value="${esc(m.venue||"")}"><datalist id="venueDatalist">${venueOptions()}</datalist></label>
 <label>Format<select name="format" onchange="matchFormatChanged(this.value)">${MATCH_FORMATS.map(f=>`<option ${m.format===f?"selected":""}>${f}</option>`).join("")}</select></label>
 <label>Tournament <span class="muted" style="font-weight:400">(optional)</span><select name="tournamentId"><option value="">None</option>${db.tournaments.map(t=>`<option value="${t.id}" ${m.tournamentId===t.id?"selected":""}>${esc(t.name)}</option>`).join("")}</select></label>
+<label>Round / stage <span class="muted" style="font-weight:400">(optional)</span><input name="stage" list="matchStageList" value="${esc(m.stage||"")}" placeholder="Group, Semi-final…"><datalist id="matchStageList"><option>Group</option><option>Super 8</option><option>Quarter-final</option><option>Semi-final</option><option>Final</option></datalist></label>
 </div>
 ${matchSectionHead("foundation","Toss & Conditions",false)}
 <div class="formgrid" id="matchSec-foundation" style="display:none;margin-top:10px">
@@ -7663,6 +7668,7 @@ function orgEntityFormHtml(kind,e,mode){
  ${kind==="team"?`<label class="full">Category / Age group<input name="category" value="${esc(e.category||"")}" placeholder="e.g. U17, Senior, 1st XI"></label>`:""}
  ${kind==="season"?`<label class="full">Team <span class="muted" style="font-weight:400">(optional, but recommended — scopes session/match counts to this team only)</span><select name="team"><option value="">No specific team</option>${db.teams.map(t=>`<option value="${esc(t.name)}" ${e.team===t.name?"selected":""}>${esc(t.name)}</option>`).join("")}</select></label>`:""}
  ${showDates?`<label>Start date<input type="date" name="startDate" value="${esc(e.startDate||"")}"></label><label>End date<input type="date" name="endDate" value="${esc(e.endDate||"")}"></label>`:""}
+ ${kind==="tournament"?`<label>Stage reached / result <span class="muted" style="font-weight:400">(optional)</span><input name="stageReached" list="trStageList" value="${esc(e.stageReached||"")}" placeholder="e.g. Semi-final, Winners"><datalist id="trStageList"><option>Group stage</option><option>Super 8</option><option>Quarter-final</option><option>Semi-final</option><option>Final</option><option>Runners-up</option><option>Winners</option></datalist></label><label>Player of the tournament <span class="muted" style="font-weight:400">(optional)</span><select name="potId"><option value="">None</option>${(()=>{let sq=(e.squadPlayerIds||[]).map(id=>db.players.find(x=>x.id===id)).filter(Boolean),L=sq.length?sq:activePlayers();return L.map(x=>`<option value="${esc(x.id)}" ${e.potId===x.id?"selected":""}>${esc(x.name)}</option>`).join("")})()}</select></label>`:""}
  <label class="full">Notes<textarea name="notes">${esc(e.notes||"")}</textarea></label>
  </div>
  <button class="btn primary">Save ${title}</button>
@@ -7694,7 +7700,7 @@ function saveOrgEntity(e,kind){
   if(idx>-1){
    let oldName=db[listKey][idx].name;
    obj.id=editingOrgId;
-   db[listKey][idx]=obj;
+   db[listKey][idx]=Object.assign({},db[listKey][idx],obj);
    if(kind==="team"&&oldName!==obj.name)cascadeTeamRename(oldName,obj.name);
   }
  } else {
@@ -8429,31 +8435,104 @@ function tournamentReport(){
  if(!db.tournaments.length){alert("Add a tournament first (Teams & Seasons).");return}
  modal(`<div class="sheetHead"><h2>Tournament Report</h2><button class="x" onclick="closeM()">×</button></div><label>Select tournament<select id="reportTournament">${db.tournaments.map(t=>`<option value="${t.id}">${esc(t.name)}</option>`).join("")}</select></label><button class="btn primary" style="margin-top:15px" onclick="buildTournamentReport()">Generate Report</button>`);
 }
-function buildTournamentReport(){
- let tid=document.getElementById("reportTournament").value;
+function tourLearnedSave(id,el){let t=db.tournaments.find(x=>x.id===id);if(!t)return;t.learned=el.value;persistQuiet();let q=document.getElementById("tourLearnedPrint");if(q)q.textContent=el.value}
+function tourLearnedReset(id){let t=db.tournaments.find(x=>x.id===id);if(!t)return;delete t.learned;persistQuiet();buildTournamentReport(id)}
+function tourMatchStars(m){
+ let bat=(m.battingReview||[]).filter(r=>r&&r.name&&Number(r.runs)>0).sort((a,b)=>Number(b.runs)-Number(a.runs))[0];
+ let bowl=(m.bowlingReview||[]).filter(r=>r&&r.name&&Number(r.wickets)>0).sort((a,b)=>Number(b.wickets)-Number(a.wickets)||(Number(a.runs)||0)-(Number(b.runs)||0))[0];
+ let L=[];
+ if(bat)L.push(esc(String(bat.name).split(" ")[0])+" "+esc(bat.runs)+(isOutText(bat.dismissal)||!String(bat.dismissal||"").trim()?"":"*"));
+ if(bowl)L.push(esc(String(bowl.name).split(" ")[0])+" "+esc(bowl.wickets)+"/"+esc(bowl.runs||0));
+ let miss=(+m.missed||0)||(m.fieldingReview||[]).reduce((a,r)=>a+(+r.drops||0),0);
+ return L.join(" · ")+(miss>0?`<div class="muted">${miss} catch${miss===1?"":"es"} dropped</div>`:"");
+}
+function buildTournamentReport(forceId){
+ let tid=forceId||document.getElementById("reportTournament").value;
  let t=db.tournaments.find(x=>x.id===tid);if(!t)return;
  let matches=db.matches.filter(m=>m.tournamentId===tid).slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
- let wins=matches.filter(m=>matchResultOutcome(m)==="Win").length;
- let losses=matches.filter(m=>matchResultOutcome(m)==="Loss").length;
- let draws=matches.filter(m=>matchResultOutcome(m)==="Draw").length;
- let batAvgs=matches.map(m=>avgRatingObj(m.battingRatings)).filter(v=>v>0);
- let bowlAvgs=matches.map(m=>avgRatingObj(m.bowlingRatings)).filter(v=>v>0);
- let fieldAvgs=matches.map(m=>avgRatingObj(m.fieldingRatings)).filter(v=>v>0);
- let avgOf=arr=>arr.length?(arr.reduce((a,b)=>a+b,0)/arr.length).toFixed(1):"—";
- {let _sq=(t.squadPlayerIds||[]).map(id=>db.players.find(p=>p.id===id)).filter(Boolean);let o={label:"Tournament: "+t.name,period:(t.startDate||t.endDate)?(fmtDate(t.startDate)||"?")+" → "+(fmtDate(t.endDate)||"?"):"",matches,sessions:[],roster:_sq};setReportExtras(reportCoverHtml(o),reportNextHtml(o))}
+ let A=matchStatsAgg(matches),T=A.T,PL=A.players;
+ let wins=T.wins,losses=T.losses,draws=T.draws,dec=T.decided;
+ let sqPl=(t.squadPlayerIds||[]).map(id=>db.players.find(p=>p.id===id)).filter(Boolean);
+ {let o={label:"Tournament: "+t.name,period:(t.startDate||t.endDate)?(fmtDate(t.startDate)||"?")+" → "+(fmtDate(t.endDate)||"?"):"",matches,sessions:[],roster:sqPl};setReportExtras(reportCoverHtml(o),reportNextHtml(o))}
+ /* fixtures not yet played */
+ let upcoming=(t.fixtures||[]).filter(f=>!matches.some(m=>m.date===f.date)).slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")));
+ /* strip */
+ let cls=m=>({Win:"W",Loss:"L",Draw:"D",NR:"N"}[matchResultOutcome(m)]||"N");
+ let tiles=[[dec?`${wins}–${losses}${draws?"–"+draws:""}`:"—",draws?"Won–Lost–Drawn":"Won–Lost"],[dec?Math.round(wins/dec*100)+"%":"—","Win rate"]];
+ if(T.scoredN)tiles.push([T.forRuns,"Runs scored"],[T.againstRuns,"Conceded"]);
+ if(t.stageReached)tiles.push([esc(t.stageReached),"Stage reached"]);
+ let strip=matches.length||upcoming.length?`<div class="trStrip">${matches.map(m=>`<i class="${cls(m)}" title="${esc(m.opp||"")}">${cls(m)}</i>`).join("")}${upcoming.map(f=>`<i class="U" title="${esc(f.opponent||"")}">Next</i>`).join("")}</div>`:"";
+ let head=`<div class="trTiles">${tiles.map(([v,l])=>`<div><b>${v}</b><span>${l}</span></div>`).join("")}</div>${strip}`;
+ /* awards */
+ let pot=t.potId&&db.players.find(p=>p.id===t.potId);
+ let ts=PL.filter(p=>p.runs>0).sort((a,b)=>b.runs-a.runs||(b.outs?b.runs/b.outs:9e9)-(a.outs?a.runs/a.outs:9e9))[0];
+ let tw=PL.filter(p=>p.w>0).sort((a,b)=>b.w-a.w||(a.ob?a.rc/a.ob:9)-(b.ob?b.rc/b.ob:9))[0];
+ let bf=PL.filter(p=>p.ct+p.st+p.ro>0).sort((a,b)=>(b.ct+b.st+b.ro)-(a.ct+a.st+a.ro)||b.ct-a.ct)[0];
+ let aw=[];
+ if(ts)aw.push(["Top scorer",ts.name,`${ts.runs} runs${ts.outs||ts.inns?" · avg "+batAvgText(ts):""}`]);
+ if(tw)aw.push(["Top wicket-taker",tw.name,`${tw.w} wkts${tw.ob?" · econ "+econText(tw):""}`]);
+ if(bf){let c=[];if(bf.ct)c.push(bf.ct+" catch"+(bf.ct===1?"":"es"));if(bf.ro)c.push(bf.ro+" run-out"+(bf.ro===1?"":"s"));if(bf.st)c.push(bf.st+" stumping"+(bf.st===1?"":"s"));aw.push(["Best fielder",bf.name,c.join(" · ")])}
+ if(pot)aw.push(["Player of the tournament",pot.name,"Coach's pick"]);
+ let awHtml=aw.length?`<h2>Awards</h2><div class="trAw">${aw.map(([k,n,s])=>`<div><small>${esc(k)}</small><b>${esc(n)}</b><span class="muted">${esc(s)}</span></div>`).join("")}</div>`:"";
+ /* match log */
+ let rowsHtml=matches.map(m=>{let oc=matchResultOutcome(m),rc=oc==="Win"?"w":oc==="Loss"?"l":"u";return `<tr><td>${esc(matchDateStr(m))}</td><td>vs ${esc(m.opp||"Opposition")}${m.stage?`<div class="muted">${esc(m.stage)}</div>`:""}</td><td class="trRes ${rc}">${esc(m.result||"—")}</td><td>${matchScoreText(m)||"—"}</td><td>${tourMatchStars(m)||"—"}</td></tr>`}).join("")
+  +upcoming.map(f=>`<tr><td>${esc(fmtDate(f.date)||"?")}</td><td>vs ${esc(f.opponent||"Opposition")}</td><td class="trRes u">Upcoming</td><td>—</td><td>${f.venue?esc(f.venue):"—"}</td></tr>`).join("");
+ let logHtml=`<h2>Match log</h2>${rowsHtml?`<div class="rptTW"><table class="rptT" style="min-width:0"><tr><th>Date</th><th>Opposition</th><th>Result</th><th>Score</th><th>Stars</th></tr>${rowsHtml}</table></div>`:empty("No matches linked to this tournament yet.")}`;
+ /* team trends */
+ let boxes="";
+ if(matches.length){
+  let avgR=a=>a.length?Math.round(a.reduce((x,y)=>x+y,0)/a.length):null,bfR=[],chR=[];
+  matches.forEach(m=>{let tt=matchTotals(m),b=matchBattedFirst(m);if(!tt||b===null)return;(b?bfR:chR).push(tt.fr)});
+  let bl=[];
+  if(bfR.length)bl.push(`Batting first: ${bfR.length} match${bfR.length===1?"":"es"}, avg ${avgR(bfR)}${T.bfN?` · won ${T.bfW}`:""}`);
+  if(chR.length)bl.push(`Chasing: ${chR.length} match${chR.length===1?"":"es"}, avg ${avgR(chR)}${T.chN?` · won ${T.chW}`:""}`);
+  if(T.hi!==null)bl.push(`Highest total ${T.hi} · lowest ${T.lo}`);
+  let bw=[];
+  if(T.hasBowl){bw.push(`Wickets: ${T.wkts}${T.ob?` · economy ${(T.rc*6/T.ob).toFixed(2)}`:""}`);let bb=PL.filter(p=>p.bw>=0&&p.bowlInns).sort((a,b)=>b.bw-a.bw||a.br-b.br)[0];if(bb&&bb.bw>0)bw.push(`Best figures: ${esc(bb.name)} ${bb.bw}/${bb.br}`)}
+  if(T.scoredN)bw.push(`Runs conceded: ${T.againstRuns} (${Math.round(T.againstRuns/T.scoredN)} a match)`);
+  let bx=(ttl,sub,L)=>L.length?`<div class="csBx"><div class="csBh"><span>${ttl}</span><span class="muted">${sub}</span></div><div style="padding:6px 12px;line-height:1.7;font-size:var(--fs-3)">${L.join("<br>")}</div></div>`:"";
+  boxes=bx("Batting",T.scoredN?`${Math.round(T.forRuns/T.scoredN)} a match`:"",bl)+bx("Bowling",T.hasBowl&&T.ob?`econ ${(T.rc*6/T.ob).toFixed(2)}`:"",bw);
+ }
+ let trends=boxes?`<h2>Team trends</h2><div class="csG2">${boxes}</div>`:"";
+ /* fielding */
+ let fTaken=T.taken,fMiss=T.missed,fRo=T.runouts,fMf=T.misfields;
+ if(!T.fieldN){fTaken=PL.reduce((a,p)=>a+p.ct,0);fMiss=PL.reduce((a,p)=>a+p.dr,0);fRo=PL.reduce((a,p)=>a+p.ro,0);fMf=PL.reduce((a,p)=>a+p.mf,0)}
+ let fHtml="";
+ if(fTaken+fMiss+fRo+fMf>0){
+  let rate=(fTaken+fMiss)?Math.round(fTaken/(fTaken+fMiss)*100)+"%":"—",drops=matches.map(m=>({m,n:(+m.missed||0)||(m.fieldingReview||[]).reduce((a,r)=>a+(+r.drops||0),0)})).filter(x=>x.n>0);
+  fHtml=`<h2>Fielding</h2><div class="csG2"><div class="csBx"><div class="csBh"><span>Team fielding</span><span class="muted">${matches.length} match${matches.length===1?"":"es"}</span></div><div style="padding:6px 12px;line-height:1.7;font-size:var(--fs-3)">Catches taken: ${fTaken} · missed: ${fMiss}<br>Catch rate: ${rate}<br>Run-outs: ${fRo} · Misfields: ${fMf}</div></div>${drops.length?`<div class="csBx"><div class="csBh"><span>Dropped catches</span></div><div style="padding:6px 12px;line-height:1.7;font-size:var(--fs-3)">${drops.map(x=>`vs ${esc(x.m.opp||"Opposition")}: ${x.n}`).join("<br>")}</div></div>`:""}</div>`;
+ }
+ /* player table */
+ let names=[];sqPl.forEach(p=>names.push(p.name));PL.forEach(p=>{if(!names.some(n=>sameName(n,p.name)))names.push(p.name)});
+ let rowsP=names.map(n=>{
+  let pl=db.players.find(x=>sameName(x.name,n)&&!x.deletedAt),ag=PL.find(x=>sameName(x.name,n));
+  let games=matches.filter(m=>(m.playingXI||[]).some(x=>sameName(x,n))||(ag&&ag.mats[m.id])).length;
+  let bat=ag&&ag.inns?`${ag.runs} · avg ${batAvgText(ag)}${ag.balls?" · SR "+batSrText(ag):""}`:"—";
+  let bow=ag&&ag.bowlInns?`${ag.w} wkts${ag.ob?" · econ "+econText(ag):""}`:"—";
+  let fld=ag&&(ag.ct||ag.st||ag.ro)?[ag.ct?ag.ct+" ct":"",ag.st?ag.st+" st":"",ag.ro?ag.ro+" ro":""].filter(Boolean).join(" · "):"—";
+  let sw="";
+  if(pl){let sk=playerSkillSeries(playerAssessments(pl)).sort((a,b)=>b.last-a.last);if(sk.length>=4&&sk[0].last>sk[sk.length-1].last)sw=`<span class="trG">${esc(sk[0].name)}</span> · <span class="trY">${esc(sk[sk.length-1].name)}</span>`}
+  return {n,games,bat,bow,fld,sw:sw||`<span class="muted">Not enough data</span>`,sc:(ag?ag.runs+ag.w*20:0)};
+ }).sort((a,b)=>b.sc-a.sc);
+ let pHtml=rowsP.length?`<h2>Player performance</h2><div class="rptTW"><table class="rptT" style="min-width:0"><tr><th>Player</th><th>Games</th><th>Batting</th><th>Bowling</th><th>Fielding</th><th>Strongest · Needs work</th></tr>${rowsP.map(r=>`<tr><td><b>${esc(r.n)}</b></td><td>${r.games||"—"}</td><td>${r.bat}</td><td>${r.bow}</td><td>${r.fld}</td><td>${r.sw}</td></tr>`).join("")}</table></div><div class="muted" style="font-size:12px;margin-top:4px">Strongest and Needs work come from each player's assessments.</div>`:"";
+ /* learned */
+ let top=ts?esc(ts.name):"",auto=[];
+ if(dec)auto.push(`Won ${wins} of ${dec} match${dec===1?"":"es"}${t.stageReached?" and reached: "+t.stageReached:""}.`);
+ if(T.bfN)auto.push(`Batting first, the team won ${T.bfW} of ${T.bfN}.`);
+ if(T.chN)auto.push(`Chasing, the team won ${T.chW} of ${T.chN}.`);
+ if(ts)auto.push(`${ts.name} led the batting with ${ts.runs} runs.`);
+ if(tw)auto.push(`${tw.name} led the bowling with ${tw.w} wickets.`);
+ if(bf)auto.push(`${bf.name} was the best fielder.`);
+ if(fMiss>0)auto.push(`${fMiss} catch${fMiss===1?"":"es"} were dropped across the event.`);
+ let learned=t.learned!==undefined?t.learned:auto.join(" ");
+ let lHtml=matches.length?`<h2>What we learned</h2><div class="sumEdit noPrint"><textarea rows="5" onchange="tourLearnedSave('${t.id}',this)" style="width:100%">${esc(learned)}</textarea><div class="muted" style="font-size:12.5px;margin:4px 0">Written from your tournament data. Edit freely.${t.learned!==undefined?` <a href="#" onclick="tourLearnedReset('${t.id}');return false">Reset to auto text</a>`:""}</div></div><p class="printOnly" id="tourLearnedPrint" style="white-space:pre-wrap">${esc(learned)}</p>`:"";
+ /* dismissal + pathway */
+ let dHtml=matches.length?teamDismissalHtml(matches):"";
+ let pathHtml=campPathwayHtml(sqPl);
+ let notes=t.notes?`<h2>Notes</h2><div class="card"><p>${esc(t.notes)}</p></div>`:"";
+ let squadOnly=(!rowsP.length&&sqPl.length)?`<h2>Squad</h2><div class="card"><p>${sqPl.map(p=>esc(p.name)).join(", ")}</p></div>`:"";
  reportShell(`Tournament Report — ${esc(t.name)}`,`${(t.startDate||t.endDate)?esc(fmtDate(t.startDate)||"?")+" → "+esc(fmtDate(t.endDate)||"?")+" · ":""}${matches.length} match${matches.length!==1?"es":""}`,
- `<div class="grid g4"><div class="card stat"><span>Wins</span><b>${wins}</b></div><div class="card stat"><span>Losses</span><b>${losses}</b></div><div class="card stat"><span>Draws</span><b>${draws}</b></div><div class="card stat"><span>Matches</span><b>${matches.length}</b></div></div>
- ${vzRecordFor(matches)}
- <h2>Tournament Performance</h2>${matchPerfHtml(matches)}${vzTopScorers(matches)}
- ${(()=>{let u=(t.squadPlayerIds||[]).map(id=>db.players.find(p=>p.id===id)).filter(Boolean);return (u.length&&matches.length)?`${campPathwayHtml(u)}<h2>Player Performance</h2>${playerPerfCardsHtml(u,matches)}`:campPathwayHtml(u)})()}
- ${t.notes?`<h2>Notes</h2><div class="card"><p>${esc(t.notes)}</p></div>`:""}
- ${selectionNotesHtml(t)}
- ${(t.squadPlayerIds&&t.squadPlayerIds.length)?`<h2>Squad</h2><div class="card"><p>${t.squadPlayerIds.map(id=>db.players.find(p=>p.id===id)).filter(Boolean).map(p=>esc(p.name)).join(", ")}</p></div>`:""}
- ${(t.fixtures&&t.fixtures.length)?`<h2>Fixture Plan</h2>${t.fixtures.slice().sort((a,b)=>String(a.date||"").localeCompare(String(b.date||""))).map(f=>{
-  let played=db.matches.find(m=>m.tournamentId===tid&&m.date===f.date);
-  return `<div class="card"><b>${esc(fmtDate(f.date)||"?")} · vs ${esc(f.opponent||"Opposition")}</b><p>${played?"✓ Played · "+esc(played.result||"Result logged"):"Upcoming"}${f.venue?" · "+esc(f.venue):""}</p></div>`;
- }).join("")}`:""}
- <h2>Match Log</h2>${matches.length?`<div class="rptTW"><table class="rptT" style="min-width:0"><tr><th>Date</th><th>Opposition</th><th>Result</th><th>Score</th></tr>${matches.map(m=>`<tr><td>${esc(matchDateStr(m))}</td><td>vs ${esc(m.opp||"Opposition")}</td><td>${esc(m.result||"—")}</td><td>${matchScoreText(m)||"—"}</td></tr>`).join("")}</table></div>`:empty("No matches linked to this tournament yet.")}`);
+  `${head}${awHtml}${logHtml}${trends}${fHtml}${pHtml}${dHtml}${pathHtml}${lHtml}${notes}${selectionNotesHtml(t)}${squadOnly}`);
 }
 function seasonAnalyticsReport(){
  if(!db.seasons.length){alert("Add a season first (Teams & Seasons).");return}
