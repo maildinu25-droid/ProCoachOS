@@ -4615,12 +4615,13 @@ function addCustomFormatSkill(d,f){
 // Old assessments still have 10 stored values — this preserves them exactly as
 // originally entered rather than silently corrupting/relabeling them.
 const legacyBowlingSkills=["Run-up / Approach","Action & Alignment","Accuracy","Length Control","Consistency","Pace / Revolutions","Swing / Seam / Spin","Variations","Tactical Awareness","Execution Under Pressure"];
-let bulkAssessmentDraft={team:"",discipline:null,format:"General",ratings:{},active:"",include:{},order:[]};
+let bulkAssessmentDraft={team:"",discipline:null,format:"General",ratings:{},active:"",include:{},order:[],date:""};
 function openBulkAssessment(){
  if(!activePlayers().length){alert("Add a player first.");return}
- bulkAssessmentDraft={team:"",discipline:null,format:"General",ratings:{},active:"",include:{},order:[]};
+ bulkAssessmentDraft={team:"",discipline:null,format:"General",ratings:{},active:"",include:{},order:[],date:""};
  modal(`<div class="sheetHead"><h2>Bulk Assess Squad</h2><button class="x" onclick="closeM()">×</button></div>
  <p class="muted">Optionally narrow to one team, then pick a skill area (and format focus, if relevant) to rate in one pass. Each player's last rating for this area is pre-filled — adjust rather than start from scratch.</p>
+ <label>Assessment date<input type="date" value="${esc(bulkAssessmentDraft.date||today())}" max="${today()}" onchange="bulkAssessmentDraft.date=this.value"></label>
  <label>Team<select onchange="selectBulkTeam(this.value)"><option value="">All Players</option>${db.teams.map(t=>`<option value="${esc(t.name)}">${esc(t.name)}</option>`).join("")}</select></label>
  <div class="skillPick" style="margin-top:12px">${Object.keys(skillSets).map(d=>`<label><input type="radio" name="bulkDiscipline" value="${d}" onchange="selectBulkDiscipline('${d}')"> ${d}</label>`).join("")}</div>
  <div id="bulkFormatPick"></div>
@@ -4797,7 +4798,7 @@ function saveBulkAssessment(){
  let skills=bulkSkillsList();
  let players=bulkIncluded();
  if(!players.length){alert("Tick at least one player to assess.");return}
- let d=today();
+ let d=bulkAssessmentDraft.date||today();
  // Remember who was ticked for this team + skill area, so next time starts from the same selection.
  db.settings=db.settings||{};db.settings.bulkSel=db.settings.bulkSel||{};
  let all=bulkPlayers();db.settings.bulkSel[bulkSelKey()]={on:all.filter(p=>bulkAssessmentDraft.include[p.name]).map(p=>p.name),off:all.filter(p=>!bulkAssessmentDraft.include[p.name]).map(p=>p.name)};
